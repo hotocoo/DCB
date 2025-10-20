@@ -25,7 +25,8 @@ export const data = new SlashCommandBuilder()
     { name: '🗡️ Rogue', value: 'rogue' },
     { name: '⚔️ Paladin', value: 'paladin' }
   )))
-  .addSubcommand(sub => sub.setName('class').setDescription('View information about character classes'));
+  .addSubcommand(sub => sub.setName('class').setDescription('View information about character classes'))
+  .addSubcommand(sub => sub.setName('inventory').setDescription('View and manage your inventory'));
 
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
@@ -51,6 +52,11 @@ export async function execute(interaction) {
       );
 
     return interaction.reply({ embeds: [embed] });
+  }
+
+  if (sub === 'inventory') {
+    // Redirect to inventory command for now
+    return interaction.reply({ content: 'Use `/inventory view` to manage your inventory!', ephemeral: true });
   }
 
   const char = getCharacter(userId);
@@ -137,22 +143,48 @@ export async function execute(interaction) {
 
     if (type === 'treasure') {
       const narr = await narrate(interaction.guildId, `A chest appears on the path. Provide a short treasure description and reward (gold or item).`, `You find a small chest containing some gold.`);
-      // reward
-  const res = applyXp(userId, char, 3);
-  char = res.char;
-  saveCharacter(userId, char);
-  let outT = `${narr}\nYou gained 3 XP.`;
-    if (res.gained > 0) {
-    outT += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('Spend on HP').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('Spend on MaxHP').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${userId}`).setLabel('Spend...').setStyle(ButtonStyle.Primary),
-    );
-    return interaction.reply({ content: outT, components: [row] });
-  }
-  return interaction.reply(outT);
+
+      // reward XP and items
+      const res = applyXp(userId, char, 3);
+      char = res.char;
+
+      // 50% chance to find an item
+      let itemFound = null;
+      if (Math.random() < 0.5) {
+        const { generateRandomItem, addItemToInventory } = await import('../rpg.js');
+        const item = generateRandomItem(char.lvl);
+        const itemResult = addItemToInventory(userId, item.id, 1);
+        if (itemResult.success) {
+          itemFound = item;
+        }
+      }
+
+      // 70% chance to find gold
+      let goldFound = 0;
+      if (Math.random() < 0.7) {
+        goldFound = Math.floor(Math.random() * 10) + 5; // 5-15 gold
+        char.gold = (char.gold || 0) + goldFound;
+      }
+
+      saveCharacter(userId, char);
+
+      let outT = `${narr}\nYou gained 3 XP.`;
+      if (itemFound) outT += `\n🎉 Found: **${itemFound.name}**!`;
+      if (goldFound > 0) outT += `\n💰 Found: **${goldFound}** gold!`;
+
+      if (res.gained > 0) {
+        outT += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('❤️ HP').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('🛡️ Max HP').setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('⚔️ ATK').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`rpg_spend:def:1:${userId}`).setLabel('🛡️ DEF').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`rpg_spend:spd:1:${userId}`).setLabel('💨 SPD').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${userId}`).setLabel('💎 Spend...').setStyle(ButtonStyle.Primary),
+        );
+        return interaction.reply({ content: outT, components: [row] });
+      }
+      return interaction.reply(outT);
     }
 
     if (type === 'trap') {
@@ -174,10 +206,12 @@ export async function execute(interaction) {
     if (res.gained > 0) {
     outNpc += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('Spend on HP').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('Spend on MaxHP').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${userId}`).setLabel('Spend...').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('❤️ HP').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('🛡️ Max HP').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('⚔️ ATK').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`rpg_spend:def:1:${userId}`).setLabel('🛡️ DEF').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`rpg_spend:spd:1:${userId}`).setLabel('💨 SPD').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${userId}`).setLabel('💎 Spend...').setStyle(ButtonStyle.Primary),
     );
     return interaction.reply({ content: outNpc, components: [row] });
   }

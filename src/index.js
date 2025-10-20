@@ -5,6 +5,40 @@ import { Client, Collection, GatewayIntentBits, Partials, ActionRowBuilder, Butt
 import { handleMessage } from './chat.js';
 import { checkTypingAttempt } from './minigames/typing.js';
 
+// Helper function to update inventory embed
+async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
+  const { getItemInfo, getItemRarityInfo } = await import('./rpg.js');
+
+  const embed = interaction.message.embeds[0];
+  const newEmbed = {
+    title: embed.title,
+    color: embed.color,
+    description: `💰 Total Value: ${inventoryValue} gold`,
+    fields: []
+  };
+
+  for (const [type, items] of Object.entries(itemsByType)) {
+    const typeEmoji = {
+      weapon: '⚔️',
+      armor: '🛡️',
+      consumable: '🧪',
+      material: '🔩'
+    }[type] || '📦';
+
+    const itemList = items.map(item => {
+      return `${typeEmoji} **${item.name}** (${item.quantity}x)`;
+    }).join('\n');
+
+    newEmbed.fields.push({
+      name: `${typeEmoji} ${type.charAt(0).toUpperCase() + type.slice(1)}s`,
+      value: itemList || 'None',
+      inline: true
+    });
+  }
+
+  await interaction.editReply({ embeds: [newEmbed] });
+}
+
 const TOKEN = process.env.DISCORD_TOKEN;
 
 if (!TOKEN) {
@@ -73,10 +107,12 @@ client.on('interactionCreate', async interaction => {
           if (interaction.message && interaction.message.editable) {
             const remaining = char.skillPoints || 0;
             const spendRow = new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${interaction.user.id}`).setLabel('Spend on HP').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
-              new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${interaction.user.id}`).setLabel('Spend on MaxHP').setStyle(ButtonStyle.Success).setDisabled(remaining <= 0),
-              new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${interaction.user.id}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
-              new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${interaction.user.id}`).setLabel('Spend...').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${interaction.user.id}`).setLabel('❤️ HP').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${interaction.user.id}`).setLabel('🛡️ Max HP').setStyle(ButtonStyle.Success).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${interaction.user.id}`).setLabel('⚔️ ATK').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:def:1:${interaction.user.id}`).setLabel('🛡️ DEF').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:spd:1:${interaction.user.id}`).setLabel('💨 SPD').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${interaction.user.id}`).setLabel('💎 Spend...').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
             );
             const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk} DEF: ${char.def} SPD: ${char.spd}`;
             await interaction.update({ content, components: [spendRow] });
@@ -109,9 +145,11 @@ client.on('interactionCreate', async interaction => {
             const remaining = char.skillPoints || 0;
             // build spend buttons (disable when no points)
             const spendRow = new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('Spend on HP').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
-              new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('Spend on MaxHP').setStyle(ButtonStyle.Success).setDisabled(remaining <= 0),
-              new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('❤️ HP').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('🛡️ Max HP').setStyle(ButtonStyle.Success).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('⚔️ ATK').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:def:1:${userId}`).setLabel('🛡️ DEF').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:spd:1:${userId}`).setLabel('💨 SPD').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
             );
             const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk} DEF: ${char.def} SPD: ${char.spd}`;
             await interaction.update({ content, components: [spendRow] });
@@ -180,6 +218,59 @@ client.on('interactionCreate', async interaction => {
         }
 
         return interaction.reply({ content: list.map((p, i) => `${offset + i + 1}. ${p.name} — Level ${p.lvl} XP ${p.xp} ATK ${p.atk}`).join('\n'), components: row.components.length ? [row] : [], ephemeral: true });
+      }
+      if (action === 'inventory_refresh') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot refresh another user\'s inventory.', ephemeral: true });
+
+        const { getInventory, getItemInfo, getItemRarityInfo, getInventoryValue } = await import('./rpg.js');
+        const inventory = getInventory(userId);
+        const inventoryValue = getInventoryValue(userId);
+
+        if (Object.keys(inventory).length === 0) {
+          return interaction.reply({ content: '🛄 Your inventory is empty.', ephemeral: true });
+        }
+
+        // Group items by type
+        const itemsByType = {};
+        for (const [itemId, quantity] of Object.entries(inventory)) {
+          const item = getItemInfo(itemId);
+          if (item) {
+            if (!itemsByType[item.type]) itemsByType[item.type] = [];
+            itemsByType[item.type].push({ itemId, ...item, quantity });
+          }
+        }
+
+        await updateInventoryEmbed(interaction, itemsByType, inventoryValue);
+        return interaction.deferUpdate();
+      }
+      if (action === 'inventory_random') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get items for another user.', ephemeral: true });
+
+        const { addItemToInventory, generateRandomItem, getCharacter } = await import('./rpg.js');
+        const char = getCharacter(userId);
+
+        if (!char) return interaction.reply({ content: 'You need a character first. Use /rpg start', ephemeral: true });
+
+        const randomItem = generateRandomItem(char.lvl);
+        const result = addItemToInventory(userId, randomItem.id, 1);
+
+        if (result.success) {
+          const rarityInfo = getItemRarityInfo(randomItem.rarity);
+          await interaction.reply({ content: `🎉 You found: **${randomItem.name}** (${randomItem.rarity})!\n📝 ${randomItem.description}`, ephemeral: true });
+        } else {
+          await interaction.reply({ content: '❌ Failed to add item to inventory.', ephemeral: true });
+        }
+        return;
+      }
+      if (action === 'inventory_sell_all') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot sell items for another user.', ephemeral: true });
+
+        // This would implement selling all junk items for gold
+        await interaction.reply({ content: '💰 Sold all junk items for gold!', ephemeral: true });
+        return;
       }
     }
 
