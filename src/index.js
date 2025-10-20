@@ -176,6 +176,38 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: '✨ **Profile updated successfully!** Use `/profile view` to see your changes.', ephemeral: true });
         return;
       }
+      // handle admin warning modal submit
+      if (custom.startsWith('admin_warn_modal:')) {
+        const [, targetUser, guildId] = custom.split(':');
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+          return interaction.reply({ content: '❌ You need Administrator permissions.', ephemeral: true });
+        }
+
+        const reason = interaction.fields.getTextInputValue('warn_reason');
+
+        const { warnUser } = await import('./moderation.js');
+        const warning = warnUser(guildId, targetUser, interaction.user.id, reason, 'medium');
+
+        await interaction.reply({ content: `⚠️ **Warning issued to <@${targetUser}>**\n📋 Reason: ${reason}`, ephemeral: true });
+        return;
+      }
+      // handle admin mute modal submit
+      if (custom.startsWith('admin_mute_modal:')) {
+        const [, targetUser, guildId] = custom.split(':');
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+          return interaction.reply({ content: '❌ You need Administrator permissions.', ephemeral: true });
+        }
+
+        const reason = interaction.fields.getTextInputValue('mute_reason');
+        const durationStr = interaction.fields.getTextInputValue('mute_duration') || '60';
+        const duration = parseInt(durationStr) * 60 * 1000; // Convert minutes to milliseconds
+
+        const { muteUser } = await import('./moderation.js');
+        const mute = muteUser(guildId, targetUser, interaction.user.id, reason, duration);
+
+        await interaction.reply({ content: `🔇 **User <@${targetUser}> muted for ${durationStr} minutes**\n📋 Reason: ${reason}`, ephemeral: true });
+        return;
+      }
       // handle guess game modal submit
       if (custom.startsWith('guess_submit:')) {
         const [, gameId] = custom.split(':');
@@ -183,6 +215,66 @@ client.on('interactionCreate', async interaction => {
 
         // Handle the guess (this would need game state persistence)
         await interaction.reply({ content: `🔢 You guessed: **${guess}**\n*Game logic would process this guess here.*`, ephemeral: true });
+        return;
+      }
+      if (action === 'admin_warn') {
+        const [, targetUser, guildId] = interaction.customId.split(':');
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+          return interaction.reply({ content: '❌ You need Administrator permissions.', ephemeral: true });
+        }
+
+        // Show warning modal
+        const modal = new ModalBuilder().setCustomId(`admin_warn_modal:${targetUser}:${guildId}`).setTitle('Issue Warning');
+        const reasonInput = new TextInputBuilder().setCustomId('warn_reason').setLabel('Warning Reason').setStyle(TextInputStyle.Paragraph).setRequired(true).setPlaceholder('Please explain the warning...');
+        modal.addComponents({ type: 1, components: [reasonInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (action === 'admin_mute') {
+        const [, targetUser, guildId] = interaction.customId.split(':');
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+          return interaction.reply({ content: '❌ You need Administrator permissions.', ephemeral: true });
+        }
+
+        // Show mute modal
+        const modal = new ModalBuilder().setCustomId(`admin_mute_modal:${targetUser}:${guildId}`).setTitle('Mute User');
+        const reasonInput = new TextInputBuilder().setCustomId('mute_reason').setLabel('Mute Reason').setStyle(TextInputStyle.Paragraph).setRequired(true);
+        const durationInput = new TextInputBuilder().setCustomId('mute_duration').setLabel('Duration (minutes)').setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder('60');
+        modal.addComponents({ type: 1, components: [reasonInput] });
+        modal.addComponents({ type: 1, components: [durationInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (action === 'admin_unmute') {
+        const [, targetUser, guildId] = interaction.customId.split(':');
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+          return interaction.reply({ content: '❌ You need Administrator permissions.', ephemeral: true });
+        }
+
+        const { unmuteUser } = await import('./moderation.js');
+        const result = unmuteUser(guildId, targetUser, interaction.user.id, 'Unmuted via button');
+
+        if (result) {
+          await interaction.reply({ content: '✅ **User unmuted successfully!**', ephemeral: true });
+        } else {
+          await interaction.reply({ content: '❌ User is not currently muted.', ephemeral: true });
+        }
+        return;
+      }
+      if (action === 'admin_unban') {
+        const [, targetUser, guildId] = interaction.customId.split(':');
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+          return interaction.reply({ content: '❌ You need Administrator permissions.', ephemeral: true });
+        }
+
+        const { unbanUser } = await import('./moderation.js');
+        const result = unbanUser(guildId, targetUser, interaction.user.id, 'Unbanned via button');
+
+        if (result) {
+          await interaction.reply({ content: '✅ **User unbanned successfully!**', ephemeral: true });
+        } else {
+          await interaction.reply({ content: '❌ User is not currently banned.', ephemeral: true });
+        }
         return;
       }
       // handle wordle guess modal submit

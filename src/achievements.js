@@ -312,3 +312,5 @@ export function getUserAchievements(userId) {
 export function getAchievementLeaderboard(limit = 10) {
   return achievementManager.getLeaderboard(limit);
 }
+
+export { ACHIEVEMENT_RARITIES };

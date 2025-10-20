@@ -309,4 +309,93 @@ class MusicManager {
 
     const queue = this.getQueue(guildId);
     const userRequests = queue.filter(s => s.requestedBy === userId);
-  
+
+    if (userRequests.length >= settings.djMode.maxRequestsPerUser) {
+      return { success: false, reason: 'max_requests_reached' };
+    }
+
+    // Add the song request to the queue
+    queue.push({ ...song, requestedBy: userId });
+    return { success: true };
+  }
+}
+
+// Export the music manager instance
+export const musicManager = new MusicManager();
+
+// Convenience functions for external use
+export async function searchSongs(query, limit = 10) {
+  return musicManager.searchSongs(query, limit);
+}
+
+export function addToQueue(guildId, song) {
+  return musicManager.addToQueue(guildId, song);
+}
+
+export function getQueue(guildId) {
+  return musicManager.getQueue(guildId);
+}
+
+export async function play(guildId, voiceChannel, song) {
+  return musicManager.play(guildId, voiceChannel, song);
+}
+
+export async function pause(guildId) {
+  return musicManager.pause(guildId);
+}
+
+export async function resume(guildId) {
+  return musicManager.resume(guildId);
+}
+
+export async function skip(guildId) {
+  return musicManager.skip(guildId);
+}
+
+export async function stop(guildId) {
+  return musicManager.stop(guildId);
+}
+
+export function setVolume(guildId, volume) {
+  return musicManager.setVolume(guildId, volume);
+}
+
+export function getVolume(guildId) {
+  return musicManager.getVolume(guildId);
+}
+
+export function getMusicStats(guildId) {
+  return musicManager.getMusicStats(guildId);
+}
+
+export async function getLyrics(songTitle, artist) {
+  return musicManager.getLyrics(songTitle, artist);
+}
+
+export function getRadioStations() {
+  return musicManager.getRadioStations();
+}
+
+export function getRecommendations(guildId, basedOnRecent = true) {
+  return musicManager.getRecommendations(guildId, basedOnRecent);
+}
+
+export function createPlaylist(guildId, name, creatorId) {
+  return musicManager.createPlaylist(guildId, name, creatorId);
+}
+
+export function addToPlaylist(guildId, playlistId, song) {
+  return musicManager.addToPlaylist(guildId, playlistId, song);
+}
+
+export function getPlaylist(guildId, playlistId) {
+  return musicManager.getPlaylist(guildId, playlistId);
+}
+
+export function shuffleQueue(guildId) {
+  return musicManager.shuffleQueue(guildId);
+}
+
+export function clearQueue(guildId) {
+  return musicManager.clearQueue(guildId);
+}
