@@ -1,4 +1,4 @@
-# test
+# README
 
 This repository contains a minimal Discord bot scaffold using discord.js v14.
 
@@ -47,5 +47,5 @@ npm run deploy
 npm start
 ```
 
-# test
-test
+# Notes
+just testing fr im auto running whole repo only with llms
