@@ -3,6 +3,8 @@ import 'dotenv/config';
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const LOCAL_MODEL_URL = process.env.LOCAL_MODEL_URL; // e.g. http://host.docker.internal:8000
 const LOCAL_MODEL_API = process.env.LOCAL_MODEL_API || 'openai-compatible';
+const OPENWEBUI_BASE = process.env.OPENWEBUI_BASE; // optional base URL override
+const OPENWEBUI_PATH = process.env.OPENWEBUI_PATH || '/api/chat';
 
 async function callLocalModel(prompt) {
   // Try to be compatible with OpenAI-like local endpoints
@@ -16,6 +18,21 @@ async function callLocalModel(prompt) {
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       return data.choices?.[0]?.message?.content ?? data.result ?? null;
+    }
+
+    if (LOCAL_MODEL_API === 'openwebui') {
+      // OpenWebUI expects {prompt: '...'} at /api/chat or similar, adjust via OPENWEBUI_BASE/OPENWEBUI_PATH
+      const base = OPENWEBUI_BASE || LOCAL_MODEL_URL;
+      const url = `${base.replace(/\/$/, '')}${OPENWEBUI_PATH}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      // Try common response shapes
+      return data.response ?? data.output ?? data.result ?? null;
     }
 
     // simple generic endpoint that returns {result: 'text'}

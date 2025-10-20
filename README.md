@@ -28,6 +28,35 @@ Advanced features
 - Conversation memory: the bot keeps a short per-user conversation history (configurable via `CHAT_MAX_HISTORY`) and a rate-limiting cooldown (`CHAT_COOLDOWN_MS`). Send `!clear` to reset your conversation.
 - Docker: a `Dockerfile` is included for running the bot in a container. Build with `docker build -t my-bot .` and run with environment variables set.
 
+OpenWebUI (Windows + Docker Desktop)
+
+If you run an OpenWebUI model on Windows (via Docker Desktop), follow these steps:
+
+1. Start OpenWebUI and expose its API port (e.g., 9000). If using the published OpenWebUI image, it often uses port 9000.
+
+```bash
+docker run -d --name openwebui -p 9000:9000 your-openwebui-image
+```
+
+2. In your bot `.env`, set:
+
+```env
+LOCAL_MODEL_URL=http://host.docker.internal:9000
+LOCAL_MODEL_API=openwebui
+OPENWEBUI_PATH=/api/chat   # adjust if your OpenWebUI uses a different path
+```
+
+3. From the bot (running on host or in a container), the URL `http://host.docker.internal:9000/api/chat` will reach the OpenWebUI endpoint.
+
+4. Deploy commands and run the bot:
+
+```bash
+npm run deploy
+npm start
+```
+
+If OpenWebUI requires authentication or a different request/response shape, paste a working curl example and I will adapt the bot to match it exactly.
+
 Environment variables
 
 - `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID` — standard Discord setup.
