@@ -96,6 +96,25 @@ client.on('interactionCreate', async interaction => {
         const def = resetCharacter(interaction.user.id, parts[3] || 'warrior');
         return interaction.reply({ content: `Character reset to defaults: HP ${def.hp}/${def.maxHp} ATK ${def.atk} DEF ${def.def} SPD ${def.spd} Level ${def.lvl}`, ephemeral: true });
       }
+      // handle guild contribution modal submit
+      if (custom.startsWith('guild_contribute_modal:')) {
+        const parts = custom.split(':');
+        const guildName = parts[1];
+        const targetUser = parts[2];
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot contribute for another user.', ephemeral: true });
+
+        const amountStr = interaction.fields.getTextInputValue('contribution_amount');
+        const amount = parseInt(amountStr || '0', 10) || 0;
+
+        if (amount <= 0) return interaction.reply({ content: '❌ Contribution amount must be greater than 0.', ephemeral: true });
+
+        const { contributeToGuild } = await import('./guilds.js');
+        const result = contributeToGuild(guildName, interaction.user.id, amount);
+
+        if (!result.success) return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+
+        return interaction.reply({ content: `💰 Contributed ${amount} gold to **${guildName}**!\n⭐ Guild gained ${result.expGain} experience!`, ephemeral: true });
+      }
       // handle spend modal submit
       if (custom.startsWith('rpg_spend_submit:')) {
         const parts = custom.split(':');
@@ -276,6 +295,61 @@ client.on('interactionCreate', async interaction => {
 
         // This would implement selling all junk items for gold
         await interaction.reply({ content: '💰 Sold all junk items for gold!', ephemeral: true });
+        return;
+      }
+      if (action === 'guild_contribute') {
+        const [, guildName, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot contribute for another user.', ephemeral: true });
+
+        // Show contribution modal
+        const modal = new ModalBuilder().setCustomId(`guild_contribute_modal:${guildName}:${userId}`).setTitle('Contribute to Guild');
+        const amountInput = new TextInputBuilder().setCustomId('contribution_amount').setLabel('Gold Amount').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('100');
+        modal.addComponents({ type: 1, components: [amountInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (action === 'guild_refresh') {
+        const [, guildName, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot refresh another user\'s guild.', ephemeral: true });
+
+        // Refresh guild info (re-run the info command logic)
+        const { getUserGuild } = await import('./guilds.js');
+        const userGuild = getUserGuild(userId);
+
+        if (!userGuild) {
+          return interaction.reply({ content: '❌ You are no longer in a guild.', ephemeral: true });
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle(`🏛️ ${userGuild.name}`)
+          .setColor(0xFFD700)
+          .setDescription(userGuild.description || 'No description set.')
+          .addFields(
+            { name: '👑 Leader', value: userGuild.members[userGuild.leader]?.name || 'Unknown', inline: true },
+            { name: '🏆 Level', value: userGuild.level, inline: true },
+            { name: '👥 Members', value: `${Object.keys(userGuild.members).length}/${userGuild.maxMembers}`, inline: true },
+            { name: '💰 Guild Gold', value: userGuild.gold, inline: true },
+            { name: '⭐ Experience', value: userGuild.experience, inline: true }
+          );
+
+        const memberList = Object.entries(userGuild.members)
+          .map(([id, member]) => `${member.role === 'leader' ? '👑' : '👤'} ${member.name} (Level ${member.level})`)
+          .join('\n');
+
+        embed.addFields({
+          name: '👥 Members',
+          value: memberList,
+          inline: false
+        });
+
+        await interaction.update({ embeds: [embed] });
+        return;
+      }
+      if (action === 'party_invite') {
+        const [, partyId, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot generate invites for another user.', ephemeral: true });
+
+        await interaction.reply({ content: `🔗 **Party Invite:**\n\`${partyId}\`\nShare this ID with friends so they can join with \`/guild party action:join party_id:${partyId}\``, ephemeral: true });
         return;
       }
       if (action === 'hangman') {
