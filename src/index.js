@@ -9,6 +9,22 @@ import { getLocations } from './locations.js';
 import { getActiveAuctions } from './trading.js';
 import { isOnCooldown, setCooldown, getFormattedCooldown } from './cooldowns.js';
 
+// Helper function for Wordle guess modal
+async function sendWordleGuessModal(interaction, gameId) {
+  const modal = new ModalBuilder().setCustomId(`wordle_submit:${gameId}`).setTitle('Wordle Guess');
+  const guessInput = new TextInputBuilder()
+    .setCustomId('word_guess')
+    .setLabel('Enter a 5-letter word')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder('HOUSE')
+    .setMinLength(5)
+    .setMaxLength(5);
+
+  modal.addComponents({ type: 1, components: [guessInput] });
+  await interaction.showModal(modal);
+}
+
 // Helper function to update inventory embed
 async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
   const { getItemInfo, getItemRarityInfo } = await import('./rpg.js');
@@ -138,6 +154,55 @@ client.on('interactionCreate', async interaction => {
         if (!result.success) return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
 
         return interaction.reply({ content: `💰 Contributed ${amount} gold to **${guildName}**!\n⭐ Guild gained ${result.expGain} experience!`, ephemeral: true });
+      }
+      // handle profile edit modal submit
+      if (custom.startsWith('profile_edit_modal:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot edit another user\'s profile.', ephemeral: true });
+
+        const displayName = interaction.fields.getTextInputValue('display_name');
+        const bio = interaction.fields.getTextInputValue('bio');
+        const title = interaction.fields.getTextInputValue('title');
+
+        const { updateProfile } = await import('./profiles.js');
+        const updates = {};
+
+        if (displayName) updates.displayName = displayName;
+        if (bio) updates.bio = bio;
+        if (title) updates.title = title;
+
+        const result = updateProfile(interaction.user.id, updates);
+
+        await interaction.reply({ content: '✨ **Profile updated successfully!** Use `/profile view` to see your changes.', ephemeral: true });
+        return;
+      }
+      // handle guess game modal submit
+      if (custom.startsWith('guess_submit:')) {
+        const [, gameId] = custom.split(':');
+        const guess = interaction.fields.getTextInputValue('guess_number');
+
+        // Handle the guess (this would need game state persistence)
+        await interaction.reply({ content: `🔢 You guessed: **${guess}**\n*Game logic would process this guess here.*`, ephemeral: true });
+        return;
+      }
+      // handle wordle guess modal submit
+      if (custom.startsWith('wordle_submit:')) {
+        const [, gameId] = custom.split(':');
+        const wordGuess = interaction.fields.getTextInputValue('word_guess');
+
+        if (!/^[a-zA-Z]{5}$/.test(wordGuess)) {
+          return interaction.reply({ content: '❌ Please enter a valid 5-letter word!', ephemeral: true });
+        }
+
+        // Process the Wordle guess (this would need game state persistence)
+        await interaction.reply({ content: `🔤 Wordle guess: **${wordGuess.toUpperCase()}**\n*Game logic would check this word and show results!*`, ephemeral: true });
+        return;
+      }
+      if (action === 'wordle_guess') {
+        const [, gameId] = interaction.customId.split(':');
+        // Show wordle guess modal
+        await sendWordleGuessModal(interaction, gameId);
+        return;
       }
       // handle spend modal submit
       if (custom.startsWith('rpg_spend_submit:')) {
@@ -513,6 +578,38 @@ client.on('interactionCreate', async interaction => {
 
         // Handle rest encounter - restore HP/MP
         await interaction.reply({ content: '🛌 **You take a well-deserved rest.**\n❤️ HP fully restored!\n✨ You feel refreshed and ready for more adventure!', ephemeral: true });
+        return;
+      }
+      if (action.startsWith('ttt_')) {
+        const [, position, gameId] = interaction.customId.split('_');
+        const pos = parseInt(position);
+
+        if (isNaN(pos) || pos < 0 || pos > 8) return;
+
+        // Find the game state (in a real implementation, you'd store this per channel)
+        // For now, handle the move and update the board
+        await interaction.reply({ content: `⭕ **Tic-Tac-Toe Move!**\nYou played position ${pos + 1}!`, ephemeral: true });
+
+        // Update game state and refresh board
+        // This would need persistent game state management
+        return;
+      }
+      if (action === 'guess_modal') {
+        const [, gameId, min, max] = interaction.customId.split(':');
+        // Show guess input modal (this would be handled by the guess command)
+        return;
+      }
+      if (action.startsWith('c4_')) {
+        const [, column, gameId] = interaction.customId.split('_');
+        const col = parseInt(column);
+
+        if (isNaN(col) || col < 0 || col > 6) return;
+
+        // Find the game state and make the move
+        await interaction.reply({ content: `🎯 **Connect Four Move!**\nYou dropped a piece in column ${col + 1}!`, ephemeral: true });
+
+        // Update game state and refresh board
+        // This would need persistent game state management
         return;
       }
       if (action === 'hangman') {
