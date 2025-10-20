@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { getGuild } from './storage.js';
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const LOCAL_MODEL_URL = process.env.LOCAL_MODEL_URL; // e.g. http://host.docker.internal:8000
@@ -6,11 +7,11 @@ const LOCAL_MODEL_API = process.env.LOCAL_MODEL_API || 'openai-compatible';
 const OPENWEBUI_BASE = process.env.OPENWEBUI_BASE; // optional base URL override
 const OPENWEBUI_PATH = process.env.OPENWEBUI_PATH || '/api/chat';
 
-async function callLocalModel(prompt) {
+async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_API) {
   // Try to be compatible with OpenAI-like local endpoints
   try {
-    if (LOCAL_MODEL_API === 'openai-compatible') {
-      const res = await fetch(`${LOCAL_MODEL_URL.replace(/\/$/, '')}/v1/chat/completions`, {
+    if (api === 'openai-compatible') {
+      const res = await fetch(`${url.replace(/\/$/, '')}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: 'gpt-oss-20b', messages: [{ role: 'user', content: prompt }], max_tokens: 512 }),
@@ -19,12 +20,11 @@ async function callLocalModel(prompt) {
       const data = await res.json();
       return data.choices?.[0]?.message?.content ?? data.result ?? null;
     }
-
-    if (LOCAL_MODEL_API === 'openwebui') {
+    if (api === 'openwebui') {
       // OpenWebUI expects {prompt: '...'} at /api/chat or similar, adjust via OPENWEBUI_BASE/OPENWEBUI_PATH
-      const base = OPENWEBUI_BASE || LOCAL_MODEL_URL;
-      const url = `${base.replace(/\/$/, '')}${OPENWEBUI_PATH}`;
-      const res = await fetch(url, {
+      const base = OPENWEBUI_BASE || url;
+      const fulld = `${base.replace(/\/$/, '')}${OPENWEBUI_PATH}`;
+      const res = await fetch(fulld, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
@@ -105,6 +105,14 @@ export async function handleMessage(message) {
   if (now - last < COOLDOWN_MS) return null;
   cooldownMap.set(message.author.id, now);
 
+  // Determine per-guild overrides
+  const guildCfg = message.guildId ? getGuild(message.guildId) : null;
+  const useLocalUrl = guildCfg?.modelUrl || LOCAL_MODEL_URL;
+  const useLocalApi = guildCfg?.modelApi || LOCAL_MODEL_API;
+  const chatEnabled = guildCfg?.chatEnabled ?? true;
+
+  if (message.guildId && !chatEnabled) return null;
+
   // Build conversation history if available
   const history = conversationMap.get(message.author.id) || [];
   history.push({ role: 'user', content: prompt });
@@ -113,10 +121,10 @@ export async function handleMessage(message) {
   if (history.length > MAX_HISTORY) history.splice(0, history.length - MAX_HISTORY);
 
   // Prefer local model if provided
-  if (LOCAL_MODEL_URL) {
+  if (useLocalUrl) {
     try {
       const inPrompt = history.map(h => `${h.role}: ${h.content}`).join('\n');
-      const out = await callLocalModel(inPrompt || 'Hello');
+      const out = await callLocalModel(inPrompt || 'Hello', useLocalUrl, useLocalApi);
       // store assistant response in history
       if (out) history.push({ role: 'assistant', content: out });
       conversationMap.set(message.author.id, history);
@@ -128,9 +136,9 @@ export async function handleMessage(message) {
 
   if (OPENAI_KEY) {
     try {
-      const messages = history.map(h => ({ role: h.role, content: h.content }));
-      messages.push({ role: 'user', content: prompt || 'Hello' });
-      const reply = await respondWithOpenAI(messages.map(m => m.content).join('\n') || 'Hello');
+    const messages = history.map(h => ({ role: h.role, content: h.content }));
+    messages.push({ role: 'user', content: prompt || 'Hello' });
+    const reply = await respondWithOpenAI(messages.map(m => m.content).join('\n') || 'Hello');
       if (reply) history.push({ role: 'assistant', content: reply });
       conversationMap.set(message.author.id, history);
       return reply ?? "I couldn't generate a response.";
