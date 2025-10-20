@@ -6,6 +6,7 @@ import { handleMessage } from './chat.js';
 import { checkTypingAttempt } from './minigames/typing.js';
 import { logger, logCommandExecution, logError } from './logger.js';
 import { getLocations } from './locations.js';
+import { getActiveAuctions } from './trading.js';
 
 // Helper function to update inventory embed
 async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
@@ -432,6 +433,48 @@ client.on('interactionCreate', async interaction => {
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot leave for another user.', ephemeral: true });
 
         await interaction.update({ content: '🏃 **You retreat safely from the location.**\n*You can return later to continue your adventure!*', components: [] });
+        return;
+      }
+      if (action === 'trade_create_auction') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot create auctions for another user.', ephemeral: true });
+
+        // Show auction creation modal
+        const modal = new ModalBuilder().setCustomId(`trade_auction_modal:${userId}`).setTitle('Create Auction');
+        const itemInput = new TextInputBuilder().setCustomId('auction_item').setLabel('Item to Auction').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('rusty_sword');
+        const priceInput = new TextInputBuilder().setCustomId('auction_price').setLabel('Starting Price (gold)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('100');
+        modal.addComponents({ type: 1, components: [itemInput] });
+        modal.addComponents({ type: 1, components: [priceInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (action === 'trade_view_auctions') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot view auctions for another user.', ephemeral: true });
+
+        const auctions = getActiveAuctions(10);
+
+        if (auctions.length === 0) {
+          return interaction.reply({ content: '🏛️ No active auctions. Be the first to create one!', ephemeral: true });
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle('🏛️ Active Auctions')
+          .setColor(0xFFD700);
+
+        auctions.forEach((auction, index) => {
+          const timeLeft = Math.max(0, auction.ends - Date.now());
+          const hoursLeft = Math.floor(timeLeft / (60 * 60 * 1000));
+          const minutesLeft = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+
+          embed.addFields({
+            name: `Auction #${index + 1} - ${auction.itemId}`,
+            value: `💰 Current: ${auction.currentBid} gold\n⏰ Time left: ${hoursLeft}h ${minutesLeft}m\n🏷️ Buyout: ${auction.buyoutPrice} gold`,
+            inline: true
+          });
+        });
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
       }
       if (action === 'explore_investigate') {
