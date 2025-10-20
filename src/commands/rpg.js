@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType } from '../rpg.js';
+import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp } from '../rpg.js';
 
 export const data = new SlashCommandBuilder()
   .setName('rpg')
@@ -9,6 +9,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('explore').setDescription('Explore and encounter random events'))
   .addSubcommand(sub => sub.setName('quest').setDescription('Quest actions (create/list/complete)').addStringOption(opt => opt.setName('action').setDescription('create|list|complete').setRequired(true)).addStringOption(opt => opt.setName('title').setDescription('Quest title')).addStringOption(opt => opt.setName('id').setDescription('Quest id to complete')).addStringOption(opt => opt.setName('desc').setDescription('Quest description')))
   .addSubcommand(sub => sub.setName('boss').setDescription('Face a boss (dangerous)'))
+  .addSubcommand(sub => sub.setName('levelup').setDescription('Spend skill points to increase stats').addStringOption(opt => opt.setName('stat').setDescription('hp|maxhp|atk').setRequired(true)).addIntegerOption(opt => opt.setName('amount').setDescription('How many points to spend').setRequired(true)))
   .addSubcommand(sub => sub.setName('stats').setDescription('Show your character stats'));
 
 export async function execute(interaction) {
@@ -26,7 +27,7 @@ export async function execute(interaction) {
   if (!char) return interaction.reply({ content: 'You have no character. Run /rpg start', ephemeral: true });
 
   if (sub === 'stats') {
-    return interaction.reply(`Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk}`);
+    return interaction.reply(`Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${char.skillPoints || 0}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk}`);
   }
 
   if (sub === 'fight') {
@@ -42,8 +43,7 @@ export async function execute(interaction) {
     }
 
     if (char.hp > 0 && monster.hp <= 0) {
-      char.xp += monster.lvl * 5;
-      char.lvl = Math.floor(1 + char.xp / 20);
+      applyXp(userId, char, monster.lvl * 5);
       char.hp = Math.min(char.maxHp, char.hp + 2);
       saveCharacter(userId, char);
       log.push(`You defeated ${monster.name}! Gained ${monster.lvl * 5} XP.`);
@@ -73,7 +73,7 @@ export async function execute(interaction) {
         saveCharacter(userId, char);
         out += '\nYou were defeated and recover to half HP.';
       } else {
-        char.xp += monster.lvl * 5;
+        applyXp(userId, char, monster.lvl * 5);
         saveCharacter(userId, char);
         out += `\nYou survived and gained ${monster.lvl * 5} XP.`;
       }
@@ -83,7 +83,7 @@ export async function execute(interaction) {
     if (type === 'treasure') {
       const narr = await narrate(interaction.guildId, `A chest appears on the path. Provide a short treasure description and reward (gold or item).`, `You find a small chest containing some gold.`);
       // reward
-      char.xp += 3;
+      applyXp(userId, char, 3);
       saveCharacter(userId, char);
       return interaction.reply(`${narr}\nYou gained 3 XP.`);
     }
@@ -100,7 +100,7 @@ export async function execute(interaction) {
     if (type === 'npc') {
       const narr = await narrate(interaction.guildId, `A wandering NPC meets the player. Provide a short friendly or quirky NPC interaction.`, `You meet a stranger.`);
       // small xp
-      char.xp += 2;
+      applyXp(userId, char, 2);
       saveCharacter(userId, char);
       return interaction.reply(`${narr}\nThey taught you something. +2 XP.`);
     }
@@ -118,8 +118,32 @@ export async function execute(interaction) {
       out += `\n${boss.name} hits you for ${mdmg} damage.`;
     }
     if (char.hp <= 0) { char.hp = Math.max(1, Math.floor(char.maxHp / 2)); saveCharacter(userId, char); out += '\nYou were defeated but live to fight another day.'; }
-    else { char.xp += boss.lvl * 20; char.lvl = Math.floor(1 + char.xp / 20); saveCharacter(userId, char); out += `\nYou survived and earned ${boss.lvl * 20} XP!`; }
+    else { applyXp(userId, char, boss.lvl * 20); saveCharacter(userId, char); out += `\nYou survived and earned ${boss.lvl * 20} XP!`; }
     return interaction.reply(out);
+  }
+
+  if (sub === 'levelup') {
+    const stat = interaction.options.getString('stat');
+    const amount = interaction.options.getInteger('amount');
+    const pts = char.skillPoints || 0;
+    if (amount <= 0) return interaction.reply({ content: 'Amount must be > 0', ephemeral: true });
+    if (amount > pts) return interaction.reply({ content: `You only have ${pts} skill points.`, ephemeral: true });
+
+    // apply points
+    if (stat === 'hp') {
+      char.hp += amount * 2; // each point heals current HP by 2
+    } else if (stat === 'maxhp') {
+      char.maxHp += amount * 5; // each point increases maxHp
+      char.hp = Math.min(char.hp + amount * 2, char.maxHp);
+    } else if (stat === 'atk') {
+      char.atk += amount;
+    } else {
+      return interaction.reply({ content: 'Unknown stat. Use hp|maxhp|atk', ephemeral: true });
+    }
+
+    char.skillPoints = pts - amount;
+    saveCharacter(userId, char);
+    return interaction.reply({ content: `Leveled up: +${amount} ${stat}. Remaining points: ${char.skillPoints}`, ephemeral: true });
   }
 
   if (sub === 'quest') {

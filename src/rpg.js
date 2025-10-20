@@ -28,9 +28,29 @@ function writeAll(obj) {
 export function createCharacter(userId, name) {
   const all = readAll();
   if (all[userId]) return null;
-  const char = { name: name || `Player${userId.slice(0,4)}`, hp: 20, maxHp: 20, atk: 5, lvl: 1, xp: 0 };
+  const char = { name: name || `Player${userId.slice(0,4)}`, hp: 20, maxHp: 20, atk: 5, lvl: 1, xp: 0, skillPoints: 0 };
   all[userId] = char;
   writeAll(all);
+  return char;
+}
+
+export function levelFromXp(xp) {
+  // simple formula: 20 XP per level, starting at level 1
+  return Math.floor(1 + (xp || 0) / 20);
+}
+
+// apply xp to character in-memory and grant skill points for levels gained
+export function applyXp(userId, char, amount = 0) {
+  const oldLvl = char.lvl || levelFromXp(char.xp || 0);
+  char.xp = (char.xp || 0) + (amount || 0);
+  const newLvl = levelFromXp(char.xp);
+  if (newLvl > oldLvl) {
+    const gained = newLvl - oldLvl;
+    char.skillPoints = (char.skillPoints || 0) + gained;
+    char.lvl = newLvl;
+  } else {
+    char.lvl = newLvl;
+  }
   return char;
 }
 
