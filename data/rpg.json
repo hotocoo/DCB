@@ -3,10 +3,10 @@
     "name": "Tester",
     "hp": 20,
     "maxHp": 20,
-    "atk": 12,
-    "lvl": 9,
-    "xp": 175,
-    "skillPoints": 1
+    "atk": 13,
+    "lvl": 11,
+    "xp": 200,
+    "skillPoints": 2
   },
   "333133024520568833": {
     "name": "watchandnotlearn",

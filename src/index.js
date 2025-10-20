@@ -19,6 +19,9 @@ const client = new Client({
 });
 client.commands = new Collection();
 
+// simple cooldown map to prevent modal spam: userId -> timestamp of last spend modal
+const spendCooldowns = new Map();
+
 // Load command modules
 const commandsPath = path.join(process.cwd(), 'src', 'commands');
 if (fs.existsSync(commandsPath)) {
@@ -52,6 +55,37 @@ client.on('interactionCreate', async interaction => {
         const { resetCharacter } = await import('./rpg.js');
         const def = resetCharacter(interaction.user.id);
         return interaction.reply({ content: `Character reset to defaults: HP ${def.hp} ATK ${def.atk} Level ${def.lvl}`, ephemeral: true });
+      }
+      // handle spend modal submit
+      if (custom.startsWith('rpg_spend_submit:')) {
+        const parts = custom.split(':');
+        const targetUser = parts[1] || interaction.user.id;
+        if (targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot spend for another user.', ephemeral: true });
+        const stat = interaction.fields.getTextInputValue('stat_choice');
+        const amountStr = interaction.fields.getTextInputValue('amount_choice');
+        const amount = parseInt(amountStr || '0', 10) || 0;
+        const { spendSkillPoints, getCharacter } = await import('./rpg.js');
+        const res = spendSkillPoints(interaction.user.id, stat, amount);
+        if (!res.success) return interaction.reply({ content: `Spend failed: ${res.reason}`, ephemeral: true });
+        const char = res.char;
+        // try to update the original message if possible
+        try {
+          if (interaction.message && interaction.message.editable) {
+            const remaining = char.skillPoints || 0;
+            const spendRow = new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${interaction.user.id}`).setLabel('Spend on HP').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${interaction.user.id}`).setLabel('Spend on MaxHP').setStyle(ButtonStyle.Success).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${interaction.user.id}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${interaction.user.id}`).setLabel('Spend...').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
+            );
+            const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk}`;
+            await interaction.update({ content, components: [spendRow] });
+            return;
+          }
+        } catch (err) {
+          console.error('Failed to update message after modal spend', err);
+        }
+        return interaction.reply({ content: `Spent ${amount} on ${stat}. New points: ${char.skillPoints}`, ephemeral: true });
       }
     }
     if (interaction.isButton()) {
@@ -89,6 +123,24 @@ client.on('interactionCreate', async interaction => {
         }
 
         return interaction.reply({ content: `Spent ${amount} point(s) on ${stat}. New stats: HP ${char.hp}/${char.maxHp} ATK ${char.atk}. Remaining points: ${char.skillPoints}`, ephemeral: true });
+      }
+      if (action === 'rpg_spend_modal') {
+        const [, , targetUser] = interaction.customId.split(':');
+        const userNow = interaction.user.id;
+        if (targetUser && targetUser !== userNow) return interaction.reply({ content: 'You cannot open a spend modal for another user.', ephemeral: true });
+        // enforce short cooldown (2s) to reduce spam
+        const last = spendCooldowns.get(userNow) || 0;
+        const now = Date.now();
+        if (now - last < 2000) return interaction.reply({ content: 'Please wait a moment before opening another spend modal.', ephemeral: true });
+        spendCooldowns.set(userNow, now);
+        // show a modal allowing stat and amount selection
+        const modal = new ModalBuilder().setCustomId(`rpg_spend_submit:${userNow}`).setTitle('Spend Skill Points');
+        const statInput = new TextInputBuilder().setCustomId('stat_choice').setLabel('Stat (hp|maxhp|atk)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('atk');
+        const amountInput = new TextInputBuilder().setCustomId('amount_choice').setLabel('Amount').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1');
+        modal.addComponents({ type: 1, components: [statInput] });
+        modal.addComponents({ type: 1, components: [amountInput] });
+        await interaction.showModal(modal);
+        return;
       }
       if (action === 'rpg_reset') {
         const [ , , targetUser ] = interaction.customId.split(':');

@@ -100,12 +100,13 @@ export async function execute(interaction) {
   char = res.char;
   saveCharacter(userId, char);
   let outT = `${narr}\nYou gained 3 XP.`;
-  if (res.gained > 0) {
+    if (res.gained > 0) {
     outT += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('Spend on HP').setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('Spend on MaxHP').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${userId}`).setLabel('Spend...').setStyle(ButtonStyle.Primary),
     );
     return interaction.reply({ content: outT, components: [row] });
   }
@@ -128,12 +129,13 @@ export async function execute(interaction) {
   char = res.char;
   saveCharacter(userId, char);
   let outNpc = `${narr}\nThey taught you something. +2 XP.`;
-  if (res.gained > 0) {
+    if (res.gained > 0) {
     outNpc += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('Spend on HP').setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('Spend on MaxHP').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${userId}`).setLabel('Spend...').setStyle(ButtonStyle.Primary),
     );
     return interaction.reply({ content: outNpc, components: [row] });
   }
