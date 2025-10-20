@@ -1,3 +1,6 @@
+#TODO
+remind me to clean up the whole mess since its the agent doing every thing possible
+
 # README
 
 This repository contains a minimal Discord bot scaffold using discord.js v14.
