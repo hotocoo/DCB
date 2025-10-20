@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } from 'discord.js';
 import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, resetCharacter, getCharacterClasses, getClassInfo } from '../rpg.js';
+import { updateUserStats } from '../achievements.js';
 
 export const data = new SlashCommandBuilder()
   .setName('rpg')
@@ -37,6 +38,18 @@ export async function execute(interaction) {
     const charClass = interaction.options.getString('class') || 'warrior';
     const char = createCharacter(userId, name, charClass);
     if (!char) return interaction.reply({ content: 'You already have a character.', ephemeral: true });
+
+    // Track achievements
+    const achievementResult = updateUserStats(userId, {
+      characters_created: 1,
+      features_tried: 1
+    });
+
+    // Check if user earned "Born to Adventure" achievement
+    if (achievementResult.newAchievements.length > 0) {
+      const newAchievement = achievementResult.newAchievements[0];
+      await interaction.reply({ content: `🎉 **Achievement Unlocked!** ${newAchievement.icon} ${newAchievement.name}\n${newAchievement.description}\n💎 +${newAchievement.points} points!` });
+    }
 
     const embed = new EmbedBuilder()
       .setTitle('🎮 Character Created!')
@@ -99,12 +112,18 @@ export async function execute(interaction) {
     }
 
     if (char.hp > 0 && monster.hp <= 0) {
-  const res = applyXp(userId, char, monster.lvl * 5);
-  char = res.char;
-  char.hp = Math.min(char.maxHp, char.hp + 2);
-  saveCharacter(userId, char);
-  log.push(`You defeated ${monster.name}! Gained ${monster.lvl * 5} XP.`);
-  if (res.gained > 0) log.push(`Level up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`);
+      const res = applyXp(userId, char, monster.lvl * 5);
+      char = res.char;
+      char.hp = Math.min(char.maxHp, char.hp + 2);
+      saveCharacter(userId, char);
+
+      // Track boss defeat achievements
+      if (monster.name.includes('Dragon') || monster.name.includes('Boss')) {
+        updateUserStats(userId, { bosses_defeated: 1 });
+      }
+
+      log.push(`You defeated ${monster.name}! Gained ${monster.lvl * 5} XP.`);
+      if (res.gained > 0) log.push(`Level up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`);
     } else if (char.hp <= 0) {
       char.hp = Math.max(1, Math.floor(char.maxHp / 2));
       saveCharacter(userId, char);
@@ -156,6 +175,8 @@ export async function execute(interaction) {
         const itemResult = addItemToInventory(userId, item.id, 1);
         if (itemResult.success) {
           itemFound = item;
+          // Track item discovery achievement
+          updateUserStats(userId, { items_found: 1 });
         }
       }
 
@@ -230,8 +251,21 @@ export async function execute(interaction) {
       const mdmg = fightTurn(boss, char);
       out += `\n${boss.name} hits you for ${mdmg} damage.`;
     }
-    if (char.hp <= 0) { char.hp = Math.max(1, Math.floor(char.maxHp / 2)); saveCharacter(userId, char); out += '\nYou were defeated but live to fight another day.'; }
-    else { const res = applyXp(userId, char, boss.lvl * 20); char = res.char; saveCharacter(userId, char); out += `\nYou survived and earned ${boss.lvl * 20} XP!`; if (res.gained > 0) out += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`; }
+    if (char.hp <= 0) {
+      char.hp = Math.max(1, Math.floor(char.maxHp / 2));
+      saveCharacter(userId, char);
+      out += '\nYou were defeated but live to fight another day.';
+    } else {
+      const res = applyXp(userId, char, boss.lvl * 20);
+      char = res.char;
+      saveCharacter(userId, char);
+
+      // Track boss defeat
+      updateUserStats(userId, { bosses_defeated: 1 });
+
+      out += `\nYou survived and earned ${boss.lvl * 20} XP!`;
+      if (res.gained > 0) out += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
+    }
     return interaction.reply(out);
   }
 

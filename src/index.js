@@ -4,6 +4,7 @@ import path from 'path';
 import { Client, Collection, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { handleMessage } from './chat.js';
 import { checkTypingAttempt } from './minigames/typing.js';
+import { logger, logCommandExecution, logError } from './logger.js';
 
 // Helper function to update inventory embed
 async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
@@ -68,11 +69,16 @@ if (fs.existsSync(commandsPath)) {
 }
 
 client.once('ready', () => {
-  console.log(`Logged in as ${client.user.tag}`);
+  logger.success(`Bot started successfully as ${client.user.tag}`, {
+    guilds: client.guilds.cache.size,
+    users: client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0)
+  });
 });
 
 client.on('interactionCreate', async interaction => {
   try {
+    // Log command execution
+    logCommandExecution(interaction, true);
     // handle modal submit for confirmations
     if (interaction.isModalSubmit && interaction.isModalSubmit()) {
       const custom = interaction.customId || '';
@@ -272,6 +278,18 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: '💰 Sold all junk items for gold!', ephemeral: true });
         return;
       }
+      if (action === 'hangman') {
+        const [, letter] = interaction.customId.split('_');
+        if (!letter || letter.length !== 1) return;
+
+        // Find the game state (in a real implementation, you'd store this per user/channel)
+        // For now, we'll handle this in the command file itself
+
+        // Update the game state and refresh the board
+        await interaction.reply({ content: `You guessed: **${letter}**`, ephemeral: true });
+        // The actual game logic would need to be implemented with persistent state
+        return;
+      }
     }
 
     if (!interaction.isChatInputCommand()) return;
@@ -281,11 +299,27 @@ client.on('interactionCreate', async interaction => {
 
     await command.execute(interaction);
   } catch (err) {
-    console.error(err);
+    // Log the error with full context
+    logError('Command execution failed', err, {
+      command: interaction.commandName,
+      user: `${interaction.user.username}#${interaction.user.discriminator}`,
+      userId: interaction.user.id,
+      guild: interaction.guild?.name || 'DM',
+      channel: interaction.channel?.name || 'Unknown'
+    });
+
+    // Log command failure
+    logCommandExecution(interaction, false, err);
+
+    // Provide user-friendly error response
+    const errorMessage = process.env.NODE_ENV === 'development'
+      ? `❌ **Error:** ${err.message}`
+      : '❌ There was an error while executing this command! Please try again.';
+
     if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+      await interaction.followUp({ content: errorMessage, ephemeral: true });
     } else {
-      await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+      await interaction.reply({ content: errorMessage, ephemeral: true });
     }
   }
 });
@@ -303,7 +337,13 @@ client.on('messageCreate', async message => {
     const reply = await handleMessage(message);
     if (reply) await message.reply({ content: reply });
   } catch (err) {
-    console.error('Error handling message', err);
+    logError('Message handling failed', err, {
+      user: `${message.author.username}#${message.author.discriminator}`,
+      userId: message.author.id,
+      guild: message.guild?.name || 'DM',
+      channel: message.channel?.name || 'Unknown',
+      messageLength: message.content.length
+    });
   }
 });
 

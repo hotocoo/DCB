@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
+import { updateUserStats } from '../achievements.js';
 
 const triviaQuestions = [
   {
@@ -231,6 +232,13 @@ async function sendResults(interaction, gameState) {
   else if (percentage >= 70) resultMessage = '🥇 Great job! You know your stuff!';
   else if (percentage >= 50) resultMessage = '🥈 Not bad! Keep practicing!';
   else resultMessage = '📚 Keep learning and try again!';
+
+  // Track trivia achievements
+  const correctAnswers = gameState.answers.filter(a => a.isCorrect).length;
+  updateUserStats(interaction.user.id, {
+    trivia_correct: correctAnswers,
+    features_tried: 1
+  });
 
   const embed = new EmbedBuilder()
     .setTitle('🎯 Trivia Quiz Complete!')
