@@ -7,7 +7,7 @@ export const data = new SlashCommandBuilder()
   .setName('minigame')
   .setDescription('Play a quick minigame')
   .addSubcommand(sub => sub.setName('guess').setDescription('Start or guess the number').addIntegerOption(opt => opt.setName('number').setDescription('Your guess').setRequired(false)))
-  .addSubcommand(sub => sub.setName('type').setDescription('Start a typing challenge'));
+  .addSubcommand(sub => sub.setName('type').setDescription('Start a typing challenge').addStringOption(opt => opt.setName('novel').setDescription('Novel ID to source sentence from')));
 
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
@@ -29,10 +29,26 @@ export async function execute(interaction) {
   }
 
   if (sub === 'type') {
-    const { sentence, endAt } = startTypingGame(user, 6);
-    // store active typing session separately
-    sessions.set(user, { type: 'typing', sentence, endAt });
-    return interaction.reply({ content: `Type this exactly within 6 seconds: \n\`${sentence}\``, ephemeral: false });
+    const novelId = interaction.options.getString('novel');
+    let sentence;
+    if (novelId) {
+      // try to load latest chapter from novel
+      try {
+        const { getNovel } = await import('../novel.js');
+        const novel = getNovel(novelId);
+        if (novel && novel.chapters && novel.chapters.length) {
+          // pick a random sentence from latest chapter
+          const text = novel.chapters[novel.chapters.length - 1].text;
+          const sentences = text.split(/[\.\!\?]\s+/).filter(Boolean);
+          sentence = sentences[Math.floor(Math.random() * sentences.length)].trim();
+        }
+      } catch (err) {
+        console.error('Failed to load novel for typing', err);
+      }
+    }
+    const { sentence: sent } = startTypingGame(user, 6, sentence);
+    sessions.set(user, { type: 'typing', sentence: sent, endAt: Date.now() + 6000 });
+    return interaction.reply({ content: `Type this exactly within 6 seconds: \n\`${sent}\``, ephemeral: false });
   }
 }
 

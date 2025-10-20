@@ -1,10 +1,15 @@
 const sessions = new Map();
 
-export function startTypingGame(userId, durationSec = 5) {
-  const sentence = ['quick brown fox', 'lorem ipsum dolor', 'hello world', 'discord bot game', 'type this fast'][Math.floor(Math.random() * 5)];
+export function startTypingGame(userId, durationSec = 5, sentence = null) {
+  const sentencePool = ['quick brown fox', 'lorem ipsum dolor', 'hello world', 'discord bot game', 'type this fast'];
+  const chosen = sentence || sentencePool[Math.floor(Math.random() * sentencePool.length)];
   const endAt = Date.now() + durationSec * 1000;
-  sessions.set(userId, { sentence, endAt });
-  return { sentence, endAt };
+  sessions.set(userId, { sentence: chosen, endAt });
+  return { sentence: chosen, endAt };
+}
+
+export function startTypingGameWithSentence(userId, sentence, durationSec = 6) {
+  return startTypingGame(userId, durationSec, sentence);
 }
 
 export function checkTypingAttempt(userId, text) {
