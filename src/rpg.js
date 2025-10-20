@@ -13,7 +13,19 @@ function readAll() {
   ensureDir();
   if (!fs.existsSync(FILE)) return {};
   try {
-    return JSON.parse(fs.readFileSync(FILE, 'utf8')) || {};
+    const raw = JSON.parse(fs.readFileSync(FILE, 'utf8')) || {};
+    // migrate / ensure defaults for older characters
+    for (const k of Object.keys(raw)) {
+      const c = raw[k] || {};
+      if (typeof c.xp === 'undefined') c.xp = 0;
+      if (typeof c.lvl === 'undefined') c.lvl = levelFromXp(c.xp);
+      if (typeof c.skillPoints === 'undefined') c.skillPoints = 0;
+      if (typeof c.hp === 'undefined') c.hp = 20;
+      if (typeof c.maxHp === 'undefined') c.maxHp = 20;
+      if (typeof c.atk === 'undefined') c.atk = 5;
+      raw[k] = c;
+    }
+    return raw;
   } catch (err) {
     console.error('Failed to read rpg storage', err);
     return {};
@@ -44,14 +56,15 @@ export function applyXp(userId, char, amount = 0) {
   const oldLvl = char.lvl || levelFromXp(char.xp || 0);
   char.xp = (char.xp || 0) + (amount || 0);
   const newLvl = levelFromXp(char.xp);
+  let gained = 0;
   if (newLvl > oldLvl) {
-    const gained = newLvl - oldLvl;
+    gained = newLvl - oldLvl;
     char.skillPoints = (char.skillPoints || 0) + gained;
     char.lvl = newLvl;
   } else {
     char.lvl = newLvl;
   }
-  return char;
+  return { char, oldLvl, newLvl, gained };
 }
 
 export function getCharacter(userId) {

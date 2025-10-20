@@ -43,10 +43,12 @@ export async function execute(interaction) {
     }
 
     if (char.hp > 0 && monster.hp <= 0) {
-      applyXp(userId, char, monster.lvl * 5);
-      char.hp = Math.min(char.maxHp, char.hp + 2);
-      saveCharacter(userId, char);
-      log.push(`You defeated ${monster.name}! Gained ${monster.lvl * 5} XP.`);
+  const res = applyXp(userId, char, monster.lvl * 5);
+  char = res.char;
+  char.hp = Math.min(char.maxHp, char.hp + 2);
+  saveCharacter(userId, char);
+  log.push(`You defeated ${monster.name}! Gained ${monster.lvl * 5} XP.`);
+  if (res.gained > 0) log.push(`Level up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`);
     } else if (char.hp <= 0) {
       char.hp = Math.max(1, Math.floor(char.maxHp / 2));
       saveCharacter(userId, char);
@@ -73,9 +75,11 @@ export async function execute(interaction) {
         saveCharacter(userId, char);
         out += '\nYou were defeated and recover to half HP.';
       } else {
-        applyXp(userId, char, monster.lvl * 5);
-        saveCharacter(userId, char);
-        out += `\nYou survived and gained ${monster.lvl * 5} XP.`;
+  const res = applyXp(userId, char, monster.lvl * 5);
+  char = res.char;
+  saveCharacter(userId, char);
+  out += `\nYou survived and gained ${monster.lvl * 5} XP.`;
+  if (res.gained > 0) out += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
       }
       return interaction.reply(out);
     }
@@ -83,9 +87,12 @@ export async function execute(interaction) {
     if (type === 'treasure') {
       const narr = await narrate(interaction.guildId, `A chest appears on the path. Provide a short treasure description and reward (gold or item).`, `You find a small chest containing some gold.`);
       // reward
-      applyXp(userId, char, 3);
-      saveCharacter(userId, char);
-      return interaction.reply(`${narr}\nYou gained 3 XP.`);
+  const res = applyXp(userId, char, 3);
+  char = res.char;
+  saveCharacter(userId, char);
+  let outT = `${narr}\nYou gained 3 XP.`;
+  if (res.gained > 0) outT += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
+  return interaction.reply(outT);
     }
 
     if (type === 'trap') {
@@ -100,9 +107,12 @@ export async function execute(interaction) {
     if (type === 'npc') {
       const narr = await narrate(interaction.guildId, `A wandering NPC meets the player. Provide a short friendly or quirky NPC interaction.`, `You meet a stranger.`);
       // small xp
-      applyXp(userId, char, 2);
-      saveCharacter(userId, char);
-      return interaction.reply(`${narr}\nThey taught you something. +2 XP.`);
+  const res = applyXp(userId, char, 2);
+  char = res.char;
+  saveCharacter(userId, char);
+  let outNpc = `${narr}\nThey taught you something. +2 XP.`;
+  if (res.gained > 0) outNpc += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
+  return interaction.reply(outNpc);
     }
   }
 
@@ -118,7 +128,7 @@ export async function execute(interaction) {
       out += `\n${boss.name} hits you for ${mdmg} damage.`;
     }
     if (char.hp <= 0) { char.hp = Math.max(1, Math.floor(char.maxHp / 2)); saveCharacter(userId, char); out += '\nYou were defeated but live to fight another day.'; }
-    else { applyXp(userId, char, boss.lvl * 20); saveCharacter(userId, char); out += `\nYou survived and earned ${boss.lvl * 20} XP!`; }
+    else { const res = applyXp(userId, char, boss.lvl * 20); char = res.char; saveCharacter(userId, char); out += `\nYou survived and earned ${boss.lvl * 20} XP!`; if (res.gained > 0) out += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`; }
     return interaction.reply(out);
   }
 
