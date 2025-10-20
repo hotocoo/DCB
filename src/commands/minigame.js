@@ -1,18 +1,20 @@
 import { SlashCommandBuilder } from 'discord.js';
+import { startTypingGame, checkTypingAttempt } from '../minigames/typing.js';
 
 const sessions = new Map();
 
 export const data = new SlashCommandBuilder()
   .setName('minigame')
   .setDescription('Play a quick minigame')
-  .addSubcommand(sub => sub.setName('guess').setDescription('Start or guess the number').addIntegerOption(opt => opt.setName('number').setDescription('Your guess').setRequired(false)));
+  .addSubcommand(sub => sub.setName('guess').setDescription('Start or guess the number').addIntegerOption(opt => opt.setName('number').setDescription('Your guess').setRequired(false)))
+  .addSubcommand(sub => sub.setName('type').setDescription('Start a typing challenge'));
 
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
   const user = interaction.user.id;
   if (sub === 'guess') {
     const guess = interaction.options.getInteger('number');
-    if (!sessions.has(user)) {
+    if (!sessions.has(user) || typeof sessions.get(user) === 'object') {
       sessions.set(user, Math.floor(Math.random() * 100) + 1);
       return interaction.reply({ content: 'I have picked a number between 1 and 100. Try /minigame guess <number> to guess!', ephemeral: true });
     }
@@ -25,4 +27,12 @@ export async function execute(interaction) {
     const hint = guess < target ? 'higher' : 'lower';
     return interaction.reply({ content: `Nope — try ${hint}.`, ephemeral: true });
   }
+
+  if (sub === 'type') {
+    const { sentence, endAt } = startTypingGame(user, 6);
+    // store active typing session separately
+    sessions.set(user, { type: 'typing', sentence, endAt });
+    return interaction.reply({ content: `Type this exactly within 6 seconds: \n\`${sentence}\``, ephemeral: false });
+  }
 }
+

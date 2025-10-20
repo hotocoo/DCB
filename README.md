@@ -78,3 +78,18 @@ npm start
 
 # Notes
 just testing fr im auto running whole repo only with llms
+
+RPG & Minigames
+
+- Minigames:
+	- `/minigame guess` — number guess game (start and guess).
+	- `/minigame type` — typing challenge: the bot posts a short sentence; type it exactly in the same channel within the time limit to win.
+
+- RPG features:
+	- `/rpg start` — create your character.
+	- `/rpg fight` — fight a monster directly.
+	- `/rpg explore` — explore and trigger random events (monster, treasure, trap, NPC) with optional model-driven narration.
+	- `/rpg boss` — face a boss for big rewards.
+	- `/rpg quest action:create|list|complete` — manage side quests.
+
+Enjoy! If you want more minigames (trivia, memory, hangman) I can add them next.

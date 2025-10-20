@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
 import { handleMessage } from './chat.js';
+import { checkTypingAttempt } from './minigames/typing.js';
 
 const TOKEN = process.env.DISCORD_TOKEN;
 
@@ -53,6 +54,14 @@ client.on('interactionCreate', async interaction => {
 
 client.on('messageCreate', async message => {
   try {
+    // First, check typing minigame attempts
+    const attempt = checkTypingAttempt(message.author.id, message.content);
+    if (attempt) {
+      if (attempt.ok) await message.reply({ content: `Nice! You typed it correctly: ${attempt.expected}` });
+      else if (attempt.reason === 'timeout') await message.reply({ content: 'Too slow! The typing challenge expired.' });
+      return;
+    }
+
     const reply = await handleMessage(message);
     if (reply) await message.reply({ content: reply });
   } catch (err) {
