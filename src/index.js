@@ -7,6 +7,7 @@ import { checkTypingAttempt } from './minigames/typing.js';
 import { logger, logCommandExecution, logError } from './logger.js';
 import { getLocations } from './locations.js';
 import { getActiveAuctions } from './trading.js';
+import { isOnCooldown, setCooldown, getFormattedCooldown } from './cooldowns.js';
 
 // Helper function to update inventory embed
 async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
@@ -79,6 +80,27 @@ client.once('ready', () => {
 
 client.on('interactionCreate', async interaction => {
   try {
+    // Check global command cooldown
+    const globalCooldown = isOnCooldown(interaction.user.id, 'command_global');
+    if (globalCooldown.onCooldown) {
+      return interaction.reply({
+        content: `⏰ **Cooldown Active!** Please wait ${getFormattedCooldown(globalCooldown.remaining)} before using another command.`,
+        ephemeral: true
+      });
+    }
+
+    // Set global cooldown
+    setCooldown(interaction.user.id, 'command_global');
+
+    // Check command-specific cooldown
+    const commandCooldown = isOnCooldown(interaction.user.id, interaction.commandName);
+    if (commandCooldown.onCooldown) {
+      return interaction.reply({
+        content: `⏰ **${interaction.commandName} is on cooldown!** Please wait ${getFormattedCooldown(commandCooldown.remaining)}.`,
+        ephemeral: true
+      });
+    }
+
     // Log command execution
     logCommandExecution(interaction, true);
     // handle modal submit for confirmations
@@ -513,6 +535,9 @@ client.on('interactionCreate', async interaction => {
     if (!command) return;
 
     await command.execute(interaction);
+
+    // Set command-specific cooldown after successful execution
+    setCooldown(interaction.user.id, interaction.commandName);
   } catch (err) {
     // Log the error with full context
     logError('Command execution failed', err, {
@@ -541,6 +566,15 @@ client.on('interactionCreate', async interaction => {
 
 client.on('messageCreate', async message => {
   try {
+    // Check global message cooldown
+    const messageCooldown = isOnCooldown(message.author.id, 'message_global');
+    if (messageCooldown.onCooldown) {
+      return; // Silently ignore messages during cooldown
+    }
+
+    // Set message cooldown
+    setCooldown(message.author.id, 'message_global');
+
     // First, check typing minigame attempts
     const attempt = checkTypingAttempt(message.author.id, message.content);
     if (attempt) {
