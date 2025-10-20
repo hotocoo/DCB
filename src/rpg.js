@@ -71,3 +71,44 @@ export function randomEventType() {
   return types[Math.floor(Math.random() * types.length)];
 }
 
+export function bossEncounter(lvl = 5) {
+  return { name: `Dragon L${lvl}`, hp: 50 + lvl * 20, atk: 8 + lvl * 2, lvl };
+}
+
+// simple quest storage inside RPG file
+function readQuests() {
+  const p = path.join(process.cwd(), 'data', 'quests.json');
+  if (!fs.existsSync(p)) return {};
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')) || {}; } catch { return {}; }
+}
+
+function writeQuests(q) {
+  const p = path.join(process.cwd(), 'data', 'quests.json');
+  if (!fs.existsSync(path.dirname(p))) fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(q, null, 2), 'utf8');
+}
+
+export function createQuest(userId, title, desc) {
+  const all = readQuests();
+  all[userId] = all[userId] || [];
+  const q = { id: Date.now(), title, desc, status: 'open' };
+  all[userId].push(q);
+  writeQuests(all);
+  return q;
+}
+
+export function listQuests(userId) {
+  const all = readQuests();
+  return all[userId] || [];
+}
+
+export function completeQuest(userId, questId) {
+  const all = readQuests();
+  const arr = all[userId] || [];
+  const q = arr.find(x => x.id === Number(questId));
+  if (!q) return null;
+  q.status = 'completed';
+  writeQuests(all);
+  return q;
+}
+

@@ -7,6 +7,8 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('start').setDescription('Create your character').addStringOption(opt => opt.setName('name').setDescription('Character name')))
   .addSubcommand(sub => sub.setName('fight').setDescription('Fight a monster'))
   .addSubcommand(sub => sub.setName('explore').setDescription('Explore and encounter random events'))
+  .addSubcommand(sub => sub.setName('quest').setDescription('Quest actions (create/list/complete)').addStringOption(opt => opt.setName('action').setDescription('create|list|complete').setRequired(true)).addStringOption(opt => opt.setName('title').setDescription('Quest title')).addStringOption(opt => opt.setName('id').setDescription('Quest id to complete')).addStringOption(opt => opt.setName('desc').setDescription('Quest description')))
+  .addSubcommand(sub => sub.setName('boss').setDescription('Face a boss (dangerous)'))
   .addSubcommand(sub => sub.setName('stats').setDescription('Show your character stats'));
 
 export async function execute(interaction) {
@@ -102,5 +104,43 @@ export async function execute(interaction) {
       saveCharacter(userId, char);
       return interaction.reply(`${narr}\nThey taught you something. +2 XP.`);
     }
+  }
+
+  if (sub === 'boss') {
+    const boss = bossEncounter(Math.max(3, char.lvl + 2));
+    const narr = await narrate(interaction.guildId, `A dire boss ${boss.name} appears. Give a short epic intro.`, `A fearsome boss appears!`);
+    let out = `${narr}`;
+    // exchange
+    const dmg = fightTurn(char, boss);
+    out += `\nYou strike the ${boss.name} for ${dmg} damage.`;
+    if (boss.hp > 0) {
+      const mdmg = fightTurn(boss, char);
+      out += `\n${boss.name} hits you for ${mdmg} damage.`;
+    }
+    if (char.hp <= 0) { char.hp = Math.max(1, Math.floor(char.maxHp / 2)); saveCharacter(userId, char); out += '\nYou were defeated but live to fight another day.'; }
+    else { char.xp += boss.lvl * 20; char.lvl = Math.floor(1 + char.xp / 20); saveCharacter(userId, char); out += `\nYou survived and earned ${boss.lvl * 20} XP!`; }
+    return interaction.reply(out);
+  }
+
+  if (sub === 'quest') {
+    const action = interaction.options.getString('action');
+    if (action === 'create') {
+      const title = interaction.options.getString('title') || 'A simple quest';
+      const desc = interaction.options.getString('desc') || 'Do something heroic.';
+      const q = createQuest(userId, title, desc);
+      return interaction.reply({ content: `Quest created: ${q.title} (id=${q.id})`, ephemeral: true });
+    }
+    if (action === 'list') {
+      const qs = listQuests(userId);
+      if (!qs.length) return interaction.reply({ content: 'No quests.', ephemeral: true });
+      return interaction.reply(qs.map(q => `${q.id} - ${q.title} [${q.status}]`).join('\n'));
+    }
+    if (action === 'complete') {
+      const id = interaction.options.getString('id');
+      const q = completeQuest(userId, id);
+      if (!q) return interaction.reply({ content: 'Quest not found.', ephemeral: true });
+      return interaction.reply({ content: `Quest completed: ${q.title}`, ephemeral: true });
+    }
+    return interaction.reply({ content: 'Unknown quest action. Use create|list|complete', ephemeral: true });
   }
 }
