@@ -110,6 +110,7 @@ export async function handleMessage(message) {
   const useLocalUrl = guildCfg?.modelUrl || LOCAL_MODEL_URL;
   const useLocalApi = guildCfg?.modelApi || LOCAL_MODEL_API;
   const chatEnabled = guildCfg?.chatEnabled ?? true;
+  const playEnabled = guildCfg?.playEnabled ?? true;
 
   if (message.guildId && !chatEnabled) return null;
 
@@ -121,6 +122,12 @@ export async function handleMessage(message) {
   if (history.length > MAX_HISTORY) history.splice(0, history.length - MAX_HISTORY);
 
   // Prefer local model if provided
+  // Playful triggers handled before handing off to models (if enabled)
+  if (playEnabled) {
+    const playReply = handlePlayfulPrompt(prompt, message);
+    if (playReply) return playReply;
+  }
+
   if (useLocalUrl) {
     try {
       const inPrompt = history.map(h => `${h.role}: ${h.content}`).join('\n');
@@ -150,4 +157,73 @@ export async function handleMessage(message) {
 
   // Fallback: simple echo + hint
   return `You said: ${prompt || message.content}`;
+}
+
+// Playful helpers: parse commands in free text and respond directly
+function handlePlayfulPrompt(text, message) {
+  const lower = text.toLowerCase();
+
+  // 8ball: starts with 8ball or 'magic 8' or contains '?'
+  if (lower.startsWith('8ball') || lower.startsWith('8-ball') || /\b8 ball\b/.test(lower)) {
+    return eightBallReply();
+  }
+
+  // rps: 'rps <choice>' or 'rock/paper/scissors' direct
+  const rpsMatch = lower.match(/\brps\s+(rock|paper|scissors)\b/) || lower.match(/\b(rock|paper|scissors)\b/);
+  if (rpsMatch) {
+    const userChoice = rpsMatch[1];
+    return playRPS(userChoice);
+  }
+
+  // roll: 'roll 2d6' or '2d6' or 'roll d20'
+  const rollMatch = lower.match(/(\d+)?d(\d+)/);
+  if (rollMatch) {
+    const n = Number(rollMatch[1] || 1);
+    const sides = Number(rollMatch[2]);
+    return rollDice(n, sides, message.user?.username || message.author.username);
+  }
+
+  // joke request
+  if (/(tell me a joke|joke|make me laugh)/.test(lower)) {
+    return randomJoke();
+  }
+
+  // prompt to play
+  if (/\b(play|game|let's play|wanna play)\b/.test(lower)) {
+    return `Wanna play? Try /rps <rock|paper|scissors>, /roll 2d6, or /8ball <question> — or DM me directly and say "roll 1d20" or "rps rock".`;
+  }
+
+  return null;
+}
+
+function eightBallReply() {
+  const answers = [
+    'It is certain.', 'Without a doubt.', 'You may rely on it.', 'Ask again later.',
+    'Better not tell you now.', 'My reply is no.', 'Very doubtful.'
+  ];
+  return answers[Math.floor(Math.random() * answers.length)];
+}
+
+function playRPS(userChoice) {
+  const choices = ['rock', 'paper', 'scissors'];
+  const bot = choices[Math.floor(Math.random() * 3)];
+  let result = 'tie';
+  if ((userChoice === 'rock' && bot === 'scissors') || (userChoice === 'paper' && bot === 'rock') || (userChoice === 'scissors' && bot === 'paper')) result = 'you win';
+  else if (userChoice !== bot) result = 'you lose';
+  return `You chose ${userChoice}, I chose ${bot} — ${result}`;
+}
+
+function rollDice(n, sides, username) {
+  const rolls = Array.from({ length: Math.min(100, n) }, () => 1 + Math.floor(Math.random() * sides));
+  const sum = rolls.reduce((a, b) => a + b, 0);
+  return `${username} rolled ${n}d${sides}: [${rolls.join(', ')}] = ${sum}`;
+}
+
+function randomJoke() {
+  const jokes = [
+    "I told my computer I needed a break, and it said: 'No problem — I'll go to sleep.'",
+    'Why do programmers prefer dark mode? Because light attracts bugs!',
+    "Why did the developer go broke? Because he used up all his cache."
+  ];
+  return jokes[Math.floor(Math.random() * jokes.length)];
 }
