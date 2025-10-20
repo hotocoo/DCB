@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } from 'discord.js';
 import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, resetCharacter, getCharacterClasses, getClassInfo } from '../rpg.js';
 import { updateUserStats } from '../achievements.js';
+import { exploreLocation } from '../locations.js';
 
 export const data = new SlashCommandBuilder()
   .setName('rpg')
@@ -134,110 +135,37 @@ export async function execute(interaction) {
   }
 
   if (sub === 'explore') {
-    const type = randomEventType();
-    if (type === 'monster') {
-      const monster = encounterMonster(char.lvl);
-      const narr = await narrate(interaction.guildId, `A level ${char.lvl} adventurer encounters a ${monster.name}. Provide a short battle intro.`, `You encounter ${monster.name}!`);
-      // do a quick exchange
-      const dmg = fightTurn(char, monster);
-      let out = `${narr}\nYou strike the ${monster.name} for ${dmg} damage.`;
-      if (monster.hp > 0) {
-        const mdmg = fightTurn(monster, char);
-        out += `\n${monster.name} hits back for ${mdmg} dmg.`;
-      }
-      if (char.hp <= 0) {
-        char.hp = Math.max(1, Math.floor(char.maxHp / 2));
-        saveCharacter(userId, char);
-        out += '\nYou were defeated and recover to half HP.';
-      } else {
-  const res = applyXp(userId, char, monster.lvl * 5);
-  char = res.char;
-  saveCharacter(userId, char);
-  out += `\nYou survived and gained ${monster.lvl * 5} XP.`;
-  if (res.gained > 0) out += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
-      }
-      // if leveled, no buttons here (monster flow already used log), respond normally
-      return interaction.reply(out);
+    // Use new location-based exploration system
+    const result = exploreLocation(userId, 'whispering_woods'); // Default to starting location
+
+    if (!result.success) {
+      return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
     }
 
-    if (type === 'treasure') {
-      const narr = await narrate(interaction.guildId, `A chest appears on the path. Provide a short treasure description and reward (gold or item).`, `You find a small chest containing some gold.`);
+    const { location, encounter, narrative } = result;
 
-      // reward XP and items
-      const res = applyXp(userId, char, 3);
-      char = res.char;
-
-      // 50% chance to find an item
-      let itemFound = null;
-      if (Math.random() < 0.5) {
-        const { generateRandomItem, addItemToInventory } = await import('../rpg.js');
-        const item = generateRandomItem(char.lvl);
-        const itemResult = addItemToInventory(userId, item.id, 1);
-        if (itemResult.success) {
-          itemFound = item;
-          // Track item discovery achievement
-          updateUserStats(userId, { items_found: 1 });
-        }
-      }
-
-      // 70% chance to find gold
-      let goldFound = 0;
-      if (Math.random() < 0.7) {
-        goldFound = Math.floor(Math.random() * 10) + 5; // 5-15 gold
-        char.gold = (char.gold || 0) + goldFound;
-      }
-
-      saveCharacter(userId, char);
-
-      let outT = `${narr}\nYou gained 3 XP.`;
-      if (itemFound) outT += `\n🎉 Found: **${itemFound.name}**!`;
-      if (goldFound > 0) outT += `\n💰 Found: **${goldFound}** gold!`;
-
-      if (res.gained > 0) {
-        outT += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('❤️ HP').setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('🛡️ Max HP').setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('⚔️ ATK').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId(`rpg_spend:def:1:${userId}`).setLabel('🛡️ DEF').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId(`rpg_spend:spd:1:${userId}`).setLabel('💨 SPD').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${userId}`).setLabel('💎 Spend...').setStyle(ButtonStyle.Primary),
-        );
-        return interaction.reply({ content: outT, components: [row] });
-      }
-      return interaction.reply(outT);
-    }
-
-    if (type === 'trap') {
-      const narr = await narrate(interaction.guildId, `Describe a sudden trap that injures the player (short).`, `A trap springs!`);
-      const dmg = Math.max(1, Math.floor(Math.random() * 6) + 1);
-      char.hp -= dmg;
-      if (char.hp <= 0) char.hp = Math.max(1, Math.floor(char.maxHp / 2));
-      saveCharacter(userId, char);
-      return interaction.reply(`${narr}\nYou took ${dmg} damage.`);
-    }
-
-    if (type === 'npc') {
-      const narr = await narrate(interaction.guildId, `A wandering NPC meets the player. Provide a short friendly or quirky NPC interaction.`, `You meet a stranger.`);
-      // small xp
-  const res = applyXp(userId, char, 2);
-  char = res.char;
-  saveCharacter(userId, char);
-  let outNpc = `${narr}\nThey taught you something. +2 XP.`;
-    if (res.gained > 0) {
-    outNpc += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('❤️ HP').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('🛡️ Max HP').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('⚔️ ATK').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`rpg_spend:def:1:${userId}`).setLabel('🛡️ DEF').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`rpg_spend:spd:1:${userId}`).setLabel('💨 SPD').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${userId}`).setLabel('💎 Spend...').setStyle(ButtonStyle.Primary),
+    const locationNarrative = await narrate(
+      interaction.guildId,
+      `${location.ai_prompt} An adventurer explores this mystical place.`,
+      `You explore ${location.name}. ${narrative.entry}`
     );
-    return interaction.reply({ content: outNpc, components: [row] });
-  }
-  return interaction.reply(outNpc);
-    }
+
+    const embed = new EmbedBuilder()
+      .setTitle(`${location.emoji} Exploring ${location.name}`)
+      .setColor(location.color)
+      .setDescription(locationNarrative)
+      .addFields(
+        { name: '🎯 Discovery', value: encounter.type.replace('_', ' ').toUpperCase(), inline: true },
+        { name: '💎 Potential Rewards', value: `${encounter.rewards.xp} XP, ${encounter.rewards.gold} gold`, inline: true }
+      );
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`explore_investigate:${location.id}:${userId}`).setLabel('🔍 Investigate').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`explore_search:${location.id}:${userId}`).setLabel('⚔️ Search for Danger').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`explore_rest:${location.id}:${userId}`).setLabel('🛌 Take a Break').setStyle(ButtonStyle.Secondary)
+    );
+
+    return interaction.reply({ embeds: [embed], components: [row] });
   }
 
   if (sub === 'boss') {

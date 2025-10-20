@@ -5,6 +5,7 @@ import { Client, Collection, GatewayIntentBits, Partials, ActionRowBuilder, Butt
 import { handleMessage } from './chat.js';
 import { checkTypingAttempt } from './minigames/typing.js';
 import { logger, logCommandExecution, logError } from './logger.js';
+import { getLocations } from './locations.js';
 
 // Helper function to update inventory embed
 async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
@@ -350,6 +351,103 @@ client.on('interactionCreate', async interaction => {
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot generate invites for another user.', ephemeral: true });
 
         await interaction.reply({ content: `🔗 **Party Invite:**\n\`${partyId}\`\nShare this ID with friends so they can join with \`/guild party action:join party_id:${partyId}\``, ephemeral: true });
+        return;
+      }
+      if (action === 'explore_unlock') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot unlock locations for another user.', ephemeral: true });
+
+        const locations = getLocations();
+        const lockedLocations = Object.values(locations).filter(loc => !loc.unlocked);
+
+        if (lockedLocations.length === 0) {
+          return interaction.reply({ content: '🎉 All locations are already unlocked! You are a true explorer!', ephemeral: true });
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle('🔓 Locked Locations')
+          .setColor(0xFFA500)
+          .setDescription('These locations await your discovery!');
+
+        lockedLocations.forEach(location => {
+          embed.addFields({
+            name: `${location.emoji} ${location.name} (Level ${location.level})`,
+            value: location.description,
+            inline: false
+          });
+        });
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+      }
+      if (action === 'explore_continue') {
+        const [, locationName, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot continue adventures for another user.', ephemeral: true });
+
+        // Generate next encounter in the location
+        const result = exploreLocation(userId, locationName);
+
+        if (!result.success) {
+          return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+        }
+
+        const { location, encounter, narrative } = result;
+
+        const embed = new EmbedBuilder()
+          .setTitle(`${location.emoji} Continuing ${location.name}`)
+          .setColor(location.color)
+          .setDescription(narrative.encounter)
+          .addFields(
+            { name: '🎯 Challenge', value: encounter.type.replace('_', ' ').toUpperCase(), inline: true },
+            { name: '💎 Rewards', value: `${encounter.rewards.xp} XP, ${encounter.rewards.gold} gold`, inline: true }
+          );
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`explore_engage:${locationName}:${userId}`).setLabel('⚔️ Engage').setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`explore_search:${locationName}:${userId}`).setLabel('🔍 Search Area').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`explore_leave:${locationName}:${userId}`).setLabel('🏃 Retreat').setStyle(ButtonStyle.Secondary)
+        );
+
+        await interaction.update({ embeds: [embed], components: [row] });
+        return;
+      }
+      if (action === 'explore_engage') {
+        const [, locationName, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot engage in combat for another user.', ephemeral: true });
+
+        // Handle combat encounter
+        await interaction.reply({ content: '⚔️ **Combat Encounter!**\n*Combat mechanics would be implemented here with turn-based button interactions.*', ephemeral: true });
+        return;
+      }
+      if (action === 'explore_search') {
+        const [, locationName, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot search for another user.', ephemeral: true });
+
+        // Handle search/puzzle encounter
+        await interaction.reply({ content: '🔍 **Discovery!**\n*Search mechanics would reveal hidden treasures or trigger puzzles.*', ephemeral: true });
+        return;
+      }
+      if (action === 'explore_leave') {
+        const [, locationName, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot leave for another user.', ephemeral: true });
+
+        await interaction.update({ content: '🏃 **You retreat safely from the location.**\n*You can return later to continue your adventure!*', components: [] });
+        return;
+      }
+      if (action === 'explore_investigate') {
+        const [, locationName, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot investigate for another user.', ephemeral: true });
+
+        // Handle investigation encounter
+        await interaction.reply({ content: '🔍 **Investigation reveals:**\n*You discover hidden secrets and gain bonus experience!*', ephemeral: true });
+        return;
+      }
+      if (action === 'explore_rest') {
+        const [, locationName, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot rest for another user.', ephemeral: true });
+
+        // Handle rest encounter - restore HP/MP
+        await interaction.reply({ content: '🛌 **You take a well-deserved rest.**\n❤️ HP fully restored!\n✨ You feel refreshed and ready for more adventure!', ephemeral: true });
         return;
       }
       if (action === 'hangman') {
