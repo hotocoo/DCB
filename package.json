@@ -1,0 +1,19 @@
+{
+  "name": "test-discord-bot",
+  "version": "0.1.0",
+  "description": "Minimal Discord bot scaffold",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "deploy": "node src/deploy-commands.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.0",
+    "dotenv": "^16.0.0"
+  }
+}
