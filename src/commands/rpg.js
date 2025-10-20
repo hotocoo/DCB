@@ -1,5 +1,5 @@
-import { SlashCommandBuilder } from 'discord.js';
-import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp } from '../rpg.js';
+import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, resetCharacter } from '../rpg.js';
 
 export const data = new SlashCommandBuilder()
   .setName('rpg')
@@ -10,7 +10,9 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('quest').setDescription('Quest actions (create/list/complete)').addStringOption(opt => opt.setName('action').setDescription('create|list|complete').setRequired(true)).addStringOption(opt => opt.setName('title').setDescription('Quest title')).addStringOption(opt => opt.setName('id').setDescription('Quest id to complete')).addStringOption(opt => opt.setName('desc').setDescription('Quest description')))
   .addSubcommand(sub => sub.setName('boss').setDescription('Face a boss (dangerous)'))
   .addSubcommand(sub => sub.setName('levelup').setDescription('Spend skill points to increase stats').addStringOption(opt => opt.setName('stat').setDescription('hp|maxhp|atk').setRequired(true)).addIntegerOption(opt => opt.setName('amount').setDescription('How many points to spend').setRequired(true)))
-  .addSubcommand(sub => sub.setName('stats').setDescription('Show your character stats'));
+  .addSubcommand(sub => sub.setName('stats').setDescription('Show your character stats'))
+  .addSubcommand(sub => sub.setName('leaderboard').setDescription('Show top players'))
+  .addSubcommand(sub => sub.setName('reset').setDescription('Reset your character to defaults'));
 
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
@@ -27,7 +29,13 @@ export async function execute(interaction) {
   if (!char) return interaction.reply({ content: 'You have no character. Run /rpg start', ephemeral: true });
 
   if (sub === 'stats') {
-    return interaction.reply(`Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${char.skillPoints || 0}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk}`);
+    // include buttons for quick actions
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`rpg_leaderboard:0:${userId}`).setLabel('Leaderboard').setStyle(ButtonStyle.Primary),
+      // open a confirmation modal instead of immediate reset
+      new ButtonBuilder().setCustomId(`rpg_reset_modal:0:${userId}`).setLabel('Reset Character').setStyle(ButtonStyle.Danger),
+    );
+    return interaction.reply({ content: `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${char.skillPoints || 0}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk}`, components: [row] });
   }
 
   if (sub === 'fight') {
@@ -81,6 +89,7 @@ export async function execute(interaction) {
   out += `\nYou survived and gained ${monster.lvl * 5} XP.`;
   if (res.gained > 0) out += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
       }
+      // if leveled, no buttons here (monster flow already used log), respond normally
       return interaction.reply(out);
     }
 
@@ -91,7 +100,15 @@ export async function execute(interaction) {
   char = res.char;
   saveCharacter(userId, char);
   let outT = `${narr}\nYou gained 3 XP.`;
-  if (res.gained > 0) outT += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
+  if (res.gained > 0) {
+    outT += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('Spend on HP').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('Spend on MaxHP').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary),
+    );
+    return interaction.reply({ content: outT, components: [row] });
+  }
   return interaction.reply(outT);
     }
 
@@ -111,7 +128,15 @@ export async function execute(interaction) {
   char = res.char;
   saveCharacter(userId, char);
   let outNpc = `${narr}\nThey taught you something. +2 XP.`;
-  if (res.gained > 0) outNpc += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
+  if (res.gained > 0) {
+    outNpc += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('Spend on HP').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('Spend on MaxHP').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary),
+    );
+    return interaction.reply({ content: outNpc, components: [row] });
+  }
   return interaction.reply(outNpc);
     }
   }
@@ -154,6 +179,30 @@ export async function execute(interaction) {
     char.skillPoints = pts - amount;
     saveCharacter(userId, char);
     return interaction.reply({ content: `Leveled up: +${amount} ${stat}. Remaining points: ${char.skillPoints}`, ephemeral: true });
+  }
+
+  if (sub === 'leaderboard') {
+    const limit = 10;
+    const offset = 0;
+    const list = getLeaderboard(limit, offset);
+    const total = getLeaderboardCount();
+    if (!list.length) return interaction.reply({ content: 'No players yet.', ephemeral: true });
+    const page = Math.floor(offset / limit) + 1;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const row = new ActionRowBuilder();
+    if (offset > 0) row.addComponents(new ButtonBuilder().setCustomId(`rpg_leaderboard:${Math.max(0, offset - limit)}:${userId}`).setLabel('Prev').setStyle(ButtonStyle.Secondary));
+    if (offset + limit < total) row.addComponents(new ButtonBuilder().setCustomId(`rpg_leaderboard:${offset + limit}:${userId}`).setLabel('Next').setStyle(ButtonStyle.Primary));
+    return interaction.reply({ content: `Leaderboard — Page ${page}/${totalPages}\n` + list.map((p, i) => `${offset + i + 1}. ${p.name} — Level ${p.lvl} XP ${p.xp} ATK ${p.atk}`).join('\n'), components: row.components.length ? [row] : [] });
+  }
+
+  if (sub === 'reset') {
+    // show a confirmation modal before resetting
+    const modal = new ModalBuilder().setCustomId(`rpg_reset_confirm:cmd:${userId}`).setTitle('Confirm Reset');
+    const input = new TextInputBuilder().setCustomId('confirm_text').setLabel('Type RESET to confirm').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('RESET');
+    // modal requires ActionRow-like placement via components
+    modal.addComponents({ type: 1, components: [input] });
+    await interaction.showModal(modal);
+    return;
   }
 
   if (sub === 'quest') {

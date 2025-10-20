@@ -4,6 +4,11 @@ import { generate } from './model-client.js';
 
 const FILE = path.join(process.cwd(), 'data', 'rpg.json');
 
+// in-memory cache to reduce fs reads/writes
+let cache = null;
+// simple per-user locks to avoid concurrent writes
+const locks = new Set();
+
 function ensureDir() {
   const dir = path.dirname(FILE);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -25,6 +30,7 @@ function readAll() {
       if (typeof c.atk === 'undefined') c.atk = 5;
       raw[k] = c;
     }
+    cache = raw;
     return raw;
   } catch (err) {
     console.error('Failed to read rpg storage', err);
@@ -34,11 +40,15 @@ function readAll() {
 
 function writeAll(obj) {
   ensureDir();
-  fs.writeFileSync(FILE, JSON.stringify(obj, null, 2), 'utf8');
+  // atomic write: write to temp file then rename
+  const tmp = `${FILE}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8');
+  fs.renameSync(tmp, FILE);
+  cache = obj;
 }
 
 export function createCharacter(userId, name) {
-  const all = readAll();
+  const all = cache || readAll();
   if (all[userId]) return null;
   const char = { name: name || `Player${userId.slice(0,4)}`, hp: 20, maxHp: 20, atk: 5, lvl: 1, xp: 0, skillPoints: 0 };
   all[userId] = char;
@@ -68,14 +78,38 @@ export function applyXp(userId, char, amount = 0) {
 }
 
 export function getCharacter(userId) {
-  const all = readAll();
+  const all = cache || readAll();
   return all[userId] || null;
 }
 
 export function saveCharacter(userId, char) {
-  const all = readAll();
+  const all = cache || readAll();
   all[userId] = char;
   writeAll(all);
+}
+
+export function getAllCharacters() {
+  return cache || readAll();
+}
+
+export function resetCharacter(userId) {
+  const all = cache || readAll();
+  const def = { name: `Player${userId.slice(0,4)}`, hp: 20, maxHp: 20, atk: 5, lvl: 1, xp: 0, skillPoints: 0 };
+  all[userId] = def;
+  writeAll(all);
+  return def;
+}
+
+export function getLeaderboard(limit = 10, offset = 0) {
+  const all = cache || readAll();
+  const arr = Object.entries(all).map(([id, c]) => ({ id, name: c.name, lvl: c.lvl || 1, xp: c.xp || 0, atk: c.atk || 0 }));
+  arr.sort((a, b) => { if (b.lvl !== a.lvl) return b.lvl - a.lvl; if (b.xp !== a.xp) return b.xp - a.xp; return b.atk - a.atk; });
+  return arr.slice(offset, offset + limit);
+}
+
+export function getLeaderboardCount() {
+  const all = cache || readAll();
+  return Object.keys(all).length;
 }
 
 export function encounterMonster(lvl = 1) {
@@ -143,5 +177,37 @@ export function completeQuest(userId, questId) {
   q.status = 'completed';
   writeQuests(all);
   return q;
+}
+
+// Spend skill points for a character and persist change
+export function spendSkillPoints(userId, stat, amount = 1) {
+  if (locks.has(userId)) return { success: false, reason: 'locked' };
+  locks.add(userId);
+  try {
+    const all = cache || readAll();
+    const char = all[userId];
+  if (!char) return { success: false, reason: 'no_character' };
+  const pts = char.skillPoints || 0;
+  if (amount <= 0) return { success: false, reason: 'invalid_amount' };
+  if (pts < amount) return { success: false, reason: 'not_enough_points', have: pts };
+
+  if (stat === 'hp') {
+    char.hp = Math.min((char.hp || 0) + amount * 2, char.maxHp || 20);
+  } else if (stat === 'maxhp') {
+    char.maxHp = (char.maxHp || 20) + amount * 5;
+    char.hp = Math.min((char.hp || 0) + amount * 2, char.maxHp);
+  } else if (stat === 'atk') {
+    char.atk = (char.atk || 5) + amount;
+  } else {
+    return { success: false, reason: 'unknown_stat' };
+  }
+
+  char.skillPoints = pts - amount;
+  all[userId] = char;
+  writeAll(all);
+  return { success: true, char };
+  } finally {
+    locks.delete(userId);
+  }
 }
 
