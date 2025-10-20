@@ -3,9 +3,9 @@
     "name": "Tester",
     "hp": 20,
     "maxHp": 20,
-    "atk": 11,
-    "lvl": 8,
-    "xp": 150,
+    "atk": 12,
+    "lvl": 9,
+    "xp": 175,
     "skillPoints": 1
   },
   "333133024520568833": {

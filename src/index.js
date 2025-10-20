@@ -69,6 +69,25 @@ client.on('interactionCreate', async interaction => {
         const res = spendSkillPoints(userId, stat, amount);
         if (!res.success) return interaction.reply({ content: `Failed: ${res.reason}` , ephemeral: true});
         const char = res.char;
+        // If the message with buttons is available, update it to reflect new stats and button state
+        try {
+          if (interaction.message && interaction.message.editable) {
+            const remaining = char.skillPoints || 0;
+            // build spend buttons (disable when no points)
+            const spendRow = new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('Spend on HP').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('Spend on MaxHP').setStyle(ButtonStyle.Success).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
+            );
+            const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk}`;
+            await interaction.update({ content, components: [spendRow] });
+            return;
+          }
+        } catch (err) {
+          // fall back to ephemeral reply on any failure
+          console.error('Failed to update original message after spend', err);
+        }
+
         return interaction.reply({ content: `Spent ${amount} point(s) on ${stat}. New stats: HP ${char.hp}/${char.maxHp} ATK ${char.atk}. Remaining points: ${char.skillPoints}`, ephemeral: true });
       }
       if (action === 'rpg_reset') {
