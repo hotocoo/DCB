@@ -1,18 +1,31 @@
-import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
-import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, resetCharacter } from '../rpg.js';
+import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } from 'discord.js';
+import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, resetCharacter, getCharacterClasses, getClassInfo } from '../rpg.js';
 
 export const data = new SlashCommandBuilder()
   .setName('rpg')
-  .setDescription('Play a simple RPG')
-  .addSubcommand(sub => sub.setName('start').setDescription('Create your character').addStringOption(opt => opt.setName('name').setDescription('Character name')))
+  .setDescription('Play an enhanced RPG with character classes')
+  .addSubcommand(sub => sub.setName('start').setDescription('Create your character')
+    .addStringOption(opt => opt.setName('name').setDescription('Character name'))
+    .addStringOption(opt => opt.setName('class').setDescription('Character class').addChoices(
+      { name: '🛡️ Warrior', value: 'warrior' },
+      { name: '🔮 Mage', value: 'mage' },
+      { name: '🗡️ Rogue', value: 'rogue' },
+      { name: '⚔️ Paladin', value: 'paladin' }
+    )))
   .addSubcommand(sub => sub.setName('fight').setDescription('Fight a monster'))
   .addSubcommand(sub => sub.setName('explore').setDescription('Explore and encounter random events'))
   .addSubcommand(sub => sub.setName('quest').setDescription('Quest actions (create/list/complete)').addStringOption(opt => opt.setName('action').setDescription('create|list|complete').setRequired(true)).addStringOption(opt => opt.setName('title').setDescription('Quest title')).addStringOption(opt => opt.setName('id').setDescription('Quest id to complete')).addStringOption(opt => opt.setName('desc').setDescription('Quest description')))
   .addSubcommand(sub => sub.setName('boss').setDescription('Face a boss (dangerous)'))
-  .addSubcommand(sub => sub.setName('levelup').setDescription('Spend skill points to increase stats').addStringOption(opt => opt.setName('stat').setDescription('hp|maxhp|atk').setRequired(true)).addIntegerOption(opt => opt.setName('amount').setDescription('How many points to spend').setRequired(true)))
+  .addSubcommand(sub => sub.setName('levelup').setDescription('Spend skill points to increase stats').addStringOption(opt => opt.setName('stat').setDescription('hp|maxhp|atk|def|spd').setRequired(true)).addIntegerOption(opt => opt.setName('amount').setDescription('How many points to spend').setRequired(true)))
   .addSubcommand(sub => sub.setName('stats').setDescription('Show your character stats'))
   .addSubcommand(sub => sub.setName('leaderboard').setDescription('Show top players'))
-  .addSubcommand(sub => sub.setName('reset').setDescription('Reset your character to defaults'));
+  .addSubcommand(sub => sub.setName('reset').setDescription('Reset your character to defaults').addStringOption(opt => opt.setName('class').setDescription('New character class').addChoices(
+    { name: '🛡️ Warrior', value: 'warrior' },
+    { name: '🔮 Mage', value: 'mage' },
+    { name: '🗡️ Rogue', value: 'rogue' },
+    { name: '⚔️ Paladin', value: 'paladin' }
+  )))
+  .addSubcommand(sub => sub.setName('class').setDescription('View information about character classes'));
 
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
@@ -20,22 +33,51 @@ export async function execute(interaction) {
 
   if (sub === 'start') {
     const name = interaction.options.getString('name');
-    const char = createCharacter(userId, name);
+    const charClass = interaction.options.getString('class') || 'warrior';
+    const char = createCharacter(userId, name, charClass);
     if (!char) return interaction.reply({ content: 'You already have a character.', ephemeral: true });
-    return interaction.reply(`Character created: ${char.name} (HP ${char.hp})`);
+
+    const embed = new EmbedBuilder()
+      .setTitle('🎮 Character Created!')
+      .setColor(char.color)
+      .setDescription(`**${char.name}** - Level ${char.lvl} ${char.class.charAt(0).toUpperCase() + char.class.slice(1)}`)
+      .addFields(
+        { name: '❤️ Health', value: `${char.hp}/${char.maxHp}`, inline: true },
+        { name: '⚔️ Attack', value: `${char.atk}`, inline: true },
+        { name: '🛡️ Defense', value: `${char.def}`, inline: true },
+        { name: '💨 Speed', value: `${char.spd}`, inline: true },
+        { name: '⭐ Abilities', value: char.abilities.join(', '), inline: false },
+        { name: '📈 Available Stats', value: 'Use `/rpg levelup` to spend skill points on:\n❤️ HP, 🛡️ Max HP, ⚔️ ATK, 🛡️ DEF, 💨 SPD', inline: false }
+      );
+
+    return interaction.reply({ embeds: [embed] });
   }
 
   const char = getCharacter(userId);
   if (!char) return interaction.reply({ content: 'You have no character. Run /rpg start', ephemeral: true });
 
   if (sub === 'stats') {
+    const classInfo = getClassInfo(char.class);
+    const embed = new EmbedBuilder()
+      .setTitle(`📊 ${char.name} - Level ${char.lvl} ${char.class.charAt(0).toUpperCase() + char.class.slice(1)}`)
+      .setColor(char.color)
+      .addFields(
+        { name: '❤️ Health', value: `${char.hp}/${char.maxHp}`, inline: true },
+        { name: '⚔️ Attack', value: `${char.atk}`, inline: true },
+        { name: '🛡️ Defense', value: `${char.def}`, inline: true },
+        { name: '💨 Speed', value: `${char.spd}`, inline: true },
+        { name: '⭐ Experience', value: `${char.xp} XP`, inline: true },
+        { name: '💎 Skill Points', value: `${char.skillPoints || 0}`, inline: true },
+        { name: '🎯 Abilities', value: char.abilities.join(', '), inline: false }
+      );
+
     // include buttons for quick actions
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`rpg_leaderboard:0:${userId}`).setLabel('Leaderboard').setStyle(ButtonStyle.Primary),
-      // open a confirmation modal instead of immediate reset
       new ButtonBuilder().setCustomId(`rpg_reset_modal:0:${userId}`).setLabel('Reset Character').setStyle(ButtonStyle.Danger),
     );
-    return interaction.reply({ content: `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${char.skillPoints || 0}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk}`, components: [row] });
+
+    return interaction.reply({ embeds: [embed], components: [row] });
   }
 
   if (sub === 'fight') {
@@ -174,8 +216,12 @@ export async function execute(interaction) {
       char.hp = Math.min(char.hp + amount * 2, char.maxHp);
     } else if (stat === 'atk') {
       char.atk += amount;
+    } else if (stat === 'def') {
+      char.def += amount;
+    } else if (stat === 'spd') {
+      char.spd += amount;
     } else {
-      return interaction.reply({ content: 'Unknown stat. Use hp|maxhp|atk', ephemeral: true });
+      return interaction.reply({ content: 'Unknown stat. Use hp|maxhp|atk|def|spd', ephemeral: true });
     }
 
     char.skillPoints = pts - amount;
@@ -198,13 +244,32 @@ export async function execute(interaction) {
   }
 
   if (sub === 'reset') {
+    const newClass = interaction.options.getString('class') || char.class;
     // show a confirmation modal before resetting
-    const modal = new ModalBuilder().setCustomId(`rpg_reset_confirm:cmd:${userId}`).setTitle('Confirm Reset');
+    const modal = new ModalBuilder().setCustomId(`rpg_reset_confirm:cmd:${userId}:${newClass}`).setTitle('Confirm Reset');
     const input = new TextInputBuilder().setCustomId('confirm_text').setLabel('Type RESET to confirm').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('RESET');
     // modal requires ActionRow-like placement via components
     modal.addComponents({ type: 1, components: [input] });
     await interaction.showModal(modal);
     return;
+  }
+
+  if (sub === 'class') {
+    const classes = getCharacterClasses();
+    const embed = new EmbedBuilder()
+      .setTitle('🏛️ Character Classes')
+      .setColor(0x0099FF)
+      .setDescription('Choose your class when creating a character with `/rpg start`');
+
+    for (const [key, classInfo] of Object.entries(classes)) {
+      embed.addFields({
+        name: `${classInfo.name}`,
+        value: `**Description:** ${classInfo.description}\n**Base Stats:** ❤️ ${classInfo.baseStats.hp} HP, ⚔️ ${classInfo.baseStats.atk} ATK, 🛡️ ${classInfo.baseStats.def} DEF, 💨 ${classInfo.baseStats.spd} SPD\n**Abilities:** ${classInfo.abilities.join(', ')}`,
+        inline: false
+      });
+    }
+
+    return interaction.reply({ embeds: [embed] });
   }
 
   if (sub === 'quest') {

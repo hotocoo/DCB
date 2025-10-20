@@ -53,8 +53,8 @@ client.on('interactionCreate', async interaction => {
           return interaction.reply({ content: 'Confirmation text did not match. Type RESET to confirm.', ephemeral: true });
         }
         const { resetCharacter } = await import('./rpg.js');
-        const def = resetCharacter(interaction.user.id);
-        return interaction.reply({ content: `Character reset to defaults: HP ${def.hp} ATK ${def.atk} Level ${def.lvl}`, ephemeral: true });
+        const def = resetCharacter(interaction.user.id, parts[3] || 'warrior');
+        return interaction.reply({ content: `Character reset to defaults: HP ${def.hp}/${def.maxHp} ATK ${def.atk} DEF ${def.def} SPD ${def.spd} Level ${def.lvl}`, ephemeral: true });
       }
       // handle spend modal submit
       if (custom.startsWith('rpg_spend_submit:')) {
@@ -78,7 +78,7 @@ client.on('interactionCreate', async interaction => {
               new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${interaction.user.id}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
               new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${interaction.user.id}`).setLabel('Spend...').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
             );
-            const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk}`;
+            const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk} DEF: ${char.def} SPD: ${char.spd}`;
             await interaction.update({ content, components: [spendRow] });
             return;
           }
@@ -113,7 +113,7 @@ client.on('interactionCreate', async interaction => {
               new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('Spend on MaxHP').setStyle(ButtonStyle.Success).setDisabled(remaining <= 0),
               new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('Spend on ATK').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
             );
-            const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk}`;
+            const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk} DEF: ${char.def} SPD: ${char.spd}`;
             await interaction.update({ content, components: [spendRow] });
             return;
           }
@@ -122,7 +122,7 @@ client.on('interactionCreate', async interaction => {
           console.error('Failed to update original message after spend', err);
         }
 
-        return interaction.reply({ content: `Spent ${amount} point(s) on ${stat}. New stats: HP ${char.hp}/${char.maxHp} ATK ${char.atk}. Remaining points: ${char.skillPoints}`, ephemeral: true });
+        return interaction.reply({ content: `Spent ${amount} point(s) on ${stat}. New stats: HP ${char.hp}/${char.maxHp} ATK ${char.atk} DEF ${char.def} SPD ${char.spd}. Remaining points: ${char.skillPoints}`, ephemeral: true });
       }
       if (action === 'rpg_spend_modal') {
         const [, , targetUser] = interaction.customId.split(':');
@@ -146,8 +146,8 @@ client.on('interactionCreate', async interaction => {
         const [ , , targetUser ] = interaction.customId.split(':');
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot reset another user.', ephemeral: true });
         const { resetCharacter } = await import('./rpg.js');
-        const def = resetCharacter(userId);
-        return interaction.reply({ content: `Character reset to defaults: HP ${def.hp} ATK ${def.atk} Level ${def.lvl}`, ephemeral: true });
+        const def = resetCharacter(userId, targetUser || 'warrior');
+        return interaction.reply({ content: `Character reset to defaults: HP ${def.hp}/${def.maxHp} ATK ${def.atk} DEF ${def.def} SPD ${def.spd} Level ${def.lvl}`, ephemeral: true });
       }
       if (action === 'rpg_reset_modal') {
         const [ , , targetUser ] = interaction.customId.split(':');
