@@ -69,6 +69,10 @@ function readAll() {
       if (typeof c.class === 'undefined') c.class = 'warrior';
       if (typeof c.abilities === 'undefined') c.abilities = CHARACTER_CLASSES[c.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
       if (typeof c.color === 'undefined') c.color = CHARACTER_CLASSES[c.class]?.color || CHARACTER_CLASSES.warrior.color;
+      if (typeof c.inventory === 'undefined') c.inventory = {};
+      if (typeof c.equipped_weapon === 'undefined') c.equipped_weapon = null;
+      if (typeof c.equipped_armor === 'undefined') c.equipped_armor = null;
+      if (typeof c.gold === 'undefined') c.gold = 0;
       raw[k] = c;
     }
     cache = raw;
@@ -103,7 +107,11 @@ export function createCharacter(userId, name, charClass = 'warrior') {
     xp: 0,
     skillPoints: 0,
     abilities: [...classData.abilities],
-    color: classData.color
+    color: classData.color,
+    inventory: {},
+    equipped_weapon: null,
+    equipped_armor: null,
+    gold: 0
   };
 
   all[userId] = char;
@@ -158,7 +166,11 @@ export function resetCharacter(userId, charClass = 'warrior') {
     xp: 0,
     skillPoints: 0,
     abilities: [...classData.abilities],
-    color: classData.color
+    color: classData.color,
+    inventory: {},
+    equipped_weapon: null,
+    equipped_armor: null,
+    gold: 0
   };
   all[userId] = def;
   writeAll(all);
@@ -224,6 +236,242 @@ export function getCharacterClasses() {
 
 export function getClassInfo(charClass) {
   return CHARACTER_CLASSES[charClass] || null;
+}
+
+// Item and Inventory System
+const ITEMS = {
+  // Weapons
+  'rusty_sword': { name: 'Rusty Sword', type: 'weapon', rarity: 'common', atk: 3, value: 10, description: 'A worn but serviceable blade' },
+  'iron_sword': { name: 'Iron Sword', type: 'weapon', rarity: 'uncommon', atk: 7, value: 50, description: 'A well-crafted iron blade' },
+  'magic_staff': { name: 'Magic Staff', type: 'weapon', rarity: 'rare', atk: 12, value: 200, description: 'Channels magical energy' },
+  'legendary_blade': { name: 'Legendary Blade', type: 'weapon', rarity: 'legendary', atk: 20, value: 1000, description: 'A blade of ancient power' },
+
+  // Armor
+  'leather_armor': { name: 'Leather Armor', type: 'armor', rarity: 'common', def: 2, value: 15, description: 'Basic protective gear' },
+  'chain_mail': { name: 'Chain Mail', type: 'armor', rarity: 'uncommon', def: 5, value: 75, description: 'Interlinked metal rings' },
+  'plate_armor': { name: 'Plate Armor', type: 'armor', rarity: 'rare', def: 10, value: 300, description: 'Heavy steel protection' },
+  'dragon_armor': { name: 'Dragon Armor', type: 'armor', rarity: 'legendary', def: 18, value: 1500, description: 'Forged from dragon scales' },
+
+  // Consumables
+  'health_potion': { name: 'Health Potion', type: 'consumable', rarity: 'common', hp_restore: 20, value: 25, description: 'Restores 20 HP' },
+  'mana_potion': { name: 'Mana Potion', type: 'consumable', rarity: 'uncommon', mp_restore: 30, value: 40, description: 'Restores 30 MP' },
+  'revive_crystal': { name: 'Revive Crystal', type: 'consumable', rarity: 'rare', revive: true, value: 150, description: 'Brings you back from defeat' },
+
+  // Materials
+  'iron_ore': { name: 'Iron Ore', type: 'material', rarity: 'common', value: 5, description: 'Raw iron for crafting' },
+  'magic_crystal': { name: 'Magic Crystal', type: 'material', rarity: 'rare', value: 100, description: 'Contains magical energy' },
+  'dragon_scale': { name: 'Dragon Scale', type: 'material', rarity: 'legendary', value: 500, description: 'Priceless crafting material' }
+};
+
+const ITEM_RARITIES = {
+  common: { color: 0x8B8B8B, chance: 50 },
+  uncommon: { color: 0x4CAF50, chance: 25 },
+  rare: { color: 0x2196F3, chance: 15 },
+  legendary: { color: 0xFF9800, chance: 10 }
+};
+
+export function generateRandomItem(level = 1) {
+  const rarityRoll = Math.random() * 100;
+  let selectedRarity = 'common';
+
+  for (const [rarity, data] of Object.entries(ITEM_RARITIES)) {
+    if (rarityRoll <= data.chance) {
+      selectedRarity = rarity;
+      break;
+    }
+  }
+
+  // Filter items by rarity and level-appropriate types
+  const availableItems = Object.entries(ITEMS).filter(([key, item]) =>
+    item.rarity === selectedRarity &&
+    (level >= getItemLevelRequirement(key))
+  );
+
+  if (availableItems.length === 0) {
+    return ITEMS['health_potion']; // Fallback
+  }
+
+  const randomItem = availableItems[Math.floor(Math.random() * availableItems.length)];
+  return { id: randomItem[0], ...randomItem[1] };
+}
+
+function getItemLevelRequirement(itemKey) {
+  const levelReqs = {
+    rusty_sword: 1, iron_sword: 3, magic_staff: 8, legendary_blade: 15,
+    leather_armor: 1, chain_mail: 4, plate_armor: 10, dragon_armor: 20,
+    health_potion: 1, mana_potion: 5, revive_crystal: 12,
+    iron_ore: 1, magic_crystal: 7, dragon_scale: 18
+  };
+  return levelReqs[itemKey] || 1;
+}
+
+export function getItemInfo(itemId) {
+  return ITEMS[itemId] || null;
+}
+
+export function getItemRarityInfo(rarity) {
+  return ITEM_RARITIES[rarity] || ITEM_RARITIES.common;
+}
+
+// Inventory Management Functions
+export function addItemToInventory(userId, itemId, quantity = 1) {
+  const all = cache || readAll();
+  const char = all[userId];
+
+  if (!char) return { success: false, reason: 'no_character' };
+
+  char.inventory = char.inventory || {};
+  char.inventory[itemId] = (char.inventory[itemId] || 0) + quantity;
+
+  writeAll(all);
+  return { success: true, char };
+}
+
+export function removeItemFromInventory(userId, itemId, quantity = 1) {
+  const all = cache || readAll();
+  const char = all[userId];
+
+  if (!char) return { success: false, reason: 'no_character' };
+  if (!char.inventory || !char.inventory[itemId]) return { success: false, reason: 'item_not_found' };
+
+  const currentQuantity = char.inventory[itemId];
+  if (currentQuantity < quantity) return { success: false, reason: 'insufficient_quantity' };
+
+  char.inventory[itemId] -= quantity;
+  if (char.inventory[itemId] <= 0) delete char.inventory[itemId];
+
+  writeAll(all);
+  return { success: true, char };
+}
+
+export function getInventory(userId) {
+  const all = cache || readAll();
+  const char = all[userId];
+
+  if (!char || !char.inventory) return {};
+
+  return char.inventory;
+}
+
+export function getInventoryValue(userId) {
+  const inventory = getInventory(userId);
+  let totalValue = 0;
+
+  for (const [itemId, quantity] of Object.entries(inventory)) {
+    const item = ITEMS[itemId];
+    if (item) {
+      totalValue += item.value * quantity;
+    }
+  }
+
+  return totalValue;
+}
+
+export function useConsumableItem(userId, itemId) {
+  const item = ITEMS[itemId];
+  if (!item || item.type !== 'consumable') {
+    return { success: false, reason: 'not_consumable' };
+  }
+
+  const all = cache || readAll();
+  const char = all[userId];
+
+  if (!char) return { success: false, reason: 'no_character' };
+
+  // Check if item is in inventory
+  if (!char.inventory || !char.inventory[itemId]) {
+    return { success: false, reason: 'item_not_in_inventory' };
+  }
+
+  // Apply item effects
+  let effects = {};
+  if (item.hp_restore) {
+    const oldHp = char.hp;
+    char.hp = Math.min(char.maxHp, char.hp + item.hp_restore);
+    effects.hp_restored = char.hp - oldHp;
+  }
+
+  if (item.revive) {
+    char.hp = char.maxHp;
+    effects.revive = true;
+  }
+
+  // Remove item from inventory
+  char.inventory[itemId]--;
+  if (char.inventory[itemId] <= 0) delete char.inventory[itemId];
+
+  writeAll(all);
+  return { success: true, char, effects };
+}
+
+export function equipItem(userId, itemId) {
+  const item = ITEMS[itemId];
+  if (!item || (item.type !== 'weapon' && item.type !== 'armor')) {
+    return { success: false, reason: 'not_equippable' };
+  }
+
+  const all = cache || readAll();
+  const char = all[userId];
+
+  if (!char) return { success: false, reason: 'no_character' };
+  if (!char.inventory || !char.inventory[itemId]) {
+    return { success: false, reason: 'item_not_in_inventory' };
+  }
+
+  // Unequip current item of same type
+  if (item.type === 'weapon' && char.equipped_weapon) {
+    addItemToInventory(userId, char.equipped_weapon, 1);
+    char.atk -= ITEMS[char.equipped_weapon].atk || 0;
+  }
+
+  if (item.type === 'armor' && char.equipped_armor) {
+    addItemToInventory(userId, char.equipped_armor, 1);
+    char.def -= ITEMS[char.equipped_armor].def || 0;
+  }
+
+  // Equip new item
+  if (item.type === 'weapon') {
+    char.equipped_weapon = itemId;
+    char.atk += item.atk || 0;
+  }
+
+  if (item.type === 'armor') {
+    char.equipped_armor = itemId;
+    char.def += item.def || 0;
+  }
+
+  // Remove from inventory
+  removeItemFromInventory(userId, itemId, 1);
+
+  writeAll(all);
+  return { success: true, char };
+}
+
+export function unequipItem(userId, slot) {
+  const all = cache || readAll();
+  const char = all[userId];
+
+  if (!char) return { success: false, reason: 'no_character' };
+
+  let itemId = null;
+  if (slot === 'weapon' && char.equipped_weapon) {
+    itemId = char.equipped_weapon;
+    char.atk -= ITEMS[itemId].atk || 0;
+    char.equipped_weapon = null;
+  } else if (slot === 'armor' && char.equipped_armor) {
+    itemId = char.equipped_armor;
+    char.def -= ITEMS[itemId].def || 0;
+    char.equipped_armor = null;
+  } else {
+    return { success: false, reason: 'no_item_equipped' };
+  }
+
+  if (itemId) {
+    addItemToInventory(userId, itemId, 1);
+  }
+
+  writeAll(all);
+  return { success: true, char };
 }
 
 export function bossEncounter(lvl = 5) {
