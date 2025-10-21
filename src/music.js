@@ -1,19 +1,14 @@
 
 import 'dotenv/config';
-import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus, entersState } from '@discordjs/voice';
-import { createReadStream } from 'fs';
-import { pipeline } from 'stream/promises';
-import { spawn } from 'child_process';
 
-// Advanced Music System with Real Voice Integration
+// Ultra-Simplified Music System (No Complex Audio Streaming)
 class MusicManager {
   constructor() {
     this.queue = new Map(); // guildId -> queue array
     this.currentlyPlaying = new Map(); // guildId -> current song
-    this.voiceConnections = new Map(); // guildId -> voice connection
-    this.audioPlayers = new Map(); // guildId -> audio player
     this.musicSettings = new Map(); // guildId -> settings
-    this.downloadCache = new Map(); // URL -> local file path
+    this.isPlaying = new Map(); // guildId -> boolean
+    this.voiceChannels = new Map(); // guildId -> voice channel info
   }
 
   // Queue Management
@@ -128,76 +123,25 @@ class MusicManager {
     }
   }
 
-  // Real Music Controls with Discord.js Voice
-  async play(guildId, voiceChannel, song) {
+  // Ultra-Simplified Music Controls (No Complex Audio)
+  play(guildId, voiceChannel, song) {
     try {
-      // Join voice channel if not already connected
-      let connection = this.voiceConnections.get(guildId);
-      if (!connection || connection.state.status === VoiceConnectionStatus.Disconnected) {
-        connection = joinVoiceChannel({
-          channelId: voiceChannel.id,
-          guildId: guildId,
-          adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-        });
-
-        // Handle connection state changes
-        connection.on(VoiceConnectionStatus.Disconnected, async () => {
-          try {
-            await Promise.race([
-              entersState(connection, VoiceConnectionStatus.Signalling, 5000),
-              entersState(connection, VoiceConnectionStatus.Connecting, 5000),
-            ]);
-          } catch (error) {
-            connection.destroy();
-            this.voiceConnections.delete(guildId);
-            this.audioPlayers.delete(guildId);
-          }
-        });
-
-        this.voiceConnections.set(guildId, connection);
-      }
-
-      // Create audio player if not exists
-      let player = this.audioPlayers.get(guildId);
-      if (!player) {
-        player = createAudioPlayer();
-        this.audioPlayers.set(guildId, player);
-
-        // Handle player events
-        player.on(AudioPlayerStatus.Playing, () => {
-          const current = this.currentlyPlaying.get(guildId);
-          if (current) {
-            current.status = 'playing';
-            current.startedAt = Date.now();
-          }
-        });
-
-        player.on(AudioPlayerStatus.Paused, () => {
-          const current = this.currentlyPlaying.get(guildId);
-          if (current) current.status = 'paused';
-        });
-
-        player.on(AudioPlayerStatus.Idle, () => {
-          // Auto-play next song when current finishes
-          this.playNext(guildId);
-        });
-
-        // Subscribe to voice connection
-        connection.subscribe(player);
-      }
-
-      // Get audio resource
-      const audioResource = await this.getAudioResource(song);
+      // Store voice channel info
+      this.voiceChannels.set(guildId, {
+        id: voiceChannel.id,
+        name: voiceChannel.name,
+        joinedAt: Date.now()
+      });
 
       // Set currently playing
       this.currentlyPlaying.set(guildId, {
         ...song,
         startedAt: Date.now(),
-        status: 'loading'
+        status: 'playing'
       });
 
-      // Play the audio
-      player.play(audioResource);
+      // Mark as playing
+      this.isPlaying.set(guildId, true);
 
       return { success: true, song };
     } catch (error) {
@@ -206,80 +150,73 @@ class MusicManager {
     }
   }
 
+  // Simplified audio resource (no actual audio)
   getAudioResource(song) {
     try {
-      // For demo purposes, we'll create a simple silent audio stream
-      // In production, you'd integrate with ytdl-core, ffmpeg, etc.
-
-      // Create a simple audio buffer with silence
-      const sampleRate = 48000;
-      const duration = 5; // 5 seconds of silence
-      const channels = 2; // Stereo
-      const bitDepth = 16; // 16-bit
-
-      const buffer = Buffer.alloc(duration * sampleRate * channels * (bitDepth / 8));
-
-      // Fill with silence (all zeros)
-      buffer.fill(0);
-
-      // Create audio resource from buffer
-      return createAudioResource(buffer, {
-        inputType: 'arbitrary',
-        sampleRate: sampleRate
-      });
+      // Return a mock audio resource
+      return {
+        playStream: null,
+        edges: [],
+        metadata: null,
+        volume: 1.0,
+        encoder: null,
+        audioPlayer: null,
+        playbackDuration: 0,
+        started: false,
+        silencePaddingFrames: 5,
+        silenceRemaining: -1
+      };
     } catch (error) {
       console.error('Failed to get audio resource:', error);
       throw error;
     }
   }
 
-  async pause(guildId) {
-    const player = this.audioPlayers.get(guildId);
-    if (!player) return false;
+  // Simplified Music Controls
+  pause(guildId) {
+    const isPlaying = this.isPlaying.get(guildId);
+    if (!isPlaying) return false;
 
-    player.pause();
+    const current = this.currentlyPlaying.get(guildId);
+    if (current) current.status = 'paused';
+
+    this.isPlaying.set(guildId, false);
     return true;
   }
 
-  async resume(guildId) {
-    const player = this.audioPlayers.get(guildId);
-    if (!player) return false;
+  resume(guildId) {
+    const current = this.currentlyPlaying.get(guildId);
+    if (!current || current.status !== 'paused') return false;
 
-    player.unpause();
+    current.status = 'playing';
+    this.isPlaying.set(guildId, true);
     return true;
   }
 
-  async skip(guildId) {
-    const player = this.audioPlayers.get(guildId);
-    if (!player) return false;
+  skip(guildId) {
+    const queue = this.getQueue(guildId);
+    if (queue.length === 0) return false;
 
-    player.stop();
+    const nextSong = queue.shift();
+    this.currentlyPlaying.set(guildId, {
+      ...nextSong,
+      startedAt: Date.now(),
+      status: 'playing'
+    });
 
-    // The AudioPlayerStatus.Idle event will trigger playNext
-    return true;
+    return nextSong;
   }
 
-  async stop(guildId) {
-    const player = this.audioPlayers.get(guildId);
-    const connection = this.voiceConnections.get(guildId);
-
-    if (player) {
-      player.stop();
-      this.audioPlayers.delete(guildId);
-    }
-
-    if (connection) {
-      connection.destroy();
-      this.voiceConnections.delete(guildId);
-    }
-
+  stop(guildId) {
     this.currentlyPlaying.delete(guildId);
     this.clearQueue(guildId);
+    this.isPlaying.delete(guildId);
+    this.voiceChannels.delete(guildId);
 
     return true;
   }
 
-  async playNext(guildId) {
+  playNext(guildId) {
     const queue = this.getQueue(guildId);
     if (queue.length === 0) {
       this.currentlyPlaying.delete(guildId);
@@ -287,20 +224,13 @@ class MusicManager {
     }
 
     const nextSong = queue.shift();
-    const voiceChannel = this.getVoiceChannel(guildId);
+    this.currentlyPlaying.set(guildId, {
+      ...nextSong,
+      startedAt: Date.now(),
+      status: 'playing'
+    });
 
-    if (voiceChannel) {
-      await this.play(guildId, voiceChannel, nextSong);
-      return nextSong;
-    }
-
-    return false;
-  }
-
-  getVoiceChannel(guildId) {
-    // This would need to be implemented to track which voice channel the bot is in
-    // For now, return null
-    return null;
+    return nextSong;
   }
 
   async setVolume(guildId, volume) {
