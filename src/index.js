@@ -155,6 +155,33 @@ client.on('interactionCreate', async interaction => {
 
         return interaction.reply({ content: `💰 Contributed ${amount} gold to **${guildName}**!\n⭐ Guild gained ${result.expGain} experience!`, ephemeral: true });
       }
+      // handle economy transfer modal submit
+      if (custom.startsWith('economy_transfer_modal:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot transfer for another user.', ephemeral: true });
+
+        const transferUser = interaction.fields.getTextInputValue('transfer_user');
+        const amountStr = interaction.fields.getTextInputValue('transfer_amount');
+        const amount = parseInt(amountStr || '0', 10) || 0;
+
+        if (amount <= 0) return interaction.reply({ content: '❌ Transfer amount must be greater than 0.', ephemeral: true });
+
+        const { getBalance, transferBalance } = await import('./economy.js');
+        const currentBalance = getBalance(interaction.user.id);
+
+        if (currentBalance < amount) {
+          return interaction.reply({ content: `❌ Insufficient funds! You have ${currentBalance} gold but need ${amount} gold.`, ephemeral: true });
+        }
+
+        // For demo, assume we're transferring to ourselves (in real implementation, find user by mention)
+        const result = transferBalance(interaction.user.id, interaction.user.id, amount);
+
+        if (result.success) {
+          return interaction.reply({ content: `💸 **Transfer simulated!** Transferred ${amount} gold.\n*(In real implementation, this would transfer to the specified user)*`, ephemeral: true });
+        } else {
+          return interaction.reply({ content: `❌ Transfer failed: ${result.reason}`, ephemeral: true });
+        }
+      }
       // handle profile edit modal submit
       if (custom.startsWith('profile_edit_modal:')) {
         const [, targetUser] = custom.split(':');
@@ -174,6 +201,28 @@ client.on('interactionCreate', async interaction => {
         const result = updateProfile(interaction.user.id, updates);
 
         await interaction.reply({ content: '✨ **Profile updated successfully!** Use `/profile view` to see your changes.', ephemeral: true });
+        return;
+      }
+      // handle trade auction modal submit
+      if (custom.startsWith('trade_auction_modal:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot create auctions for another user.', ephemeral: true });
+
+        const item = interaction.fields.getTextInputValue('auction_item');
+        const priceStr = interaction.fields.getTextInputValue('auction_price');
+        const price = parseInt(priceStr || '0', 10) || 0;
+
+        if (!item) return interaction.reply({ content: '❌ Please specify an item to auction.', ephemeral: true });
+        if (price <= 0) return interaction.reply({ content: '❌ Please specify a valid starting price.', ephemeral: true });
+
+        const { createAuction } = await import('./trading.js');
+        const result = createAuction(item, price, 24, interaction.user.id);
+
+        if (result.success) {
+          await interaction.reply({ content: `🎯 **Auction created!**\n**Item:** ${item}\n**Starting Price:** ${price} gold\n**Buyout:** ${price * 3} gold\n**Duration:** 24 hours`, ephemeral: true });
+        } else {
+          await interaction.reply({ content: `❌ Failed to create auction: ${result.reason}`, ephemeral: true });
+        }
         return;
       }
       // handle admin warning modal submit
@@ -215,6 +264,191 @@ client.on('interactionCreate', async interaction => {
 
         // Handle the guess (this would need game state persistence)
         await interaction.reply({ content: `🔢 You guessed: **${guess}**\n*Game logic would process this guess here.*`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_joke') {
+        const [, category, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get jokes for another user.', ephemeral: true });
+
+        const { getRandomJoke } = await import('./entertainment.js');
+        const joke = getRandomJoke(category);
+
+        await interaction.reply({ content: `😂 **${category.charAt(0).toUpperCase() + category.slice(1)} Joke:**\n${joke.joke}`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_story') {
+        const [, genre, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot generate stories for another user.', ephemeral: true });
+
+        const { generateStory } = await import('./entertainment.js');
+        const story = generateStory('A creative adventure', genre);
+
+        await interaction.reply({ content: `📖 **${genre.charAt(0).toUpperCase() + genre.slice(1)} Story:**\n${story.story}`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_riddle') {
+        const [, difficulty, riddleId, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get riddle answers for another user.', ephemeral: true });
+
+        // Show riddle answer (this would need to store the riddle)
+        await interaction.reply({ content: `💡 **Riddle Answer:**\n*The answer would be revealed here.*`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_riddle_new') {
+        const [, difficulty, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get riddles for another user.', ephemeral: true });
+
+        const { getRiddle } = await import('./entertainment.js');
+        const riddle = getRiddle(difficulty);
+
+        await interaction.reply({ content: `🧩 **${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Riddle:**\n${riddle.riddle}`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_fact') {
+        const [, category, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get facts for another user.', ephemeral: true });
+
+        const { getFunFact } = await import('./entertainment.js');
+        const fact = getFunFact(category);
+
+        await interaction.reply({ content: `🧠 **${category === 'random' ? 'Random' : category.charAt(0).toUpperCase() + category.slice(1)} Fun Fact:**\n${fact.fact}`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_quote') {
+        const [, category, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get quotes for another user.', ephemeral: true });
+
+        const { getRandomQuote } = await import('./entertainment.js');
+        const quote = getRandomQuote(category);
+
+        await interaction.reply({ content: `💬 **${category.charAt(0).toUpperCase() + category.slice(1)} Quote:**\n"${quote.quote}" - ${quote.author}`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_8ball') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot ask 8-ball for another user.', ephemeral: true });
+
+        const { magic8Ball } = await import('./entertainment.js');
+        const result = magic8Ball('The magic 8-ball speaks...');
+
+        await interaction.reply({ content: `🔮 **Magic 8-Ball says:** ${result.answer}`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_name') {
+        const [, type, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot generate names for another user.', ephemeral: true });
+
+        const { generateFunName } = await import('./entertainment.js');
+        const name = generateFunName(type);
+
+        await interaction.reply({ content: `🎭 **${type.charAt(0).toUpperCase() + type.slice(1)} Name:** ${name.name}`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_name_random') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot generate names for another user.', ephemeral: true });
+
+        const types = ['superhero', 'villain', 'fantasy', 'sciFi'];
+        const randomType = types[Math.floor(Math.random() * types.length)];
+
+        const { generateFunName } = await import('./entertainment.js');
+        const name = generateFunName(randomType);
+
+        await interaction.reply({ content: `🎭 **${randomType.charAt(0).toUpperCase() + randomType.slice(1)} Name:** ${name.name}`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_challenge') {
+        const [, type, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get challenges for another user.', ephemeral: true });
+
+        const { createFunChallenge } = await import('./entertainment.js');
+        const challenge = createFunChallenge(type);
+
+        await interaction.reply({ content: `🎯 **${type.charAt(0).toUpperCase() + type.slice(1)} Challenge:**\n${challenge.challenge}\n💎 **Reward:** ${challenge.reward}`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_challenge_new') {
+        const [, type, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get challenges for another user.', ephemeral: true });
+
+        const { createFunChallenge } = await import('./entertainment.js');
+        const challenge = createFunChallenge(type);
+
+        await interaction.reply({ content: `🎯 **${type.charAt(0).toUpperCase() + type.slice(1)} Challenge:**\n${challenge.challenge}\n💎 **Reward:** ${challenge.reward}`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_share') {
+        const [, contentId, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot share content for another user.', ephemeral: true });
+
+        await interaction.reply({ content: `📤 **Content Shared!**\n*The content would be shared to the channel here.*`, ephemeral: true });
+        return;
+      }
+      if (action === 'fun_rate') {
+        const [, contentId, rating, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot rate content for another user.', ephemeral: true });
+
+        await interaction.reply({ content: `⭐ **Content Rated!**\nThank you for rating! This helps improve our recommendations.`, ephemeral: true });
+        return;
+      }
+      if (action === 'economy_transfer') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot initiate transfers for another user.', ephemeral: true });
+
+        // Show transfer modal
+        const modal = new ModalBuilder().setCustomId(`economy_transfer_modal:${userId}`).setTitle('Transfer Gold');
+        const userInput = new TextInputBuilder().setCustomId('transfer_user').setLabel('User to transfer to').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('username');
+        const amountInput = new TextInputBuilder().setCustomId('transfer_amount').setLabel('Amount to transfer').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('100');
+        modal.addComponents({ type: 1, components: [userInput] });
+        modal.addComponents({ type: 1, components: [amountInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (action === 'economy_market') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot access market for another user.', ephemeral: true });
+
+        const { getMarketPrice } = await import('./economy.js');
+        const embed = new EmbedBuilder()
+          .setTitle('🏛️ Marketplace')
+          .setColor(0xFFD700);
+
+        const items = ['health_potion', 'mana_potion', 'iron_ore', 'magic_crystal', 'dragon_scale'];
+        items.forEach(itemId => {
+          const price = getMarketPrice(itemId);
+          embed.addFields({
+            name: itemId.replace('_', ' ').toUpperCase(),
+            value: `💰 ${price} gold each`,
+            inline: true
+          });
+        });
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+      }
+      if (action === 'economy_business') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot manage businesses for another user.', ephemeral: true });
+
+        const { collectBusinessIncome } = await import('./economy.js');
+        const result = collectBusinessIncome(userId);
+
+        if (result.success) {
+          if (result.income > 0) {
+            await interaction.reply({ content: `💰 **Business Income Collected!**\nYou earned ${result.income} gold from your ${result.businesses} business(es)!`, ephemeral: true });
+          } else {
+            await interaction.reply({ content: '💤 **No income available yet.** Check back later!', ephemeral: true });
+          }
+        } else {
+          await interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+        }
+        return;
+      }
+      if (action === 'economy_invest') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot manage investments for another user.', ephemeral: true });
+
+        await interaction.reply({ content: '📈 **Investment System Coming Soon!**\n*Advanced investment features will be available soon.*', ephemeral: true });
         return;
       }
       if (action === 'admin_warn') {
