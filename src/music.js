@@ -206,22 +206,21 @@ class MusicManager {
     }
   }
 
-  async getAudioResource(song) {
+  getAudioResource(song) {
     try {
-      // For demo purposes, we'll create a simple beep sound
+      // For demo purposes, we'll create a simple silent audio stream
       // In production, you'd integrate with ytdl-core, ffmpeg, etc.
 
-      // Create a simple sine wave audio buffer for demonstration
+      // Create a simple audio buffer with silence
       const sampleRate = 48000;
-      const duration = 3; // 3 seconds
-      const frequency = 440; // A4 note
+      const duration = 5; // 5 seconds of silence
+      const channels = 2; // Stereo
+      const bitDepth = 16; // 16-bit
 
-      const buffer = Buffer.alloc(duration * sampleRate * 2); // 16-bit samples
+      const buffer = Buffer.alloc(duration * sampleRate * channels * (bitDepth / 8));
 
-      for (let i = 0; i < duration * sampleRate; i++) {
-        const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 32767;
-        buffer.writeInt16LE(Math.floor(sample), i * 2);
-      }
+      // Fill with silence (all zeros)
+      buffer.fill(0);
 
       // Create audio resource from buffer
       return createAudioResource(buffer, {
