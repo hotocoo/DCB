@@ -111,14 +111,14 @@ class MusicManager {
   }
 
   // Search and Discovery
-  async searchSongs(query, limit = 10) {
+  searchSongs(query, limit = 10) {
     try {
       // This would integrate with music APIs like Spotify, YouTube, SoundCloud
       // For now, return mock results
       const mockResults = [
-        { title: `Song about ${query}`, artist: 'Artist', duration: '3:45', url: 'https://example.com/song1' },
-        { title: `Another ${query} track`, artist: 'Another Artist', duration: '4:12', url: 'https://example.com/song2' },
-        { title: `${query} remix`, artist: 'Remix Artist', duration: '5:20', url: 'https://example.com/song3' }
+        { title: `Song about ${query}`, artist: 'Demo Artist', duration: '3:45', url: 'demo://song1' },
+        { title: `Another ${query} track`, artist: 'Another Artist', duration: '4:12', url: 'demo://song2' },
+        { title: `${query} remix`, artist: 'Remix Artist', duration: '5:20', url: 'demo://song3' }
       ];
 
       return mockResults.slice(0, limit);
@@ -208,34 +208,30 @@ class MusicManager {
 
   async getAudioResource(song) {
     try {
-      // For demo purposes, we'll create a silent audio resource
+      // For demo purposes, we'll create a simple beep sound
       // In production, you'd integrate with ytdl-core, ffmpeg, etc.
 
-      // This is a placeholder - real implementation would:
-      // 1. Download/stream audio from URL
-      // 2. Convert to proper format if needed
-      // 3. Create audio resource from stream
+      // Create a simple sine wave audio buffer for demonstration
+      const sampleRate = 48000;
+      const duration = 3; // 3 seconds
+      const frequency = 440; // A4 note
 
-      // For now, create a simple tone using ffmpeg if available
-      const audioStream = await this.generateAudioStream(song);
+      const buffer = Buffer.alloc(duration * sampleRate * 2); // 16-bit samples
 
-      return createAudioResource(audioStream, {
-        inputType: 'arbitrary', // This would be 'webm/opus' for real audio
+      for (let i = 0; i < duration * sampleRate; i++) {
+        const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 32767;
+        buffer.writeInt16LE(Math.floor(sample), i * 2);
+      }
+
+      // Create audio resource from buffer
+      return createAudioResource(buffer, {
+        inputType: 'arbitrary',
+        sampleRate: sampleRate
       });
     } catch (error) {
       console.error('Failed to get audio resource:', error);
       throw error;
     }
-  }
-
-  async generateAudioStream(song) {
-    // Placeholder for audio stream generation
-    // In a real implementation, this would:
-    // - Use ytdl-core to get audio from YouTube
-    // - Use ffmpeg to convert to proper format
-    // - Return the audio stream
-
-    return createReadStream('/dev/null'); // Placeholder
   }
 
   async pause(guildId) {
