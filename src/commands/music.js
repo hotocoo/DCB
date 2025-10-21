@@ -66,9 +66,9 @@ export async function execute(interaction) {
 
       if (playResult.success) {
         const embed = new EmbedBuilder()
-          .setTitle('🎵 Now Playing')
+          .setTitle('🎵 Music Started!')
           .setColor(0x00FF00)
-          .setDescription(`**${song.title}** by ${song.artist}`)
+          .setDescription(`**${song.title}** by ${song.artist}\n\n🎵 *Bot has joined ${userVoiceChannel.name} and started playing music!*`)
           .addFields(
             { name: '⏱️ Duration', value: song.duration, inline: true },
             { name: '👤 Requested by', value: interaction.user.username, inline: true },
