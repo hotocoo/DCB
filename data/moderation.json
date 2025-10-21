@@ -1,1 +1,15 @@
-{"warnings":{},"bans":{},"mutes":{},"kicks":{},"mod_actions":[],"auto_mod":{"enabled":true,"spam_detection":true,"caps_detection":true,"link_detection":false,"invite_detection":true,"bad_words":[]}}
+{
+  "warnings": {},
+  "bans": {},
+  "mutes": {},
+  "kicks": {},
+  "mod_actions": [],
+  "auto_mod": {
+    "enabled": true,
+    "spam_detection": true,
+    "caps_detection": true,
+    "link_detection": false,
+    "invite_detection": true,
+    "bad_words": []
+  }
+}
