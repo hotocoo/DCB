@@ -49,14 +49,13 @@ export async function execute(interaction) {
         });
       }
 
-      // Search for the song
-      const searchResults = await searchSongs(query, 1);
-
-      if (searchResults.length === 0) {
-        return interaction.reply({ content: '❌ No songs found for that query.', ephemeral: true });
-      }
-
-      const song = searchResults[0];
+      // For demo purposes, create a mock song
+      const song = {
+        title: `Demo Song: ${query}`,
+        artist: 'Demo Artist',
+        duration: '3:00',
+        url: 'demo://song'
+      };
 
       // Add to queue and start playing
       const { addToQueue, play } = await import('../music.js');
@@ -96,7 +95,7 @@ export async function execute(interaction) {
     const query = interaction.options.getString('query');
 
     try {
-      const results = await searchSongs(query, 5);
+      const results = searchSongs(query, 5);
 
       if (results.length === 0) {
         return interaction.reply({ content: '🔍 No songs found for that query.', ephemeral: true });
@@ -301,7 +300,7 @@ export async function execute(interaction) {
 
     try {
       const { getLyrics } = await import('../music.js');
-      const lyrics = await getLyrics(songQuery, 'Unknown Artist');
+      const lyrics = getLyrics(songQuery, 'Unknown Artist');
 
       if (!lyrics) {
         return interaction.reply({ content: '📝 Lyrics not found for that song.', ephemeral: true });
