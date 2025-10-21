@@ -920,6 +920,76 @@ client.on('interactionCreate', async interaction => {
         // This would need persistent game state management
         return;
       }
+      if (action === 'music_pause') {
+        const [, targetGuild] = interaction.customId.split(':');
+        if (targetGuild && targetGuild !== interaction.guild.id) return interaction.reply({ content: 'You cannot pause music in another server.', ephemeral: true });
+
+        const { pause } = await import('./music.js');
+        const result = pause(interaction.guild.id);
+
+        if (result) {
+          await interaction.reply({ content: '⏸️ **Music paused!**', ephemeral: true });
+        } else {
+          await interaction.reply({ content: '❌ No music currently playing.', ephemeral: true });
+        }
+        return;
+      }
+      if (action === 'music_skip') {
+        const [, targetGuild] = interaction.customId.split(':');
+        if (targetGuild && targetGuild !== interaction.guild.id) return interaction.reply({ content: 'You cannot skip music in another server.', ephemeral: true });
+
+        const { skip } = await import('./music.js');
+        const nextSong = skip(interaction.guild.id);
+
+        if (nextSong) {
+          await interaction.reply({ content: `⏭️ **Skipped to:** ${nextSong.title} by ${nextSong.artist}`, ephemeral: true });
+        } else {
+          await interaction.reply({ content: '❌ No songs in queue to skip to.', ephemeral: true });
+        }
+        return;
+      }
+      if (action === 'music_stop') {
+        const [, targetGuild] = interaction.customId.split(':');
+        if (targetGuild && targetGuild !== interaction.guild.id) return interaction.reply({ content: 'You cannot stop music in another server.', ephemeral: true });
+
+        const { stop } = await import('./music.js');
+        const result = stop(interaction.guild.id);
+
+        if (result) {
+          await interaction.reply({ content: '⏹️ **Music stopped and queue cleared!**', ephemeral: true });
+        } else {
+          await interaction.reply({ content: '❌ Failed to stop music.', ephemeral: true });
+        }
+        return;
+      }
+      if (action === 'music_shuffle') {
+        const [, targetGuild] = interaction.customId.split(':');
+        if (targetGuild && targetGuild !== interaction.guild.id) return interaction.reply({ content: 'You cannot shuffle queue in another server.', ephemeral: true });
+
+        const { shuffleQueue } = await import('./music.js');
+        const result = shuffleQueue(interaction.guild.id);
+
+        if (result) {
+          await interaction.reply({ content: '🔀 **Queue shuffled!**', ephemeral: true });
+        } else {
+          await interaction.reply({ content: '❌ Queue is empty or too small to shuffle.', ephemeral: true });
+        }
+        return;
+      }
+      if (action === 'music_clear') {
+        const [, targetGuild] = interaction.customId.split(':');
+        if (targetGuild && targetGuild !== interaction.guild.id) return interaction.reply({ content: 'You cannot clear queue in another server.', ephemeral: true });
+
+        const { clearQueue } = await import('./music.js');
+        const result = clearQueue(interaction.guild.id);
+
+        if (result) {
+          await interaction.reply({ content: '🗑️ **Queue cleared!**', ephemeral: true });
+        } else {
+          await interaction.reply({ content: '❌ Failed to clear queue.', ephemeral: true });
+        }
+        return;
+      }
       if (action === 'guess_modal') {
         const [, gameId, min, max] = interaction.customId.split(':');
         // Show guess input modal (this would be handled by the guess command)
