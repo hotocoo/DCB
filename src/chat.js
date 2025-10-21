@@ -79,84 +79,165 @@ export async function respondWithOpenAI(prompt) {
 }
 
 export async function handleMessage(message) {
-  // Ignore bots
-  if (message.author.bot) return null;
+  try {
+    // Ignore bots
+    if (message.author.bot) return null;
 
-  const isDM = message.channel.type === 1 || message.channel?.type === 'DM';
+    const isDM = message.channel.type === 1 || message.channel?.type === 'DM';
 
-  // Only respond to DMs or mentions
-  const isMention = message.mentions && message.mentions.has && message.mentions.has(message.client.user.id);
-  if (!isDM && !isMention) return null;
+    // Only respond to DMs or mentions
+    const isMention = message.mentions && message.mentions.has && message.mentions.has(message.client.user.id);
+    if (!isDM && !isMention) return null;
 
-  const raw = message.content.replace(/<@!?.+?>/g, '').trim() || '';
+    const raw = message.content.replace(/<@!?.+?>/g, '').trim() || '';
 
-  // support a user command to clear conversation context
-  if (raw.toLowerCase() === '!clear') {
-    conversationMap.delete(message.author.id);
-    return 'Conversation cleared.';
-  }
-
-  const prompt = raw;
-
-  // per-user cooldown (ms)
-  const COOLDOWN_MS = Number(process.env.CHAT_COOLDOWN_MS || 1500);
-  const last = cooldownMap.get(message.author.id) || 0;
-  const now = Date.now();
-  if (now - last < COOLDOWN_MS) return null;
-  cooldownMap.set(message.author.id, now);
-
-  // Determine per-guild overrides
-  const guildCfg = message.guildId ? getGuild(message.guildId) : null;
-  const useLocalUrl = guildCfg?.modelUrl || LOCAL_MODEL_URL;
-  const useLocalApi = guildCfg?.modelApi || LOCAL_MODEL_API;
-  const chatEnabled = guildCfg?.chatEnabled ?? true;
-  const playEnabled = guildCfg?.playEnabled ?? true;
-
-  if (message.guildId && !chatEnabled) return null;
-
-  // Build conversation history if available
-  const history = conversationMap.get(message.author.id) || [];
-  history.push({ role: 'user', content: prompt });
-  // Trim history to last N messages
-  const MAX_HISTORY = Number(process.env.CHAT_MAX_HISTORY || 6);
-  if (history.length > MAX_HISTORY) history.splice(0, history.length - MAX_HISTORY);
-
-  // Prefer local model if provided
-  // Playful triggers handled before handing off to models (if enabled)
-  if (playEnabled) {
-    const playReply = handlePlayfulPrompt(prompt, message);
-    if (playReply) return playReply;
-  }
-
-  if (useLocalUrl) {
-    try {
-      const inPrompt = history.map(h => `${h.role}: ${h.content}`).join('\n');
-      const out = await callLocalModel(inPrompt || 'Hello', useLocalUrl, useLocalApi);
-      // store assistant response in history
-      if (out) history.push({ role: 'assistant', content: out });
-      conversationMap.set(message.author.id, history);
-      return out ?? "I couldn't generate a response from the local model.";
-    } catch (err) {
-      console.error('Local model failed, falling back', err);
+    // Support user commands
+    if (raw.toLowerCase() === '!clear') {
+      conversationMap.delete(message.author.id);
+      return '🧹 Conversation cleared! Starting fresh.';
     }
-  }
 
-  if (OPENAI_KEY) {
-    try {
-    const messages = history.map(h => ({ role: h.role, content: h.content }));
-    messages.push({ role: 'user', content: prompt || 'Hello' });
-    const reply = await respondWithOpenAI(messages.map(m => m.content).join('\n') || 'Hello');
-      if (reply) history.push({ role: 'assistant', content: reply });
-      conversationMap.set(message.author.id, history);
-      return reply ?? "I couldn't generate a response.";
-    } catch (err) {
-      console.error('OpenAI API error', err);
-      return "Sorry, I couldn't reach the AI service.";
+    if (raw.toLowerCase() === '!help') {
+      return '🤖 **Available Commands:**\n• `!clear` - Clear conversation history\n• `!status` - Check bot status\n• `!commands` - List all commands\n• Just chat normally for AI responses!';
     }
-  }
 
-  // Fallback: simple echo + hint
-  return `You said: ${prompt || message.content}`;
+    if (raw.toLowerCase() === '!status') {
+      const guilds = message.client.guilds.cache.size;
+      const users = message.client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0);
+      return `🤖 **Bot Status:**\n• Servers: ${guilds}\n• Users: ${users}\n• AI: ${OPENAI_KEY ? 'OpenAI ✓' : LOCAL_MODEL_URL ? 'Local Model ✓' : 'Basic Chat ✓'}\n• Version: ULTRA v3.0`;
+    }
+
+    if (raw.toLowerCase() === '!commands') {
+      return '📚 **All Commands:**\n• `/help` - Dynamic help system\n• `/rpg` - RPG adventures\n• `/trivia` - Quiz games\n• `/music` - Music system\n• `/guild` - Guild management\n• `/trade` - Trading system\n• `/profile` - User profiles\n• `/achievements` - Achievement system\n• And many more! Use `/help` for details.';
+    }
+
+    const prompt = raw;
+
+    // Enhanced cooldown system
+    const COOLDOWN_MS = Number(process.env.CHAT_COOLDOWN_MS || 2000);
+    const last = cooldownMap.get(message.author.id) || 0;
+    const now = Date.now();
+    if (now - last < COOLDOWN_MS) return null;
+    cooldownMap.set(message.author.id, now);
+
+    // Determine per-guild overrides
+    const guildCfg = message.guildId ? getGuild(message.guildId) : null;
+    const useLocalUrl = guildCfg?.modelUrl || LOCAL_MODEL_URL;
+    const useLocalApi = guildCfg?.modelApi || LOCAL_MODEL_API;
+    const chatEnabled = guildCfg?.chatEnabled ?? true;
+    const playEnabled = guildCfg?.playEnabled ?? true;
+
+    if (message.guildId && !chatEnabled) return null;
+
+    // Build enhanced conversation history
+    const history = conversationMap.get(message.author.id) || [];
+    history.push({ role: 'user', content: prompt });
+
+    // Trim history to last N messages
+    const MAX_HISTORY = Number(process.env.CHAT_MAX_HISTORY || 8);
+    if (history.length > MAX_HISTORY) history.splice(0, history.length - MAX_HISTORY);
+
+    // Enhanced personality and context
+    const contextPrompt = `You are ULTRA, an advanced AI Discord bot with many features including RPG games, trivia, music, trading, and more. You have a friendly, helpful personality and love to engage users in conversation.
+
+Current context:
+- User: ${message.author.username}
+- Channel: ${isDM ? 'Direct Message' : message.channel.name}
+- Server: ${message.guild?.name || 'Direct Message'}
+- Time: ${new Date().toLocaleString()}
+
+Previous conversation:
+${history.slice(-3).map(h => `${h.role}: ${h.content}`).join('\n')}
+
+User's message: ${prompt}
+
+Respond naturally and helpfully. If they're asking about bot features, mention relevant commands. Keep responses engaging but not too long.`;
+
+    // Try local model first if configured
+    if (useLocalUrl) {
+      try {
+        const response = await callLocalModel(contextPrompt, useLocalUrl, useLocalApi);
+        if (response) {
+          // Clean and format response
+          const cleanResponse = response.trim().substring(0, 2000);
+          history.push({ role: 'assistant', content: cleanResponse });
+          conversationMap.set(message.author.id, history);
+
+          // Log successful AI response
+          logger.info('Local model response generated', {
+            user: message.author.username,
+            responseLength: cleanResponse.length,
+            model: useLocalApi
+          });
+
+          return cleanResponse;
+        }
+      } catch (err) {
+        logger.warn('Local model failed, falling back to OpenAI', {
+          error: err.message,
+          user: message.author.username
+        });
+      }
+    }
+
+    // Try OpenAI if available
+    if (OPENAI_KEY) {
+      try {
+        const messages = [
+          {
+            role: 'system',
+            content: 'You are ULTRA, an advanced AI Discord bot with RPG games, trivia, music, trading, and many other features. Be friendly, helpful, and engaging. Keep responses under 2000 characters.'
+          },
+          ...history.map(h => ({ role: h.role, content: h.content }))
+        ];
+
+        const reply = await respondWithOpenAI(messages);
+        if (reply) {
+          const cleanReply = reply.trim().substring(0, 2000);
+          history.push({ role: 'assistant', content: cleanReply });
+          conversationMap.set(message.author.id, history);
+
+          // Log successful OpenAI response
+          logger.info('OpenAI response generated', {
+            user: message.author.username,
+            responseLength: cleanReply.length
+          });
+
+          return cleanReply;
+        }
+      } catch (err) {
+        logger.error('OpenAI API failed', err, {
+          user: message.author.username,
+          promptLength: prompt.length
+        });
+      }
+    }
+
+    // Enhanced fallback with more personality
+    const fallbackResponses = [
+      `💭 I'm thinking... "${prompt}" is an interesting message! While my AI brain is loading, did you know you can use /rpg to start an adventure?`,
+      `🤔 Processing your message: "${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}". My neural networks are warming up! Try /help to explore all features.`,
+      `🧠 Analyzing: "${prompt}". I'm getting smarter every day! Meanwhile, you can play /trivia or start an RPG adventure with /rpg.`,
+      `⚡ "${prompt}" - fascinating input! While I'm connecting to my AI core, why not try /music to play some tunes?`
+    ];
+
+    const fallbackResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+
+    // Store basic response in history
+    history.push({ role: 'assistant', content: fallbackResponse });
+    conversationMap.set(message.author.id, history);
+
+    return fallbackResponse;
+
+  } catch (error) {
+    logger.error('Chat message handling failed', error, {
+      user: message.author.username,
+      messageLength: message.content.length,
+      channel: message.channel.name
+    });
+
+    return '🤖 Oops! Something went wrong processing your message. Please try again.';
+  }
 }
 
 // Playful helpers: parse commands in free text and respond directly
