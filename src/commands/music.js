@@ -62,7 +62,7 @@ export async function execute(interaction) {
       addToQueue(guildId, { ...song, addedBy: interaction.user.id });
 
       // Join voice channel and play
-      const playResult = await play(guildId, voiceChannel, song);
+      const playResult = await play(guildId, userVoiceChannel, song);
 
       if (playResult.success) {
         const embed = new EmbedBuilder()
