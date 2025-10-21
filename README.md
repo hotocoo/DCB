@@ -1,3 +1,9 @@
+# NOTES
+
+not my work 
+
+LLMs: GPT-5 mini, code-supernova. gpt-oss:20b
+
 # 🚀 **ULTRA - The Most Advanced Discord Bot Ever Created** 🚀
 
 <div align="center">
