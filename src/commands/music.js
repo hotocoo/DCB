@@ -1,10 +1,9 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { searchSongs, getMusicStats } from '../music.js';
 
 export const data = new SlashCommandBuilder()
   .setName('music')
   .setDescription('Advanced music system with playlists and controls')
-  .setDefaultMemberPermissions(PermissionFlagsBits.Connect | PermissionFlagsBits.Speak)
   .addSubcommand(sub => sub.setName('play').setDescription('Play a song').addStringOption(opt => opt.setName('query').setDescription('Song name or URL').setRequired(true)))
   .addSubcommand(sub => sub.setName('search').setDescription('Search for songs').addStringOption(opt => opt.setName('query').setDescription('Search term').setRequired(true)))
   .addSubcommand(sub => sub.setName('skip').setDescription('Skip current song'))
@@ -61,8 +60,8 @@ export async function execute(interaction) {
       const { addToQueue, play } = await import('../music.js');
       addToQueue(guildId, { ...song, addedBy: interaction.user.id });
 
-      // Join voice channel and play
-      const playResult = await play(guildId, userVoiceChannel, song);
+      // Start playing
+      const playResult = play(guildId, userVoiceChannel, song);
 
       if (playResult.success) {
         const embed = new EmbedBuilder()
@@ -173,11 +172,6 @@ export async function execute(interaction) {
     }
 
   } else if (sub === 'resume') {
-    // Check if user is in voice channel
-    if (!interaction.member.voice.channel) {
-      return interaction.reply({ content: '🎵 You must be in a voice channel to control music!', ephemeral: true });
-    }
-
     const { resume } = await import('../music.js');
     const result = resume(guildId);
 
@@ -188,11 +182,6 @@ export async function execute(interaction) {
     }
 
   } else if (sub === 'stop') {
-    // Check if user is in voice channel
-    if (!interaction.member.voice.channel) {
-      return interaction.reply({ content: '🎵 You must be in a voice channel to control music!', ephemeral: true });
-    }
-
     const { stop } = await import('../music.js');
     const result = stop(guildId);
 
