@@ -1,20 +1,54 @@
 {
-  "name": "test-discord-bot",
-  "version": "0.1.0",
-  "description": "Minimal Discord bot scaffold",
+  "name": "ultra-discord-bot",
+  "version": "3.0.0",
+  "description": "ULTRA - The Most Advanced Discord Bot Ever Created",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "deploy": "node src/deploy-commands.js",
-    "test": "node tests/rpg.test.js"
+    "test": "node tests/rpg.test.js",
+    "install-deps": "npm install @discordjs/voice @discordjs/opus ytdl-core ffmpeg-static"
   },
   "engines": {
     "node": ">=18"
   },
+  "keywords": [
+    "discord",
+    "bot",
+    "rpg",
+    "gaming",
+    "music",
+    "ai",
+    "moderation",
+    "economy",
+    "social",
+    "entertainment"
+  ],
+  "author": "ULTRA Bot Development Team",
+  "license": "MIT",
   "dependencies": {
     "discord.js": "^14.16.0",
-    "dotenv": "^16.0.0"
-  }
+    "dotenv": "^16.0.0",
+    "@discordjs/voice": "^0.16.0",
+    "@discordjs/opus": "^0.9.0",
+    "ytdl-core": "^4.11.5",
+    "ffmpeg-static": "^5.2.0",
+    "axios": "^1.6.0",
+    "node-cron": "^3.0.3",
+    "ws": "^8.14.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0",
+    "eslint": "^8.50.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/ultra-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/ultra-bot/issues"
+  },
+  "homepage": "https://github.com/your-username/ultra-bot#readme"
 }
