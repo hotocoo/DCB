@@ -1020,6 +1020,33 @@ client.on('interactionCreate', async interaction => {
         // The actual game logic would need to be implemented with persistent state
         return;
       }
+      if (action === 'music_radio_change') {
+        const [, currentStation] = interaction.customId.split(':');
+        const stations = ['lofi', 'rock', 'electronic', 'jazz', 'classical'];
+        const nextStation = stations[(stations.indexOf(currentStation) + 1) % stations.length];
+
+        const stationNames = {
+          lofi: '🎵 Lo-fi Hip Hop',
+          rock: '🎸 Rock Classics',
+          electronic: '🎶 Electronic',
+          jazz: '🎷 Smooth Jazz',
+          classical: '🎼 Classical'
+        };
+
+        await interaction.reply({ content: `📻 **Changed to:** ${stationNames[nextStation]}\n🎵 *Now playing ${stationNames[nextStation]} radio!*`, ephemeral: true });
+        return;
+      }
+      if (action === 'ai_chat') {
+        const [, model, personality, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot continue AI chat for another user.', ephemeral: true });
+
+        // Show AI chat modal
+        const modal = new ModalBuilder().setCustomId(`ai_chat_modal:${model}:${personality}:${userId}`).setTitle('Continue AI Chat');
+        const messageInput = new TextInputBuilder().setCustomId('ai_message').setLabel('Your message').setStyle(TextInputStyle.Paragraph).setRequired(true).setPlaceholder('Continue the conversation...');
+        modal.addComponents({ type: 1, components: [messageInput] });
+        await interaction.showModal(modal);
+        return;
+      }
     }
 
     if (!interaction.isChatInputCommand()) return;
