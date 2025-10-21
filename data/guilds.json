@@ -1,1 +1,22 @@
-{}
+{
+  "test": {
+    "name": "test",
+    "leader": "333133024520568833",
+    "members": {
+      "333133024520568833": {
+        "name": "yhmh1314",
+        "role": "leader",
+        "joined": 1761017478759,
+        "level": 1,
+        "contribution": 0
+      }
+    },
+    "level": 1,
+    "experience": 0,
+    "gold": 0,
+    "created": 1761017478759,
+    "description": "",
+    "maxMembers": 10,
+    "isPublic": true
+  }
+}
