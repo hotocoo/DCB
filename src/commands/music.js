@@ -19,11 +19,6 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('playlist').setDescription('Playlist management').addStringOption(opt => opt.setName('action').setDescription('create|add|view').setRequired(true)).addStringOption(opt => opt.setName('name').setDescription('Playlist name')));
 
 export async function execute(interaction) {
-  // Check if user has permission to use music commands
-  if (!interaction.member.voice.channel) {
-    return interaction.reply({ content: '🎵 You need to be in a voice channel to use music commands!', ephemeral: true });
-  }
-
   const sub = interaction.options.getSubcommand();
   const guildId = interaction.guild.id;
 
@@ -31,9 +26,27 @@ export async function execute(interaction) {
     const query = interaction.options.getString('query');
 
     try {
-      // Check if user is in voice channel
-      if (!interaction.member.voice.channel) {
-        return interaction.reply({ content: '🎵 You must be in a voice channel to play music!', ephemeral: true });
+      // Enhanced voice channel check
+      const userVoiceChannel = interaction.member.voice?.channel;
+      if (!userVoiceChannel) {
+        return interaction.reply({
+          content: '🎵 **You must be in a voice channel to play music!**\n\n**Troubleshooting:**\n• Join a voice channel first\n• Make sure the bot has permission to view your voice channel\n• Check that the bot has "Connect" and "Speak" permissions',
+          ephemeral: true
+        });
+      }
+
+      // Additional validation
+      if (userVoiceChannel.guild.id !== interaction.guild.id) {
+        return interaction.reply({ content: '❌ You must be in a voice channel in this server!', ephemeral: true });
+      }
+
+      // Check bot permissions in voice channel
+      const botPermissions = userVoiceChannel.permissionsFor(interaction.guild.members.me);
+      if (!botPermissions.has('Connect') || !botPermissions.has('Speak')) {
+        return interaction.reply({
+          content: '❌ **I need permissions to join and speak in voice channels!**\n\n**Required Permissions:**\n• Connect\n• Speak\n• Use Voice Activity\n\nPlease give me these permissions in your voice channel.',
+          ephemeral: true
+        });
       }
 
       // Search for the song
@@ -50,7 +63,6 @@ export async function execute(interaction) {
       addToQueue(guildId, { ...song, addedBy: interaction.user.id });
 
       // Join voice channel and play
-      const voiceChannel = interaction.member.voice.channel;
       const playResult = await play(guildId, voiceChannel, song);
 
       if (playResult.success) {
@@ -61,7 +73,7 @@ export async function execute(interaction) {
           .addFields(
             { name: '⏱️ Duration', value: song.duration, inline: true },
             { name: '👤 Requested by', value: interaction.user.username, inline: true },
-            { name: '🔊 Voice Channel', value: voiceChannel.name, inline: true }
+            { name: '🔊 Voice Channel', value: userVoiceChannel.name, inline: true }
           );
 
         const row = new ActionRowBuilder().addComponents(
