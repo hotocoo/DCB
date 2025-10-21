@@ -31,6 +31,11 @@ export async function execute(interaction) {
     const query = interaction.options.getString('query');
 
     try {
+      // Check if user is in voice channel
+      if (!interaction.member.voice.channel) {
+        return interaction.reply({ content: '🎵 You must be in a voice channel to play music!', ephemeral: true });
+      }
+
       // Search for the song
       const searchResults = await searchSongs(query, 1);
 
@@ -50,17 +55,24 @@ export async function execute(interaction) {
 
       if (playResult.success) {
         const embed = new EmbedBuilder()
-          .setTitle('🎵 Song Added to Queue')
+          .setTitle('🎵 Now Playing')
           .setColor(0x00FF00)
           .setDescription(`**${song.title}** by ${song.artist}`)
           .addFields(
             { name: '⏱️ Duration', value: song.duration, inline: true },
-            { name: '👤 Added by', value: interaction.user.username, inline: true }
+            { name: '👤 Requested by', value: interaction.user.username, inline: true },
+            { name: '🔊 Voice Channel', value: voiceChannel.name, inline: true }
           );
 
-        await interaction.reply({ embeds: [embed] });
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`music_pause:${guildId}`).setLabel('⏸️ Pause').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`music_skip:${guildId}`).setLabel('⏭️ Skip').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`music_stop:${guildId}`).setLabel('⏹️ Stop').setStyle(ButtonStyle.Danger)
+        );
+
+        await interaction.reply({ embeds: [embed], components: [row] });
       } else {
-        await interaction.reply({ content: '❌ Failed to play song. Please try again.', ephemeral: true });
+        await interaction.reply({ content: `❌ Failed to play song: ${playResult.error}`, ephemeral: true });
       }
 
     } catch (error) {
@@ -115,6 +127,11 @@ export async function execute(interaction) {
     }
 
   } else if (sub === 'skip') {
+    // Check if user is in voice channel
+    if (!interaction.member.voice.channel) {
+      return interaction.reply({ content: '🎵 You must be in a voice channel to control music!', ephemeral: true });
+    }
+
     const { skip } = await import('../music.js');
     const nextSong = skip(guildId);
 
@@ -130,6 +147,11 @@ export async function execute(interaction) {
     }
 
   } else if (sub === 'pause') {
+    // Check if user is in voice channel
+    if (!interaction.member.voice.channel) {
+      return interaction.reply({ content: '🎵 You must be in a voice channel to control music!', ephemeral: true });
+    }
+
     const { pause } = await import('../music.js');
     const result = pause(guildId);
 
@@ -140,6 +162,11 @@ export async function execute(interaction) {
     }
 
   } else if (sub === 'resume') {
+    // Check if user is in voice channel
+    if (!interaction.member.voice.channel) {
+      return interaction.reply({ content: '🎵 You must be in a voice channel to control music!', ephemeral: true });
+    }
+
     const { resume } = await import('../music.js');
     const result = resume(guildId);
 
@@ -150,6 +177,11 @@ export async function execute(interaction) {
     }
 
   } else if (sub === 'stop') {
+    // Check if user is in voice channel
+    if (!interaction.member.voice.channel) {
+      return interaction.reply({ content: '🎵 You must be in a voice channel to control music!', ephemeral: true });
+    }
+
     const { stop } = await import('../music.js');
     const result = stop(guildId);
 
@@ -160,6 +192,11 @@ export async function execute(interaction) {
     }
 
   } else if (sub === 'queue') {
+    // Check if user is in voice channel
+    if (!interaction.member.voice.channel) {
+      return interaction.reply({ content: '🎵 You must be in a voice channel to view the queue!', ephemeral: true });
+    }
+
     const { getQueue, getMusicStats } = await import('../music.js');
     const queue = getQueue(guildId);
     const stats = getMusicStats(guildId);
@@ -216,6 +253,11 @@ export async function execute(interaction) {
     await interaction.reply({ embeds: [embed], components: [row] });
 
   } else if (sub === 'shuffle') {
+    // Check if user is in voice channel
+    if (!interaction.member.voice.channel) {
+      return interaction.reply({ content: '🎵 You must be in a voice channel to control music!', ephemeral: true });
+    }
+
     const { shuffleQueue } = await import('../music.js');
     const result = shuffleQueue(guildId);
 
@@ -226,10 +268,15 @@ export async function execute(interaction) {
     }
 
   } else if (sub === 'volume') {
+    // Check if user is in voice channel
+    if (!interaction.member.voice.channel) {
+      return interaction.reply({ content: '🎵 You must be in a voice channel to control music!', ephemeral: true });
+    }
+
     const volume = interaction.options.getInteger('level');
 
-    if (volume < 0 || volume > 100) {
-      return interaction.reply({ content: '❌ Volume must be between 0 and 100.', ephemeral: true });
+    if (volume < 0 || volume > 200) {
+      return interaction.reply({ content: '❌ Volume must be between 0 and 200.', ephemeral: true });
     }
 
     const { setVolume } = await import('../music.js');
