@@ -142,6 +142,8 @@ export async function execute(interaction) {
     try {
       const nextSong = skip(interaction.guild.id);
       if (nextSong) {
+        if (!nextSong.title) nextSong.title = 'Unknown';
+        if (!nextSong.artist) nextSong.artist = 'Unknown';
         const embed = new EmbedBuilder()
           .setTitle('⏭️ Song Skipped')
           .setColor(0xFFA500)
@@ -151,13 +153,13 @@ export async function execute(interaction) {
             { name: '👤 Requested by', value: interaction.user.username, inline: true }
           )
           .setThumbnail(nextSong.thumbnail || 'https://i.imgur.com/SjIgjlE.png');
-
+      
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`music_pause:${interaction.guild.id}`).setLabel('⏸️ Pause').setStyle(ButtonStyle.Primary),
           new ButtonBuilder().setCustomId(`music_skip:${interaction.guild.id}`).setLabel('⏭️ Skip').setStyle(ButtonStyle.Secondary),
           new ButtonBuilder().setCustomId(`music_stop:${interaction.guild.id}`).setLabel('⏹️ Stop').setStyle(ButtonStyle.Danger)
         );
-
+      
         await interaction.reply({ embeds: [embed], components: [row] });
       } else {
         await interaction.reply({ content: '❌ No songs in queue to skip.', ephemeral: true });

@@ -1,5 +1,6 @@
 node_modules/
 .env
+.env.backup
 # Ignore local env files
 # Create a local .env (not committed) with your tokens and config
 # .env should contain DISCORD_TOKEN, CLIENT_ID, GUILD_ID, etc.
