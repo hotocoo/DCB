@@ -260,7 +260,9 @@ const ITEMS = {
   // Materials
   'iron_ore': { name: 'Iron Ore', type: 'material', rarity: 'common', value: 5, description: 'Raw iron for crafting' },
   'magic_crystal': { name: 'Magic Crystal', type: 'material', rarity: 'rare', value: 100, description: 'Contains magical energy' },
-  'dragon_scale': { name: 'Dragon Scale', type: 'material', rarity: 'legendary', value: 500, description: 'Priceless crafting material' }
+  'dragon_scale': { name: 'Dragon Scale', type: 'material', rarity: 'legendary', value: 500, description: 'Priceless crafting material' },
+  'gold_ore': { name: 'Gold Ore', type: 'material', rarity: 'uncommon', value: 50, description: 'Shiny gold for high-value crafting' },
+  'mithril_ingot': { name: 'Mithril Ingot', type: 'material', rarity: 'legendary', value: 2000, description: 'Lightweight and incredibly strong' }
 };
 
 const ITEM_RARITIES = {
@@ -300,7 +302,8 @@ function getItemLevelRequirement(itemKey) {
     rusty_sword: 1, iron_sword: 3, magic_staff: 8, legendary_blade: 15,
     leather_armor: 1, chain_mail: 4, plate_armor: 10, dragon_armor: 20,
     health_potion: 1, mana_potion: 5, revive_crystal: 12,
-    iron_ore: 1, magic_crystal: 7, dragon_scale: 18
+    iron_ore: 1, magic_crystal: 7, dragon_scale: 18,
+    gold_ore: 5, mithril_ingot: 25
   };
   return levelReqs[itemKey] || 1;
 }
@@ -500,6 +503,32 @@ export function createQuest(userId, title, desc) {
   return q;
 }
 
+export function generateRandomQuest(userId, level = 1) {
+  const questTypes = [
+    { title: `Slay ${5 + level * 2} Goblins`, desc: `Defeat ${5 + level * 2} goblins in combat.`, requirement: 'goblins_defeated', amount: 5 + level * 2 },
+    { title: `Collect ${3 + level} Health Potions`, desc: `Gather ${3 + level} health potions from exploration.`, requirement: 'potions_collected', amount: 3 + level },
+    { title: `Reach Level ${level + 5}`, desc: `Gain enough XP to reach level ${level + 5}.`, requirement: 'level_reached', amount: level + 5 },
+    { title: `Earn ${100 + level * 50} Gold`, desc: `Accumulate ${100 + level * 50} gold through various activities.`, requirement: 'gold_earned', amount: 100 + level * 50 }
+  ];
+
+  const randomType = questTypes[Math.floor(Math.random() * questTypes.length)];
+  const quest = createQuest(userId, randomType.title, randomType.desc);
+  quest.requirement = randomType.requirement;
+  quest.amount = randomType.amount;
+
+  // Update the quest in storage
+  const all = readQuests();
+  const userQuests = all[userId] || [];
+  const index = userQuests.findIndex(q => q.id === quest.id);
+  if (index !== -1) {
+    userQuests[index] = quest;
+    all[userId] = userQuests;
+    writeQuests(all);
+  }
+
+  return quest;
+}
+
 export function listQuests(userId) {
   const all = readQuests();
   return all[userId] || [];
@@ -511,6 +540,23 @@ export function completeQuest(userId, questId) {
   const q = arr.find(x => x.id === Number(questId));
   if (!q) return null;
   q.status = 'completed';
+  writeQuests(all);
+  return q;
+}
+
+export function generateRandomQuest(userId, level = 1) {
+  const all = readQuests();
+  all[userId] = all[userId] || [];
+  const questTypes = [
+    { title: `Slay ${5 + level * 2} Goblins`, desc: `Defeat ${5 + level * 2} goblins in combat.`, requirement: 'goblins_defeated', amount: 5 + level * 2 },
+    { title: `Collect ${3 + level} Health Potions`, desc: `Gather ${3 + level} health potions from exploration.`, requirement: 'potions_collected', amount: 3 + level },
+    { title: `Reach Level ${level + 5}`, desc: `Gain enough XP to reach level ${level + 5}.`, requirement: 'level_reached', amount: level + 5 },
+    { title: `Earn ${100 + level * 50} Gold`, desc: `Accumulate ${100 + level * 50} gold through various activities.`, requirement: 'gold_earned', amount: 100 + level * 50 }
+  ];
+
+  const randomType = questTypes[Math.floor(Math.random() * questTypes.length)];
+  const q = { id: Date.now(), title: randomType.title, desc: randomType.desc, status: 'open', requirement: randomType.requirement, amount: randomType.amount };
+  all[userId].push(q);
   writeQuests(all);
   return q;
 }

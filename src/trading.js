@@ -261,7 +261,9 @@ class TradingManager {
 
     // Refund previous highest bidder if exists
     if (auction.highestBidder && auction.highestBidder !== bidderId) {
-      // In real implementation, refund gold to previous bidder
+      // Import economy functions for refund
+      const { addBalance } = require('./economy.js');
+      addBalance(auction.highestBidder, auction.currentBid);
     }
 
     auction.currentBid = bidAmount;
@@ -313,8 +315,8 @@ class TradingManager {
     }
 
     const prices = relevantTrades.map(trade => {
-      // Extract price from trade data (simplified)
-      return Math.floor(Math.random() * 100) + 50; // Placeholder
+      // Calculate price based on gold involved in trade
+      return (trade.offer.gold + trade.request.gold) || 50; // Use gold amount or default
     });
 
     return {

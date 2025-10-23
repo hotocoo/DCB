@@ -1,7 +1,10 @@
 
 import 'dotenv/config';
+import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
+import ytdl from 'ytdl-core';
+import axios from 'axios';
 
-// Ultra-Simplified Music System (No Complex Audio Streaming)
+// Enhanced Music System with Real Audio Streaming
 class MusicManager {
   constructor() {
     this.queue = new Map(); // guildId -> queue array
@@ -9,6 +12,7 @@ class MusicManager {
     this.musicSettings = new Map(); // guildId -> settings
     this.isPlaying = new Map(); // guildId -> boolean
     this.voiceChannels = new Map(); // guildId -> voice channel info
+    this.audioPlayers = new Map(); // guildId -> audio player
   }
 
   // Queue Management
@@ -106,26 +110,64 @@ class MusicManager {
   }
 
   // Search and Discovery
-  searchSongs(query, limit = 10) {
+  async searchSongs(query, limit = 10) {
     try {
-      // This would integrate with music APIs like Spotify, YouTube, SoundCloud
-      // For now, return mock results
-      const mockResults = [
-        { title: `Song about ${query}`, artist: 'Demo Artist', duration: '3:45', url: 'demo://song1' },
-        { title: `Another ${query} track`, artist: 'Another Artist', duration: '4:12', url: 'demo://song2' },
-        { title: `${query} remix`, artist: 'Remix Artist', duration: '5:20', url: 'demo://song3' }
-      ];
-
-      return mockResults.slice(0, limit);
+      // Check if query is a YouTube URL
+      if (ytdl.validateURL(query)) {
+        const info = await ytdl.getInfo(query);
+        const video = info.videoDetails;
+        return [{
+          title: video.title,
+          artist: video.author.name,
+          duration: video.lengthSeconds ? `${Math.floor(video.lengthSeconds / 60)}:${(video.lengthSeconds % 60).toString().padStart(2, '0')}` : 'Unknown',
+          url: query,
+          thumbnail: video.thumbnails[0]?.url || ''
+        }];
+      }
+      // For text queries, implement YouTube search (requires API key for full functionality)
+      // For demo, return a placeholder with note
+      return [{
+        title: `Search for "${query}"`,
+        artist: 'YouTube',
+        duration: '3:45',
+        url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+        note: 'Real search requires YouTube Data API key'
+      }];
     } catch (error) {
       console.error('Music search error:', error);
       return [];
     }
   }
 
-  // Ultra-Simplified Music Controls (No Complex Audio)
-  play(guildId, voiceChannel, song) {
+  // Real Music Playback with Voice Integration
+  async play(guildId, voiceChannel, song) {
     try {
+      // Join voice channel
+      const connection = joinVoiceChannel({
+        channelId: voiceChannel.id,
+        guildId: guildId,
+        adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+      });
+
+      // Create audio player
+      const player = createAudioPlayer();
+      this.audioPlayers.set(guildId, player);
+
+      connection.on('stateChange', (oldState, newState) => {
+        console.log(`Connection state change: ${oldState.status} -> ${newState.status}`);
+      });
+
+      player.on(AudioPlayerStatus.Idle, () => {
+        this.playNext(guildId);
+      });
+
+      player.on(AudioPlayerStatus.Playing, () => {
+        console.log('Audio player is playing');
+      });
+
+      // Subscribe to connection
+      connection.subscribe(player);
+
       // Store voice channel info
       this.voiceChannels.set(guildId, {
         id: voiceChannel.id,
@@ -143,6 +185,16 @@ class MusicManager {
       // Mark as playing
       this.isPlaying.set(guildId, true);
 
+      // Stream audio using ytdl-core if it's a YouTube URL
+      if (ytdl.validateURL(song.url)) {
+        const stream = ytdl(song.url, { filter: 'audioonly' });
+        const resource = createAudioResource(stream, { inputType: 'arbitrary' });
+        player.play(resource);
+      } else {
+        // Fallback for non-YouTube URLs
+        return { success: false, error: 'Unsupported URL format' };
+      }
+
       return { success: true, song };
     } catch (error) {
       console.error('Play music error:', error);
@@ -150,27 +202,6 @@ class MusicManager {
     }
   }
 
-  // Simplified audio resource (no actual audio)
-  getAudioResource(song) {
-    try {
-      // Return a mock audio resource
-      return {
-        playStream: null,
-        edges: [],
-        metadata: null,
-        volume: 1.0,
-        encoder: null,
-        audioPlayer: null,
-        playbackDuration: 0,
-        started: false,
-        silencePaddingFrames: 5,
-        silenceRemaining: -1
-      };
-    } catch (error) {
-      console.error('Failed to get audio resource:', error);
-      throw error;
-    }
-  }
 
   // Simplified Music Controls
   pause(guildId) {
@@ -181,6 +212,13 @@ class MusicManager {
     if (current) current.status = 'paused';
 
     this.isPlaying.set(guildId, false);
+
+    // Pause the audio player
+    const player = this.audioPlayers.get(guildId);
+    if (player) {
+      player.pause();
+    }
+
     return true;
   }
 
@@ -190,6 +228,13 @@ class MusicManager {
 
     current.status = 'playing';
     this.isPlaying.set(guildId, true);
+
+    // Resume the audio player
+    const player = this.audioPlayers.get(guildId);
+    if (player) {
+      player.unpause();
+    }
+
     return true;
   }
 
@@ -204,10 +249,27 @@ class MusicManager {
       status: 'playing'
     });
 
+    // Play the next song using the existing player
+    const player = this.audioPlayers.get(guildId);
+    if (player && ytdl.validateURL(nextSong.url)) {
+      const stream = ytdl(nextSong.url, { filter: 'audioonly' });
+      const resource = createAudioResource(stream, { inputType: 'arbitrary' });
+      player.play(resource);
+    }
+
     return nextSong;
   }
 
   stop(guildId) {
+    const connection = getVoiceConnection(guildId);
+    if (connection) {
+      connection.destroy();
+    }
+    const player = this.audioPlayers.get(guildId);
+    if (player) {
+      player.stop();
+      this.audioPlayers.delete(guildId);
+    }
     this.currentlyPlaying.delete(guildId);
     this.clearQueue(guildId);
     this.isPlaying.delete(guildId);
@@ -220,6 +282,7 @@ class MusicManager {
     const queue = this.getQueue(guildId);
     if (queue.length === 0) {
       this.currentlyPlaying.delete(guildId);
+      this.isPlaying.set(guildId, false);
       return false;
     }
 
@@ -229,6 +292,14 @@ class MusicManager {
       startedAt: Date.now(),
       status: 'playing'
     });
+
+    // Play the next song using the existing player
+    const player = this.audioPlayers.get(guildId);
+    if (player && ytdl.validateURL(nextSong.url)) {
+      const stream = ytdl(nextSong.url, { filter: 'audioonly' });
+      const resource = createAudioResource(stream, { inputType: 'arbitrary' });
+      player.play(resource);
+    }
 
     return nextSong;
   }
@@ -241,18 +312,12 @@ class MusicManager {
     // Apply volume to current player if exists
     const player = this.audioPlayers.get(guildId);
     if (player) {
-      // Volume would be applied to the audio resource
-      // This is a simplified implementation
+      const resource = player.state.resource;
+      if (resource && resource.volume) {
+        resource.volume.setVolume(settings.volume / 100); // Convert to 0-1 scale
+      }
     }
 
-    return settings.volume;
-  }
-
-  // Volume and Audio Settings
-  setVolume(guildId, volume) {
-    const settings = this.musicSettings.get(guildId) || {};
-    settings.volume = Math.max(0, Math.min(100, volume));
-    this.musicSettings.set(guildId, settings);
     return settings.volume;
   }
 
@@ -283,15 +348,19 @@ class MusicManager {
   // Lyrics and Song Info
   async getLyrics(songTitle, artist) {
     try {
-      // This would integrate with lyrics APIs
-      // For now, return mock lyrics
-      return {
-        title: songTitle,
-        artist,
-        lyrics: `[Verse 1]\nThis is a sample lyric for ${songTitle}\nBy ${artist}\n\n[Chorus]\nLa la la la la\nSample chorus line\n\n[Verse 2]\nAnother verse here\nWith more sample text`,
-        source: 'Mock Lyrics API'
-      };
+      // Use Lyrics.ovh API for real lyrics
+      const response = await axios.get(`https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(songTitle)}`);
+      if (response.data.lyrics) {
+        return {
+          title: songTitle,
+          artist,
+          lyrics: response.data.lyrics,
+          source: 'Lyrics.ovh'
+        };
+      }
+      return null;
     } catch (error) {
+      console.error('Lyrics fetch error:', error);
       return null;
     }
   }
@@ -420,8 +489,8 @@ export async function stop(guildId) {
   return musicManager.stop(guildId);
 }
 
-export function setVolume(guildId, volume) {
-  return musicManager.setVolume(guildId, volume);
+export async function setVolume(guildId, volume) {
+  return await musicManager.setVolume(guildId, volume);
 }
 
 export function getVolume(guildId) {
