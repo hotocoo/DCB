@@ -10,7 +10,9 @@ import {
   sellToMarket,
   getUserEconomyStats,
   getTransactionHistory,
-  createLottery
+  createLottery,
+  getUserBusinesses,
+  claimDailyReward
 } from '../economy.js';
 
 export const data = new SlashCommandBuilder()
@@ -27,7 +29,8 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('market').setDescription('Marketplace').addStringOption(opt => opt.setName('action').setDescription('buy|sell|prices').setRequired(true)).addStringOption(opt => opt.setName('item').setDescription('Item to buy/sell')).addIntegerOption(opt => opt.setName('quantity').setDescription('Quantity')))
   .addSubcommand(sub => sub.setName('lottery').setDescription('Play the lottery').addIntegerOption(opt => opt.setName('ticket_price').setDescription('Ticket price').setRequired(true)))
   .addSubcommand(sub => sub.setName('history').setDescription('Transaction history').addIntegerOption(opt => opt.setName('limit').setDescription('Number of transactions')))
-  .addSubcommand(sub => sub.setName('stats').setDescription('Economy statistics'));
+  .addSubcommand(sub => sub.setName('stats').setDescription('Economy statistics'))
+  .addSubcommand(sub => sub.setName('daily').setDescription('Claim your daily reward'));
 
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
@@ -140,8 +143,30 @@ export async function execute(interaction) {
       }
 
     } else if (action === 'list') {
-      // This would show user's businesses
-      await interaction.reply({ content: '🏢 **Your Businesses:**\n*Business listing feature coming soon!*', ephemeral: true });
+      const businesses = getUserBusinesses(interaction.user.id);
+
+      if (businesses.length === 0) {
+        return interaction.reply({ content: '🏢 You have no businesses yet. Use `/economy business action:create` to start one!', ephemeral: true });
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle('🏢 Your Businesses')
+        .setColor(0xFFD700)
+        .setDescription('Manage your business empire!');
+
+      businesses.forEach((business, index) => {
+        const now = Date.now();
+        const hoursSinceCollection = (now - business.lastCollected) / (1000 * 60 * 60);
+        const pendingIncome = Math.floor(business.income * hoursSinceCollection);
+
+        embed.addFields({
+          name: `${index + 1}. ${business.type.charAt(0).toUpperCase() + business.type.slice(1)} (${business.level})`,
+          value: `💰 Income: ${business.income}/hour\n🕐 Pending: ${pendingIncome} gold\n👥 Employees: ${business.employees}\n🔧 Upgrades: ${business.upgrades}`,
+          inline: true
+        });
+      });
+
+      await interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
   } else if (sub === 'market') {
@@ -308,5 +333,27 @@ export async function execute(interaction) {
     );
 
     await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+  } else if (sub === 'daily') {
+    const result = claimDailyReward(interaction.user.id);
+
+    if (result.success) {
+      const embed = new EmbedBuilder()
+        .setTitle('🎁 Daily Reward Claimed!')
+        .setColor(0x00FF00)
+        .setDescription(`You claimed your daily reward!`)
+        .addFields(
+          { name: '💰 Reward', value: `${result.reward} gold`, inline: true },
+          { name: '🔥 Streak', value: `${result.streak} days`, inline: true }
+        );
+
+      await interaction.reply({ embeds: [embed] });
+    } else {
+      const embed = new EmbedBuilder()
+        .setTitle('⏰ Daily Reward Not Available')
+        .setColor(0xFFA500)
+        .setDescription(`Your daily reward will be available in ${result.hoursLeft} hours.`);
+
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+    }
   }
 }

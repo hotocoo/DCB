@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { hangmanGames } from '../index.js';
 
 const WORDS = [
   // Easy words
@@ -60,9 +61,12 @@ export async function execute(interaction) {
     maxWrongGuesses: 7,
     guessedWord: word.replace(/[A-Z]/g, '_'),
     gameActive: true,
-    startTime: Date.now()
+    startTime: Date.now(),
+    userId: interaction.user.id,
+    interaction: interaction
   };
 
+  hangmanGames.set(interaction.user.id, gameState);
   await sendHangmanBoard(interaction, gameState);
 }
 
