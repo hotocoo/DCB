@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { hangmanGames } from '../index.js';
+import { hangmanGames } from '../game-states.js';
 
 const WORDS = [
   // Easy words
