@@ -1235,13 +1235,67 @@ client.on('interactionCreate', async interaction => {
         const [, targetGuild] = interaction.customId.split(':');
         if (targetGuild && targetGuild !== interaction.guild.id) return interaction.reply({ content: 'You cannot pause music in another server.', ephemeral: true });
 
-        const { pause } = await import('./music.js');
+        const { pause, getMusicStats } = await import('./music.js');
         const result = pause(interaction.guild.id);
 
         if (result) {
-          await interaction.reply({ content: '⏸️ **Music paused!**', ephemeral: true });
+          // Update the button to show "Resume" instead of "Pause"
+          const currentRow = interaction.message.components[0];
+          if (currentRow && currentRow.components) {
+            const newRow = currentRow.components.map(button => {
+              if (button.customId === `music_pause:${interaction.guild.id}`) {
+                return new ButtonBuilder()
+                  .setCustomId(`music_resume:${interaction.guild.id}`)
+                  .setLabel('▶️ Resume')
+                  .setStyle(ButtonStyle.Success);
+              }
+              return ButtonBuilder.from(button);
+            });
+
+            await interaction.update({
+              content: interaction.message.content,
+              embeds: interaction.message.embeds,
+              components: [new ActionRowBuilder().addComponents(newRow)]
+            });
+          } else {
+            await interaction.reply({ content: '⏸️ **Music paused!**', ephemeral: true });
+          }
         } else {
           await interaction.reply({ content: '❌ No music currently playing.', ephemeral: true });
+        }
+        return;
+      }
+      if (action === 'music_resume') {
+        const [, targetGuild] = interaction.customId.split(':');
+        if (targetGuild && targetGuild !== interaction.guild.id) return interaction.reply({ content: 'You cannot resume music in another server.', ephemeral: true });
+
+        const { resume, getMusicStats } = await import('./music.js');
+        const result = resume(interaction.guild.id);
+
+        if (result) {
+          // Update the button back to show "Pause" instead of "Resume"
+          const currentRow = interaction.message.components[0];
+          if (currentRow && currentRow.components) {
+            const newRow = currentRow.components.map(button => {
+              if (button.customId === `music_resume:${interaction.guild.id}`) {
+                return new ButtonBuilder()
+                  .setCustomId(`music_pause:${interaction.guild.id}`)
+                  .setLabel('⏸️ Pause')
+                  .setStyle(ButtonStyle.Primary);
+              }
+              return ButtonBuilder.from(button);
+            });
+
+            await interaction.update({
+              content: interaction.message.content,
+              embeds: interaction.message.embeds,
+              components: [new ActionRowBuilder().addComponents(newRow)]
+            });
+          } else {
+            await interaction.reply({ content: '▶️ **Music resumed!**', ephemeral: true });
+          }
+        } else {
+          await interaction.reply({ content: '❌ No paused music to resume.', ephemeral: true });
         }
         return;
       }
@@ -1249,11 +1303,32 @@ client.on('interactionCreate', async interaction => {
         const [, targetGuild] = interaction.customId.split(':');
         if (targetGuild && targetGuild !== interaction.guild.id) return interaction.reply({ content: 'You cannot skip music in another server.', ephemeral: true });
 
-        const { skip } = await import('./music.js');
+        const { skip, getMusicStats } = await import('./music.js');
         const nextSong = skip(interaction.guild.id);
+        const stats = getMusicStats(interaction.guild.id);
 
         if (nextSong) {
-          await interaction.reply({ content: `⏭️ **Skipped to:** ${nextSong.title} by ${nextSong.artist}`, ephemeral: true });
+          // Update the embed with the new song info
+          const embed = interaction.message.embeds[0];
+          if (embed) {
+            const newEmbed = {
+              title: embed.title,
+              color: embed.color,
+              description: `**${nextSong.title}** by **${nextSong.artist}**`,
+              fields: [
+                { name: '⏱️ Duration', value: nextSong.duration, inline: true },
+                { name: '👤 Requested by', value: embed.fields[2]?.value || 'Unknown', inline: true }
+              ],
+              thumbnail: nextSong.thumbnail || embed.thumbnail
+            };
+
+            await interaction.update({
+              embeds: [newEmbed],
+              components: interaction.message.components
+            });
+          } else {
+            await interaction.reply({ content: `⏭️ **Skipped to:** ${nextSong.title} by ${nextSong.artist}`, ephemeral: true });
+          }
         } else {
           await interaction.reply({ content: '❌ No songs in queue to skip to.', ephemeral: true });
         }
@@ -1267,7 +1342,12 @@ client.on('interactionCreate', async interaction => {
         const result = stop(interaction.guild.id);
 
         if (result) {
-          await interaction.reply({ content: '⏹️ **Music stopped and queue cleared!**', ephemeral: true });
+          // Remove all buttons since music is stopped
+          await interaction.update({
+            content: '⏹️ **Music stopped and queue cleared!**',
+            embeds: [],
+            components: []
+          });
         } else {
           await interaction.reply({ content: '❌ Failed to stop music.', ephemeral: true });
         }
@@ -1299,6 +1379,48 @@ client.on('interactionCreate', async interaction => {
         } else {
           await interaction.reply({ content: '❌ Failed to clear queue.', ephemeral: true });
         }
+        return;
+      }
+      if (action === 'music_queue') {
+        const [, targetGuild] = interaction.customId.split(':');
+        if (targetGuild && targetGuild !== interaction.guild.id) return interaction.reply({ content: 'You cannot view queue in another server.', ephemeral: true });
+
+        const { getQueue, getMusicStats } = await import('./music.js');
+        const queue = getQueue(interaction.guild.id);
+        const stats = getMusicStats(interaction.guild.id);
+        const current = stats.currentlyPlaying;
+
+        let description = '';
+        if (current) {
+          description += `🎵 **Currently Playing:** ${current.title} by ${current.artist}\n`;
+          description += `⏱️ Progress: ${Math.floor(current.progress / 1000)}s / ${current.duration}\n\n`;
+        }
+        if (queue.length > 0) {
+          description += '📋 **Queue:**\n';
+          queue.slice(0, 10).forEach((song, index) => {
+            description += `${index + 1}. ${song.title} by ${song.artist} (${song.duration})\n`;
+          });
+          if (queue.length > 10) {
+            description += `... and ${queue.length - 10} more songs`;
+          }
+        } else {
+          description += '📭 Queue is empty.';
+        }
+
+        const embed = {
+          title: '🎵 Music Queue',
+          color: 0x0099FF,
+          description,
+          fields: [
+            {
+              name: '📊 Queue Info',
+              value: `**Total Songs:** ${stats.queueLength}\n**Volume:** ${stats.volume}%`,
+              inline: true
+            }
+          ]
+        };
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
       }
       if (action === 'guess_modal') {
