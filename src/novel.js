@@ -27,7 +27,20 @@ export async function generateChapter(guildId, novelId) {
   const chapIndex = novel.chapters.length + 1;
   const prompt = `Write chapter ${chapIndex} of the light novel titled "${novel.title}". Context: ${novel.prompt}. Keep it short (~300 words).`;
   const text = await generate(guildId, prompt);
-  const chapter = { index: chapIndex, text: text || `A short chapter placeholder for ${novel.title}.` };
+  if (!text) {
+    // Fallback to a template-based chapter
+    const templates = [
+      `Chapter ${chapIndex}: The Journey Begins\n\nIn the world of ${novel.title}, our hero embarks on an epic adventure. Guided by the context of ${novel.prompt}, they face challenges and discover new horizons.`,
+      `Chapter ${chapIndex}: Unexpected Twists\n\nAs the story unfolds in ${novel.title}, surprises await. Building on ${novel.prompt}, the narrative takes a thrilling turn.`,
+      `Chapter ${chapIndex}: Deep Reflections\n\nOur characters in ${novel.title} pause to reflect. Drawing from ${novel.prompt}, they grow and evolve.`
+    ];
+    const fallbackText = templates[chapIndex % templates.length];
+    const chapter = { index: chapIndex, text: fallbackText };
+    novel.chapters.push(chapter);
+    const all = readAll(); all[novelId] = novel; writeAll(all);
+    return chapter;
+  }
+  const chapter = { index: chapIndex, text };
   novel.chapters.push(chapter);
   const all = readAll(); all[novelId] = novel; writeAll(all);
   return chapter;

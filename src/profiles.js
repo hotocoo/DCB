@@ -502,14 +502,45 @@ class ProfileManager {
   }
 
   evaluateRequirement(profile, requirement) {
-    // Simple evaluation for demonstration
-    // In real implementation, use a proper expression evaluator
     try {
+      // Improved requirement evaluator with basic expression parsing
       const stats = profile.statistics;
-      return eval(requirement.replace(/(\w+)/g, 'stats.$1'));
+
+      // Replace stat paths with actual values, e.g., 'rpg.highest_level' -> stats.rpg.highest_level
+      const expression = requirement.replace(/(\w+(?:\.\w+)*)/g, (match) => {
+        const keys = match.split('.');
+        let value = stats;
+        for (const key of keys) {
+          value = value?.[key];
+        }
+        return typeof value === 'number' ? value : `'${value}'`;
+      });
+
+      // Use a safe evaluator for basic comparisons
+      return this.safeEval(expression);
     } catch {
       return false;
     }
+  }
+
+  safeEval(expr) {
+    // Basic safe evaluator for simple expressions like '>= 5', '== 100', etc.
+    // This is still limited but safer than full eval
+    const match = expr.match(/^(\d+)(==|!=|>=|<=|>|<)(\d+)$/);
+    if (match) {
+      const [, left, op, right] = match;
+      const l = parseInt(left);
+      const r = parseInt(right);
+      switch (op) {
+        case '==': return l == r;
+        case '!=': return l != r;
+        case '>=': return l >= r;
+        case '<=': return l <= r;
+        case '>': return l > r;
+        case '<': return l < r;
+      }
+    }
+    return false;
   }
 
   // Profile Customization
