@@ -262,7 +262,10 @@ const ITEMS = {
   'magic_crystal': { name: 'Magic Crystal', type: 'material', rarity: 'rare', value: 100, description: 'Contains magical energy' },
   'dragon_scale': { name: 'Dragon Scale', type: 'material', rarity: 'legendary', value: 500, description: 'Priceless crafting material' },
   'gold_ore': { name: 'Gold Ore', type: 'material', rarity: 'uncommon', value: 50, description: 'Shiny gold for high-value crafting' },
-  'mithril_ingot': { name: 'Mithril Ingot', type: 'material', rarity: 'legendary', value: 2000, description: 'Lightweight and incredibly strong' }
+  'mithril_ingot': { name: 'Mithril Ingot', type: 'material', rarity: 'legendary', value: 2000, description: 'Lightweight and incredibly strong' },
+  'wood': { name: 'Wood', type: 'material', rarity: 'common', value: 2, description: 'Basic building material' },
+  'leather': { name: 'Leather', type: 'material', rarity: 'common', value: 3, description: 'Tough animal hide' },
+  'gemstone': { name: 'Gemstone', type: 'material', rarity: 'rare', value: 150, description: 'Sparkling precious stone' }
 };
 
 const ITEM_RARITIES = {
@@ -303,7 +306,8 @@ function getItemLevelRequirement(itemKey) {
     leather_armor: 1, chain_mail: 4, plate_armor: 10, dragon_armor: 20,
     health_potion: 1, mana_potion: 5, revive_crystal: 12,
     iron_ore: 1, magic_crystal: 7, dragon_scale: 18,
-    gold_ore: 5, mithril_ingot: 25
+    gold_ore: 5, mithril_ingot: 25,
+    wood: 1, leather: 1, gemstone: 10
   };
   return levelReqs[itemKey] || 1;
 }
@@ -508,7 +512,9 @@ export function generateRandomQuest(userId, level = 1) {
     { title: `Slay ${5 + level * 2} Goblins`, desc: `Defeat ${5 + level * 2} goblins in combat.`, requirement: 'goblins_defeated', amount: 5 + level * 2 },
     { title: `Collect ${3 + level} Health Potions`, desc: `Gather ${3 + level} health potions from exploration.`, requirement: 'potions_collected', amount: 3 + level },
     { title: `Reach Level ${level + 5}`, desc: `Gain enough XP to reach level ${level + 5}.`, requirement: 'level_reached', amount: level + 5 },
-    { title: `Earn ${100 + level * 50} Gold`, desc: `Accumulate ${100 + level * 50} gold through various activities.`, requirement: 'gold_earned', amount: 100 + level * 50 }
+    { title: `Earn ${100 + level * 50} Gold`, desc: `Accumulate ${100 + level * 50} gold through various activities.`, requirement: 'gold_earned', amount: 100 + level * 50 },
+    { title: `Explore ${2 + level} Locations`, desc: `Discover and explore ${2 + level} new locations.`, requirement: 'locations_explored', amount: 2 + level },
+    { title: `Craft ${1 + level} Items`, desc: `Use materials to craft ${1 + level} new items.`, requirement: 'items_crafted', amount: 1 + level }
   ];
 
   const randomType = questTypes[Math.floor(Math.random() * questTypes.length)];
@@ -544,22 +550,7 @@ export function completeQuest(userId, questId) {
   return q;
 }
 
-export function generateRandomQuest(userId, level = 1) {
-  const all = readQuests();
-  all[userId] = all[userId] || [];
-  const questTypes = [
-    { title: `Slay ${5 + level * 2} Goblins`, desc: `Defeat ${5 + level * 2} goblins in combat.`, requirement: 'goblins_defeated', amount: 5 + level * 2 },
-    { title: `Collect ${3 + level} Health Potions`, desc: `Gather ${3 + level} health potions from exploration.`, requirement: 'potions_collected', amount: 3 + level },
-    { title: `Reach Level ${level + 5}`, desc: `Gain enough XP to reach level ${level + 5}.`, requirement: 'level_reached', amount: level + 5 },
-    { title: `Earn ${100 + level * 50} Gold`, desc: `Accumulate ${100 + level * 50} gold through various activities.`, requirement: 'gold_earned', amount: 100 + level * 50 }
-  ];
-
-  const randomType = questTypes[Math.floor(Math.random() * questTypes.length)];
-  const q = { id: Date.now(), title: randomType.title, desc: randomType.desc, status: 'open', requirement: randomType.requirement, amount: randomType.amount };
-  all[userId].push(q);
-  writeQuests(all);
-  return q;
-}
+// Removed duplicate function
 
 // Spend skill points for a character and persist change
 export function spendSkillPoints(userId, stat, amount = 1) {
