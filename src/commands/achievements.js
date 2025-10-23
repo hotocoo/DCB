@@ -110,12 +110,22 @@ export async function execute(interaction) {
     await interaction.reply({ embeds: [embed] });
 
   } else if (sub === 'stats') {
-    // This would require integration with the achievement system
-    // For now, show a placeholder
+    const userStats = updateUserStats(userId, {});
+
     const embed = new EmbedBuilder()
       .setTitle(`📊 ${interaction.user.username}'s Statistics`)
       .setColor(0x0099FF)
-      .setDescription('Detailed statistics will be available as you use more bot features!');
+      .setDescription('Your detailed activity statistics!')
+      .addFields(
+        { name: '🎮 Commands Used', value: userStats.commands_used || 0, inline: true },
+        { name: '🏆 Achievements Earned', value: userStats.achievements_earned || 0, inline: true },
+        { name: '⭐ Achievement Points', value: userStats.achievement_points || 0, inline: true },
+        { name: '💰 Gold Earned', value: userStats.gold_earned || 0, inline: true },
+        { name: '⚔️ Battles Fought', value: userStats.battles_fought || 0, inline: true },
+        { name: '🎯 Games Played', value: userStats.games_played || 0, inline: true },
+        { name: '📅 Member Since', value: userStats.join_date ? new Date(userStats.join_date).toLocaleDateString() : 'Unknown', inline: true },
+        { name: '🏅 Level', value: userStats.level || 1, inline: true }
+      );
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
   }
