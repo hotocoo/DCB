@@ -408,8 +408,21 @@ class LocationManager {
   }
 
   checkRequirements(userId, requirements) {
-    // This would check if user meets the requirements
-    // For now, return true for demonstration
+    // Check if user meets the requirements
+    const { getCharacter, getUserAchievements } = require('./rpg.js');
+    const { getUserAchievements: getAch } = require('./achievements.js');
+
+    const char = getCharacter(userId);
+    if (!char) return false;
+
+    if (requirements.level && char.lvl < requirements.level) return false;
+
+    if (requirements.achievements && requirements.achievements.length > 0) {
+      const userAch = getAch(userId);
+      const hasRequired = requirements.achievements.every(achId => userAch.find(a => a.id === achId));
+      if (!hasRequired) return false;
+    }
+
     return true;
   }
 }

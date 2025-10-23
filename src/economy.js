@@ -227,6 +227,15 @@ class EconomyManager {
     return { success: true, investment };
   }
 
+  // Define investment types
+  getInvestmentTypes() {
+    return {
+      'bank': { name: 'Bank Deposit', rate: 0.05, duration: 30, minAmount: 100 },
+      'stock': { name: 'Stock Market', rate: 0.10, duration: 30, minAmount: 500 },
+      'venture': { name: 'High Risk Venture', rate: 0.20, duration: 30, minAmount: 1000 }
+    };
+  }
+
   processMatureInvestments() {
     const now = Date.now();
 
@@ -533,6 +542,45 @@ class EconomyManager {
     return totalTaxed;
   }
 
+  // Daily Rewards System
+  claimDailyReward(userId) {
+    const now = Date.now();
+    const lastClaim = this.economyData.dailyRewards?.[userId]?.lastClaim || 0;
+    const oneDay = 24 * 60 * 60 * 1000;
+
+    if (now - lastClaim < oneDay) {
+      const hoursLeft = Math.ceil((oneDay - (now - lastClaim)) / (60 * 60 * 1000));
+      return { success: false, reason: `daily_cooldown`, hoursLeft };
+    }
+
+    // Calculate reward based on streak
+    const streak = this.economyData.dailyRewards?.[userId]?.streak || 0;
+    const baseReward = 50;
+    const streakBonus = Math.min(streak * 10, 100);
+    const reward = baseReward + streakBonus;
+
+    this.addBalance(userId, reward);
+
+    // Update streak
+    if (!this.economyData.dailyRewards) this.economyData.dailyRewards = {};
+    this.economyData.dailyRewards[userId] = {
+      lastClaim: now,
+      streak: streak + 1
+    };
+
+    this.logTransaction({
+      type: 'daily_reward',
+      user: userId,
+      amount: reward,
+      streak: streak + 1,
+      timestamp: now
+    });
+
+    this.saveEconomy();
+
+    return { success: true, reward, streak: streak + 1 };
+  }
+
   // Cleanup and Maintenance
   cleanup() {
     // Process mature investments
@@ -598,7 +646,19 @@ export function createLottery(userId, ticketPrice, prizePool) {
   return economyManager.createLottery(userId, ticketPrice, prizePool);
 }
 
-// Auto-cleanup every 10 minutes
-setInterval(() => {
-  economyManager.cleanup();
-}, 10 * 60 * 1000);
+export function getUserBusinesses(userId) {
+  return economyManager.getUserBusinesses(userId);
+}
+
+export function getInvestmentTypes() {
+  return economyManager.getInvestmentTypes();
+}
+
+export function claimDailyReward(userId) {
+  return economyManager.claimDailyReward(userId);
+}
+
+// Get user's businesses
+getUserBusinesses(userId) {
+  return this.economyData.businessData[userId] || [];
+}
