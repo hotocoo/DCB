@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
-import { Client, Collection, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { Client, Collection, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } from 'discord.js';
 import { handleMessage } from './chat.js';
 import { checkTypingAttempt } from './minigames/typing.js';
 import { logger, logCommandExecution, logError } from './logger.js';
@@ -78,6 +78,18 @@ const spendCooldowns = new Map();
 
 // Hangman game states: userId -> gameState
 export const hangmanGames = new Map();
+
+// Wordle game states: userId -> gameState
+export const wordleGames = new Map();
+
+// Guess game states: userId -> gameState
+export const guessGames = new Map();
+
+// Combat game states: userId -> gameState
+export const combatGames = new Map();
+
+// Wordle word list
+const wordleWords = ['HOUSE', 'PLANE', 'TIGER', 'BREAD', 'CHAIR', 'SNAKE', 'CLOUD', 'LIGHT', 'MUSIC', 'WATER', 'EARTH', 'STORM', 'FLAME', 'SHARP', 'QUIET', 'BRIGHT', 'DANCE', 'FIELD', 'GRASS', 'HEART', 'KNIFE', 'LARGE', 'MOUSE', 'NIGHT', 'OCEAN', 'PIANO', 'QUICK', 'RIVER', 'SHINE', 'TRUCK', 'WHEAT', 'YOUNG', 'ALARM', 'BEACH', 'CLOCK', 'DRIVE', 'ELBOW', 'FLOUR', 'GHOST', 'HAPPY', 'INDEX', 'JOINT', 'KNOCK', 'LUNCH', 'MIGHT', 'NOISE', 'OCCUR', 'PAINT', 'QUILT', 'ROBOT', 'SHORE', 'THICK', 'UNION', 'VOICE', 'WASTE', 'YIELD', 'ABUSE', 'ADULT', 'AGENT', 'AGREE', 'AHEAD', 'ALARM', 'ALBUM', 'ALERT', 'ALIEN', 'ALIGN', 'ALIKE', 'ALIVE', 'ALLOW', 'ALONE', 'ALONG', 'ALTER', 'AMONG', 'ANGER', 'ANGLE', 'ANGRY', 'APART', 'APPLE', 'APPLY', 'ARENA', 'ARGUE', 'ARISE', 'ARMED', 'ARMOR', 'ARRAY', 'ASIDE', 'ASSET', 'AVOID', 'AWAKE', 'AWARD', 'AWARE', 'BADLY', 'BAKER', 'BASES', 'BASIC', 'BEACH', 'BEGAN', 'BEGIN', 'BEING', 'BELOW', 'BENCH', 'BILLY', 'BIRTH', 'BLACK', 'BLAME', 'BLANK', 'BLIND', 'BLOCK', 'BLOOD', 'BOARD', 'BOOST', 'BOOTH', 'BOUND', 'BRAIN', 'BRAND', 'BRASS', 'BRAVE', 'BREAD', 'BREAK', 'BREED', 'BRIEF', 'BRING', 'BROAD', 'BROKE', 'BROWN', 'BUILD', 'BUILT', 'BUYER', 'CABLE', 'CALIF', 'CARRY', 'CATCH', 'CAUSE', 'CHAIN', 'CHAIR', 'CHAOS', 'CHARM', 'CHART', 'CHASE', 'CHEAP', 'CHECK', 'CHEST', 'CHIEF', 'CHILD', 'CHINA', 'CHOSE', 'CIVIL', 'CLAIM', 'CLASS', 'CLEAN', 'CLEAR', 'CLICK', 'CLIMB', 'CLOCK', 'CLOSE', 'CLOUD', 'COACH', 'COAST', 'COULD', 'COUNT', 'COURT', 'COVER', 'CRAFT', 'CRASH', 'CRAZY', 'CREAM', 'CRIME', 'CROSS', 'CROWD', 'CROWN', 'CRUDE', 'CURVE', 'CYCLE', 'DAILY', 'DANCE', 'DATED', 'DEALT', 'DEATH', 'DEBUT', 'DELAY', 'DEPTH', 'DOING', 'DOUBT', 'DOZEN', 'DRAFT', 'DRAMA', 'DRANK', 'DREAM', 'DRESS', 'DRILL', 'DRINK', 'DRIVE', 'DROVE', 'DYING', 'EAGER', 'EARLY', 'EARTH', 'EIGHT', 'ELITE', 'EMPTY', 'ENEMY', 'ENJOY', 'ENTER', 'ENTRY', 'EQUAL', 'ERROR', 'EVENT', 'EVERY', 'EXACT', 'EXIST', 'EXTRA', 'FAITH', 'FALSE', 'FAULT', 'FIBER', 'FIELD', 'FIFTH', 'FIFTY', 'FIGHT', 'FINAL', 'FIRST', 'FIXED', 'FLASH', 'FLEET', 'FLOOR', 'FLUID', 'FOCUS', 'FORCE', 'FORTH', 'FORTY', 'FORUM', 'FOUND', 'FRAME', 'FRANK', 'FRAUD', 'FRESH', 'FRONT', 'FRUIT', 'FULLY', 'FUNNY', 'GIANT', 'GIVEN', 'GLASS', 'GLOBE', 'GOING', 'GRACE', 'GRADE', 'GRAND', 'GRANT', 'GRASS', 'GRAVE', 'GREAT', 'GREEN', 'GROSS', 'GROUP', 'GROWN', 'GUARD', 'GUESS', 'GUEST', 'GUIDE', 'HAPPY', 'HARRY', 'HEART', 'HEAVY', 'HENCE', 'HENRY', 'HORSE', 'HOTEL', 'HOUSE', 'HUMAN', 'HURRY', 'IMAGE', 'INDEX', 'INNER', 'INPUT', 'ISSUE', 'JAPAN', 'JIMMY', 'JOINT', 'JONES', 'JUDGE', 'KNOWN', 'LABEL', 'LARGE', 'LASER', 'LATER', 'LAUGH', 'LAYER', 'LEARN', 'LEASE', 'LEAST', 'LEAVE', 'LEGAL', 'LEVEL', 'LEWIS', 'LIGHT', 'LIMIT', 'LINKS', 'LIVES', 'LOCAL', 'LOOSE', 'LOWER', 'LUCKY', 'LUNCH', 'LYING', 'MAGIC', 'MAJOR', 'MAKER', 'MARCH', 'MARIA', 'MATCH', 'MAYBE', 'MAYOR', 'MEANT', 'MEDAL', 'MEDIA', 'METAL', 'MIGHT', 'MINOR', 'MINUS', 'MIXED', 'MODEL', 'MONEY', 'MONTH', 'MORAL', 'MOTOR', 'MOUNT', 'MOUSE', 'MOUTH', 'MOVED', 'MOVIE', 'MUSIC', 'NEEDS', 'NEVER', 'NEWLY', 'NIGHT', 'NOISE', 'NORTH', 'NOTED', 'NOVEL', 'NURSE', 'OCCUR', 'OCEAN', 'OFFER', 'OFTEN', 'ORDER', 'OTHER', 'OUGHT', 'PAINT', 'PANEL', 'PAPER', 'PARTY', 'PEACE', 'PETER', 'PHASE', 'PHONE', 'PHOTO', 'PIANO', 'PIECE', 'PILOT', 'PITCH', 'PLACE', 'PLAIN', 'PLANE', 'PLANT', 'PLATE', 'PLAYS', 'PLENT', 'PLOTS', 'POEMS', 'POINT', 'POUND', 'POWER', 'PRESS', 'PRICE', 'PRIDE', 'PRIME', 'PRINT', 'PRIOR', 'PRIZE', 'PROOF', 'PROUD', 'PROVE', 'QUEEN', 'QUICK', 'QUIET', 'QUITE', 'RADIO', 'RAISE', 'RANGE', 'RAPID', 'RATIO', 'REACH', 'READY', 'REALM', 'REBEL', 'REFER', 'RELAX', 'REMARK', 'REMIND', 'REMOVE', 'RENDER', 'RENEW', 'RENTAL', 'REPAIR', 'REPEAT', 'REPLACE', 'REPORT', 'RESIST', 'RESOURCE', 'RESPONSE', 'RESULT', 'RETAIN', 'RETIRE', 'RETURN', 'REVEAL', 'REVIEW', 'REWARD', 'RIDER', 'RIDGE', 'RIGHT', 'RIGID', 'RING', 'RISE', 'RISK', 'RIVER', 'ROAD', 'ROBOT', 'ROGER', 'ROMAN', 'ROUGH', 'ROUND', 'ROUTE', 'ROYAL', 'RURAL', 'SCALE', 'SCENE', 'SCOPE', 'SCORE', 'SENSE', 'SERVE', 'SEVEN', 'SHALL', 'SHAPE', 'SHARE', 'SHARP', 'SHEET', 'SHELF', 'SHELL', 'SHIFT', 'SHINE', 'SHIRT', 'SHOCK', 'SHOOT', 'SHORT', 'SHOWN', 'SIDES', 'SIGHT', 'SILVER', 'SIMILAR', 'SIMPLE', 'SIXTH', 'SIXTY', 'SIZED', 'SKILL', 'SLEEP', 'SLIDE', 'SMALL', 'SMART', 'SMILE', 'SMITH', 'SMOKE', 'SNAKE', 'SOLID', 'SOLVE', 'SORRY', 'SOUND', 'SOUTH', 'SPACE', 'SPARE', 'SPEAK', 'SPEED', 'SPEND', 'SPENT', 'SPLIT', 'SPOKE', 'STAGE', 'STAKE', 'STAND', 'START', 'STATE', 'STEAM', 'STEEL', 'STEEP', 'STICK', 'STILL', 'STOCK', 'STONE', 'STOOD', 'STORE', 'STORM', 'STORY', 'STRIP', 'STUCK', 'STUDY', 'STUFF', 'STYLE', 'SUGAR', 'SUITE', 'SUPER', 'SWEET', 'TABLE', 'TAKEN', 'TASTE', 'TAXES', 'TEACH', 'TEETH', 'TERRY', 'TEXAS', 'THANK', 'THEFT', 'THEIR', 'THEME', 'THERE', 'THESE', 'THICK', 'THING', 'THINK', 'THIRD', 'THOSE', 'THREE', 'THREW', 'THROW', 'THUMB', 'TIGER', 'TIGHT', 'TIRED', 'TITLE', 'TODAY', 'TOKEN', 'TOPIC', 'TOTAL', 'TOUCH', 'TOUGH', 'TOWER', 'TRACK', 'TRADE', 'TRAIN', 'TREAT', 'TREND', 'TRIAL', 'TRIBE', 'TRICK', 'TRIED', 'TRIES', 'TRUCK', 'TRULY', 'TRUNK', 'TRUST', 'TRUTH', 'TWICE', 'TWIST', 'TYLER', 'UNION', 'UNITY', 'UNTIL', 'UPPER', 'UPSET', 'URBAN', 'USAGE', 'USUAL', 'VALUE', 'VIDEO', 'VIRUS', 'VISIT', 'VITAL', 'VOCAL', 'VOICE', 'WASTE', 'WATCH', 'WATER', 'WAVE', 'WHEEL', 'WHERE', 'WHICH', 'WHILE', 'WHITE', 'WHOLE', 'WINNER', 'WINTER', 'WOMAN', 'WOMEN', 'WORLD', 'WORRY', 'WORSE', 'WORST', 'WORTH', 'WOULD', 'WRITE', 'WRONG', 'WROTE', 'YOUNG', 'YOURS', 'YOUTH'];
 
 // Load command modules
 const commandsPath = path.join(process.cwd(), 'src', 'commands');
@@ -310,11 +322,55 @@ client.on('interactionCreate', async interaction => {
       }
       // handle guess game modal submit
       if (custom.startsWith('guess_submit:')) {
-        const [, gameId] = custom.split(':');
-        const guess = interaction.fields.getTextInputValue('guess_number');
+        const [, gameId, min, max] = custom.split(':');
+        const guess = parseInt(interaction.fields.getTextInputValue('guess_number'));
 
-        // Handle the guess (this would need game state persistence)
-        await interaction.reply({ content: `🔢 You guessed: **${guess}**\n*Game logic would process this guess here.*`, ephemeral: true });
+        if (isNaN(guess)) {
+          return interaction.reply({ content: '❌ Please enter a valid number!', ephemeral: true });
+        }
+
+        const userId = interaction.user.id;
+        let gameState = guessGames.get(userId);
+
+        if (!gameState) {
+          // Start a new game
+          const rangeMin = parseInt(min) || 1;
+          const rangeMax = parseInt(max) || 100;
+          const number = Math.floor(Math.random() * (rangeMax - rangeMin + 1)) + rangeMin;
+          gameState = {
+            number,
+            min: rangeMin,
+            max: rangeMax,
+            attempts: 0,
+            maxAttempts: 10,
+            gameActive: true
+          };
+          guessGames.set(userId, gameState);
+        }
+
+        if (!gameState.gameActive) {
+          return interaction.reply({ content: 'No active guess game. Start a new one!', ephemeral: true });
+        }
+
+        gameState.attempts++;
+
+        let message = `🔢 Guess ${gameState.attempts}/${gameState.maxAttempts}: ${guess}\n`;
+
+        if (guess < gameState.number) {
+          message += '📈 Too low!';
+        } else if (guess > gameState.number) {
+          message += '📉 Too high!';
+        } else {
+          message += `🎉 **Correct! You guessed it in ${gameState.attempts} attempts!**`;
+          gameState.gameActive = false;
+        }
+
+        if (gameState.attempts >= gameState.maxAttempts && guess !== gameState.number) {
+          message += `\n💀 **Game Over!** The number was **${gameState.number}**.`;
+          gameState.gameActive = false;
+        }
+
+        await interaction.reply({ content: message, ephemeral: true });
         return;
       }
       if (action === 'fun_joke') {
@@ -620,14 +676,65 @@ client.on('interactionCreate', async interaction => {
       // handle wordle guess modal submit
       if (custom.startsWith('wordle_submit:')) {
         const [, gameId] = custom.split(':');
-        const wordGuess = interaction.fields.getTextInputValue('word_guess');
+        const wordGuess = interaction.fields.getTextInputValue('word_guess').toUpperCase();
 
-        if (!/^[a-zA-Z]{5}$/.test(wordGuess)) {
+        if (!/^[A-Z]{5}$/.test(wordGuess)) {
           return interaction.reply({ content: '❌ Please enter a valid 5-letter word!', ephemeral: true });
         }
 
-        // Process the Wordle guess (this would need game state persistence)
-        await interaction.reply({ content: `🔤 Wordle guess: **${wordGuess.toUpperCase()}**\n*Game logic would check this word and show results!*`, ephemeral: true });
+        const userId = interaction.user.id;
+        let gameState = wordleGames.get(userId);
+
+        if (!gameState) {
+          // Start a new game
+          const word = wordleWords[Math.floor(Math.random() * wordleWords.length)];
+          gameState = {
+            word,
+            guesses: [],
+            maxGuesses: 6,
+            gameActive: true
+          };
+          wordleGames.set(userId, gameState);
+        }
+
+        if (!gameState.gameActive) {
+          return interaction.reply({ content: 'No active Wordle game. Start a new one!', ephemeral: true });
+        }
+
+        // Check if word is in list (optional)
+        if (!wordleWords.includes(wordGuess)) {
+          return interaction.reply({ content: `❌ "${wordGuess}" is not a valid word!`, ephemeral: true });
+        }
+
+        // Process guess
+        gameState.guesses.push(wordGuess);
+        let result = '';
+        let correct = 0;
+        const wordArray = gameState.word.split('');
+        const guessArray = wordGuess.split('');
+
+        for (let i = 0; i < 5; i++) {
+          if (guessArray[i] === wordArray[i]) {
+            result += '🟢'; // Correct position
+            correct++;
+          } else if (wordArray.includes(guessArray[i])) {
+            result += '🟡'; // Wrong position
+          } else {
+            result += '⚫'; // Not in word
+          }
+        }
+
+        let message = `🔤 Guess ${gameState.guesses.length}/6: ${wordGuess}\n${result}`;
+
+        if (correct === 5) {
+          message += `\n🎉 **Congratulations! You guessed the word in ${gameState.guesses.length} guesses!**`;
+          gameState.gameActive = false;
+        } else if (gameState.guesses.length >= gameState.maxGuesses) {
+          message += `\n💀 **Game Over!** The word was **${gameState.word}**.`;
+          gameState.gameActive = false;
+        }
+
+        await interaction.reply({ content: message, ephemeral: true });
         return;
       }
       if (action === 'wordle_guess') {
@@ -1258,6 +1365,77 @@ client.on('interactionCreate', async interaction => {
         };
 
         await interaction.reply({ content: `📻 **Changed to:** ${stationNames[nextStation]}\n🎵 *Now playing ${stationNames[nextStation]} radio!*`, ephemeral: true });
+        return;
+      }
+      if (action === 'music_play') {
+        const [, indexStr, query] = interaction.customId.split(':');
+        const index = parseInt(indexStr);
+
+        // Re-search to get the song
+        const { searchSongs, play } = await import('./music.js');
+        const results = await searchSongs(query, 5);
+        if (results[index]) {
+          const song = results[index];
+
+          // Voice channel check
+          const voiceChannel = interaction.member.voice?.channel;
+          if (!voiceChannel) {
+            return interaction.reply({ content: '🎵 You must be in a voice channel to play music!', ephemeral: true });
+          }
+
+          const result = await play(interaction.guild.id, voiceChannel, song);
+          if (result.success) {
+            const embed = new EmbedBuilder()
+              .setTitle('🎵 Now Playing')
+              .setColor(0x00FF00)
+              .setDescription(`**${song.title}** by **${song.artist}**`)
+              .addFields(
+                { name: '⏱️ Duration', value: song.duration, inline: true },
+                { name: '👤 Requested by', value: interaction.user.username, inline: true }
+              )
+              .setThumbnail(song.thumbnail || 'https://i.imgur.com/SjIgjlE.png');
+
+            const row = new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`music_pause:${interaction.guild.id}`).setLabel('⏸️ Pause').setStyle(ButtonStyle.Primary),
+              new ButtonBuilder().setCustomId(`music_skip:${interaction.guild.id}`).setLabel('⏭️ Skip').setStyle(ButtonStyle.Secondary),
+              new ButtonBuilder().setCustomId(`music_stop:${interaction.guild.id}`).setLabel('⏹️ Stop').setStyle(ButtonStyle.Danger)
+            );
+
+            await interaction.reply({ embeds: [embed], components: [row] });
+          } else {
+            await interaction.reply({ content: `❌ Failed to play: ${result.error}`, ephemeral: true });
+          }
+        } else {
+          await interaction.reply({ content: '❌ Song not found.', ephemeral: true });
+        }
+        return;
+      }
+      if (action === 'music_shuffle') {
+        const [, targetGuild] = interaction.customId.split(':');
+        if (targetGuild && targetGuild !== interaction.guild.id) return interaction.reply({ content: 'You cannot shuffle in another server.', ephemeral: true });
+
+        const { shuffleQueue } = await import('./music.js');
+        const result = shuffleQueue(interaction.guild.id);
+
+        if (result) {
+          await interaction.reply({ content: '🔀 **Queue shuffled!**', ephemeral: true });
+        } else {
+          await interaction.reply({ content: '❌ Queue is empty or too small to shuffle.', ephemeral: true });
+        }
+        return;
+      }
+      if (action === 'music_clear') {
+        const [, targetGuild] = interaction.customId.split(':');
+        if (targetGuild && targetGuild !== interaction.guild.id) return interaction.reply({ content: 'You cannot clear queue in another server.', ephemeral: true });
+
+        const { clearQueue } = await import('./music.js');
+        const result = clearQueue(interaction.guild.id);
+
+        if (result) {
+          await interaction.reply({ content: '🗑️ **Queue cleared!**', ephemeral: true });
+        } else {
+          await interaction.reply({ content: '❌ Failed to clear queue.', ephemeral: true });
+        }
         return;
       }
       if (action === 'ai_chat') {

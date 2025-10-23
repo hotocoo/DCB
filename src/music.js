@@ -191,8 +191,10 @@ class MusicManager {
         const resource = createAudioResource(stream, { inputType: 'arbitrary' });
         player.play(resource);
       } else {
-        // Fallback for non-YouTube URLs
-        return { success: false, error: 'Unsupported URL format' };
+        // For direct stream URLs (like radio)
+        const stream = song.url;
+        const resource = createAudioResource(stream, { inputType: 'arbitrary' });
+        player.play(resource);
       }
 
       return { success: true, song };
@@ -251,10 +253,16 @@ class MusicManager {
 
     // Play the next song using the existing player
     const player = this.audioPlayers.get(guildId);
-    if (player && ytdl.validateURL(nextSong.url)) {
-      const stream = ytdl(nextSong.url, { filter: 'audioonly' });
-      const resource = createAudioResource(stream, { inputType: 'arbitrary' });
-      player.play(resource);
+    if (player) {
+      if (ytdl.validateURL(nextSong.url)) {
+        const stream = ytdl(nextSong.url, { filter: 'audioonly' });
+        const resource = createAudioResource(stream, { inputType: 'arbitrary' });
+        player.play(resource);
+      } else {
+        // For direct streams
+        const resource = createAudioResource(nextSong.url, { inputType: 'arbitrary' });
+        player.play(resource);
+      }
     }
 
     return nextSong;
@@ -295,10 +303,16 @@ class MusicManager {
 
     // Play the next song using the existing player
     const player = this.audioPlayers.get(guildId);
-    if (player && ytdl.validateURL(nextSong.url)) {
-      const stream = ytdl(nextSong.url, { filter: 'audioonly' });
-      const resource = createAudioResource(stream, { inputType: 'arbitrary' });
-      player.play(resource);
+    if (player) {
+      if (ytdl.validateURL(nextSong.url)) {
+        const stream = ytdl(nextSong.url, { filter: 'audioonly' });
+        const resource = createAudioResource(stream, { inputType: 'arbitrary' });
+        player.play(resource);
+      } else {
+        // For direct streams
+        const resource = createAudioResource(nextSong.url, { inputType: 'arbitrary' });
+        player.play(resource);
+      }
     }
 
     return nextSong;
@@ -368,11 +382,11 @@ class MusicManager {
   // Radio Stations
   getRadioStations() {
     return {
-      'lofi_hip_hop': { name: 'Lo-fi Hip Hop', genre: 'Lo-fi', url: 'https://streams.example.com/lofi' },
-      'electronic': { name: 'Electronic Beats', genre: 'Electronic', url: 'https://streams.example.com/electronic' },
-      'rock_classics': { name: 'Rock Classics', genre: 'Rock', url: 'https://streams.example.com/rock' },
-      'jazz': { name: 'Smooth Jazz', genre: 'Jazz', url: 'https://streams.example.com/jazz' },
-      'classical': { name: 'Classical Music', genre: 'Classical', url: 'https://streams.example.com/classical' }
+      'lofi_hip_hop': { name: 'Lo-fi Hip Hop', genre: 'Lo-fi', url: 'https://streams.ilovemusic.de/iloveradio17.mp3' },
+      'electronic': { name: 'Electronic Beats', genre: 'Electronic', url: 'https://streams.radiomast.io/electronic-radio' },
+      'rock_classics': { name: 'Rock Classics', genre: 'Rock', url: 'https://streams.radiomast.io/rock-radio' },
+      'jazz': { name: 'Smooth Jazz', genre: 'Jazz', url: 'https://streams.radiomast.io/jazz-radio' },
+      'classical': { name: 'Classical Music', genre: 'Classical', url: 'https://streams.radiomast.io/classical-radio' }
     };
   }
 
