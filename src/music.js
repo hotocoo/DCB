@@ -181,12 +181,9 @@ class MusicManager {
         startedAt: Date.now(),
         status: 'playing'
       });
-      
+
       // Mark as playing
       this.isPlaying.set(guildId, true);
-      
-      // Add to queue
-      addToQueue(guildId, song);
 
       // Stream audio using ytdl-core if it's a YouTube URL
       if (ytdl.validateURL(song.url)) {
@@ -303,21 +300,18 @@ class MusicManager {
       startedAt: Date.now(),
       status: 'playing'
     });
-    
+
     // Play the next song using the existing player
     const player = this.audioPlayers.get(guildId);
     if (player) {
-      const current = this.currentlyPlaying.get(guildId);
-      if (nextSong.url !== current.url) {
-        if (ytdl.validateURL(nextSong.url)) {
-          const stream = ytdl(nextSong.url, { filter: 'audioonly' });
-          const resource = createAudioResource(stream, { inputType: 'arbitrary' });
-          player.play(resource);
-        } else {
-          // For direct streams
-          const resource = createAudioResource(nextSong.url, { inputType: 'arbitrary' });
-          player.play(resource);
-        }
+      if (ytdl.validateURL(nextSong.url)) {
+        const stream = ytdl(nextSong.url, { filter: 'audioonly' });
+        const resource = createAudioResource(stream, { inputType: 'arbitrary' });
+        player.play(resource);
+      } else {
+        // For direct streams
+        const resource = createAudioResource(nextSong.url, { inputType: 'arbitrary' });
+        player.play(resource);
       }
     }
 
