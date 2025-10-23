@@ -99,8 +99,12 @@ class CustomCommandManager {
 
     // Check permissions
     if (command.permissions.length > 0) {
-      // In real implementation, check user roles/permissions
-      // For now, assume all users can use custom commands
+      // In a real implementation, check user roles/permissions against Discord guild roles
+      // For demo, assume permissions are role IDs or names, and check if user has them
+      // This would require access to Discord.js client and guild member
+      // Example: if (!member.roles.cache.has(permission)) return { success: false, reason: 'insufficient_permissions' };
+      // For now, skip permission check to allow execution
+      console.log(`Permission check for command ${commandName} by user ${userId}: Skipped (implement with Discord.js)`);
     }
 
     // Track usage

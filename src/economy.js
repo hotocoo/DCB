@@ -159,6 +159,43 @@ class EconomyManager {
     return Math.floor(baseIncome * (1 + (level - 1) * 0.5));
   }
 
+  getUserBusinesses(userId) {
+    return this.economyData.businessData[userId] || [];
+  }
+
+  upgradeBusiness(userId, businessId) {
+    if (!this.economyData.businessData[userId]) {
+      return { success: false, reason: 'no_businesses' };
+    }
+
+    const business = this.economyData.businessData[userId].find(b => b.id === businessId);
+    if (!business) {
+      return { success: false, reason: 'business_not_found' };
+    }
+
+    const upgradeCost = business.level * 500; // Cost increases with level
+    if (this.getBalance(userId) < upgradeCost) {
+      return { success: false, reason: 'insufficient_funds' };
+    }
+
+    this.subtractBalance(userId, upgradeCost);
+    business.level++;
+    business.income = this.getBusinessIncome(business.type, business.level);
+    business.upgrades++;
+
+    this.logTransaction({
+      type: 'business_upgrade',
+      user: userId,
+      businessId,
+      amount: upgradeCost,
+      newLevel: business.level,
+      timestamp: Date.now()
+    });
+
+    this.saveEconomy();
+    return { success: true, business };
+  }
+
   collectBusinessIncome(userId) {
     if (!this.economyData.businessData[userId]) {
       return { success: false, reason: 'no_businesses' };
@@ -232,7 +269,10 @@ class EconomyManager {
     return {
       'bank': { name: 'Bank Deposit', rate: 0.05, duration: 30, minAmount: 100 },
       'stock': { name: 'Stock Market', rate: 0.10, duration: 30, minAmount: 500 },
-      'venture': { name: 'High Risk Venture', rate: 0.20, duration: 30, minAmount: 1000 }
+      'venture': { name: 'High Risk Venture', rate: 0.20, duration: 30, minAmount: 1000 },
+      'real_estate': { name: 'Real Estate', rate: 0.15, duration: 45, minAmount: 2000 },
+      'crypto': { name: 'Cryptocurrency', rate: 0.25, duration: 15, minAmount: 300, risk: 'high' },
+      'bond': { name: 'Government Bond', rate: 0.03, duration: 60, minAmount: 500, risk: 'low' }
     };
   }
 
@@ -650,6 +690,10 @@ export function getUserBusinesses(userId) {
   return economyManager.getUserBusinesses(userId);
 }
 
+export function upgradeBusiness(userId, businessId) {
+  return economyManager.upgradeBusiness(userId, businessId);
+}
+
 export function getInvestmentTypes() {
   return economyManager.getInvestmentTypes();
 }
@@ -658,7 +702,4 @@ export function claimDailyReward(userId) {
   return economyManager.claimDailyReward(userId);
 }
 
-// Get user's businesses
-getUserBusinesses(userId) {
-  return this.economyData.businessData[userId] || [];
-}
+// End of file
