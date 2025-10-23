@@ -100,7 +100,7 @@ console.log('Client created, logging in...');
 
 // Add connection event handlers for debugging
 client.on('error', (error) => {
-  console.error('Discord client error:', error);
+  logger.error('Discord client error', error);
 });
 
 client.on('warn', (warning) => {
