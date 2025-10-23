@@ -120,8 +120,54 @@ class TradingManager {
     if (!trade) return { success: false, reason: 'trade_not_found' };
     if (trade.status !== 'accepted') return { success: false, reason: 'trade_not_accepted' };
 
-    // Here you would implement the actual item/gold transfer
-    // For now, just mark as completed
+    // Implement actual item/gold transfer
+    // Import necessary functions (assuming they are available)
+    const { getCharacter, addItemToInventory, removeItemFromInventory, getBalance, addBalance, subtractBalance } = require('./rpg.js');
+    const { transferBalance } = require('./economy.js');
+
+    const initiatorChar = getCharacter(trade.initiator);
+    const targetChar = getCharacter(trade.target);
+
+    if (!initiatorChar || !targetChar) {
+      return { success: false, reason: 'character_not_found' };
+    }
+
+    // Transfer gold
+    if (trade.offer.gold > 0) {
+      const initiatorBalance = getBalance(trade.initiator);
+      if (initiatorBalance < trade.offer.gold) {
+        return { success: false, reason: 'insufficient_gold_initiator' };
+      }
+      subtractBalance(trade.initiator, trade.offer.gold);
+      addBalance(trade.target, trade.offer.gold);
+    }
+
+    if (trade.request.gold > 0) {
+      const targetBalance = getBalance(trade.target);
+      if (targetBalance < trade.request.gold) {
+        return { success: false, reason: 'insufficient_gold_target' };
+      }
+      subtractBalance(trade.target, trade.request.gold);
+      addBalance(trade.initiator, trade.request.gold);
+    }
+
+    // Transfer items
+    for (const itemId of trade.offer.items) {
+      const result = removeItemFromInventory(trade.initiator, itemId, 1);
+      if (!result.success) {
+        return { success: false, reason: 'item_transfer_failed' };
+      }
+      addItemToInventory(trade.target, itemId, 1);
+    }
+
+    for (const itemId of trade.request.items) {
+      const result = removeItemFromInventory(trade.target, itemId, 1);
+      if (!result.success) {
+        return { success: false, reason: 'item_transfer_failed' };
+      }
+      addItemToInventory(trade.initiator, itemId, 1);
+    }
+
     trade.status = 'completed';
     trade.completedAt = Date.now();
 

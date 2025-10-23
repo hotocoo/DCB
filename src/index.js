@@ -76,6 +76,9 @@ client.commands = new Collection();
 // simple cooldown map to prevent modal spam: userId -> timestamp of last spend modal
 const spendCooldowns = new Map();
 
+// Hangman game states: userId -> gameState
+export const hangmanGames = new Map();
+
 // Load command modules
 const commandsPath = path.join(process.cwd(), 'src', 'commands');
 if (fs.existsSync(commandsPath)) {
@@ -173,13 +176,61 @@ client.on('interactionCreate', async interaction => {
           return interaction.reply({ content: `❌ Insufficient funds! You have ${currentBalance} gold but need ${amount} gold.`, ephemeral: true });
         }
 
-        // For demo, assume we're transferring to ourselves (in real implementation, find user by mention)
-        const result = transferBalance(interaction.user.id, interaction.user.id, amount);
+        // Find target user by mention or username
+        const transferUserStr = transferUser.trim();
+        let targetUserId = null;
+
+        // Check if it's a mention <@123456>
+        if (transferUserStr.startsWith('<@') && transferUserStr.endsWith('>')) {
+          targetUserId = transferUserStr.slice(2, -1);
+        } else {
+          // Find by username (simplified, in real use guild.members.fetch or cache)
+          const member = interaction.guild.members.cache.find(m => m.user.username.toLowerCase() === transferUserStr.toLowerCase() || m.displayName.toLowerCase() === transferUserStr.toLowerCase());
+          if (member) targetUserId = member.user.id;
+        }
+
+        if (!targetUserId) {
+          return interaction.reply({ content: '❌ User not found. Please mention the user or use their username.', ephemeral: true });
+        }
+
+        const result = transferBalance(interaction.user.id, targetUserId, amount);
 
         if (result.success) {
-          return interaction.reply({ content: `💸 **Transfer simulated!** Transferred ${amount} gold.\n*(In real implementation, this would transfer to the specified user)*`, ephemeral: true });
+          return interaction.reply({ content: `💸 **Transfer Successful!** Transferred ${amount} gold to <@${targetUserId}>.`, ephemeral: true });
         } else {
           return interaction.reply({ content: `❌ Transfer failed: ${result.reason}`, ephemeral: true });
+        }
+      }
+      // handle investment modal submit
+      if (custom.startsWith('invest_modal:')) {
+        const [, invType, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
+
+        const amountStr = interaction.fields.getTextInputValue('invest_amount');
+        const amount = parseInt(amountStr || '0', 10) || 0;
+
+        if (amount <= 0) return interaction.reply({ content: '❌ Investment amount must be greater than 0.', ephemeral: true });
+
+        const { getBalance, createInvestment, getInvestmentTypes } = await import('./economy.js');
+        const currentBalance = getBalance(interaction.user.id);
+
+        if (currentBalance < amount) {
+          return interaction.reply({ content: `❌ Insufficient funds! You have ${currentBalance} gold but need ${amount} gold.`, ephemeral: true });
+        }
+
+        const investmentTypes = getInvestmentTypes();
+        const typeData = investmentTypes[invType];
+
+        if (!typeData || amount < typeData.minAmount) {
+          return interaction.reply({ content: `❌ Minimum amount for ${typeData.name} is ${typeData.minAmount} gold.`, ephemeral: true });
+        }
+
+        const result = createInvestment(interaction.user.id, typeData, amount);
+
+        if (result.success) {
+          return interaction.reply({ content: `📈 **Investment Created!**\nType: ${typeData.name}\nAmount: ${amount} gold\nRate: ${typeData.rate * 100}%\nDuration: ${typeData.duration} days`, ephemeral: true });
+        } else {
+          return interaction.reply({ content: `❌ Investment failed: ${result.reason}`, ephemeral: true });
         }
       }
       // handle profile edit modal submit
@@ -448,7 +499,62 @@ client.on('interactionCreate', async interaction => {
         const [, targetUser] = interaction.customId.split(':');
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot manage investments for another user.', ephemeral: true });
 
-        await interaction.reply({ content: '📈 **Investment System Coming Soon!**\n*Advanced investment features will be available soon.*', ephemeral: true });
+        // Show investment options
+        const { getBalance, createInvestment } = await import('./economy.js');
+        const balance = getBalance(userId);
+
+        if (balance < 100) {
+          return interaction.reply({ content: '❌ You need at least 100 gold to invest.', ephemeral: true });
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle('📈 Investment Opportunities')
+          .setColor(0x0099FF)
+          .setDescription('Choose an investment to grow your wealth!')
+          .addFields(
+            { name: '🏦 Bank Deposit (Safe)', value: 'Rate: 5%/month\nMin: 100 gold', inline: true },
+            { name: '🏭 Stock Market (Medium)', value: 'Rate: 10%/month\nMin: 500 gold', inline: true },
+            { name: '🎲 High Risk Venture (High)', value: 'Rate: 20%/month\nMin: 1000 gold', inline: true }
+          );
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`invest_bank:${userId}`).setLabel('🏦 Bank Deposit').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`invest_stock:${userId}`).setLabel('🏭 Stock Market').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`invest_venture:${userId}`).setLabel('🎲 High Risk').setStyle(ButtonStyle.Danger)
+        );
+
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        return;
+      }
+      if (action === 'invest_bank') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
+
+        // Show modal for amount
+        const modal = new ModalBuilder().setCustomId(`invest_modal:bank:${userId}`).setTitle('Bank Deposit');
+        const amountInput = new TextInputBuilder().setCustomId('invest_amount').setLabel('Amount to deposit (min 100)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('100');
+        modal.addComponents({ type: 1, components: [amountInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (action === 'invest_stock') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
+
+        const modal = new ModalBuilder().setCustomId(`invest_modal:stock:${userId}`).setTitle('Stock Investment');
+        const amountInput = new TextInputBuilder().setCustomId('invest_amount').setLabel('Amount to invest (min 500)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('500');
+        modal.addComponents({ type: 1, components: [amountInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (action === 'invest_venture') {
+        const [, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
+
+        const modal = new ModalBuilder().setCustomId(`invest_modal:venture:${userId}`).setTitle('High Risk Venture');
+        const amountInput = new TextInputBuilder().setCustomId('invest_amount').setLabel('Amount to invest (min 1000)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1000');
+        modal.addComponents({ type: 1, components: [amountInput] });
+        await interaction.showModal(modal);
         return;
       }
       if (action === 'admin_warn') {
@@ -708,8 +814,29 @@ client.on('interactionCreate', async interaction => {
         const [, targetUser] = interaction.customId.split(':');
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot sell items for another user.', ephemeral: true });
 
-        // This would implement selling all junk items for gold
-        await interaction.reply({ content: '💰 Sold all junk items for gold!', ephemeral: true });
+        // Implement selling all junk items (common rarity) for gold
+        const { getInventory, getItemInfo, removeItemFromInventory, addBalance } = await import('./rpg.js');
+
+        const inventory = getInventory(userId);
+        let totalGold = 0;
+        let soldItems = [];
+
+        for (const [itemId, quantity] of Object.entries(inventory)) {
+          const item = getItemInfo(itemId);
+          if (item && item.rarity === 'common') {
+            const sellPrice = Math.floor(item.value * 0.5); // Sell for 50% of value
+            totalGold += sellPrice * quantity;
+            soldItems.push(`${item.name} (${quantity}x)`);
+            removeItemFromInventory(userId, itemId, quantity);
+          }
+        }
+
+        if (totalGold > 0) {
+          addBalance(userId, totalGold);
+          await interaction.reply({ content: `💰 **Sold Junk Items!**\nItems: ${soldItems.join(', ')}\nGold Earned: ${totalGold}`, ephemeral: true });
+        } else {
+          await interaction.reply({ content: '🗑️ No junk items to sell!', ephemeral: true });
+        }
         return;
       }
       if (action === 'guild_contribute') {
@@ -829,8 +956,85 @@ client.on('interactionCreate', async interaction => {
         const [, locationName, targetUser] = interaction.customId.split(':');
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot engage in combat for another user.', ephemeral: true });
 
-        // Handle combat encounter
-        await interaction.reply({ content: '⚔️ **Combat Encounter!**\n*Combat mechanics would be implemented here with turn-based button interactions.*', ephemeral: true });
+        // Handle combat encounter - implement turn-based combat
+        const { getCharacter, encounterMonster, fightTurn, applyXp, addBalance } = await import('./rpg.js');
+        const { narrate } = await import('./rpg.js');
+
+        const char = getCharacter(userId);
+        if (!char) return interaction.reply({ content: 'You need a character first. Use /rpg start', ephemeral: true });
+
+        const monster = encounterMonster(char.lvl || 1);
+        const narrative = await narrate(interaction.guildId, `Describe a thrilling combat encounter with a ${monster.name}.`, `You engage in combat with ${monster.name}!`);
+
+        const embed = new EmbedBuilder()
+          .setTitle('⚔️ Combat Encounter!')
+          .setColor(0xFF0000)
+          .setDescription(narrative)
+          .addFields(
+            { name: '🧙 Your Stats', value: `HP: ${char.hp}/${char.maxHp}\nATK: ${char.atk}\nDEF: ${char.def}\nSPD: ${char.spd}`, inline: true },
+            { name: '👹 Enemy Stats', value: `${monster.name}\nHP: ${monster.hp}\nATK: ${monster.atk}`, inline: true }
+          );
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`combat_attack:${monster.name}:${userId}`).setLabel('⚔️ Attack').setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`combat_defend:${monster.name}:${userId}`).setLabel('🛡️ Defend').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`combat_flee:${monster.name}:${userId}`).setLabel('🏃 Flee').setStyle(ButtonStyle.Secondary)
+        );
+
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        return;
+      }
+      if (action === 'combat_attack') {
+        const [, monsterName, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot attack for another user.', ephemeral: true });
+
+        // Simulate combat turn
+        const { getCharacter, encounterMonster, fightTurn, applyXp, addBalance } = await import('./rpg.js');
+        const char = getCharacter(userId);
+        if (!char) return interaction.reply({ content: 'Character not found.', ephemeral: true });
+
+        const monster = encounterMonster(char.lvl || 1); // Simplified, in real use store monster state
+        const playerDamage = fightTurn(char, monster);
+        const monsterDamage = fightTurn(monster, char);
+
+        let resultMessage = `⚔️ **Attack Turn!**\nYou dealt ${playerDamage} damage!\n${monster.name} dealt ${monsterDamage} damage!\n`;
+        if (monster.hp <= 0) {
+          const xpGain = char.lvl * 5;
+          const goldGain = char.lvl * 3;
+          applyXp(userId, char, xpGain);
+          addBalance(userId, goldGain);
+          resultMessage += `🎉 **Victory!** Gained ${xpGain} XP and ${goldGain} gold!`;
+        } else if (char.hp <= 0) {
+          resultMessage += '💀 **Defeat!** You have fallen in battle.';
+        } else {
+          resultMessage += `🧙 Your HP: ${char.hp}/${char.maxHp}\n👹 ${monster.name} HP: ${monster.hp}`;
+          // Add buttons for next turn if not ended
+          if (monster.hp > 0 && char.hp > 0) {
+            const row = new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`combat_attack:${monster.name}:${userId}`).setLabel('⚔️ Attack').setStyle(ButtonStyle.Danger),
+              new ButtonBuilder().setCustomId(`combat_defend:${monster.name}:${userId}`).setLabel('🛡️ Defend').setStyle(ButtonStyle.Primary),
+              new ButtonBuilder().setCustomId(`combat_flee:${monster.name}:${userId}`).setLabel('🏃 Flee').setStyle(ButtonStyle.Secondary)
+            );
+            await interaction.update({ content: resultMessage, components: [row] });
+            return;
+          }
+        }
+
+        await interaction.update({ content: resultMessage, components: [] });
+        return;
+      }
+      if (action === 'combat_defend') {
+        const [, monsterName, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot defend for another user.', ephemeral: true });
+
+        await interaction.update({ content: '🛡️ **Defend Turn!**\nYou raise your guard, reducing incoming damage next turn.', components: [] });
+        return;
+      }
+      if (action === 'combat_flee') {
+        const [, monsterName, targetUser] = interaction.customId.split(':');
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot flee for another user.', ephemeral: true });
+
+        await interaction.update({ content: '🏃 **Fled Successfully!**\nYou retreat from the battle unharmed.', components: [] });
         return;
       }
       if (action === 'explore_search') {
@@ -1012,12 +1216,32 @@ client.on('interactionCreate', async interaction => {
         const [, letter] = interaction.customId.split('_');
         if (!letter || letter.length !== 1) return;
 
-        // Find the game state (in a real implementation, you'd store this per user/channel)
-        // For now, we'll handle this in the command file itself
+        // Get game state
+        const gameState = hangmanGames.get(userId);
+        if (!gameState || !gameState.gameActive) {
+          return interaction.reply({ content: 'No active hangman game found. Start a new one with /hangman', ephemeral: true });
+        }
 
-        // Update the game state and refresh the board
-        await interaction.reply({ content: `You guessed: **${letter}**`, ephemeral: true });
-        // The actual game logic would need to be implemented with persistent state
+        // Process guess
+        if (gameState.guessedLetters.has(letter)) {
+          return interaction.reply({ content: `You already guessed **${letter}**!`, ephemeral: true });
+        }
+
+        gameState.guessedLetters.add(letter);
+
+        if (gameState.word.includes(letter)) {
+          // Correct guess
+          const displayWord = gameState.word.split('').map(l => gameState.guessedLetters.has(l) ? l : '_').join(' ');
+          gameState.guessedWord = displayWord;
+        } else {
+          // Wrong guess
+          gameState.wrongGuesses++;
+        }
+
+        // Send updated board
+        const { sendHangmanBoard } = await import('./commands/hangman.js');
+        await sendHangmanBoard(interaction, gameState);
+
         return;
       }
       if (action === 'music_radio_change') {
