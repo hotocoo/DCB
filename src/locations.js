@@ -376,7 +376,7 @@ class LocationManager {
   }
 
   // Location Discovery System
-  discoverLocation(userId, locationId) {
+  async discoverLocation(userId, locationId) {
     const locations = this.getLocations();
     const location = locations[locationId];
 
@@ -387,11 +387,13 @@ class LocationManager {
     // Check discovery requirements
     const requirements = this.getDiscoveryRequirements(locationId);
 
+    const canUnlock = await this.checkRequirements(userId, requirements);
+
     return {
       success: true,
       location,
       requirements,
-      canUnlock: this.checkRequirements(userId, requirements)
+      canUnlock
     };
   }
 
@@ -407,10 +409,10 @@ class LocationManager {
     return requirements[locationId] || {};
   }
 
-  checkRequirements(userId, requirements) {
+  async checkRequirements(userId, requirements) {
     // Check if user meets the requirements
-    const { getCharacter, getUserAchievements } = require('./rpg.js');
-    const { getUserAchievements: getAch } = require('./achievements.js');
+    const { getCharacter, getUserAchievements } = await import('./rpg.js');
+    const { getUserAchievements: getAch } = await import('./achievements.js');
 
     const char = getCharacter(userId);
     if (!char) return false;
@@ -443,8 +445,8 @@ export function enterDungeon(userId, locationId) {
   return locationManager.enterDungeon(userId, locationId);
 }
 
-export function discoverLocation(userId, locationId) {
-  return locationManager.discoverLocation(userId, locationId);
+export async function discoverLocation(userId, locationId) {
+  return await locationManager.discoverLocation(userId, locationId);
 }
 
 export function getLocations() {

@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
-import { Client, Collection, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } from 'discord.js';
+import { Client, Collection, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+
+console.log('Starting bot...');
 import { handleMessage } from './chat.js';
 import { checkTypingAttempt } from './minigames/typing.js';
 import { logger, logCommandExecution, logError } from './logger.js';
@@ -95,14 +97,23 @@ const wordleWords = ['HOUSE', 'PLANE', 'TIGER', 'BREAD', 'CHAIR', 'SNAKE', 'CLOU
 const commandsPath = path.join(process.cwd(), 'src', 'commands');
 if (fs.existsSync(commandsPath)) {
   for (const file of fs.readdirSync(commandsPath)) {
-    if (file.endsWith('.js')) {
-      const { data, execute } = await import(path.join(commandsPath, file));
-      client.commands.set(data.name, { data, execute });
-    }
-  }
+       if (file.endsWith('.js') || file.endsWith('.mjs')) {
+         try {
+           const { data, execute } = await import(path.join(commandsPath, file));
+           client.commands.set(data.name, { data, execute });
+         } catch (error) {
+           console.error(`Failed to load command ${file}:`, error.message);
+         }
+       }
+     }
 }
 
+client.on('error', (error) => {
+  console.log('Error:', error.message);
+});
+
 client.once('ready', () => {
+  console.log(`Bot ready as ${client.user.tag}`);
   logger.success(`Bot started successfully as ${client.user.tag}`, {
     guilds: client.guilds.cache.size,
     users: client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0)
@@ -922,7 +933,8 @@ client.on('interactionCreate', async interaction => {
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot sell items for another user.', ephemeral: true });
 
         // Implement selling all junk items (common rarity) for gold
-        const { getInventory, getItemInfo, removeItemFromInventory, addBalance } = await import('./rpg.js');
+        const { getInventory, getItemInfo, removeItemFromInventory } = await import('./rpg.js');
+        const { addBalance } = await import('./economy.js');
 
         const inventory = getInventory(userId);
         let totalGold = 0;

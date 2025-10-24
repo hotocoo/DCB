@@ -15,11 +15,11 @@ if (!TOKEN || !CLIENT_ID) {
 const commands = [];
 const commandsPath = path.join(process.cwd(), 'src', 'commands');
 for (const file of fs.readdirSync(commandsPath)) {
-  if (file.endsWith('.js')) {
-    const { data } = await import(path.join(commandsPath, file));
-    commands.push(data.toJSON());
-  }
-}
+   if (file.endsWith('.js') || file.endsWith('.mjs')) {
+     const { data } = await import(path.join(commandsPath, file));
+     commands.push(data.toJSON());
+   }
+ }
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 

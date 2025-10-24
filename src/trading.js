@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import { getCharacter, addItemToInventory, removeItemFromInventory } from './rpg.js';
+import { getBalance, subtractBalance, transferBalance, addBalance } from './economy.js';
 
 const TRADES_FILE = path.join(process.cwd(), 'data', 'trades.json');
 
@@ -121,9 +123,6 @@ class TradingManager {
     if (trade.status !== 'accepted') return { success: false, reason: 'trade_not_accepted' };
 
     // Implement actual item/gold transfer
-    // Import necessary functions (assuming they are available)
-    const { getCharacter, addItemToInventory, removeItemFromInventory, getBalance, addBalance, subtractBalance } = require('./rpg.js');
-    const { transferBalance } = require('./economy.js');
 
     const initiatorChar = getCharacter(trade.initiator);
     const targetChar = getCharacter(trade.target);
@@ -261,8 +260,6 @@ class TradingManager {
 
     // Refund previous highest bidder if exists
     if (auction.highestBidder && auction.highestBidder !== bidderId) {
-      // Import economy functions for refund
-      const { addBalance } = require('./economy.js');
       addBalance(auction.highestBidder, auction.currentBid);
     }
 
