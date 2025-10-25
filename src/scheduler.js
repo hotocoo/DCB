@@ -9,7 +9,16 @@ class SchedulerManager {
     this.ensureStorage();
     this.loadSchedules();
     this.activeTimers = new Map();
-    this.startScheduler();
+    this.client = null;
+    this.started = false;
+  }
+
+  setClient(client) {
+    this.client = client;
+    if (!this.started) {
+      this.startScheduler();
+      this.started = true;
+    }
   }
 
   ensureStorage() {
@@ -97,7 +106,7 @@ class SchedulerManager {
     this.activeTimers.set(reminder.id, timerId);
   }
 
-  executeReminder(reminder) {
+  async executeReminder(reminder) {
     // Mark as executed
     reminder.executed = true;
     reminder.executedAt = Date.now();
@@ -116,7 +125,23 @@ class SchedulerManager {
     this.saveSchedules();
     this.activeTimers.delete(reminder.id);
 
-    // Send the reminder (this would integrate with Discord API)
+    // Send the reminder via Discord
+    if (this.client) {
+      try {
+        const message = `⏰ **Reminder: ${reminder.title}**\n${reminder.message}`;
+        if (reminder.guildId) {
+          const guild = await this.client.guilds.fetch(reminder.guildId);
+          const channel = await guild.channels.fetch(reminder.channelId);
+          await channel.send(message);
+        } else {
+          const channel = await this.client.channels.fetch(reminder.channelId);
+          await channel.send(message);
+        }
+      } catch (error) {
+        console.error('Failed to send reminder:', error);
+      }
+    }
+
     return {
       success: true,
       reminder,
@@ -224,7 +249,7 @@ class SchedulerManager {
     });
   }
 
-  executeEvent(event) {
+  async executeEvent(event) {
     event.active = false;
     event.executedAt = Date.now();
 
@@ -237,6 +262,23 @@ class SchedulerManager {
     this.saveSchedules();
     this.activeTimers.delete(event.id);
 
+    // Send the event via Discord
+    if (this.client) {
+      try {
+        const message = `📅 **Event Started: ${event.title}**\n${event.description}`;
+        if (event.guildId) {
+          const guild = await this.client.guilds.fetch(event.guildId);
+          const channel = await guild.channels.fetch(event.channelId);
+          await channel.send(message);
+        } else {
+          const channel = await this.client.channels.fetch(event.channelId);
+          await channel.send(message);
+        }
+      } catch (error) {
+        console.error('Failed to send event:', error);
+      }
+    }
+
     return {
       success: true,
       event,
@@ -244,11 +286,28 @@ class SchedulerManager {
     };
   }
 
-  sendEventReminder(event, reminderOffset) {
+  async sendEventReminder(event, reminderOffset) {
     const timeUntilEvent = Math.round(reminderOffset / 60000); // Convert to minutes
+    const message = `⏰ **Event Reminder: ${event.title}**\nStarts in ${timeUntilEvent} minutes!\n${event.description}`;
+
+    if (this.client) {
+      try {
+        if (event.guildId) {
+          const guild = await this.client.guilds.fetch(event.guildId);
+          const channel = await guild.channels.fetch(event.channelId);
+          await channel.send(message);
+        } else {
+          const channel = await this.client.channels.fetch(event.channelId);
+          await channel.send(message);
+        }
+      } catch (error) {
+        console.error('Failed to send event reminder:', error);
+      }
+    }
+
     return {
       success: true,
-      message: `⏰ **Event Reminder: ${event.title}**\nStarts in ${timeUntilEvent} minutes!\n${event.description}`
+      message
     };
   }
 

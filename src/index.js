@@ -5,9 +5,17 @@ import { Client, Collection, GatewayIntentBits, Partials, ActionRowBuilder, Butt
 
 console.log('Starting bot...');
 import { handleMessage } from './chat.js';
+console.log('Imported handleMessage from chat.js');
 import { checkTypingAttempt } from './minigames/typing.js';
+console.log('Imported checkTypingAttempt from minigames/typing.js');
 import { logger, logCommandExecution, logError } from './logger.js';
+console.log('Imported logger from logger.js');
 import { getLocations } from './locations.js';
+console.log('Imported getLocations from locations.js');
+// import { schedulerManager } from './scheduler.js';
+
+console.log('All imports successful');
+console.log('Logger available:', typeof logger.info === 'function');
 import { getActiveAuctions } from './trading.js';
 import { isOnCooldown, setCooldown, getFormattedCooldown } from './cooldowns.js';
 
@@ -63,17 +71,35 @@ async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
 
 const TOKEN = process.env.DISCORD_TOKEN;
 
-if (!TOKEN) {
-  console.error('Missing DISCORD_TOKEN in environment');
+if (!TOKEN || TOKEN.trim() === '' || TOKEN === 'your-discord-bot-token-here') {
+  console.error('DISCORD_TOKEN is missing or invalid in .env file.');
+  console.error('Please add a valid Discord bot token from https://discord.com/developers/applications');
+  console.error('Update the .env file with: DISCORD_TOKEN=your_actual_token_here');
   process.exit(1);
 }
 
-// Include DirectMessages and MessageContent intents so the bot can respond to DMs and mentions
+console.log('About to create client');
+
+// Include necessary intents for bot functionality
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages, GatewayIntentBits.MessageContent],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildModeration
+  ],
   partials: [Partials.Channel],
 });
+
+console.log('Client created successfully');
+console.log('About to add event listeners');
+
+console.log('About to add event listeners');
 client.commands = new Collection();
+console.log('Commands collection created');
 
 // simple cooldown map to prevent modal spam: userId -> timestamp of last spend modal
 const spendCooldowns = new Map();
@@ -95,22 +121,32 @@ const wordleWords = ['HOUSE', 'PLANE', 'TIGER', 'BREAD', 'CHAIR', 'SNAKE', 'CLOU
 
 // Load command modules
 const commandsPath = path.join(process.cwd(), 'src', 'commands');
+console.log('Commands path:', commandsPath);
 if (fs.existsSync(commandsPath)) {
-  for (const file of fs.readdirSync(commandsPath)) {
-       if (file.endsWith('.js') || file.endsWith('.mjs')) {
-         try {
-           const { data, execute } = await import(path.join(commandsPath, file));
-           client.commands.set(data.name, { data, execute });
-         } catch (error) {
-           console.error(`Failed to load command ${file}:`, error.message);
-         }
-       }
-     }
+  console.log('Commands directory exists, reading files...');
+  const files = fs.readdirSync(commandsPath);
+  console.log('Found files:', files);
+  for (const file of files) {
+        if (file.endsWith('.js') || file.endsWith('.mjs')) {
+          console.log('Loading command file:', file);
+          try {
+            const { data, execute } = await import(path.join(commandsPath, file));
+            console.log('Loaded command:', data.name);
+            client.commands.set(data.name, { data, execute });
+          } catch (error) {
+            console.error(`Failed to load command ${file}:`, error.message);
+          }
+        }
+      }
+  console.log('Finished loading commands');
+} else {
+  console.log('Commands directory does not exist');
 }
 
 client.on('error', (error) => {
-  console.log('Error:', error.message);
+  logError('Client error occurred', error);
 });
+console.log('Error listener added');
 
 client.once('ready', () => {
   console.log(`Bot ready as ${client.user.tag}`);
@@ -118,9 +154,12 @@ client.once('ready', () => {
     guilds: client.guilds.cache.size,
     users: client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0)
   });
+  // schedulerManager.setClient(client);
 });
+console.log('Ready listener added');
 
 client.on('interactionCreate', async interaction => {
+  console.log('Interaction received');
   try {
     // Check global command cooldown
     const globalCooldown = isOnCooldown(interaction.user.id, 'command_global');
@@ -146,7 +185,7 @@ client.on('interactionCreate', async interaction => {
     // Log command execution
     logCommandExecution(interaction, true);
     // handle modal submit for confirmations
-    if (interaction.isModalSubmit && interaction.isModalSubmit()) {
+    if (interaction.isModalSubmit()) {
       const custom = interaction.customId || '';
       if (custom.startsWith('rpg_reset_confirm:')) {
         const parts = custom.split(':');
@@ -1619,7 +1658,9 @@ client.on('interactionCreate', async interaction => {
     }
   }
 });
+console.log('Interaction listener added');
 
+console.log('About to add message listener');
 client.on('messageCreate', async message => {
   try {
     // Check global message cooldown
@@ -1652,6 +1693,22 @@ client.on('messageCreate', async message => {
   }
 });
 
+console.log('All event listeners added, about to start login process');
 (async () => {
-  await client.login(TOKEN);
+  try {
+    console.log('About to attempt login');
+    logger.info('Attempting to login to Discord...');
+    // Add timeout to prevent hanging on invalid token
+    const loginPromise = client.login(TOKEN);
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Discord login timed out after 10 seconds. Please check your DISCORD_TOKEN in .env file.')), 10000));
+    await Promise.race([loginPromise, timeoutPromise]);
+    logger.success('Login successful');
+  } catch (error) {
+    console.error('Login failed:', error.message);
+    logError('Failed to login to Discord', error);
+    if (error.message.includes('timeout') || error.message.includes('Invalid token')) {
+      console.error('Please ensure DISCORD_TOKEN in .env is set to a valid Discord bot token from https://discord.com/developers/applications');
+    }
+    process.exit(1);
+  }
 })();
