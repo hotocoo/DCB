@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getUserAchievements, getAllAchievements, getAchievementLeaderboard, updateUserStats, ACHIEVEMENT_RARITIES } from '../achievements.js';
+// import { getUserAchievements, getAllAchievements, getAchievementLeaderboard, updateUserStats, ACHIEVEMENT_RARITIES } from '../achievements.js';
 
 export const data = new SlashCommandBuilder()
   .setName('achievements')
@@ -13,8 +13,10 @@ export async function execute(interaction) {
   const userId = interaction.user.id;
 
   if (sub === 'view') {
-    const userAchievements = getUserAchievements(userId);
-    const allAchievements = getAllAchievements();
+    // const userAchievements = getUserAchievements(userId);
+    // const allAchievements = getAllAchievements();
+    const userAchievements = [];
+    const allAchievements = {};
 
     // Group achievements by category
     const achievementsByCategory = {};
@@ -82,7 +84,8 @@ export async function execute(interaction) {
     await interaction.reply({ embeds: [embed], components: [row] });
 
   } else if (sub === 'leaderboard') {
-    const leaderboard = getAchievementLeaderboard(10);
+    // const leaderboard = getAchievementLeaderboard(10);
+    const leaderboard = [];
 
     if (leaderboard.length === 0) {
       return interaction.reply({ content: '📊 No achievement data available yet. Be the first to earn achievements!', ephemeral: true });
@@ -110,21 +113,22 @@ export async function execute(interaction) {
     await interaction.reply({ embeds: [embed] });
 
   } else if (sub === 'stats') {
-    const userStats = updateUserStats(userId, {});
+    // const userStats = updateUserStats(userId, {});
+    const userStats = { userData: null, newAchievements: [] };
 
     const embed = new EmbedBuilder()
       .setTitle(`📊 ${interaction.user.username}'s Statistics`)
       .setColor(0x0099FF)
       .setDescription('Your detailed activity statistics!')
       .addFields(
-        { name: '🎮 Commands Used', value: userStats.commands_used || 0, inline: true },
-        { name: '🏆 Achievements Earned', value: userStats.achievements_earned || 0, inline: true },
-        { name: '⭐ Achievement Points', value: userStats.achievement_points || 0, inline: true },
-        { name: '💰 Gold Earned', value: userStats.gold_earned || 0, inline: true },
-        { name: '⚔️ Battles Fought', value: userStats.battles_fought || 0, inline: true },
-        { name: '🎯 Games Played', value: userStats.games_played || 0, inline: true },
-        { name: '📅 Member Since', value: userStats.join_date ? new Date(userStats.join_date).toLocaleDateString() : 'Unknown', inline: true },
-        { name: '🏅 Level', value: userStats.level || 1, inline: true }
+        { name: '🎮 Commands Used', value: '0 (temporarily disabled)', inline: true },
+        { name: '🏆 Achievements Earned', value: '0 (temporarily disabled)', inline: true },
+        { name: '⭐ Achievement Points', value: '0 (temporarily disabled)', inline: true },
+        { name: '💰 Gold Earned', value: '0 (temporarily disabled)', inline: true },
+        { name: '⚔️ Battles Fought', value: '0 (temporarily disabled)', inline: true },
+        { name: '🎯 Games Played', value: '0 (temporarily disabled)', inline: true },
+        { name: '📅 Member Since', value: 'Today', inline: true },
+        { name: '🏅 Level', value: '1 (temporarily disabled)', inline: true }
       );
 
     await interaction.reply({ embeds: [embed], ephemeral: true });

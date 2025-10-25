@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
-import { updateUserStats } from '../achievements.js';
+// import { updateUserStats } from '../achievements.js';
 
 const WORD_LIST = [
   'HOUSE', 'PLANE', 'TIGER', 'OCEAN', 'FLAME', 'CLOUD', 'BRAIN', 'CHAIR', 'DANCE', 'EAGLE',
@@ -61,7 +61,7 @@ async function sendWordleBoard(interaction, gameState) {
     gameState.gameActive = false;
     const timeElapsed = Math.round((Date.now() - gameState.startTime) / 1000);
 
-    updateUserStats(interaction.user.id, { wordle_wins: 1 });
+    // updateUserStats(interaction.user.id, { wordle_wins: 1 });
 
     let performanceMessage;
     if (guesses.length === 1) performanceMessage = '🌟 INCREDIBLE! First try!';
