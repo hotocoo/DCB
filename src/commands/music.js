@@ -1,11 +1,17 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { searchSongs, play, pause, resume, skip, stop, getQueue, getMusicStats, getLyrics, getRadioStations, setVolume, shuffleQueue, clearQueue } from '../music.js';
+import { searchSongs, play, pause, resume, skip, stop, getQueue, getMusicStats, getLyrics, getRadioStations, setVolume, shuffleQueue, clearQueue, back, setLoop, getLoop } from '../music.js';
 
 export const data = new SlashCommandBuilder()
   .setName('music')
   .setDescription('🎵 ULTRA Music System - The Most Advanced Music Bot!')
   .addSubcommand(sub => sub.setName('play').setDescription('🎵 Play any song instantly').addStringOption(opt => opt.setName('query').setDescription('Song name or URL').setRequired(true)))
   .addSubcommand(sub => sub.setName('search').setDescription('🔍 Search millions of songs').addStringOption(opt => opt.setName('query').setDescription('Search term').setRequired(true)))
+  .addSubcommand(sub => sub.setName('back').setDescription('⬅️ Go back to previous song'))
+  .addSubcommand(sub => sub.setName('loop').setDescription('🔄 Set loop mode').addStringOption(opt => opt.setName('mode').setDescription('Loop mode').addChoices(
+    { name: 'None', value: 'none' },
+    { name: 'Single', value: 'single' },
+    { name: 'Queue', value: 'queue' }
+  ).setRequired(true)))
   .addSubcommand(sub => sub.setName('skip').setDescription('⏭️ Skip to next song'))
   .addSubcommand(sub => sub.setName('pause').setDescription('⏸️ Pause current song'))
   .addSubcommand(sub => sub.setName('resume').setDescription('▶️ Resume paused song'))
@@ -24,6 +30,7 @@ export const data = new SlashCommandBuilder()
   ).setRequired(true)));
 
 export async function execute(interaction) {
+  console.log(`[MUSIC] Command executed: ${interaction.options.getSubcommand()} by ${interaction.user.username} in ${interaction.guild.name}`);
   const sub = interaction.options.getSubcommand();
 
   if (sub === 'play') {
@@ -51,8 +58,19 @@ export async function execute(interaction) {
       // Search for the song
       const songs = await searchSongs(query, 1);
       if (songs.length === 0) {
+        let noResultsMessage = '❌ **No results found for that query.**';
+
+        // Provide more specific messaging for URL queries
+        if (query.includes('deezer.com')) {
+          noResultsMessage = '❌ **Track unavailable on Deezer**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
+        } else if (query.includes('youtube.com') || query.includes('youtu.be')) {
+          noResultsMessage = '❌ **Video unavailable**\n\n📹 The requested video is not available, private, or has been deleted.\n🔍 Try searching for the song title instead of using the direct URL.';
+        } else {
+          noResultsMessage = '❌ **No results found**\n\n🔍 No tracks found for your search query.\n💡 Try different keywords or check the spelling.';
+        }
+
         return interaction.reply({
-          content: '❌ **No results found for that query.**',
+          content: noResultsMessage,
           ephemeral: true
         });
       }
@@ -62,8 +80,42 @@ export async function execute(interaction) {
       // Play the song
       const result = await play(interaction.guild.id, voiceChannel, song);
       if (!result.success) {
+        let errorMessage = `❌ **Failed to play music**`;
+
+        // Provide specific error messages based on error type
+        switch (result.errorType) {
+          case 'validation_failed':
+            if (song.source === 'deezer') {
+              errorMessage += `\n\n🎵 **Track unavailable on Deezer**\nThe requested track is no longer available or has no preview.`;
+            } else {
+              errorMessage += `\n\n📹 **Video unavailable or deleted**\nThe requested video is no longer available on YouTube.`;
+            }
+            break;
+          case 'stream_creation':
+            errorMessage += `\n\n🔊 **Audio stream error**\nThere was an issue creating the audio stream for this video.`;
+            break;
+          case 'connection_failed':
+            errorMessage += `\n\n🔗 **Voice connection error**\nFailed to establish a stable connection to the voice channel.`;
+            break;
+          case 'skipped_to_next':
+            errorMessage += `\n\n⏭️ **Skipped to next song**\nThe current song failed and has been skipped.`;
+            // Don't reply with error for this case, let the next song play
+            return;
+          case 'stopped':
+            errorMessage += `\n\n⏹️ **Playback stopped**\nNo more songs in the queue.`;
+            break;
+          case 'no_preview':
+            errorMessage += `\n\n🎵 **No preview available**\nThis Deezer track does not have a preview clip.`;
+            break;
+          case 'deezer_stream':
+            errorMessage += `\n\n🎵 **Deezer stream error**\nFailed to play the preview clip.`;
+            break;
+          default:
+            errorMessage += `: ${result.error}`;
+        }
+
         return interaction.reply({
-          content: `❌ **Failed to play music: ${result.error}**`,
+          content: errorMessage,
           ephemeral: true
         });
       }
@@ -80,12 +132,17 @@ export async function execute(interaction) {
         )
         .setThumbnail(song.thumbnail || 'https://i.imgur.com/SjIgjlE.png');
 
+      if (song.source === 'deezer') {
+        embed.addFields({ name: 'ℹ️ Note', value: 'Playing 30-second preview from Deezer', inline: false });
+      }
+
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`music_pause:${interaction.guild.id}`).setLabel('⏸️ Pause').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId(`music_skip:${interaction.guild.id}`).setLabel('⏭️ Skip').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId(`music_stop:${interaction.guild.id}`).setLabel('⏹️ Stop').setStyle(ButtonStyle.Danger),
         new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary)
       );
+console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
 
       await interaction.reply({ embeds: [embed], components: [row] });
     } catch (error) {
@@ -102,7 +159,18 @@ export async function execute(interaction) {
     try {
       const results = await searchSongs(query, 5);
       if (results.length === 0) {
-        return interaction.reply({ content: '❌ No search results found.', ephemeral: true });
+        let noResultsMessage = '❌ **No search results found**';
+
+        // Provide more specific messaging for URL queries
+        if (query.includes('deezer.com')) {
+          noResultsMessage = '❌ **Track unavailable on Deezer**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
+        } else if (query.includes('youtube.com') || query.includes('youtu.be')) {
+          noResultsMessage = '❌ **Video unavailable**\n\n📹 The requested video is not available, private, or has been deleted.\n🔍 Try searching for the song title instead of using the direct URL.';
+        } else {
+          noResultsMessage = '❌ **No search results found**\n\n🔍 No tracks found for your search query.\n💡 Try different keywords or check the spelling.';
+        }
+
+        return interaction.reply({ content: noResultsMessage, ephemeral: true });
       }
 
       const embed = new EmbedBuilder()
@@ -137,6 +205,52 @@ export async function execute(interaction) {
     } catch (error) {
       console.error('Search command error:', error);
       await interaction.reply({ content: '❌ Failed to search songs.', ephemeral: true });
+    }
+
+  } else if (sub === 'back') {
+    try {
+      const previousSong = back(interaction.guild.id);
+      if (previousSong) {
+        const embed = new EmbedBuilder()
+          .setTitle('⬅️ Back to Previous Song')
+          .setColor(0xFFA500)
+          .setDescription(`**Now Playing:** ${previousSong.title} by ${previousSong.artist}`)
+          .addFields(
+            { name: '⏱️ Duration', value: previousSong.duration, inline: true },
+            { name: '👤 Requested by', value: interaction.user.username, inline: true }
+          )
+          .setThumbnail(previousSong.thumbnail || 'https://i.imgur.com/SjIgjlE.png');
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`music_pause:${interaction.guild.id}`).setLabel('⏸️ Pause').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`music_skip:${interaction.guild.id}`).setLabel('⏭️ Skip').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`music_back:${interaction.guild.id}`).setLabel('⬅️ Back').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`music_stop:${interaction.guild.id}`).setLabel('⏹️ Stop').setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary)
+        );
+
+        await interaction.reply({ embeds: [embed], components: [row] });
+      } else {
+        await interaction.reply({ content: '❌ No previous song in history.', ephemeral: true });
+      }
+    } catch (error) {
+      console.error('Back command error:', error);
+      await interaction.reply({ content: '❌ Failed to go back.', ephemeral: true });
+    }
+
+  } else if (sub === 'loop') {
+    const mode = interaction.options.getString('mode');
+
+    try {
+      setLoop(interaction.guild.id, mode);
+      const embed = new EmbedBuilder()
+        .setTitle('🔄 Loop Mode Set')
+        .setColor(0x9932CC)
+        .setDescription(`Loop mode set to **${mode.charAt(0).toUpperCase() + mode.slice(1)}**`);
+      await interaction.reply({ embeds: [embed] });
+    } catch (error) {
+      console.error('Loop command error:', error);
+      await interaction.reply({ content: '❌ Failed to set loop mode.', ephemeral: true });
     }
 
   } else if (sub === 'skip') {
@@ -386,7 +500,30 @@ export async function execute(interaction) {
       // Play the radio
       const result = await play(interaction.guild.id, voiceChannel, song);
       if (!result.success) {
-        return interaction.reply({ content: `❌ Failed to play radio: ${result.error}`, ephemeral: true });
+        let errorMessage = `❌ **Failed to play radio**`;
+
+        // Provide specific error messages based on error type
+        switch (result.errorType) {
+          case 'validation_failed':
+            errorMessage += `\n\n📻 **Radio station unavailable**\nThe radio station URL is not accessible.`;
+            break;
+          case 'stream_creation':
+            errorMessage += `\n\n🔊 **Stream error**\nThere was an issue connecting to the radio stream.`;
+            break;
+          case 'connection_failed':
+            errorMessage += `\n\n🔗 **Voice connection error**\nFailed to establish a stable connection to the voice channel.`;
+            break;
+          case 'skipped_to_next':
+            errorMessage += `\n\n⏭️ **Stream failed**\nThe radio station failed and playback has been stopped.`;
+            break;
+          case 'stopped':
+            errorMessage += `\n\n⏹️ **Radio stopped**\nThe radio station is no longer available.`;
+            break;
+          default:
+            errorMessage += `: ${result.error}`;
+        }
+
+        return interaction.reply({ content: errorMessage, ephemeral: true });
       }
 
       const embed = new EmbedBuilder()

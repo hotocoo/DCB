@@ -3,6 +3,10 @@ import 'dotenv/config';
 import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
 import ytdl from 'ytdl-core';
 import axios from 'axios';
+import yts from 'yt-search';
+import ffmpeg from 'ffmpeg-static';
+import { spawn } from 'child_process';
+import { RateLimiterMemory } from 'rate-limiter-flexible';
 
 // Enhanced Music System with Real Audio Streaming
 class MusicManager {
@@ -13,6 +17,13 @@ class MusicManager {
     this.isPlaying = new Map(); // guildId -> boolean
     this.voiceChannels = new Map(); // guildId -> voice channel info
     this.audioPlayers = new Map(); // guildId -> audio player
+    this.history = new Map(); // guildId -> history array
+    // Rate limiter for Deezer API (100 requests per minute)
+    this.rateLimiter = new RateLimiterMemory({
+      keyPrefix: 'deezer_api',
+      points: 100,
+      duration: 60,
+    });
   }
 
   // Queue Management
@@ -49,6 +60,57 @@ class MusicManager {
   clearQueue(guildId) {
     this.queue.set(guildId, []);
     return true;
+  }
+
+  // History Management
+  addToHistory(guildId, song) {
+    if (!this.history.has(guildId)) {
+      this.history.set(guildId, []);
+    }
+    const history = this.history.get(guildId);
+    history.push(song);
+    // Limit history to last 10 songs
+    if (history.length > 10) {
+      history.shift();
+    }
+  }
+
+  getHistory(guildId) {
+    return this.history.get(guildId) || [];
+  }
+
+  back(guildId) {
+    const history = this.getHistory(guildId);
+    if (history.length === 0) return false;
+
+    const previousSong = history.pop();
+    this.currentlyPlaying.set(guildId, {
+      ...previousSong,
+      startedAt: Date.now(),
+      status: 'playing'
+    });
+
+    // Play the previous song using enhanced error handling
+    const player = this.audioPlayers.get(guildId);
+    if (player) {
+      const currentVolume = this.getVolume(guildId) / 100;
+
+      // Use the enhanced playback method
+      this.playWithErrorHandling(guildId, null, previousSong, player, getVoiceConnection(guildId))
+        .then(result => {
+          if (!result.success) {
+            console.error(`[MUSIC] Failed to play previous song "${previousSong.title}":`, result.error);
+            // Try to play next available song
+            this.playNext(guildId);
+          }
+        })
+        .catch(error => {
+          console.error(`[MUSIC] Unexpected error playing previous song:`, error);
+          this.playNext(guildId);
+        });
+    }
+
+    return previousSong;
   }
 
   shuffleQueue(guildId) {
@@ -112,71 +174,373 @@ class MusicManager {
   // Search and Discovery
   async searchSongs(query, limit = 10) {
     try {
-      // Check if query is a YouTube URL
-      if (ytdl.validateURL(query)) {
-        const info = await ytdl.getInfo(query);
-        const video = info.videoDetails;
-        return [{
-          title: video.title,
-          artist: video.author.name,
-          duration: video.lengthSeconds ? `${Math.floor(video.lengthSeconds / 60)}:${(video.lengthSeconds % 60).toString().padStart(2, '0')}` : 'Unknown',
-          url: query,
-          thumbnail: video.thumbnails[0]?.url || ''
-        }];
+      // Check if query is a Deezer URL
+      const deezerMatch = query.match(/deezer\.com\/track\/(\d+)/);
+      if (deezerMatch) {
+        try {
+          const trackId = deezerMatch[1];
+          const response = await axios.get(`https://api.deezer.com/track/${trackId}`);
+          if (response.data && response.data.title) {
+            const track = response.data;
+            return [{
+              title: track.title,
+              artist: track.artist?.name || 'Unknown',
+              duration: track.duration ? `${Math.floor(track.duration / 60)}:${(track.duration % 60).toString().padStart(2, '0')}` : 'Unknown',
+              url: query,
+              thumbnail: track.album?.cover_medium || '',
+              source: 'deezer',
+              preview: track.preview || null
+            }];
+          }
+        } catch (urlError) {
+          console.error(`[MUSIC] Deezer URL validation failed for ${query}:`, urlError.message);
+          return [];
+        }
       }
 
-      // For text queries, return working search results that can actually play
-      // Using a simple approach that creates playable URLs from search terms
-      const searchQuery = encodeURIComponent(query);
-      const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${searchQuery}`;
+      // Check if query is a YouTube URL (fallback)
+      if (ytdl.validateURL(query)) {
+        try {
+          const info = await ytdl.getInfo(query);
+          const video = info.videoDetails;
 
-      // Return multiple realistic results that can be converted to actual YouTube URLs
-      return [
-        {
-          title: `${query} - Official Video`,
-          artist: 'Various Artists',
-          duration: '3:45',
-          url: `https://www.youtube.com/watch?v=dQw4w9WgXcQ`, // Default test video URL
-          thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
-          note: 'Click to play'
-        },
-        {
-          title: `${query} - Live Performance`,
-          artist: 'Live Concert',
-          duration: '4:12',
-          url: `https://www.youtube.com/watch?v=9bZkp7q19f0`, // Another test video
-          thumbnail: 'https://i.ytimg.com/vi/9bZkp7q19f0/maxresdefault.jpg',
-          note: 'Alternative version'
-        },
-        {
-          title: `${query} - Acoustic Cover`,
-          artist: 'Cover Artist',
-          duration: '3:22',
-          url: `https://www.youtube.com/watch?v=jNQXAC9IVRw`, // Third test video
-          thumbnail: 'https://i.ytimg.com/vi/jNQXAC9IVRw/maxresdefault.jpg',
-          note: 'Cover version'
+          if (video.isPrivate || !video.title || video.title === 'Deleted video' || video.title === 'Private video') {
+            console.log(`[MUSIC] Video unavailable: ${query} (Title: ${video.title})`);
+            return [];
+          }
+
+          return [{
+            title: video.title,
+            artist: video.author.name,
+            duration: video.lengthSeconds ? `${Math.floor(video.lengthSeconds / 60)}:${(video.lengthSeconds % 60).toString().padStart(2, '0')}` : 'Unknown',
+            url: query,
+            thumbnail: video.thumbnails[0]?.url || '',
+            source: 'youtube'
+          }];
+        } catch (urlError) {
+          console.error(`[MUSIC] YouTube URL validation failed for ${query}:`, urlError.message);
+          return [];
         }
-      ].slice(0, limit);
+      }
+
+      // For text queries, try Deezer first
+      try {
+        await this.rateLimiter.consume('deezer_api');
+        const response = await axios.get(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+        if (response.data && response.data.data && response.data.data.length > 0) {
+          const tracks = response.data.data.slice(0, limit);
+          const results = tracks.map(track => ({
+            title: track.title,
+            artist: track.artist?.name || 'Unknown',
+            duration: track.duration ? `${Math.floor(track.duration / 60)}:${(track.duration % 60).toString().padStart(2, '0')}` : 'Unknown',
+            url: track.link,
+            thumbnail: track.album?.cover_medium || '',
+            source: 'deezer',
+            preview: track.preview || null
+          }));
+          console.log(`[MUSIC] Deezer search successful for "${query}": ${results.length} results`);
+          return results;
+        }
+      } catch (error) {
+        if (error.message.includes('rate limit') || error.message.includes('Too Many Requests')) {
+          console.error('[MUSIC] Deezer API rate limit exceeded:', error.message);
+        } else {
+          console.error('[MUSIC] Deezer search failed:', error.message);
+        }
+      }
+
+      // Fallback to YouTube search
+      try {
+        const searchResults = await yts(query);
+        const videos = searchResults.videos.slice(0, limit);
+
+        const validVideos = [];
+        for (const video of videos) {
+          try {
+            await ytdl.getInfo(video.url);
+            validVideos.push({
+              title: video.title,
+              artist: video.author.name,
+              duration: video.duration.timestamp,
+              url: video.url,
+              thumbnail: video.thumbnail,
+              source: 'youtube'
+            });
+          } catch (videoError) {
+            console.log(`[MUSIC] Skipping unavailable video: ${video.title} (${video.url}) - ${videoError.message}`);
+          }
+        }
+
+        console.log(`[MUSIC] YouTube fallback search for "${query}": ${validVideos.length} results`);
+        return validVideos;
+      } catch (fallbackError) {
+        console.error('[MUSIC] YouTube fallback search failed:', fallbackError.message);
+        return [];
+      }
     } catch (error) {
       console.error('Music search error:', error);
       return [];
     }
   }
 
+  // Enhanced URL validation before playback
+  async validateSongUrl(song) {
+    if (song.source === 'deezer') {
+      // For Deezer, check if track exists
+      try {
+        const trackId = song.url.match(/deezer\.com\/track\/(\d+)/)?.[1];
+        if (trackId) {
+          const response = await axios.get(`https://api.deezer.com/track/${trackId}`);
+          if (response.data && response.data.title) {
+            return { valid: true };
+          }
+        }
+        throw new Error('Track not found');
+      } catch (error) {
+        console.error(`[MUSIC] Deezer URL validation failed for "${song.title}":`, error.message);
+        return {
+          valid: false,
+          error: error.message,
+          canFallback: true
+        };
+      }
+    } else if (ytdl.validateURL(song.url)) {
+      try {
+        const info = await ytdl.getInfo(song.url);
+        const video = info.videoDetails;
+
+        // Check if video is available
+        if (video.isPrivate || !video.title || video.title === 'Deleted video' || video.title === 'Private video') {
+          throw new Error(`Video unavailable: ${video.title}`);
+        }
+
+        return { valid: true };
+      } catch (error) {
+        console.error(`[MUSIC] YouTube URL validation failed for "${song.title}":`, error.message);
+        return {
+          valid: false,
+          error: error.message,
+          canFallback: true
+        };
+      }
+    }
+    return { valid: true }; // Non-YouTube/Deezer URLs are assumed valid
+  }
+
+  // Enhanced playback with comprehensive error handling
+  async playWithErrorHandling(guildId, voiceChannel, song, player, connection) {
+    const currentVolume = this.getVolume(guildId) / 100;
+
+    if (song.source === 'deezer') {
+      // For Deezer tracks, use preview URL
+      const streamUrl = song.preview;
+      if (!streamUrl) {
+        console.error(`[MUSIC] No preview URL available for Deezer track: ${song.title}`);
+        return {
+          success: false,
+          error: 'No preview available for this track. Deezer previews are 30 seconds long.',
+          errorType: 'no_preview'
+        };
+      }
+
+      console.log(`[MUSIC] Creating direct stream for Deezer preview: ${song.title}`);
+      try {
+        const ffmpegProcess = spawn(ffmpeg, [
+          '-i', streamUrl,
+          '-f', 'opus',
+          '-ar', '48000',
+          '-ac', '2',
+          'pipe:1'
+        ]);
+
+        ffmpegProcess.stderr.on('data', (data) => {
+          const errorMsg = data.toString();
+          console.error(`[MUSIC] FFmpeg Deezer stderr for "${song.title}": ${errorMsg}`);
+        });
+
+        ffmpegProcess.on('close', (code) => {
+          console.log(`[MUSIC] FFmpeg Deezer process exited with code ${code} for "${song.title}"`);
+        });
+
+        const resource = createAudioResource(ffmpegProcess.stdout, {
+          inputType: 'arbitrary',
+          inlineVolume: true
+        });
+
+        resource.volume.setVolume(currentVolume);
+        player.play(resource);
+
+        return { success: true };
+
+      } catch (streamError) {
+        console.error(`[MUSIC] Deezer stream error for "${song.title}":`, streamError.message);
+        return {
+          success: false,
+          error: `Failed to play Deezer preview: ${streamError.message}`,
+          errorType: 'deezer_stream'
+        };
+      }
+    } else if (ytdl.validateURL(song.url)) {
+      console.log(`[MUSIC] Creating ytdl stream for YouTube URL: ${song.title}`);
+
+      try {
+        const ytdlStream = ytdl(song.url, {
+          filter: 'audioonly',
+          highWaterMark: 1 << 62,
+          dlChunkSize: 0,
+          bitrate: 128,
+          quality: 'lowestaudio'
+        });
+
+        // Set up comprehensive error handling for ytdl stream
+        let streamError = null;
+        ytdlStream.on('error', (error) => {
+          console.error(`[MUSIC] YTDL stream error for "${song.title}":`, error);
+          streamError = error;
+        });
+
+        // Transcode to Opus using ffmpeg
+        const ffmpegProcess = spawn(ffmpeg, [
+          '-i', 'pipe:0',
+          '-f', 'opus',
+          '-ar', '48000',
+          '-ac', '2',
+          'pipe:1'
+        ]);
+
+        // Handle ffmpeg process errors
+        ffmpegProcess.stderr.on('data', (data) => {
+          const errorMsg = data.toString();
+          console.error(`[MUSIC] FFmpeg stderr for "${song.title}": ${errorMsg}`);
+
+          // Check for specific error patterns
+          if (errorMsg.includes('410') || errorMsg.includes('404') || errorMsg.includes('Video unavailable')) {
+            console.error(`[MUSIC] Video became unavailable during playback: ${song.title}`);
+          }
+        });
+
+        ffmpegProcess.on('error', (error) => {
+          console.error(`[MUSIC] FFmpeg process error for "${song.title}":`, error);
+          streamError = error;
+        });
+
+        ffmpegProcess.on('close', (code) => {
+          console.log(`[MUSIC] FFmpeg process exited with code ${code} for "${song.title}"`);
+          if (code !== 0 && streamError) {
+            console.error(`[MUSIC] FFmpeg failed for "${song.title}":`, streamError.message);
+          }
+        });
+
+        // Pipe ytdl stream to ffmpeg
+        ytdlStream.pipe(ffmpegProcess.stdin);
+        ffmpegProcess.stdin.on('error', (err) => {
+          console.error(`[MUSIC] FFmpeg stdin error for "${song.title}":`, err);
+        });
+
+        const resource = createAudioResource(ffmpegProcess.stdout, {
+          inputType: 'arbitrary',
+          inlineVolume: true
+        });
+
+        resource.volume.setVolume(currentVolume);
+        player.play(resource);
+
+        return { success: true };
+
+      } catch (streamError) {
+        console.error(`[MUSIC] Stream creation error for "${song.title}":`, streamError.message);
+        return {
+          success: false,
+          error: `Failed to create audio stream: ${streamError.message}`,
+          errorType: 'stream_creation'
+        };
+      }
+    } else {
+      // For direct stream URLs (like radio)
+      console.log(`[MUSIC] Creating direct stream for URL: ${song.title}`);
+
+      try {
+        const ffmpegProcess = spawn(ffmpeg, [
+          '-i', song.url,
+          '-f', 'opus',
+          '-ar', '48000',
+          '-ac', '2',
+          'pipe:1'
+        ]);
+
+        ffmpegProcess.stderr.on('data', (data) => {
+          const errorMsg = data.toString();
+          console.error(`[MUSIC] FFmpeg direct stderr for "${song.title}": ${errorMsg}`);
+
+          // Check for specific error patterns
+          if (errorMsg.includes('410') || errorMsg.includes('404') || errorMsg.includes('unavailable')) {
+            console.error(`[MUSIC] Direct stream became unavailable: ${song.title}`);
+          }
+        });
+
+        ffmpegProcess.on('close', (code) => {
+          console.log(`[MUSIC] FFmpeg direct process exited with code ${code} for "${song.title}"`);
+        });
+
+        const resource = createAudioResource(ffmpegProcess.stdout, {
+          inputType: 'arbitrary',
+          inlineVolume: true
+        });
+
+        resource.volume.setVolume(currentVolume);
+        player.play(resource);
+
+        return { success: true };
+
+      } catch (streamError) {
+        console.error(`[MUSIC] Direct stream error for "${song.title}":`, streamError.message);
+        return {
+          success: false,
+          error: `Failed to play stream: ${streamError.message}`,
+          errorType: 'direct_stream'
+        };
+      }
+    }
+  }
+
   // Real Music Playback with Voice Integration
   async play(guildId, voiceChannel, song) {
+    console.log(`[MUSIC] Starting play for guild ${guildId}, song: ${song.title}`);
     try {
       // Check if already connected to a voice channel
       const existingConnection = getVoiceConnection(guildId);
       let connection = existingConnection;
+      console.log(`[MUSIC] Existing connection: ${connection ? connection.state.status : 'none'}`);
 
-      if (!connection || connection.state.status === 'disconnected') {
+      if (!connection || connection.state.status === 'disconnected' || connection.state.status === 'destroyed') {
+        console.log(`[MUSIC] Joining voice channel: ${voiceChannel.name}`);
         // Join voice channel
         connection = joinVoiceChannel({
           channelId: voiceChannel.id,
           guildId: guildId,
           adapterCreator: voiceChannel.guild.voiceAdapterCreator,
         });
+        console.log(`[MUSIC] Joined voice channel, connection status: ${connection.state.status}`);
+      } else if (connection.state.status === 'connecting') {
+        // Wait a moment for connection to stabilize
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const updatedConnection = getVoiceConnection(guildId);
+        if (updatedConnection && updatedConnection.state.status === 'ready') {
+          connection = updatedConnection;
+        }
+      }
+
+      // Ensure connection stability
+      if (!this.ensureConnectionStability(guildId)) {
+        console.log(`[MUSIC] Connection unstable, attempting reconnection`);
+        connection = await this.reconnectToVoice(guildId, voiceChannel);
+        if (!connection) {
+          return {
+            success: false,
+            error: 'Failed to establish stable voice connection',
+            errorType: 'connection_failed'
+          };
+        }
       }
 
       // Create audio player if not exists
@@ -186,21 +550,21 @@ class MusicManager {
         this.audioPlayers.set(guildId, player);
 
         connection.on('stateChange', (oldState, newState) => {
-          console.log(`Connection state change: ${oldState.status} -> ${newState.status}`);
+          console.log(`[MUSIC] Connection state change: ${oldState.status} -> ${newState.status}`);
         });
 
         player.on(AudioPlayerStatus.Idle, () => {
-          console.log('Player idle, playing next song');
+          console.log(`[MUSIC] Player idle for guild ${guildId}, playing next song`);
           this.playNext(guildId);
         });
 
         player.on(AudioPlayerStatus.Playing, () => {
-          console.log('Audio player is playing');
+          console.log(`[MUSIC] Audio player is playing for guild ${guildId}`);
         });
 
         player.on('error', error => {
-          console.error('Audio player error:', error);
-          this.playNext(guildId);
+          console.error(`[MUSIC] Audio player error for guild ${guildId}:`, error);
+          this.handlePlaybackError(guildId, error);
         });
 
         // Subscribe to connection
@@ -214,54 +578,167 @@ class MusicManager {
         joinedAt: Date.now()
       });
 
+      // Validate song URL before attempting playback
+      const validation = await this.validateSongUrl(song);
+      if (!validation.valid) {
+        console.error(`[MUSIC] Song validation failed for "${song.title}": ${validation.error}`);
+
+        if (validation.canFallback) {
+          // Try fallback search
+          try {
+            const fallbackQuery = song.title + ' ' + song.artist;
+            const fallbackResults = await this.searchSongs(fallbackQuery, 1);
+            if (fallbackResults.length > 0 && !fallbackResults[0].isFallback) {
+              console.log(`[MUSIC] Using fallback song: ${fallbackResults[0].title}`);
+              song = fallbackResults[0];
+            } else {
+              return {
+                success: false,
+                error: `Video unavailable and no suitable fallback found. Original error: ${validation.error}`,
+                errorType: 'validation_failed'
+              };
+            }
+          } catch (fallbackError) {
+            console.error('[MUSIC] Fallback search failed:', fallbackError.message);
+            return {
+              success: false,
+              error: `Video unavailable: ${validation.error}`,
+              errorType: 'validation_failed'
+            };
+          }
+        } else {
+          return {
+            success: false,
+            error: `Video unavailable: ${validation.error}`,
+            errorType: 'validation_failed'
+          };
+        }
+      }
+
       // Set currently playing
       this.currentlyPlaying.set(guildId, {
         ...song,
         startedAt: Date.now(),
-        status: 'playing'
+        status: 'playing',
+        totalPaused: 0,
+        pausedAt: null
       });
 
       // Mark as playing
       this.isPlaying.set(guildId, true);
 
-      // Stream audio using ytdl-core if it's a YouTube URL
-      if (ytdl.validateURL(song.url)) {
-        try {
-          const stream = ytdl(song.url, {
-            filter: 'audioonly',
-            highWaterMark: 1 << 62,
-            dlChunkSize: 0,
-            bitrate: 128,
-            quality: 'lowestaudio'
-          });
-          const resource = createAudioResource(stream, {
-            inputType: 'arbitrary',
-            inlineVolume: true
-          });
-          player.play(resource);
-        } catch (streamError) {
-          console.error('Stream creation error:', streamError);
-          return { success: false, error: `Failed to create audio stream: ${streamError.message}` };
-        }
+      // Attempt playback with enhanced error handling
+      const playResult = await this.playWithErrorHandling(guildId, voiceChannel, song, player, connection);
+
+      if (playResult.success) {
+        console.log(`[MUSIC] Play successful for guild ${guildId}, song: ${song.title}`);
+        return { success: true, song };
       } else {
-        // For direct stream URLs (like radio)
-        try {
-          const stream = song.url;
-          const resource = createAudioResource(stream, {
-            inputType: 'arbitrary',
-            inlineVolume: true
-          });
-          player.play(resource);
-        } catch (streamError) {
-          console.error('Direct stream error:', streamError);
-          return { success: false, error: `Failed to play stream: ${streamError.message}` };
-        }
+        // Handle playback failure
+        return this.handlePlaybackError(guildId, new Error(playResult.error), playResult.errorType);
       }
 
-      return { success: true, song };
     } catch (error) {
-      console.error('Play music error:', error);
-      return { success: false, error: error.message };
+      console.error(`[MUSIC] Play music error for guild ${guildId}:`, error);
+      return this.handlePlaybackError(guildId, error);
+    }
+  }
+
+  // Enhanced error handling and recovery
+  handlePlaybackError(guildId, error, errorType = 'unknown') {
+    console.error(`[MUSIC] Handling playback error for guild ${guildId}:`, error.message);
+
+    // Log detailed error information
+    const errorDetails = {
+      guildId,
+      error: error.message,
+      errorType,
+      timestamp: new Date().toISOString(),
+      connectionStatus: getVoiceConnection(guildId)?.state?.status || 'no_connection',
+      queueLength: this.getQueue(guildId).length,
+      currentlyPlaying: this.currentlyPlaying.get(guildId)?.title || 'none'
+    };
+
+    console.error(`[MUSIC] Error details:`, JSON.stringify(errorDetails, null, 2));
+
+    // Check if we should skip to next song
+    const queue = this.getQueue(guildId);
+    if (queue.length > 0) {
+      console.log(`[MUSIC] Skipping to next song in queue due to error`);
+      // The player's error event handler will trigger playNext automatically
+      return {
+        success: false,
+        error: `Playback failed: ${error.message}. Skipping to next song.`,
+        errorType: 'skipped_to_next'
+      };
+    } else {
+      console.log(`[MUSIC] No songs in queue, stopping playback`);
+      this.stop(guildId);
+      return {
+        success: false,
+        error: `Playback failed: ${error.message}. No more songs in queue.`,
+        errorType: 'stopped'
+      };
+    }
+  }
+
+  // Voice connection stability management
+  ensureConnectionStability(guildId) {
+    const connection = getVoiceConnection(guildId);
+    if (!connection) {
+      console.log(`[MUSIC] No voice connection found for guild ${guildId}`);
+      return false;
+    }
+
+    const connectionState = connection.state.status;
+    console.log(`[MUSIC] Connection status for guild ${guildId}: ${connectionState}`);
+
+    // Check if connection is in a problematic state
+    if (connectionState === 'disconnected' || connectionState === 'destroyed') {
+      console.log(`[MUSIC] Connection is ${connectionState}, attempting recovery`);
+      return false;
+    }
+
+    // Check if connection is ready
+    if (connectionState === 'ready') {
+      console.log(`[MUSIC] Connection is stable for guild ${guildId}`);
+      return true;
+    }
+
+    // For connecting state, wait a bit and check again
+    if (connectionState === 'connecting') {
+      console.log(`[MUSIC] Connection is still connecting for guild ${guildId}`);
+      return true; // Assume it's okay for now
+    }
+
+    console.log(`[MUSIC] Unknown connection state for guild ${guildId}: ${connectionState}`);
+    return false;
+  }
+
+  // Reconnect to voice channel if needed
+  async reconnectToVoice(guildId, voiceChannel) {
+    console.log(`[MUSIC] Attempting to reconnect to voice channel for guild ${guildId}`);
+
+    try {
+      const connection = getVoiceConnection(guildId);
+      if (connection) {
+        connection.destroy();
+      }
+
+      // Wait a moment before reconnecting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const newConnection = joinVoiceChannel({
+        channelId: voiceChannel.id,
+        guildId: guildId,
+        adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+      });
+
+      console.log(`[MUSIC] Successfully reconnected to voice channel: ${voiceChannel.name}`);
+      return newConnection;
+    } catch (error) {
+      console.error(`[MUSIC] Failed to reconnect to voice channel:`, error);
+      return null;
     }
   }
 
@@ -272,7 +749,10 @@ class MusicManager {
     if (!isPlaying) return false;
 
     const current = this.currentlyPlaying.get(guildId);
-    if (current) current.status = 'paused';
+    if (current) {
+      current.status = 'paused';
+      current.pausedAt = Date.now();
+    }
 
     this.isPlaying.set(guildId, false);
 
@@ -289,6 +769,10 @@ class MusicManager {
     const current = this.currentlyPlaying.get(guildId);
     if (!current || current.status !== 'paused') return false;
 
+    if (current.pausedAt) {
+      current.totalPaused += (Date.now() - current.pausedAt);
+      current.pausedAt = null;
+    }
     current.status = 'playing';
     this.isPlaying.set(guildId, true);
 
@@ -302,6 +786,11 @@ class MusicManager {
   }
 
   skip(guildId) {
+    const currentSong = this.currentlyPlaying.get(guildId);
+    if (currentSong) {
+      this.addToHistory(guildId, currentSong);
+    }
+
     const queue = this.getQueue(guildId);
     if (queue.length === 0) return false;
 
@@ -312,17 +801,26 @@ class MusicManager {
       status: 'playing'
     });
 
-    // Play the next song using the existing player
+    // Play the next song using enhanced error handling
     const player = this.audioPlayers.get(guildId);
     if (player) {
-      if (ytdl.validateURL(nextSong.url)) {
-        const stream = ytdl(nextSong.url, { filter: 'audioonly' });
-        const resource = createAudioResource(stream, { inputType: 'arbitrary' });
-        player.play(resource);
+      const connection = getVoiceConnection(guildId);
+      if (connection) {
+        this.playWithErrorHandling(guildId, null, nextSong, player, connection)
+          .then(result => {
+            if (!result.success) {
+              console.error(`[MUSIC] Failed to skip to song "${nextSong.title}":`, result.error);
+              // Try to play next available song
+              this.playNext(guildId);
+            }
+          })
+          .catch(error => {
+            console.error(`[MUSIC] Unexpected error skipping to song:`, error);
+            this.playNext(guildId);
+          });
       } else {
-        // For direct streams
-        const resource = createAudioResource(nextSong.url, { inputType: 'arbitrary' });
-        player.play(resource);
+        console.error(`[MUSIC] No voice connection available for skip`);
+        return false;
       }
     }
 
@@ -348,32 +846,63 @@ class MusicManager {
   }
 
   playNext(guildId) {
-    const queue = this.getQueue(guildId);
-    if (queue.length === 0) {
-      this.currentlyPlaying.delete(guildId);
-      this.isPlaying.set(guildId, false);
-      return false;
+    const currentSong = this.currentlyPlaying.get(guildId);
+    if (currentSong) {
+      this.addToHistory(guildId, currentSong);
     }
 
-    const nextSong = queue.shift();
+    const queue = this.getQueue(guildId);
+    const loopMode = this.getLoop(guildId);
+
+    let nextSong;
+    if (loopMode === 'single' && currentSong) {
+      nextSong = currentSong;
+    } else if (queue.length === 0) {
+      if (loopMode === 'queue' && currentSong) {
+        // Add current back to queue and play it
+        this.addToQueue(guildId, currentSong);
+        nextSong = currentSong;
+      } else {
+        this.currentlyPlaying.delete(guildId);
+        this.isPlaying.set(guildId, false);
+        return false;
+      }
+    } else {
+      nextSong = queue.shift();
+      if (loopMode === 'queue' && currentSong) {
+        this.addToQueue(guildId, currentSong);
+      }
+    }
+
     this.currentlyPlaying.set(guildId, {
       ...nextSong,
       startedAt: Date.now(),
       status: 'playing'
     });
 
-    // Play the next song using the existing player
+    // Play the next song using enhanced error handling
     const player = this.audioPlayers.get(guildId);
-    if (player) {
-      if (ytdl.validateURL(nextSong.url)) {
-        const stream = ytdl(nextSong.url, { filter: 'audioonly' });
-        const resource = createAudioResource(stream, { inputType: 'arbitrary' });
-        player.play(resource);
-      } else {
-        // For direct streams
-        const resource = createAudioResource(nextSong.url, { inputType: 'arbitrary' });
-        player.play(resource);
-      }
+    const connection = getVoiceConnection(guildId);
+
+    if (player && connection) {
+      this.playWithErrorHandling(guildId, null, nextSong, player, connection)
+        .then(result => {
+          if (!result.success) {
+            console.error(`[MUSIC] Failed to play next song "${nextSong.title}":`, result.error);
+            // Try to play the song after next
+            setTimeout(() => this.playNext(guildId), 1000);
+          }
+        })
+        .catch(error => {
+          console.error(`[MUSIC] Unexpected error playing next song:`, error);
+          // Try to play the song after next
+          setTimeout(() => this.playNext(guildId), 1000);
+        });
+    } else {
+      console.error(`[MUSIC] No player or connection available for playNext`);
+      this.currentlyPlaying.delete(guildId);
+      this.isPlaying.set(guildId, false);
+      return false;
     }
 
     return nextSong;
@@ -386,10 +915,30 @@ class MusicManager {
 
     // Apply volume to current player if exists
     const player = this.audioPlayers.get(guildId);
-    if (player) {
-      const resource = player.state.resource;
-      if (resource && resource.volume) {
-        resource.volume.setVolume(settings.volume / 100); // Convert to 0-1 scale
+    if (player && player.state.status === AudioPlayerStatus.Playing) {
+      const currentSong = this.currentlyPlaying.get(guildId);
+      if (currentSong) {
+        try {
+          // Use enhanced playback method with new volume
+          const newVolume = settings.volume / 100;
+          const connection = getVoiceConnection(guildId);
+
+          if (connection) {
+            const playResult = await this.playWithErrorHandling(guildId, null, currentSong, player, connection);
+            if (playResult.success) {
+              // Find the current resource and update its volume
+              const resource = player.state.resource;
+              if (resource && resource.volume) {
+                resource.volume.setVolume(newVolume);
+              }
+            } else {
+              console.error(`[MUSIC] Failed to update volume for "${currentSong.title}":`, playResult.error);
+            }
+          }
+        } catch (error) {
+          console.error(`[MUSIC] Error updating volume:`, error);
+          // Don't fail the volume change, just log the error
+        }
       }
     }
 
@@ -398,6 +947,18 @@ class MusicManager {
 
   getVolume(guildId) {
     return this.musicSettings.get(guildId)?.volume || 50;
+  }
+
+  setLoop(guildId, mode) {
+    if (!['none', 'single', 'queue'].includes(mode)) return false;
+    const settings = this.musicSettings.get(guildId) || {};
+    settings.loop = mode;
+    this.musicSettings.set(guildId, settings);
+    return true;
+  }
+
+  getLoop(guildId) {
+    return this.musicSettings.get(guildId)?.loop || 'none';
   }
 
   // Music Statistics
@@ -412,7 +973,7 @@ class MusicManager {
         title: current.title,
         artist: current.artist,
         duration: current.duration,
-        progress: current.startedAt ? Date.now() - current.startedAt : 0,
+        progress: current.startedAt ? (Date.now() - current.startedAt) - (current.totalPaused || 0) : 0,
         status: current.status
       } : null,
       volume: settings?.volume || 50,
@@ -630,4 +1191,28 @@ export function shuffleQueue(guildId) {
 
 export function clearQueue(guildId) {
   return musicManager.clearQueue(guildId);
+}
+
+export function back(guildId) {
+  return musicManager.back(guildId);
+}
+
+export function addToHistory(guildId, song) {
+  return musicManager.addToHistory(guildId, song);
+}
+
+export function getHistory(guildId) {
+  return musicManager.getHistory(guildId);
+}
+
+export function setLoop(guildId, mode) {
+  return musicManager.setLoop(guildId, mode);
+}
+
+export function getLoop(guildId) {
+  return musicManager.getLoop(guildId);
+}
+
+export async function validateSongUrl(song) {
+  return musicManager.validateSongUrl(song);
 }

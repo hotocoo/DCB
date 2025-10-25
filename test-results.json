@@ -1,0 +1,162 @@
+[
+  {
+    "message": "Deezer API connectivity: ✅ Connected",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:07.081Z"
+  },
+  {
+    "message": "YouTube connectivity: ✅ Connected",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:07.351Z"
+  },
+  {
+    "message": "Deezer search returned 3 results",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:07.905Z"
+  },
+  {
+    "message": "Deezer result has required fields: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:07.905Z"
+  },
+  {
+    "message": "Deezer URL search successful: Harder, Better, Faster, Stronger",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:08.097Z"
+  },
+  {
+    "message": "Rate limiting test completed: 0, 1, 1, 1, 0 requests",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:14.117Z"
+  },
+  {
+    "message": "YouTube URL search failed",
+    "success": false,
+    "timestamp": "2025-10-25T18:33:21.270Z"
+  },
+  {
+    "message": "Queue cleared successfully",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:21.271Z"
+  },
+  {
+    "message": "Initial queue length: 0",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:21.271Z"
+  },
+  {
+    "message": "Volume set to 75%: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:21.271Z"
+  },
+  {
+    "message": "Current volume retrieved: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:21.271Z"
+  },
+  {
+    "message": "Queue operations working: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:21.271Z"
+  },
+  {
+    "message": "Music stats retrieved: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:21.271Z"
+  },
+  {
+    "message": "Invalid Deezer URL handled: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:23.898Z"
+  },
+  {
+    "message": "Invalid YouTube URL handled: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:26.617Z"
+  },
+  {
+    "message": "Empty search handled: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:26.812Z"
+  },
+  {
+    "message": "Special characters handled: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:27.038Z"
+  },
+  {
+    "message": "Direct URL failed: https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "success": false,
+    "timestamp": "2025-10-25T18:33:28.351Z"
+  },
+  {
+    "message": "Direct URL failed: https://youtu.be/dQw4w9WgXcQ",
+    "success": false,
+    "timestamp": "2025-10-25T18:33:29.847Z"
+  },
+  {
+    "message": "Direct URL supported: https://www.deezer.com/track/3135556",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:30.038Z"
+  },
+  {
+    "message": "Pause command executed: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:30.038Z"
+  },
+  {
+    "message": "Resume command executed: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:30.038Z"
+  },
+  {
+    "message": "Skip command executed: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:30.039Z"
+  },
+  {
+    "message": "Stop command executed: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:30.039Z"
+  },
+  {
+    "message": "Loop set to single: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:30.039Z"
+  },
+  {
+    "message": "Loop mode retrieved: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:30.039Z"
+  },
+  {
+    "message": "Discord search command simulation: Found 3 results",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:30.274Z"
+  },
+  {
+    "message": "Deezer results prioritized: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:30.274Z"
+  },
+  {
+    "message": "Selected song for playback: Superman's Song (deezer)",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:30.274Z"
+  },
+  {
+    "message": "Song has required properties: https://www.deezer.com/track/1076297",
+    "success": "https://www.deezer.com/track/1076297",
+    "timestamp": "2025-10-25T18:33:30.274Z"
+  },
+  {
+    "message": "Song ready for Discord playback: https://www.deezer.com/track/1076297",
+    "success": "https://www.deezer.com/track/1076297",
+    "timestamp": "2025-10-25T18:33:30.274Z"
+  },
+  {
+    "message": "Queue and stats accessible: true",
+    "success": true,
+    "timestamp": "2025-10-25T18:33:30.274Z"
+  }
+]
