@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { exploreLocation, unlockLocation, enterDungeon, discoverLocation, getLocations } from '../locations.js';
-import { narrate } from '../rpg.js';
+import { narrate, checkDailyLimit, incrementDailyExploration, checkSessionXpCap } from '../rpg.js';
 
 export const data = new SlashCommandBuilder()
   .setName('explore')
@@ -24,6 +24,9 @@ export async function execute(interaction) {
       });
     }
 
+    const dailyCheck = checkDailyLimit(userId);
+    const sessionCheck = checkSessionXpCap(userId);
+
     const embed = new EmbedBuilder()
       .setTitle('🗺️ Available Locations')
       .setColor(0x0099FF)
@@ -35,6 +38,19 @@ export async function execute(interaction) {
         value: `**Type:** ${location.type}\n**Description:** ${location.description}\n**Rewards:** ${location.rewards.xp} XP, ${location.rewards.gold} gold`,
         inline: false
       });
+    });
+
+    // Add usage info
+    embed.addFields({
+      name: '📊 Daily Usage',
+      value: dailyCheck.allowed ? `Explorations: ${dailyCheck.remaining} remaining` : `Explorations: ${dailyCheck.used}/${dailyCheck.max} (limit reached)`,
+      inline: true
+    });
+
+    embed.addFields({
+      name: '⭐ Session XP',
+      value: sessionCheck.allowed ? `XP: ${sessionCheck.remaining} remaining` : `XP: ${sessionCheck.used}/${sessionCheck.max} (cap reached)`,
+      inline: true
     });
 
     const row = new ActionRowBuilder().addComponents(
@@ -85,11 +101,33 @@ export async function execute(interaction) {
 
   } else if (sub === 'enter') {
     const locationName = interaction.options.getString('location');
+
+    // Check daily limit
+    const dailyCheck = checkDailyLimit(userId);
+    if (!dailyCheck.allowed) {
+      return interaction.reply({
+        content: `❌ **Daily exploration limit reached!** You have used ${dailyCheck.used}/${dailyCheck.max} explorations today. Reset in ${Math.ceil((24 - (Date.now() - (dailyCheck.resetTime || Date.now())) / 3600000))} hours.`,
+        ephemeral: true
+      });
+    }
+
+    // Check session XP cap
+    const sessionCheck = checkSessionXpCap(userId);
+    if (!sessionCheck.allowed) {
+      return interaction.reply({
+        content: `❌ **Session XP cap reached!** You have gained ${sessionCheck.used}/${sessionCheck.max} XP this session. Reset in ${Math.ceil((24 - (Date.now() - (sessionCheck.resetTime || Date.now())) / 3600000))} hours.`,
+        ephemeral: true
+      });
+    }
+
     const result = exploreLocation(userId, locationName);
 
     if (!result.success) {
       return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
     }
+
+    // Increment daily exploration count
+    incrementDailyExploration(userId);
 
     const { location, encounter, narrative } = result;
 
@@ -107,7 +145,9 @@ export async function execute(interaction) {
       .addFields(
         { name: '🎯 Encounter Type', value: encounter.type.replace('_', ' ').toUpperCase(), inline: true },
         { name: '⚔️ Difficulty', value: `Level ${encounter.difficulty}`, inline: true },
-        { name: '💎 Potential Rewards', value: `${encounter.rewards.xp} XP, ${encounter.rewards.gold} gold`, inline: true }
+        { name: '💎 Potential Rewards', value: `${encounter.rewards.xp} XP, ${encounter.rewards.gold} gold`, inline: true },
+        { name: '📊 Daily Explorations', value: `${dailyCheck.remaining - 1} remaining`, inline: true },
+        { name: '⭐ Session XP', value: `${sessionCheck.remaining} remaining`, inline: true }
       );
 
     // Add exploration action buttons

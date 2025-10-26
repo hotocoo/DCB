@@ -634,6 +634,28 @@ class EconomyManager {
     const cutoffTime = Date.now() - (30 * 24 * 60 * 60 * 1000); // 30 days
     this.economyData.transactions = this.economyData.transactions.filter(t => t.timestamp > cutoffTime);
 
+    // Clean up price history maps (keep only last 50 entries per item)
+    for (const [itemId, history] of this.priceHistory.entries()) {
+      if (history.length > 50) {
+        this.priceHistory.set(itemId, history.slice(-50));
+        console.log(`[ECONOMY] Cleaned up price history for ${itemId}: ${history.length} -> 50 entries`);
+      }
+    }
+
+    // Clean up stale market prices (remove items with no recent activity)
+    const recentTransactions = this.economyData.transactions.filter(t =>
+      t.type === 'market_purchase' || t.type === 'market_sale'
+    );
+    const activeItems = new Set(recentTransactions.map(t => t.item).filter(Boolean));
+
+    for (const [itemId] of this.marketPrices.entries()) {
+      if (!activeItems.has(itemId)) {
+        this.marketPrices.delete(itemId);
+        this.priceHistory.delete(itemId);
+        console.log(`[ECONOMY] Cleaned up stale market data for ${itemId}`);
+      }
+    }
+
     this.saveEconomy();
   }
 }

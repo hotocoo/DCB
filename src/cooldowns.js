@@ -58,6 +58,14 @@ class CooldownManager {
       'coin_flip': 5000,         // 5 seconds between coin flips
       'weather_check': 10000,    // 10 seconds between weather checks
 
+      // Button cooldowns
+      'button_explore': 5000,    // 5 seconds between button presses for exploration
+      'button_combat': 3000,     // 3 seconds between combat button presses
+      'button_inventory': 2000,  // 2 seconds between inventory button presses
+      'button_guild': 3000,      // 3 seconds between guild button presses
+      'button_trade': 5000,      // 5 seconds between trade button presses
+      'button_music': 2000,      // 2 seconds between music button presses
+
       // Chat cooldowns
       'ai_chat': 3000,           // 3 seconds between AI messages
       'ai_chat_dm': 5000,        // 5 seconds for DMs (more lenient)
@@ -283,6 +291,22 @@ class CooldownManager {
 
     this.saveCooldowns();
   }
+
+  // Function to determine button cooldown type based on customId
+  getButtonCooldownType(customId) {
+    if (!customId) return 'button_explore'; // default
+
+    const [action] = customId.split(':');
+
+    if (action.startsWith('explore_')) return 'button_explore';
+    if (action.startsWith('combat_')) return 'button_combat';
+    if (action.startsWith('inventory_')) return 'button_inventory';
+    if (action.startsWith('guild_')) return 'button_guild';
+    if (action.startsWith('trade_')) return 'button_trade';
+    if (action.startsWith('music_')) return 'button_music';
+
+    return 'button_explore'; // default
+  }
 }
 
 // Export singleton instance
@@ -324,6 +348,12 @@ export function getAdaptiveCooldown(userId, action, baseCooldown) {
 export function getCooldownStats() {
   return cooldownManager.getCooldownStats();
 }
+
+export function getButtonCooldownType(customId) {
+  return cooldownManager.getButtonCooldownType(customId);
+}
+
+// Export the function from the class instance
 
 // Auto-cleanup every minute
 setInterval(() => {

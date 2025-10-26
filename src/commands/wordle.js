@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
-import { wordleGames } from '../index.js';
+import { wordleGames } from '../game-states.js';
 import { updateUserStats } from '../achievements.js';
 
 const WORD_LIST = [

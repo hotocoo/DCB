@@ -1,82 +1,9 @@
 {
-  "warnings": {
-    "testguild1": {
-      "testuser1": [
-        {
-          "id": "warn_1761465203776_8v8vcciib",
-          "userId": "testuser1",
-          "moderatorId": "testuser2",
-          "reason": "Test warning",
-          "severity": "low",
-          "timestamp": 1761465203776,
-          "active": true
-        },
-        {
-          "id": "warn_1761465242872_t80n8tl22",
-          "userId": "testuser1",
-          "moderatorId": "testuser2",
-          "reason": "Test warning",
-          "severity": "low",
-          "timestamp": 1761465242872,
-          "active": true
-        }
-      ]
-    }
-  },
+  "warnings": {},
   "bans": {},
-  "mutes": {
-    "testguild1": {
-      "testuser1": {
-        "id": "mute_1761465242873_4ivjref6m",
-        "userId": "testuser1",
-        "moderatorId": "testuser2",
-        "reason": "Test mute",
-        "duration": 60000,
-        "startTime": 1761465242873,
-        "endTime": 1761465302873,
-        "active": true
-      }
-    }
-  },
+  "mutes": {},
   "kicks": {},
-  "mod_actions": [
-    {
-      "id": "mod_1761465203776_je3csaf2o",
-      "guildId": "testguild1",
-      "action": "warn",
-      "targetUserId": "testuser1",
-      "moderatorId": "testuser2",
-      "reason": "Test warning",
-      "timestamp": 1761465203776
-    },
-    {
-      "id": "mod_1761465203776_ga692r0du",
-      "guildId": "testguild1",
-      "action": "mute",
-      "targetUserId": "testuser1",
-      "moderatorId": "testuser2",
-      "reason": "Test mute (1m)",
-      "timestamp": 1761465203776
-    },
-    {
-      "id": "mod_1761465242872_jbu1o2di4",
-      "guildId": "testguild1",
-      "action": "warn",
-      "targetUserId": "testuser1",
-      "moderatorId": "testuser2",
-      "reason": "Test warning",
-      "timestamp": 1761465242872
-    },
-    {
-      "id": "mod_1761465242873_lc4b8c6pq",
-      "guildId": "testguild1",
-      "action": "mute",
-      "targetUserId": "testuser1",
-      "moderatorId": "testuser2",
-      "reason": "Test mute (1m)",
-      "timestamp": 1761465242873
-    }
-  ],
+  "mod_actions": [],
   "auto_mod": {
     "enabled": true,
     "spam_detection": true,

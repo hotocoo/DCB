@@ -431,7 +431,7 @@ class ModerationManager {
     return { filter: false };
   }
 
-  // Cleanup expired punishments
+  // Cleanup expired punishments and caches
   cleanup() {
     const now = Date.now();
 
@@ -453,6 +453,23 @@ class ModerationManager {
           ban.active = false;
         }
       }
+    }
+
+    // Clean up warning cache for inactive users (older than 1 hour)
+    const cleanupThreshold = 60 * 60 * 1000; // 1 hour
+    for (const [key, messages] of this.warningCache.entries()) {
+      const recentMessages = messages.filter(msg => now - msg.timestamp < cleanupThreshold);
+      if (recentMessages.length === 0) {
+        this.warningCache.delete(key);
+        console.log(`[MODERATION] Cleaned up warning cache for key: ${key}`);
+      } else {
+        this.warningCache.set(key, recentMessages);
+      }
+    }
+
+    // Clean up old moderation actions (keep only last 500)
+    if (this.moderationData.mod_actions.length > 500) {
+      this.moderationData.mod_actions = this.moderationData.mod_actions.slice(-500);
     }
 
     this.saveModerationData();

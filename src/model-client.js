@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { getGuild } from './storage.js';
+import { RateLimiterMemory } from 'rate-limiter-flexible';
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const DEFAULT_LOCAL_URL = process.env.LOCAL_MODEL_URL;
@@ -7,8 +8,28 @@ const DEFAULT_LOCAL_API = process.env.LOCAL_MODEL_API || 'openai-compatible';
 const OPENWEBUI_BASE = process.env.OPENWEBUI_BASE;
 const OPENWEBUI_PATH = process.env.OPENWEBUI_PATH || '/api/chat';
 
+// Rate limiters for external API calls
+const openAIRateLimiter = new RateLimiterMemory({
+  keyPrefix: 'openai_api',
+  points: 100, // 100 requests per hour
+  duration: 3600,
+});
+
+const localModelRateLimiter = new RateLimiterMemory({
+  keyPrefix: 'local_model_api',
+  points: 500, // 500 requests per hour (higher for local)
+  duration: 3600,
+});
+
 async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOCAL_API) {
   if (!url) throw new Error('No local model URL configured');
+
+  // Rate limiting for local model API
+  try {
+    await localModelRateLimiter.consume('local_model_api');
+  } catch (rejRes) {
+    throw new Error(`Rate limit exceeded. Try again in ${Math.round(rejRes.msBeforeNext / 1000)} seconds.`);
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
@@ -99,6 +120,13 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
 
 async function callOpenAI(messages) {
   if (!OPENAI_KEY) throw new Error('OpenAI API key not configured');
+
+  // Rate limiting for OpenAI API
+  try {
+    await openAIRateLimiter.consume('openai_api');
+  } catch (rejRes) {
+    throw new Error(`Rate limit exceeded. Try again in ${Math.round(rejRes.msBeforeNext / 1000)} seconds.`);
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout

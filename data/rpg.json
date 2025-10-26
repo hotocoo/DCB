@@ -25,12 +25,12 @@
   },
   "333133024520568833": {
     "name": "watchandnotlearn",
-    "hp": 20,
+    "hp": 10,
     "maxHp": 20,
     "atk": 5,
-    "lvl": 1,
-    "xp": 15,
-    "skillPoints": 0,
+    "lvl": 9,
+    "xp": 170,
+    "skillPoints": 8,
     "mp": 10,
     "maxMp": 10,
     "def": 2,
@@ -43,7 +43,11 @@
     ],
     "color": 16711680,
     "inventory": {
-      "iron_ore": 1
+      "undefined": 4,
+      "chain_mail": 1,
+      "iron_sword": 1,
+      "mana_potion": 1,
+      "wood": 1
     },
     "equipped_weapon": null,
     "equipped_armor": null,

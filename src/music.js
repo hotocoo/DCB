@@ -23,6 +23,9 @@ class MusicManager {
     this.audioPlayers = new Map(); // guildId -> audio player
     this.history = new Map(); // guildId -> history array
 
+    // Start periodic cleanup to prevent memory leaks
+    this.startPeriodicCleanup();
+
     // Initialize Spotify API
     this.spotifyApi = new SpotifyWebApi({
       clientId: process.env.SPOTIFY_CLIENT_ID,
@@ -45,6 +48,56 @@ class MusicManager {
       points: 10000,
       duration: 86400,
     });
+  }
+
+  // Periodic cleanup to prevent memory leaks
+  startPeriodicCleanup() {
+    // Clean up every 30 minutes
+    setInterval(() => {
+      this.performCleanup();
+    }, 30 * 60 * 1000); // 30 minutes
+  }
+
+  // Perform cleanup of stale data
+  performCleanup() {
+    const now = Date.now();
+    const cleanupThreshold = 60 * 60 * 1000; // 1 hour of inactivity
+
+    console.log('[MUSIC] Starting periodic cleanup of Maps and caches');
+
+    // Clean up music settings for inactive guilds
+    for (const [guildId, settings] of this.musicSettings.entries()) {
+      if (!settings.lastActivity || (now - settings.lastActivity) > cleanupThreshold) {
+        this.musicSettings.delete(guildId);
+        console.log(`[MUSIC] Cleaned up music settings for inactive guild: ${guildId}`);
+      }
+    }
+
+    // Clean up history maps for inactive guilds
+    for (const [guildId, history] of this.history.entries()) {
+      if (history.length === 0 || (now - history[history.length - 1]?.playedAt) > cleanupThreshold) {
+        this.history.delete(guildId);
+        console.log(`[MUSIC] Cleaned up history for inactive guild: ${guildId}`);
+      }
+    }
+
+    // Clean up voice channel info for disconnected guilds
+    for (const [guildId, voiceInfo] of this.voiceChannels.entries()) {
+      if (!voiceInfo || (now - voiceInfo.joinedAt) > cleanupThreshold) {
+        this.voiceChannels.delete(guildId);
+        console.log(`[MUSIC] Cleaned up voice channel info for inactive guild: ${guildId}`);
+      }
+    }
+
+    // Clean up audio players for guilds without active connections
+    for (const [guildId, player] of this.audioPlayers.entries()) {
+      if (!player || player.state.status === 'idle') {
+        this.audioPlayers.delete(guildId);
+        console.log(`[MUSIC] Cleaned up audio player for inactive guild: ${guildId}`);
+      }
+    }
+
+    console.log('[MUSIC] Periodic cleanup completed');
   }
 
   // Spotify Authentication Management
@@ -933,6 +986,11 @@ class MusicManager {
 
       // Mark as playing
       this.isPlaying.set(guildId, true);
+
+      // Update last activity timestamp
+      const settings = this.musicSettings.get(guildId) || {};
+      settings.lastActivity = Date.now();
+      this.musicSettings.set(guildId, settings);
 
       // Attempt playback with enhanced error handling
       const playResult = await this.playWithErrorHandling(guildId, voiceChannel, song, player, connection);

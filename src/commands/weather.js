@@ -1,4 +1,12 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { RateLimiterMemory } from 'rate-limiter-flexible';
+
+// Rate limiter for weather API (60 requests per minute)
+const weatherRateLimiter = new RateLimiterMemory({
+  keyPrefix: 'weather_api',
+  points: 60,
+  duration: 60,
+});
 
 export const data = new SlashCommandBuilder()
   .setName('weather')
@@ -12,6 +20,16 @@ export async function execute(interaction) {
   const location = interaction.options.getString('location');
 
   try {
+    // Rate limiting for weather API
+    try {
+      await weatherRateLimiter.consume('weather_api');
+    } catch (rejRes) {
+      return interaction.reply({
+        content: `⏰ **Rate limit exceeded!** Please wait ${Math.round(rejRes.msBeforeNext / 1000)} seconds before trying again.`,
+        ephemeral: true
+      });
+    }
+
     // Using a free weather API (you may want to replace with a paid one for production)
     const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`);
 
