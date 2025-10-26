@@ -14,32 +14,32 @@ const CHARACTER_CLASSES = {
   warrior: {
     name: 'Warrior',
     description: 'Strong melee fighter with high HP and defense',
-    baseStats: { hp: 25, maxHp: 25, atk: 7, def: 3, spd: 1 },
-    statGrowth: { hp: 3, maxHp: 3, atk: 2, def: 1, spd: 0 },
+    baseStats: { hp: 25, maxHp: 25, mp: 10, maxMp: 10, atk: 7, def: 3, spd: 1 },
+    statGrowth: { hp: 3, maxHp: 3, mp: 1, maxMp: 1, atk: 2, def: 1, spd: 0 },
     abilities: ['Power Strike', 'Shield Block', 'Battle Cry'],
     color: 0xFF0000
   },
   mage: {
     name: 'Mage',
     description: 'Powerful spellcaster with magic attacks',
-    baseStats: { hp: 15, maxHp: 15, atk: 10, def: 1, spd: 2 },
-    statGrowth: { hp: 1, maxHp: 1, atk: 3, def: 0, spd: 1 },
+    baseStats: { hp: 15, maxHp: 15, mp: 30, maxMp: 30, atk: 10, def: 1, spd: 2 },
+    statGrowth: { hp: 1, maxHp: 1, mp: 4, maxMp: 4, atk: 3, def: 0, spd: 1 },
     abilities: ['Fireball', 'Magic Shield', 'Mana Surge'],
     color: 0x9933FF
   },
   rogue: {
     name: 'Rogue',
     description: 'Fast and agile with critical strike chance',
-    baseStats: { hp: 18, maxHp: 18, atk: 6, def: 2, spd: 4 },
-    statGrowth: { hp: 2, maxHp: 2, atk: 2, def: 1, spd: 2 },
+    baseStats: { hp: 18, maxHp: 18, mp: 15, maxMp: 15, atk: 6, def: 2, spd: 4 },
+    statGrowth: { hp: 2, maxHp: 2, mp: 2, maxMp: 2, atk: 2, def: 1, spd: 2 },
     abilities: ['Backstab', 'Dodge', 'Sprint'],
     color: 0x333333
   },
   paladin: {
     name: 'Paladin',
     description: 'Holy warrior with healing and protective abilities',
-    baseStats: { hp: 22, maxHp: 22, atk: 5, def: 4, spd: 1 },
-    statGrowth: { hp: 3, maxHp: 3, atk: 1, def: 2, spd: 0 },
+    baseStats: { hp: 22, maxHp: 22, mp: 20, maxMp: 20, atk: 5, def: 4, spd: 1 },
+    statGrowth: { hp: 3, maxHp: 3, mp: 3, maxMp: 3, atk: 1, def: 2, spd: 0 },
     abilities: ['Holy Strike', 'Heal', 'Divine Shield'],
     color: 0xFFD700
   }
@@ -63,6 +63,8 @@ function readAll() {
       if (typeof c.skillPoints === 'undefined') c.skillPoints = 0;
       if (typeof c.hp === 'undefined') c.hp = 20;
       if (typeof c.maxHp === 'undefined') c.maxHp = 20;
+      if (typeof c.mp === 'undefined') c.mp = 10;
+      if (typeof c.maxMp === 'undefined') c.maxMp = 10;
       if (typeof c.atk === 'undefined') c.atk = 5;
       if (typeof c.def === 'undefined') c.def = 2;
       if (typeof c.spd === 'undefined') c.spd = 2;
@@ -85,38 +87,55 @@ function readAll() {
 
 function writeAll(obj) {
   ensureDir();
-  // atomic write: write to temp file then rename
-  const tmp = `${FILE}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8');
-  fs.renameSync(tmp, FILE);
-  cache = obj;
+  try {
+    // atomic write: write to temp file then rename
+    const tmp = `${FILE}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8');
+    fs.renameSync(tmp, FILE);
+    cache = obj;
+  } catch (err) {
+    console.error('Failed to write RPG data:', err);
+    // Attempt to restore from cache if available
+    if (cache) {
+      console.log('Restoring from cache after write failure');
+    } else {
+      throw new Error(`Failed to save RPG data: ${err.message}`);
+    }
+  }
 }
 
 export function createCharacter(userId, name, charClass = 'warrior') {
-  const all = cache || readAll();
-  if (all[userId]) return null;
+  if (locks.has(userId)) return null;
 
-  const classData = CHARACTER_CLASSES[charClass];
-  if (!classData) throw new Error(`Invalid character class: ${charClass}`);
+  locks.add(userId);
+  try {
+    const all = cache || readAll();
+    if (all[userId]) return null;
 
-  const char = {
-    name: name || `Player${userId.slice(0,4)}`,
-    class: charClass,
-    ...classData.baseStats,
-    lvl: 1,
-    xp: 0,
-    skillPoints: 0,
-    abilities: [...classData.abilities],
-    color: classData.color,
-    inventory: {},
-    equipped_weapon: null,
-    equipped_armor: null,
-    gold: 0
-  };
+    const classData = CHARACTER_CLASSES[charClass];
+    if (!classData) throw new Error(`Invalid character class: ${charClass}`);
 
-  all[userId] = char;
-  writeAll(all);
-  return char;
+    const char = {
+      name: name || `Player${userId.slice(0,4)}`,
+      class: charClass,
+      ...classData.baseStats,
+      lvl: 1,
+      xp: 0,
+      skillPoints: 0,
+      abilities: [...classData.abilities],
+      color: classData.color,
+      inventory: {},
+      equipped_weapon: null,
+      equipped_armor: null,
+      gold: 0
+    };
+
+    all[userId] = char;
+    writeAll(all);
+    return char;
+  } finally {
+    locks.delete(userId);
+  }
 }
 
 export function levelFromXp(xp) {
@@ -134,6 +153,9 @@ export function applyXp(userId, char, amount = 0) {
     gained = newLvl - oldLvl;
     char.skillPoints = (char.skillPoints || 0) + gained;
     char.lvl = newLvl;
+    // Restore HP and MP on level up
+    char.hp = char.maxHp || 20;
+    char.mp = char.maxMp || 10;
   } else {
     char.lvl = newLvl;
   }
@@ -146,9 +168,19 @@ export function getCharacter(userId) {
 }
 
 export function saveCharacter(userId, char) {
-  const all = cache || readAll();
-  all[userId] = char;
-  writeAll(all);
+  if (locks.has(userId)) {
+    console.warn(`Save operation blocked for user ${userId} - already locked`);
+    return false;
+  }
+  locks.add(userId);
+  try {
+    const all = cache || readAll();
+    all[userId] = char;
+    writeAll(all);
+    return true;
+  } finally {
+    locks.delete(userId);
+  }
 }
 
 export function getAllCharacters() {
@@ -156,25 +188,32 @@ export function getAllCharacters() {
 }
 
 export function resetCharacter(userId, charClass = 'warrior') {
-  const all = cache || readAll();
-  const classData = CHARACTER_CLASSES[charClass];
-  const def = {
-    name: `Player${userId.slice(0,4)}`,
-    class: charClass,
-    ...classData.baseStats,
-    lvl: 1,
-    xp: 0,
-    skillPoints: 0,
-    abilities: [...classData.abilities],
-    color: classData.color,
-    inventory: {},
-    equipped_weapon: null,
-    equipped_armor: null,
-    gold: 0
-  };
-  all[userId] = def;
-  writeAll(all);
-  return def;
+  if (locks.has(userId)) return null;
+
+  locks.add(userId);
+  try {
+    const all = cache || readAll();
+    const classData = CHARACTER_CLASSES[charClass];
+    const def = {
+      name: `Player${userId.slice(0,4)}`,
+      class: charClass,
+      ...classData.baseStats,
+      lvl: 1,
+      xp: 0,
+      skillPoints: 0,
+      abilities: [...classData.abilities],
+      color: classData.color,
+      inventory: {},
+      equipped_weapon: null,
+      equipped_armor: null,
+      gold: 0
+    };
+    all[userId] = def;
+    writeAll(all);
+    return def;
+  } finally {
+    locks.delete(userId);
+  }
 }
 
 export function getLeaderboard(limit = 10, offset = 0) {
@@ -268,6 +307,40 @@ const ITEMS = {
   'gemstone': { name: 'Gemstone', type: 'material', rarity: 'rare', value: 150, description: 'Sparkling precious stone' }
 };
 
+// Crafting recipes
+const CRAFTING_RECIPES = {
+  'iron_sword': {
+    materials: { 'iron_ore': 3, 'wood': 1 },
+    description: 'Craft an iron sword from iron ore and wood',
+    required_level: 3
+  },
+  'chain_mail': {
+    materials: { 'iron_ore': 5, 'leather': 2 },
+    description: 'Craft chain mail armor from iron and leather',
+    required_level: 4
+  },
+  'health_potion': {
+    materials: { 'magic_crystal': 1, 'wood': 1 },
+    description: 'Craft a health potion using magic and wood',
+    required_level: 1
+  },
+  'mana_potion': {
+    materials: { 'magic_crystal': 2, 'gemstone': 1 },
+    description: 'Craft a mana potion using crystals and gems',
+    required_level: 5
+  },
+  'magic_staff': {
+    materials: { 'wood': 2, 'magic_crystal': 3, 'gemstone': 1 },
+    description: 'Craft a powerful magic staff',
+    required_level: 8
+  },
+  'plate_armor': {
+    materials: { 'iron_ore': 8, 'leather': 3, 'mithril_ingot': 1 },
+    description: 'Craft heavy plate armor',
+    required_level: 10
+  }
+};
+
 const ITEM_RARITIES = {
   common: { color: 0x8B8B8B, chance: 50 },
   uncommon: { color: 0x4CAF50, chance: 25 },
@@ -279,8 +352,23 @@ export function generateRandomItem(level = 1) {
   const rarityRoll = Math.random() * 100;
   let selectedRarity = 'common';
 
-  for (const [rarity, data] of Object.entries(ITEM_RARITIES)) {
-    if (rarityRoll <= data.chance) {
+  // Adjust rarity chances based on level
+  const adjustedRarities = { ...ITEM_RARITIES };
+  if (level >= 20) {
+    adjustedRarities.legendary.chance += 5;
+    adjustedRarities.rare.chance += 5;
+    adjustedRarities.uncommon.chance += 5;
+    adjustedRarities.common.chance -= 15;
+  } else if (level >= 10) {
+    adjustedRarities.rare.chance += 3;
+    adjustedRarities.uncommon.chance += 3;
+    adjustedRarities.common.chance -= 6;
+  }
+
+  let cumulativeChance = 0;
+  for (const [rarity, data] of Object.entries(adjustedRarities)) {
+    cumulativeChance += data.chance;
+    if (rarityRoll <= cumulativeChance) {
       selectedRarity = rarity;
       break;
     }
@@ -398,6 +486,12 @@ export function useConsumableItem(userId, itemId) {
     effects.hp_restored = char.hp - oldHp;
   }
 
+  if (item.mp_restore) {
+    const oldMp = char.mp;
+    char.mp = Math.min(char.maxMp, char.mp + item.mp_restore);
+    effects.mp_restored = char.mp - oldMp;
+  }
+
   if (item.revive) {
     char.hp = char.maxHp;
     effects.revive = true;
@@ -481,6 +575,61 @@ export function unequipItem(userId, slot) {
   return { success: true, char };
 }
 
+// Crafting System
+export function getCraftingRecipes() {
+  return CRAFTING_RECIPES;
+}
+
+export function canCraftItem(userId, itemId) {
+  const recipe = CRAFTING_RECIPES[itemId];
+  if (!recipe) return { success: false, reason: 'not_craftable' };
+
+  const character = getCharacter(userId);
+  if (!character) return { success: false, reason: 'no_character' };
+  if (character.lvl < recipe.required_level) {
+    return { success: false, reason: 'level_too_low', required: recipe.required_level };
+  }
+
+  const inventory = getInventory(userId);
+
+  // Check if all required materials are available
+  for (const [materialId, requiredQuantity] of Object.entries(recipe.materials)) {
+    if (!inventory[materialId] || inventory[materialId] < requiredQuantity) {
+      return { success: false, reason: 'missing_materials', missing: materialId };
+    }
+  }
+
+  return { success: true };
+}
+
+export function craftItem(userId, itemId) {
+  const canCraft = canCraftItem(userId, itemId);
+  if (!canCraft.success) return canCraft;
+
+  const recipe = CRAFTING_RECIPES[itemId];
+  const character = getCharacter(userId);
+  const inventory = getInventory(userId);
+
+  // Remove materials
+  for (const [materialId, requiredQuantity] of Object.entries(recipe.materials)) {
+    removeItemFromInventory(userId, materialId, requiredQuantity);
+  }
+
+  // Add crafted item
+  const result = addItemToInventory(userId, itemId, 1);
+
+  // Award XP for crafting
+  const xpReward = Math.floor(character.lvl * 2);
+  applyXp(userId, character, xpReward);
+
+  return {
+    success: true,
+    char: character,
+    xpGained: xpReward,
+    item: ITEMS[itemId]
+  };
+}
+
 export function bossEncounter(lvl = 5) {
   return { name: `Dragon L${lvl}`, hp: 50 + lvl * 20, atk: 8 + lvl * 2, lvl };
 }
@@ -540,6 +689,40 @@ export function listQuests(userId) {
   return all[userId] || [];
 }
 
+function calculateQuestXpReward(quest) {
+  const baseXp = 50; // Base XP for completing any quest
+  const typeMultipliers = {
+    'goblins_defeated': 2,
+    'potions_collected': 1.5,
+    'level_reached': 3,
+    'gold_earned': 1,
+    'locations_explored': 2.5,
+    'items_crafted': 2
+  };
+
+  const multiplier = typeMultipliers[quest.requirement] || 1;
+  const levelBonus = (quest.amount || 1) * 2;
+
+  return Math.floor(baseXp * multiplier + levelBonus);
+}
+
+function calculateQuestGoldReward(quest) {
+  const baseGold = 25; // Base gold for completing any quest
+  const typeMultipliers = {
+    'goblins_defeated': 1.5,
+    'potions_collected': 1,
+    'level_reached': 2,
+    'gold_earned': 0, // No gold for gold-earning quests
+    'locations_explored': 1.8,
+    'items_crafted': 1.2
+  };
+
+  const multiplier = typeMultipliers[quest.requirement] || 1;
+  const levelBonus = (quest.amount || 1);
+
+  return Math.floor(baseGold * multiplier + levelBonus * 5);
+}
+
 export function completeQuest(userId, questId) {
   const all = readQuests();
   const arr = all[userId] || [];
@@ -547,7 +730,20 @@ export function completeQuest(userId, questId) {
   if (!q) return null;
   q.status = 'completed';
   writeQuests(all);
-  return q;
+
+  // Award XP based on quest type and level
+  const xpReward = calculateQuestXpReward(q);
+  const goldReward = calculateQuestGoldReward(q);
+
+  // Apply XP and gold rewards
+  const char = getCharacter(userId);
+  if (char) {
+    applyXp(userId, char, xpReward);
+    char.gold = (char.gold || 0) + goldReward;
+    saveCharacter(userId, char);
+  }
+
+  return { ...q, xpReward, goldReward };
 }
 
 // Removed duplicate function
@@ -569,6 +765,11 @@ export function spendSkillPoints(userId, stat, amount = 1) {
   } else if (stat === 'maxhp') {
     char.maxHp = (char.maxHp || 20) + amount * 5;
     char.hp = Math.min((char.hp || 0) + amount * 2, char.maxHp);
+  } else if (stat === 'mp') {
+    char.mp = Math.min((char.mp || 0) + amount * 3, char.maxMp || 10);
+  } else if (stat === 'maxmp') {
+    char.maxMp = (char.maxMp || 10) + amount * 5;
+    char.mp = Math.min((char.mp || 0) + amount * 3, char.maxMp);
   } else if (stat === 'atk') {
     char.atk = (char.atk || 5) + amount;
   } else if (stat === 'def') {

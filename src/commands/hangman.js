@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-// import { hangmanGames } from '../index.js';
+import { hangmanGames } from '../index.js';
 
 const WORDS = [
   // Easy words
@@ -66,11 +66,12 @@ export async function execute(interaction) {
     interaction: interaction
   };
 
-  // hangmanGames.set(interaction.user.id, gameState);
+  // Store game state globally for button handlers
+  hangmanGames.set(interaction.user.id, gameState);
   await sendHangmanBoard(interaction, gameState);
 }
 
-async function sendHangmanBoard(interaction, gameState) {
+export async function sendHangmanBoard(interaction, gameState) {
   if (!gameState.gameActive) return;
 
   const { word, guessedLetters, wrongGuesses, guessedWord, maxWrongGuesses } = gameState;

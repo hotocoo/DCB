@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } from 'discord.js';
-import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, resetCharacter, getCharacterClasses, getClassInfo } from '../rpg.js';
+import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, resetCharacter, getCharacterClasses, getClassInfo, bossEncounter, getCraftingRecipes, canCraftItem, craftItem, createQuest, listQuests, completeQuest } from '../rpg.js';
 import { updateUserStats } from '../achievements.js';
 import { exploreLocation } from '../locations.js';
 
@@ -18,7 +18,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('explore').setDescription('Explore and encounter random events'))
   .addSubcommand(sub => sub.setName('quest').setDescription('Quest actions (create/list/complete)').addStringOption(opt => opt.setName('action').setDescription('create|list|complete').setRequired(true)).addStringOption(opt => opt.setName('title').setDescription('Quest title')).addStringOption(opt => opt.setName('id').setDescription('Quest id to complete')).addStringOption(opt => opt.setName('desc').setDescription('Quest description')))
   .addSubcommand(sub => sub.setName('boss').setDescription('Face a boss (dangerous)'))
-  .addSubcommand(sub => sub.setName('levelup').setDescription('Spend skill points to increase stats').addStringOption(opt => opt.setName('stat').setDescription('hp|maxhp|atk|def|spd').setRequired(true)).addIntegerOption(opt => opt.setName('amount').setDescription('How many points to spend').setRequired(true)))
+  .addSubcommand(sub => sub.setName('levelup').setDescription('Spend skill points to increase stats').addStringOption(opt => opt.setName('stat').setDescription('hp|mp|maxhp|maxmp|atk|def|spd').setRequired(true)).addIntegerOption(opt => opt.setName('amount').setDescription('How many points to spend').setRequired(true)))
   .addSubcommand(sub => sub.setName('stats').setDescription('Show your character stats'))
   .addSubcommand(sub => sub.setName('leaderboard').setDescription('Show top players'))
   .addSubcommand(sub => sub.setName('reset').setDescription('Reset your character to defaults').addStringOption(opt => opt.setName('class').setDescription('New character class').addChoices(
@@ -28,7 +28,8 @@ export const data = new SlashCommandBuilder()
     { name: '⚔️ Paladin', value: 'paladin' }
   )))
   .addSubcommand(sub => sub.setName('class').setDescription('View information about character classes'))
-  .addSubcommand(sub => sub.setName('inventory').setDescription('View and manage your inventory'));
+  .addSubcommand(sub => sub.setName('inventory').setDescription('View and manage your inventory'))
+  .addSubcommand(sub => sub.setName('craft').setDescription('Craft items using materials').addStringOption(opt => opt.setName('item').setDescription('Item to craft').setRequired(true)));
 
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
@@ -58,11 +59,12 @@ export async function execute(interaction) {
       .setDescription(`**${char.name}** - Level ${char.lvl} ${char.class.charAt(0).toUpperCase() + char.class.slice(1)}`)
       .addFields(
         { name: '❤️ Health', value: `${char.hp}/${char.maxHp}`, inline: true },
+        { name: '🔮 Mana', value: `${char.mp}/${char.maxMp}`, inline: true },
         { name: '⚔️ Attack', value: `${char.atk}`, inline: true },
         { name: '🛡️ Defense', value: `${char.def}`, inline: true },
         { name: '💨 Speed', value: `${char.spd}`, inline: true },
         { name: '⭐ Abilities', value: char.abilities.join(', '), inline: false },
-        { name: '📈 Available Stats', value: 'Use `/rpg levelup` to spend skill points on:\n❤️ HP, 🛡️ Max HP, ⚔️ ATK, 🛡️ DEF, 💨 SPD', inline: false }
+        { name: '📈 Available Stats', value: 'Use `/rpg levelup` to spend skill points on:\n❤️ HP, 🔮 MP, 🛡️ Max HP, 🔮 Max MP, ⚔️ ATK, 🛡️ DEF, 💨 SPD', inline: false }
       );
 
     return interaction.reply({ embeds: [embed] });
@@ -83,6 +85,7 @@ export async function execute(interaction) {
       .setColor(char.color)
       .addFields(
         { name: '❤️ Health', value: `${char.hp}/${char.maxHp}`, inline: true },
+        { name: '🔮 Mana', value: `${char.mp}/${char.maxMp}`, inline: true },
         { name: '⚔️ Attack', value: `${char.atk}`, inline: true },
         { name: '🛡️ Defense', value: `${char.def}`, inline: true },
         { name: '💨 Speed', value: `${char.spd}`, inline: true },
@@ -206,10 +209,15 @@ export async function execute(interaction) {
 
     // apply points
     if (stat === 'hp') {
-      char.hp += amount * 2; // each point heals current HP by 2
+      char.hp = Math.min(char.hp + amount * 2, char.maxHp);
     } else if (stat === 'maxhp') {
       char.maxHp += amount * 5; // each point increases maxHp
       char.hp = Math.min(char.hp + amount * 2, char.maxHp);
+    } else if (stat === 'mp') {
+      char.mp = Math.min(char.mp + amount * 3, char.maxMp);
+    } else if (stat === 'maxmp') {
+      char.maxMp += amount * 5; // each point increases maxMp
+      char.mp = Math.min(char.mp + amount * 3, char.maxMp);
     } else if (stat === 'atk') {
       char.atk += amount;
     } else if (stat === 'def') {
@@ -217,7 +225,7 @@ export async function execute(interaction) {
     } else if (stat === 'spd') {
       char.spd += amount;
     } else {
-      return interaction.reply({ content: 'Unknown stat. Use hp|maxhp|atk|def|spd', ephemeral: true });
+      return interaction.reply({ content: 'Unknown stat. Use hp|mp|maxhp|maxmp|atk|def|spd', ephemeral: true });
     }
 
     char.skillPoints = pts - amount;
@@ -285,8 +293,51 @@ export async function execute(interaction) {
       const id = interaction.options.getString('id');
       const q = completeQuest(userId, id);
       if (!q) return interaction.reply({ content: 'Quest not found.', ephemeral: true });
-      return interaction.reply({ content: `Quest completed: ${q.title}`, ephemeral: true });
+      const rewardText = q.xpReward && q.goldReward ? `\n🎉 **Rewards:** ${q.xpReward} XP, ${q.goldReward} gold!` : '';
+      return interaction.reply({ content: `Quest completed: ${q.title}${rewardText}`, ephemeral: true });
     }
     return interaction.reply({ content: 'Unknown quest action. Use create|list|complete', ephemeral: true });
+  }
+
+  if (sub === 'craft') {
+    const itemId = interaction.options.getString('item');
+    const recipes = getCraftingRecipes();
+
+    if (!recipes[itemId]) {
+      return interaction.reply({ content: `❌ "${itemId}" is not a craftable item.`, ephemeral: true });
+    }
+
+    const canCraft = canCraftItem(userId, itemId);
+
+    if (!canCraft.success) {
+      if (canCraft.reason === 'level_too_low') {
+        return interaction.reply({ content: `❌ You need to be level ${canCraft.required} to craft this item.`, ephemeral: true });
+      } else if (canCraft.reason === 'missing_materials') {
+        return interaction.reply({ content: `❌ You're missing materials. You need: ${canCraft.missing}`, ephemeral: true });
+      }
+      return interaction.reply({ content: `❌ Cannot craft this item: ${canCraft.reason}`, ephemeral: true });
+    }
+
+    const result = craftItem(userId, itemId);
+
+    if (result.success) {
+      const recipe = recipes[itemId];
+      const embed = new EmbedBuilder()
+        .setTitle('🔨 Item Crafted!')
+        .setColor(0x00FF00)
+        .setDescription(`Successfully crafted **${result.item.name}**!`)
+        .addFields(
+          { name: '📦 Item', value: `${result.item.name} (${result.item.rarity})`, inline: true },
+          { name: '⭐ XP Gained', value: `${result.xpGained} XP`, inline: true },
+          { name: '📋 Description', value: result.item.description, inline: false }
+        );
+
+      // Track crafting achievement
+      updateUserStats(userId, { items_crafted: 1 });
+
+      await interaction.reply({ embeds: [embed] });
+    } else {
+      await interaction.reply({ content: `❌ Failed to craft item: ${result.reason}`, ephemeral: true });
+    }
   }
 }

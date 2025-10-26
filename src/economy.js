@@ -264,6 +264,10 @@ class EconomyManager {
     return { success: true, investment };
   }
 
+  getUserInvestments(userId) {
+    return this.economyData.investments[userId] || [];
+  }
+
   // Define investment types
   getInvestmentTypes() {
     return {
@@ -700,6 +704,14 @@ export function getInvestmentTypes() {
 
 export function claimDailyReward(userId) {
   return economyManager.claimDailyReward(userId);
+}
+
+export function createInvestment(userId, investmentType, amount) {
+  return economyManager.createInvestment(userId, investmentType, amount);
+}
+
+export function getUserInvestments(userId) {
+  return economyManager.getUserInvestments(userId);
 }
 
 // End of file

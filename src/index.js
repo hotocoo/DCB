@@ -35,6 +35,70 @@ async function sendWordleGuessModal(interaction, gameId) {
   await interaction.showModal(modal);
 }
 
+// Helper function to safely handle interactions and prevent duplicate responses
+async function safeInteractionReply(interaction, options) {
+  const interactionId = interaction.id;
+
+  // Check if this interaction has already been processed
+  if (processedInteractions.has(interactionId)) {
+    console.warn(`Interaction ${interactionId} already processed, ignoring`);
+    return false;
+  }
+
+  try {
+    // Check if interaction is still valid (not expired)
+    if (interaction.replied || interaction.deferred) {
+      console.warn(`Interaction ${interactionId} already replied/deferred`);
+      return false;
+    }
+
+    // Mark as processed
+    processedInteractions.set(interactionId, Date.now());
+
+    // Clean up old processed interactions (older than 5 minutes)
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    for (const [id, timestamp] of processedInteractions.entries()) {
+      if (timestamp < fiveMinutesAgo) {
+        processedInteractions.delete(id);
+      }
+    }
+
+    await interaction.reply(options);
+    return true;
+  } catch (error) {
+    console.error(`Failed to reply to interaction ${interactionId}:`, error);
+    return false;
+  }
+}
+
+// Helper function to safely update interactions
+async function safeInteractionUpdate(interaction, options) {
+  const interactionId = interaction.id;
+
+  // Check if this interaction has already been processed
+  if (processedInteractions.has(interactionId)) {
+    console.warn(`Interaction ${interactionId} already processed, ignoring`);
+    return false;
+  }
+
+  try {
+    // Check if interaction is still valid
+    if (interaction.replied || interaction.deferred) {
+      console.warn(`Interaction ${interactionId} already replied/deferred`);
+      return false;
+    }
+
+    // Mark as processed
+    processedInteractions.set(interactionId, Date.now());
+
+    await interaction.update(options);
+    return true;
+  } catch (error) {
+    console.error(`Failed to update interaction ${interactionId}:`, error);
+    return false;
+  }
+}
+
 // Helper function to update inventory embed
 async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
   const { getItemInfo, getItemRarityInfo } = await import('./rpg.js');
@@ -104,6 +168,9 @@ console.log('Commands collection created');
 // simple cooldown map to prevent modal spam: userId -> timestamp of last spend modal
 const spendCooldowns = new Map();
 
+// Track processed interactions to prevent duplicate responses: interactionId -> timestamp
+const processedInteractions = new Map();
+
 // Hangman game states: userId -> gameState
 export const hangmanGames = new Map();
 
@@ -115,6 +182,9 @@ export const guessGames = new Map();
 
 // Combat game states: userId -> gameState
 export const combatGames = new Map();
+
+// Exploration game states: userId -> gameState
+export const explorationGames = new Map();
 
 // Wordle word list
 const wordleWords = ['HOUSE', 'PLANE', 'TIGER', 'BREAD', 'CHAIR', 'SNAKE', 'CLOUD', 'LIGHT', 'MUSIC', 'WATER', 'EARTH', 'STORM', 'FLAME', 'SHARP', 'QUIET', 'BRIGHT', 'DANCE', 'FIELD', 'GRASS', 'HEART', 'KNIFE', 'LARGE', 'MOUSE', 'NIGHT', 'OCEAN', 'PIANO', 'QUICK', 'RIVER', 'SHINE', 'TRUCK', 'WHEAT', 'YOUNG', 'ALARM', 'BEACH', 'CLOCK', 'DRIVE', 'ELBOW', 'FLOUR', 'GHOST', 'HAPPY', 'INDEX', 'JOINT', 'KNOCK', 'LUNCH', 'MIGHT', 'NOISE', 'OCCUR', 'PAINT', 'QUILT', 'ROBOT', 'SHORE', 'THICK', 'UNION', 'VOICE', 'WASTE', 'YIELD', 'ABUSE', 'ADULT', 'AGENT', 'AGREE', 'AHEAD', 'ALARM', 'ALBUM', 'ALERT', 'ALIEN', 'ALIGN', 'ALIKE', 'ALIVE', 'ALLOW', 'ALONE', 'ALONG', 'ALTER', 'AMONG', 'ANGER', 'ANGLE', 'ANGRY', 'APART', 'APPLE', 'APPLY', 'ARENA', 'ARGUE', 'ARISE', 'ARMED', 'ARMOR', 'ARRAY', 'ASIDE', 'ASSET', 'AVOID', 'AWAKE', 'AWARD', 'AWARE', 'BADLY', 'BAKER', 'BASES', 'BASIC', 'BEACH', 'BEGAN', 'BEGIN', 'BEING', 'BELOW', 'BENCH', 'BILLY', 'BIRTH', 'BLACK', 'BLAME', 'BLANK', 'BLIND', 'BLOCK', 'BLOOD', 'BOARD', 'BOOST', 'BOOTH', 'BOUND', 'BRAIN', 'BRAND', 'BRASS', 'BRAVE', 'BREAD', 'BREAK', 'BREED', 'BRIEF', 'BRING', 'BROAD', 'BROKE', 'BROWN', 'BUILD', 'BUILT', 'BUYER', 'CABLE', 'CALIF', 'CARRY', 'CATCH', 'CAUSE', 'CHAIN', 'CHAIR', 'CHAOS', 'CHARM', 'CHART', 'CHASE', 'CHEAP', 'CHECK', 'CHEST', 'CHIEF', 'CHILD', 'CHINA', 'CHOSE', 'CIVIL', 'CLAIM', 'CLASS', 'CLEAN', 'CLEAR', 'CLICK', 'CLIMB', 'CLOCK', 'CLOSE', 'CLOUD', 'COACH', 'COAST', 'COULD', 'COUNT', 'COURT', 'COVER', 'CRAFT', 'CRASH', 'CRAZY', 'CREAM', 'CRIME', 'CROSS', 'CROWD', 'CROWN', 'CRUDE', 'CURVE', 'CYCLE', 'DAILY', 'DANCE', 'DATED', 'DEALT', 'DEATH', 'DEBUT', 'DELAY', 'DEPTH', 'DOING', 'DOUBT', 'DOZEN', 'DRAFT', 'DRAMA', 'DRANK', 'DREAM', 'DRESS', 'DRILL', 'DRINK', 'DRIVE', 'DROVE', 'DYING', 'EAGER', 'EARLY', 'EARTH', 'EIGHT', 'ELITE', 'EMPTY', 'ENEMY', 'ENJOY', 'ENTER', 'ENTRY', 'EQUAL', 'ERROR', 'EVENT', 'EVERY', 'EXACT', 'EXIST', 'EXTRA', 'FAITH', 'FALSE', 'FAULT', 'FIBER', 'FIELD', 'FIFTH', 'FIFTY', 'FIGHT', 'FINAL', 'FIRST', 'FIXED', 'FLASH', 'FLEET', 'FLOOR', 'FLUID', 'FOCUS', 'FORCE', 'FORTH', 'FORTY', 'FORUM', 'FOUND', 'FRAME', 'FRANK', 'FRAUD', 'FRESH', 'FRONT', 'FRUIT', 'FULLY', 'FUNNY', 'GIANT', 'GIVEN', 'GLASS', 'GLOBE', 'GOING', 'GRACE', 'GRADE', 'GRAND', 'GRANT', 'GRASS', 'GRAVE', 'GREAT', 'GREEN', 'GROSS', 'GROUP', 'GROWN', 'GUARD', 'GUESS', 'GUEST', 'GUIDE', 'HAPPY', 'HARRY', 'HEART', 'HEAVY', 'HENCE', 'HENRY', 'HORSE', 'HOTEL', 'HOUSE', 'HUMAN', 'HURRY', 'IMAGE', 'INDEX', 'INNER', 'INPUT', 'ISSUE', 'JAPAN', 'JIMMY', 'JOINT', 'JONES', 'JUDGE', 'KNOWN', 'LABEL', 'LARGE', 'LASER', 'LATER', 'LAUGH', 'LAYER', 'LEARN', 'LEASE', 'LEAST', 'LEAVE', 'LEGAL', 'LEVEL', 'LEWIS', 'LIGHT', 'LIMIT', 'LINKS', 'LIVES', 'LOCAL', 'LOOSE', 'LOWER', 'LUCKY', 'LUNCH', 'LYING', 'MAGIC', 'MAJOR', 'MAKER', 'MARCH', 'MARIA', 'MATCH', 'MAYBE', 'MAYOR', 'MEANT', 'MEDAL', 'MEDIA', 'METAL', 'MIGHT', 'MINOR', 'MINUS', 'MIXED', 'MODEL', 'MONEY', 'MONTH', 'MORAL', 'MOTOR', 'MOUNT', 'MOUSE', 'MOUTH', 'MOVED', 'MOVIE', 'MUSIC', 'NEEDS', 'NEVER', 'NEWLY', 'NIGHT', 'NOISE', 'NORTH', 'NOTED', 'NOVEL', 'NURSE', 'OCCUR', 'OCEAN', 'OFFER', 'OFTEN', 'ORDER', 'OTHER', 'OUGHT', 'PAINT', 'PANEL', 'PAPER', 'PARTY', 'PEACE', 'PETER', 'PHASE', 'PHONE', 'PHOTO', 'PIANO', 'PIECE', 'PILOT', 'PITCH', 'PLACE', 'PLAIN', 'PLANE', 'PLANT', 'PLATE', 'PLAYS', 'PLENT', 'PLOTS', 'POEMS', 'POINT', 'POUND', 'POWER', 'PRESS', 'PRICE', 'PRIDE', 'PRIME', 'PRINT', 'PRIOR', 'PRIZE', 'PROOF', 'PROUD', 'PROVE', 'QUEEN', 'QUICK', 'QUIET', 'QUITE', 'RADIO', 'RAISE', 'RANGE', 'RAPID', 'RATIO', 'REACH', 'READY', 'REALM', 'REBEL', 'REFER', 'RELAX', 'REMARK', 'REMIND', 'REMOVE', 'RENDER', 'RENEW', 'RENTAL', 'REPAIR', 'REPEAT', 'REPLACE', 'REPORT', 'RESIST', 'RESOURCE', 'RESPONSE', 'RESULT', 'RETAIN', 'RETIRE', 'RETURN', 'REVEAL', 'REVIEW', 'REWARD', 'RIDER', 'RIDGE', 'RIGHT', 'RIGID', 'RING', 'RISE', 'RISK', 'RIVER', 'ROAD', 'ROBOT', 'ROGER', 'ROMAN', 'ROUGH', 'ROUND', 'ROUTE', 'ROYAL', 'RURAL', 'SCALE', 'SCENE', 'SCOPE', 'SCORE', 'SENSE', 'SERVE', 'SEVEN', 'SHALL', 'SHAPE', 'SHARE', 'SHARP', 'SHEET', 'SHELF', 'SHELL', 'SHIFT', 'SHINE', 'SHIRT', 'SHOCK', 'SHOOT', 'SHORT', 'SHOWN', 'SIDES', 'SIGHT', 'SILVER', 'SIMILAR', 'SIMPLE', 'SIXTH', 'SIXTY', 'SIZED', 'SKILL', 'SLEEP', 'SLIDE', 'SMALL', 'SMART', 'SMILE', 'SMITH', 'SMOKE', 'SNAKE', 'SOLID', 'SOLVE', 'SORRY', 'SOUND', 'SOUTH', 'SPACE', 'SPARE', 'SPEAK', 'SPEED', 'SPEND', 'SPENT', 'SPLIT', 'SPOKE', 'STAGE', 'STAKE', 'STAND', 'START', 'STATE', 'STEAM', 'STEEL', 'STEEP', 'STICK', 'STILL', 'STOCK', 'STONE', 'STOOD', 'STORE', 'STORM', 'STORY', 'STRIP', 'STUCK', 'STUDY', 'STUFF', 'STYLE', 'SUGAR', 'SUITE', 'SUPER', 'SWEET', 'TABLE', 'TAKEN', 'TASTE', 'TAXES', 'TEACH', 'TEETH', 'TERRY', 'TEXAS', 'THANK', 'THEFT', 'THEIR', 'THEME', 'THERE', 'THESE', 'THICK', 'THING', 'THINK', 'THIRD', 'THOSE', 'THREE', 'THREW', 'THROW', 'THUMB', 'TIGER', 'TIGHT', 'TIRED', 'TITLE', 'TODAY', 'TOKEN', 'TOPIC', 'TOTAL', 'TOUCH', 'TOUGH', 'TOWER', 'TRACK', 'TRADE', 'TRAIN', 'TREAT', 'TREND', 'TRIAL', 'TRIBE', 'TRICK', 'TRIED', 'TRIES', 'TRUCK', 'TRULY', 'TRUNK', 'TRUST', 'TRUTH', 'TWICE', 'TWIST', 'TYLER', 'UNION', 'UNITY', 'UNTIL', 'UPPER', 'UPSET', 'URBAN', 'USAGE', 'USUAL', 'VALUE', 'VIDEO', 'VIRUS', 'VISIT', 'VITAL', 'VOCAL', 'VOICE', 'WASTE', 'WATCH', 'WATER', 'WAVE', 'WHEEL', 'WHERE', 'WHICH', 'WHILE', 'WHITE', 'WHOLE', 'WINNER', 'WINTER', 'WOMAN', 'WOMEN', 'WORLD', 'WORRY', 'WORSE', 'WORST', 'WORTH', 'WOULD', 'WRITE', 'WRONG', 'WROTE', 'YOUNG', 'YOURS', 'YOUTH'];
@@ -199,7 +269,7 @@ client.on('interactionCreate', async interaction => {
         }
         const { resetCharacter } = await import('./rpg.js');
         const def = resetCharacter(interaction.user.id, parts[3] || 'warrior');
-        return interaction.reply({ content: `Character reset to defaults: HP ${def.hp}/${def.maxHp} ATK ${def.atk} DEF ${def.def} SPD ${def.spd} Level ${def.lvl}`, ephemeral: true });
+        return interaction.reply({ content: `Character reset to defaults: HP ${def.hp}/${def.maxHp} MP ${def.mp}/${def.maxMp} ATK ${def.atk} DEF ${def.def} SPD ${def.spd} Level ${def.lvl}`, ephemeral: true });
       }
       // handle guild contribution modal submit
       if (custom.startsWith('guild_contribute_modal:')) {
@@ -423,9 +493,9 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: message, ephemeral: true });
         return;
       }
-      if (action === 'fun_joke') {
-        const [, category, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get jokes for another user.', ephemeral: true });
+      if (custom.startsWith('fun_joke:')) {
+        const [, category, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot get jokes for another user.', ephemeral: true });
 
         const { getRandomJoke } = await import('./entertainment.js');
         const joke = getRandomJoke(category);
@@ -433,9 +503,9 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `😂 **${category.charAt(0).toUpperCase() + category.slice(1)} Joke:**\n${joke.joke}`, ephemeral: true });
         return;
       }
-      if (action === 'fun_story') {
-        const [, genre, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot generate stories for another user.', ephemeral: true });
+      if (custom.startsWith('fun_story:')) {
+        const [, genre, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot generate stories for another user.', ephemeral: true });
 
         const { generateStory } = await import('./entertainment.js');
         const story = generateStory('A creative adventure', genre);
@@ -443,17 +513,29 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `📖 **${genre.charAt(0).toUpperCase() + genre.slice(1)} Story:**\n${story.story}`, ephemeral: true });
         return;
       }
-      if (action === 'fun_riddle') {
-        const [, difficulty, riddleId, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get riddle answers for another user.', ephemeral: true });
+      if (custom.startsWith('fun_riddle:')) {
+        const [, difficulty, riddleId, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot get riddle answers for another user.', ephemeral: true });
 
-        // Show riddle answer (this would need to store the riddle)
-        await interaction.reply({ content: `💡 **Riddle Answer:**\n*The answer would be revealed here.*`, ephemeral: true });
+        // Show riddle answer - get the riddle from the stored state or regenerate
+        const { getRiddle } = await import('./entertainment.js');
+        const riddle = getRiddle(difficulty);
+
+        const embed = new EmbedBuilder()
+          .setTitle(`💡 Riddle Answer - ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}`)
+          .setColor(0xFF8C00)
+          .addFields(
+            { name: '🧩 Riddle', value: riddle.riddle, inline: false },
+            { name: '✅ Answer', value: `**${riddle.answer}**`, inline: false }
+          )
+          .setFooter({ text: 'Think you can solve it? Use /fun riddle to get another one!' });
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
       }
-      if (action === 'fun_riddle_new') {
-        const [, difficulty, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get riddles for another user.', ephemeral: true });
+      if (custom.startsWith('fun_riddle_new:')) {
+        const [, difficulty, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot get riddles for another user.', ephemeral: true });
 
         const { getRiddle } = await import('./entertainment.js');
         const riddle = getRiddle(difficulty);
@@ -461,9 +543,9 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `🧩 **${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Riddle:**\n${riddle.riddle}`, ephemeral: true });
         return;
       }
-      if (action === 'fun_fact') {
-        const [, category, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get facts for another user.', ephemeral: true });
+      if (custom.startsWith('fun_fact:')) {
+        const [, category, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot get facts for another user.', ephemeral: true });
 
         const { getFunFact } = await import('./entertainment.js');
         const fact = getFunFact(category);
@@ -471,9 +553,9 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `🧠 **${category === 'random' ? 'Random' : category.charAt(0).toUpperCase() + category.slice(1)} Fun Fact:**\n${fact.fact}`, ephemeral: true });
         return;
       }
-      if (action === 'fun_quote') {
-        const [, category, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get quotes for another user.', ephemeral: true });
+      if (custom.startsWith('fun_quote:')) {
+        const [, category, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot get quotes for another user.', ephemeral: true });
 
         const { getRandomQuote } = await import('./entertainment.js');
         const quote = getRandomQuote(category);
@@ -481,9 +563,9 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `💬 **${category.charAt(0).toUpperCase() + category.slice(1)} Quote:**\n"${quote.quote}" - ${quote.author}`, ephemeral: true });
         return;
       }
-      if (action === 'fun_8ball') {
-        const [, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot ask 8-ball for another user.', ephemeral: true });
+      if (custom.startsWith('fun_8ball:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot ask 8-ball for another user.', ephemeral: true });
 
         const { magic8Ball } = await import('./entertainment.js');
         const result = magic8Ball('The magic 8-ball speaks...');
@@ -491,9 +573,9 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `🔮 **Magic 8-Ball says:** ${result.answer}`, ephemeral: true });
         return;
       }
-      if (action === 'fun_name') {
-        const [, type, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot generate names for another user.', ephemeral: true });
+      if (custom.startsWith('fun_name:')) {
+        const [, type, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot generate names for another user.', ephemeral: true });
 
         const { generateFunName } = await import('./entertainment.js');
         const name = generateFunName(type);
@@ -501,9 +583,9 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `🎭 **${type.charAt(0).toUpperCase() + type.slice(1)} Name:** ${name.name}`, ephemeral: true });
         return;
       }
-      if (action === 'fun_name_random') {
-        const [, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot generate names for another user.', ephemeral: true });
+      if (custom.startsWith('fun_name_random:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot generate names for another user.', ephemeral: true });
 
         const types = ['superhero', 'villain', 'fantasy', 'sciFi'];
         const randomType = types[Math.floor(Math.random() * types.length)];
@@ -514,9 +596,9 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `🎭 **${randomType.charAt(0).toUpperCase() + randomType.slice(1)} Name:** ${name.name}`, ephemeral: true });
         return;
       }
-      if (action === 'fun_challenge') {
-        const [, type, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get challenges for another user.', ephemeral: true });
+      if (custom.startsWith('fun_challenge:')) {
+        const [, type, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot get challenges for another user.', ephemeral: true });
 
         const { createFunChallenge } = await import('./entertainment.js');
         const challenge = createFunChallenge(type);
@@ -524,9 +606,9 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `🎯 **${type.charAt(0).toUpperCase() + type.slice(1)} Challenge:**\n${challenge.challenge}\n💎 **Reward:** ${challenge.reward}`, ephemeral: true });
         return;
       }
-      if (action === 'fun_challenge_new') {
-        const [, type, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot get challenges for another user.', ephemeral: true });
+      if (custom.startsWith('fun_challenge_new:')) {
+        const [, type, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot get challenges for another user.', ephemeral: true });
 
         const { createFunChallenge } = await import('./entertainment.js');
         const challenge = createFunChallenge(type);
@@ -534,26 +616,119 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `🎯 **${type.charAt(0).toUpperCase() + type.slice(1)} Challenge:**\n${challenge.challenge}\n💎 **Reward:** ${challenge.reward}`, ephemeral: true });
         return;
       }
-      if (action === 'fun_share') {
-        const [, contentId, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot share content for another user.', ephemeral: true });
+      if (custom.startsWith('fun_share:')) {
+        const [, contentId, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot share content for another user.', ephemeral: true });
 
-        await interaction.reply({ content: `📤 **Content Shared!**\n*The content would be shared to the channel here.*`, ephemeral: true });
+        // Get the content type and details from the contentId
+        // contentId format: type_id (e.g., "story_123", "fact_456", "quote_789")
+        const [contentType, itemId] = contentId.split('_');
+
+        let shareContent = '';
+        let embed = null;
+
+        if (contentType === 'story') {
+          const { generateStory } = await import('./entertainment.js');
+          const story = generateStory('An amazing tale', 'fantasy');
+          shareContent = `📖 **Story Shared by <@${interaction.user.id}>**\n\n${story.story}`;
+        } else if (contentType === 'fact') {
+          const { getFunFact } = await import('./entertainment.js');
+          const fact = getFunFact('random');
+          shareContent = `🧠 **Fun Fact Shared by <@${interaction.user.id}>**\n\n${fact.fact}\n\n*Category: ${fact.category}*`;
+        } else if (contentType === 'quote') {
+          const { getRandomQuote } = await import('./entertainment.js');
+          const quote = getRandomQuote('inspirational');
+          shareContent = `💬 **Quote Shared by <@${interaction.user.id}>**\n\n"${quote.quote}"\n\n- ${quote.author}`;
+        } else {
+          shareContent = `📤 **Content Shared by <@${interaction.user.id}>**\n\n*Amazing content that was shared with everyone!*`;
+        }
+
+        // Try to share to the channel where the interaction occurred
+        try {
+          if (interaction.channel && interaction.channel.type === 0) { // Text channel
+            await interaction.channel.send({ content: shareContent });
+            await interaction.reply({ content: `✅ **Content shared successfully!** Everyone in this channel can now see it.`, ephemeral: true });
+          } else {
+            await interaction.reply({ content: shareContent });
+            await interaction.followUp({ content: `📤 **Content shared!**`, ephemeral: true });
+          }
+        } catch (error) {
+          console.error('Failed to share content:', error);
+          await interaction.reply({ content: `❌ **Failed to share content.** Please check my permissions in this channel.`, ephemeral: true });
+        }
         return;
       }
-      if (action === 'fun_rate') {
-        const [, contentId, rating, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot rate content for another user.', ephemeral: true });
+      if (custom.startsWith('fun_rate:')) {
+        const [, contentId, rating, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot rate content for another user.', ephemeral: true });
 
         await interaction.reply({ content: `⭐ **Content Rated!**\nThank you for rating! This helps improve our recommendations.`, ephemeral: true });
         return;
       }
-      if (action === 'economy_transfer') {
-        const [, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot initiate transfers for another user.', ephemeral: true });
+      // handle economy buy modal submit
+      if (custom.startsWith('economy_buy_modal:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot buy items for another user.', ephemeral: true });
+
+        const item = interaction.fields.getTextInputValue('buy_item');
+        const quantityStr = interaction.fields.getTextInputValue('buy_quantity');
+        const quantity = parseInt(quantityStr || '1', 10) || 1;
+
+        if (!item) return interaction.reply({ content: '❌ Please specify an item to buy.', ephemeral: true });
+        if (quantity <= 0) return interaction.reply({ content: '❌ Please specify a valid quantity.', ephemeral: true });
+
+        const { getMarketPrice, buyFromMarket } = await import('./economy.js');
+        const price = getMarketPrice(item);
+        const totalCost = price * quantity;
+
+        if (price === 0) {
+          return interaction.reply({ content: `❌ "${item}" is not available in the market.`, ephemeral: true });
+        }
+
+        const result = buyFromMarket(interaction.user.id, item, quantity);
+
+        if (result.success) {
+          await interaction.reply({ content: `🛒 **Purchase Complete!**\nBought ${quantity}x ${item} for ${totalCost} gold!`, ephemeral: true });
+        } else {
+          await interaction.reply({ content: `❌ Purchase failed: ${result.reason}`, ephemeral: true });
+        }
+        return;
+      }
+      // handle economy sell modal submit
+      if (custom.startsWith('economy_sell_modal:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot sell items for another user.', ephemeral: true });
+
+        const item = interaction.fields.getTextInputValue('sell_item');
+        const quantityStr = interaction.fields.getTextInputValue('sell_quantity');
+        const quantity = parseInt(quantityStr || '1', 10) || 1;
+
+        if (!item) return interaction.reply({ content: '❌ Please specify an item to sell.', ephemeral: true });
+        if (quantity <= 0) return interaction.reply({ content: '❌ Please specify a valid quantity.', ephemeral: true });
+
+        const { getMarketPrice, sellToMarket } = await import('./economy.js');
+        const sellPrice = Math.floor(getMarketPrice(item) * 0.8);
+        const totalEarnings = sellPrice * quantity;
+
+        if (sellPrice === 0) {
+          return interaction.reply({ content: `❌ "${item}" is not available in the market.`, ephemeral: true });
+        }
+
+        const result = sellToMarket(interaction.user.id, item, quantity);
+
+        if (result.success) {
+          await interaction.reply({ content: `💸 **Sale Complete!**\nSold ${quantity}x ${item} for ${totalEarnings} gold!`, ephemeral: true });
+        } else {
+          await interaction.reply({ content: `❌ Sale failed: ${result.reason}`, ephemeral: true });
+        }
+        return;
+      }
+      if (custom.startsWith('economy_transfer:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot initiate transfers for another user.', ephemeral: true });
 
         // Show transfer modal
-        const modal = new ModalBuilder().setCustomId(`economy_transfer_modal:${userId}`).setTitle('Transfer Gold');
+        const modal = new ModalBuilder().setCustomId(`economy_transfer_modal:${interaction.user.id}`).setTitle('Transfer Gold');
         const userInput = new TextInputBuilder().setCustomId('transfer_user').setLabel('User to transfer to').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('username');
         const amountInput = new TextInputBuilder().setCustomId('transfer_amount').setLabel('Amount to transfer').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('100');
         modal.addComponents({ type: 1, components: [userInput] });
@@ -561,9 +736,9 @@ client.on('interactionCreate', async interaction => {
         await interaction.showModal(modal);
         return;
       }
-      if (action === 'economy_market') {
-        const [, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot access market for another user.', ephemeral: true });
+      if (custom.startsWith('economy_market:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot access market for another user.', ephemeral: true });
 
         const { getMarketPrice } = await import('./economy.js');
         const embed = new EmbedBuilder()
@@ -583,12 +758,12 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
       }
-      if (action === 'economy_business') {
-        const [, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot manage businesses for another user.', ephemeral: true });
+      if (custom.startsWith('economy_business:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot manage businesses for another user.', ephemeral: true });
 
         const { collectBusinessIncome } = await import('./economy.js');
-        const result = collectBusinessIncome(userId);
+        const result = collectBusinessIncome(interaction.user.id);
 
         if (result.success) {
           if (result.income > 0) {
@@ -601,13 +776,39 @@ client.on('interactionCreate', async interaction => {
         }
         return;
       }
-      if (action === 'economy_invest') {
-        const [, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot manage investments for another user.', ephemeral: true });
+      if (custom.startsWith('economy_buy:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot buy items for another user.', ephemeral: true });
+
+        // Show buy modal
+        const modal = new ModalBuilder().setCustomId(`economy_buy_modal:${interaction.user.id}`).setTitle('Buy from Market');
+        const itemInput = new TextInputBuilder().setCustomId('buy_item').setLabel('Item to buy').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('health_potion');
+        const quantityInput = new TextInputBuilder().setCustomId('buy_quantity').setLabel('Quantity').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1');
+        modal.addComponents({ type: 1, components: [itemInput] });
+        modal.addComponents({ type: 1, components: [quantityInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (custom.startsWith('economy_sell:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot sell items for another user.', ephemeral: true });
+
+        // Show sell modal
+        const modal = new ModalBuilder().setCustomId(`economy_sell_modal:${interaction.user.id}`).setTitle('Sell to Market');
+        const itemInput = new TextInputBuilder().setCustomId('sell_item').setLabel('Item to sell').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('health_potion');
+        const quantityInput = new TextInputBuilder().setCustomId('sell_quantity').setLabel('Quantity').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1');
+        modal.addComponents({ type: 1, components: [itemInput] });
+        modal.addComponents({ type: 1, components: [quantityInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (custom.startsWith('economy_invest:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot manage investments for another user.', ephemeral: true });
 
         // Show investment options
         const { getBalance, createInvestment } = await import('./economy.js');
-        const balance = getBalance(userId);
+        const balance = getBalance(interaction.user.id);
 
         if (balance < 100) {
           return interaction.reply({ content: '❌ You need at least 100 gold to invest.', ephemeral: true });
@@ -618,53 +819,92 @@ client.on('interactionCreate', async interaction => {
           .setColor(0x0099FF)
           .setDescription('Choose an investment to grow your wealth!')
           .addFields(
-            { name: '🏦 Bank Deposit (Safe)', value: 'Rate: 5%/month\nMin: 100 gold', inline: true },
-            { name: '🏭 Stock Market (Medium)', value: 'Rate: 10%/month\nMin: 500 gold', inline: true },
-            { name: '🎲 High Risk Venture (High)', value: 'Rate: 20%/month\nMin: 1000 gold', inline: true }
+            { name: '🏦 Bank Deposit (Safe)', value: 'Rate: 5%/month\nMin: 100 gold\nDuration: 30 days', inline: true },
+            { name: '🏭 Stock Market (Medium)', value: 'Rate: 10%/month\nMin: 500 gold\nDuration: 30 days', inline: true },
+            { name: '🎲 High Risk Venture (High)', value: 'Rate: 20%/month\nMin: 1000 gold\nDuration: 30 days', inline: true },
+            { name: '🏠 Real Estate (Medium)', value: 'Rate: 15%/month\nMin: 2000 gold\nDuration: 45 days', inline: true },
+            { name: '💰 Cryptocurrency (High)', value: 'Rate: 25%/month\nMin: 300 gold\nDuration: 15 days', inline: true },
+            { name: '📄 Government Bond (Safe)', value: 'Rate: 3%/month\nMin: 500 gold\nDuration: 60 days', inline: true }
           );
 
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`invest_bank:${userId}`).setLabel('🏦 Bank Deposit').setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId(`invest_stock:${userId}`).setLabel('🏭 Stock Market').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId(`invest_venture:${userId}`).setLabel('🎲 High Risk').setStyle(ButtonStyle.Danger)
+        const row1 = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`invest_bank:${interaction.user.id}`).setLabel('🏦 Bank').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`invest_stock:${interaction.user.id}`).setLabel('🏭 Stocks').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`invest_venture:${interaction.user.id}`).setLabel('🎲 Venture').setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`invest_real_estate:${interaction.user.id}`).setLabel('🏠 Real Estate').setStyle(ButtonStyle.Success)
         );
 
-        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        const row2 = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`invest_crypto:${interaction.user.id}`).setLabel('💰 Crypto').setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`invest_bond:${interaction.user.id}`).setLabel('📄 Bonds').setStyle(ButtonStyle.Primary)
+        );
+
+        await interaction.reply({ embeds: [embed], components: [row1, row2], ephemeral: true });
         return;
       }
-      if (action === 'invest_bank') {
-        const [, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
+      if (custom.startsWith('invest_bank:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
 
         // Show modal for amount
-        const modal = new ModalBuilder().setCustomId(`invest_modal:bank:${userId}`).setTitle('Bank Deposit');
+        const modal = new ModalBuilder().setCustomId(`invest_modal:bank:${interaction.user.id}`).setTitle('Bank Deposit');
         const amountInput = new TextInputBuilder().setCustomId('invest_amount').setLabel('Amount to deposit (min 100)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('100');
         modal.addComponents({ type: 1, components: [amountInput] });
         await interaction.showModal(modal);
         return;
       }
-      if (action === 'invest_stock') {
-        const [, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
+      if (custom.startsWith('invest_stock:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
 
-        const modal = new ModalBuilder().setCustomId(`invest_modal:stock:${userId}`).setTitle('Stock Investment');
+        const modal = new ModalBuilder().setCustomId(`invest_modal:stock:${interaction.user.id}`).setTitle('Stock Investment');
         const amountInput = new TextInputBuilder().setCustomId('invest_amount').setLabel('Amount to invest (min 500)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('500');
         modal.addComponents({ type: 1, components: [amountInput] });
         await interaction.showModal(modal);
         return;
       }
-      if (action === 'invest_venture') {
-        const [, targetUser] = interaction.customId.split(':');
-        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
+      if (custom.startsWith('invest_venture:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
 
-        const modal = new ModalBuilder().setCustomId(`invest_modal:venture:${userId}`).setTitle('High Risk Venture');
+        const modal = new ModalBuilder().setCustomId(`invest_modal:venture:${interaction.user.id}`).setTitle('High Risk Venture');
         const amountInput = new TextInputBuilder().setCustomId('invest_amount').setLabel('Amount to invest (min 1000)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1000');
         modal.addComponents({ type: 1, components: [amountInput] });
         await interaction.showModal(modal);
         return;
       }
-      if (action === 'admin_warn') {
-        const [, targetUser, guildId] = interaction.customId.split(':');
+      if (custom.startsWith('invest_real_estate:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
+
+        const modal = new ModalBuilder().setCustomId(`invest_modal:real_estate:${interaction.user.id}`).setTitle('Real Estate Investment');
+        const amountInput = new TextInputBuilder().setCustomId('invest_amount').setLabel('Amount to invest (min 2000)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('2000');
+        modal.addComponents({ type: 1, components: [amountInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (custom.startsWith('invest_crypto:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
+
+        const modal = new ModalBuilder().setCustomId(`invest_modal:crypto:${interaction.user.id}`).setTitle('Cryptocurrency Investment');
+        const amountInput = new TextInputBuilder().setCustomId('invest_amount').setLabel('Amount to invest (min 300)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('300');
+        modal.addComponents({ type: 1, components: [amountInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (custom.startsWith('invest_bond:')) {
+        const [, targetUser] = custom.split(':');
+        if (targetUser && targetUser !== interaction.user.id) return interaction.reply({ content: 'You cannot invest for another user.', ephemeral: true });
+
+        const modal = new ModalBuilder().setCustomId(`invest_modal:bond:${interaction.user.id}`).setTitle('Government Bond');
+        const amountInput = new TextInputBuilder().setCustomId('invest_amount').setLabel('Amount to invest (min 500)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('500');
+        modal.addComponents({ type: 1, components: [amountInput] });
+        await interaction.showModal(modal);
+        return;
+      }
+      if (custom.startsWith('admin_warn:')) {
+        const [, targetUser, guildId] = custom.split(':');
         if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
           return interaction.reply({ content: '❌ You need Administrator permissions.', ephemeral: true });
         }
@@ -676,8 +916,8 @@ client.on('interactionCreate', async interaction => {
         await interaction.showModal(modal);
         return;
       }
-      if (action === 'admin_mute') {
-        const [, targetUser, guildId] = interaction.customId.split(':');
+      if (custom.startsWith('admin_mute:')) {
+        const [, targetUser, guildId] = custom.split(':');
         if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
           return interaction.reply({ content: '❌ You need Administrator permissions.', ephemeral: true });
         }
@@ -691,8 +931,8 @@ client.on('interactionCreate', async interaction => {
         await interaction.showModal(modal);
         return;
       }
-      if (action === 'admin_unmute') {
-        const [, targetUser, guildId] = interaction.customId.split(':');
+      if (custom.startsWith('admin_unmute:')) {
+        const [, targetUser, guildId] = custom.split(':');
         if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
           return interaction.reply({ content: '❌ You need Administrator permissions.', ephemeral: true });
         }
@@ -707,8 +947,8 @@ client.on('interactionCreate', async interaction => {
         }
         return;
       }
-      if (action === 'admin_unban') {
-        const [, targetUser, guildId] = interaction.customId.split(':');
+      if (custom.startsWith('admin_unban:')) {
+        const [, targetUser, guildId] = custom.split(':');
         if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
           return interaction.reply({ content: '❌ You need Administrator permissions.', ephemeral: true });
         }
@@ -787,8 +1027,8 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: message, ephemeral: true });
         return;
       }
-      if (action === 'wordle_guess') {
-        const [, gameId] = interaction.customId.split(':');
+      if (custom.startsWith('wordle_guess:')) {
+        const [, gameId] = custom.split(':');
         // Show wordle guess modal
         await sendWordleGuessModal(interaction, gameId);
         return;
@@ -809,16 +1049,20 @@ client.on('interactionCreate', async interaction => {
         try {
           if (interaction.message && interaction.message.editable) {
             const remaining = char.skillPoints || 0;
-            const spendRow = new ActionRowBuilder().addComponents(
+            const spendRow1 = new ActionRowBuilder().addComponents(
               new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${interaction.user.id}`).setLabel('❤️ HP').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:mp:1:${interaction.user.id}`).setLabel('🔮 MP').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
               new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${interaction.user.id}`).setLabel('🛡️ Max HP').setStyle(ButtonStyle.Success).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:maxmp:1:${interaction.user.id}`).setLabel('🔮 Max MP').setStyle(ButtonStyle.Success).setDisabled(remaining <= 0),
               new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${interaction.user.id}`).setLabel('⚔️ ATK').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
+            );
+            const spendRow2 = new ActionRowBuilder().addComponents(
               new ButtonBuilder().setCustomId(`rpg_spend:def:1:${interaction.user.id}`).setLabel('🛡️ DEF').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
               new ButtonBuilder().setCustomId(`rpg_spend:spd:1:${interaction.user.id}`).setLabel('💨 SPD').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
               new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${interaction.user.id}`).setLabel('💎 Spend...').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
             );
-            const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk} DEF: ${char.def} SPD: ${char.spd}`;
-            await interaction.update({ content, components: [spendRow] });
+            const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} MP: ${char.mp}/${char.maxMp}\nATK: ${char.atk} DEF: ${char.def} SPD: ${char.spd}`;
+            await interaction.update({ content, components: [spendRow1, spendRow2] });
             return;
           }
         } catch (err) {
@@ -847,15 +1091,20 @@ client.on('interactionCreate', async interaction => {
           if (interaction.message && interaction.message.editable) {
             const remaining = char.skillPoints || 0;
             // build spend buttons (disable when no points)
-            const spendRow = new ActionRowBuilder().addComponents(
+            const spendRow1 = new ActionRowBuilder().addComponents(
               new ButtonBuilder().setCustomId(`rpg_spend:hp:1:${userId}`).setLabel('❤️ HP').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:mp:1:${userId}`).setLabel('🔮 MP').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
               new ButtonBuilder().setCustomId(`rpg_spend:maxhp:1:${userId}`).setLabel('🛡️ Max HP').setStyle(ButtonStyle.Success).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend:maxmp:1:${userId}`).setLabel('🔮 Max MP').setStyle(ButtonStyle.Success).setDisabled(remaining <= 0),
               new ButtonBuilder().setCustomId(`rpg_spend:atk:1:${userId}`).setLabel('⚔️ ATK').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
+            );
+            const spendRow2 = new ActionRowBuilder().addComponents(
               new ButtonBuilder().setCustomId(`rpg_spend:def:1:${userId}`).setLabel('🛡️ DEF').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
               new ButtonBuilder().setCustomId(`rpg_spend:spd:1:${userId}`).setLabel('💨 SPD').setStyle(ButtonStyle.Secondary).setDisabled(remaining <= 0),
+              new ButtonBuilder().setCustomId(`rpg_spend_modal:0:${userId}`).setLabel('💎 Spend...').setStyle(ButtonStyle.Primary).setDisabled(remaining <= 0),
             );
-            const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} ATK: ${char.atk} DEF: ${char.def} SPD: ${char.spd}`;
-            await interaction.update({ content, components: [spendRow] });
+            const content = `Name: ${char.name}\nLevel: ${char.lvl} XP: ${char.xp} Skill Points: ${remaining}\nHP: ${char.hp}/${char.maxHp} MP: ${char.mp}/${char.maxMp}\nATK: ${char.atk} DEF: ${char.def} SPD: ${char.spd}`;
+            await interaction.update({ content, components: [spendRow1, spendRow2] });
             return;
           }
         } catch (err) {
@@ -863,7 +1112,7 @@ client.on('interactionCreate', async interaction => {
           console.error('Failed to update original message after spend', err);
         }
 
-        return interaction.reply({ content: `Spent ${amount} point(s) on ${stat}. New stats: HP ${char.hp}/${char.maxHp} ATK ${char.atk} DEF ${char.def} SPD ${char.spd}. Remaining points: ${char.skillPoints}`, ephemeral: true });
+        return interaction.reply({ content: `Spent ${amount} point(s) on ${stat}. New stats: HP ${char.hp}/${char.maxHp} MP ${char.mp}/${char.maxMp} ATK ${char.atk} DEF ${char.def} SPD ${char.spd}. Remaining points: ${char.skillPoints}`, ephemeral: true });
       }
       if (action === 'rpg_spend_modal') {
         const [, , targetUser] = interaction.customId.split(':');
@@ -876,7 +1125,7 @@ client.on('interactionCreate', async interaction => {
         spendCooldowns.set(userNow, now);
         // show a modal allowing stat and amount selection
         const modal = new ModalBuilder().setCustomId(`rpg_spend_submit:${userNow}`).setTitle('Spend Skill Points');
-        const statInput = new TextInputBuilder().setCustomId('stat_choice').setLabel('Stat (hp|maxhp|atk)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('atk');
+        const statInput = new TextInputBuilder().setCustomId('stat_choice').setLabel('Stat (hp|mp|maxhp|maxmp|atk|def|spd)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('atk');
         const amountInput = new TextInputBuilder().setCustomId('amount_choice').setLabel('Amount').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1');
         modal.addComponents({ type: 1, components: [statInput] });
         modal.addComponents({ type: 1, components: [amountInput] });
@@ -888,7 +1137,7 @@ client.on('interactionCreate', async interaction => {
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot reset another user.', ephemeral: true });
         const { resetCharacter } = await import('./rpg.js');
         const def = resetCharacter(userId, targetUser || 'warrior');
-        return interaction.reply({ content: `Character reset to defaults: HP ${def.hp}/${def.maxHp} ATK ${def.atk} DEF ${def.def} SPD ${def.spd} Level ${def.lvl}`, ephemeral: true });
+        return interaction.reply({ content: `Character reset to defaults: HP ${def.hp}/${def.maxHp} MP ${def.mp}/${def.maxMp} ATK ${def.atk} DEF ${def.def} SPD ${def.spd} Level ${def.lvl}`, ephemeral: true });
       }
       if (action === 'rpg_reset_modal') {
         const [ , , targetUser ] = interaction.customId.split(':');
@@ -1124,12 +1373,24 @@ client.on('interactionCreate', async interaction => {
         const monster = encounterMonster(char.lvl || 1);
         const narrative = await narrate(interaction.guildId, `Describe a thrilling combat encounter with a ${monster.name}.`, `You engage in combat with ${monster.name}!`);
 
+        // Create combat game state
+        const combatState = {
+          monster: { ...monster },
+          playerTurn: true,
+          turnCount: 1,
+          lastAction: null,
+          locationName,
+          startedAt: Date.now()
+        };
+
+        combatGames.set(userId, combatState);
+
         const embed = new EmbedBuilder()
           .setTitle('⚔️ Combat Encounter!')
           .setColor(0xFF0000)
-          .setDescription(narrative)
+          .setDescription(`${narrative}\n\n**Turn 1** - Your turn!`)
           .addFields(
-            { name: '🧙 Your Stats', value: `HP: ${char.hp}/${char.maxHp}\nATK: ${char.atk}\nDEF: ${char.def}\nSPD: ${char.spd}`, inline: true },
+            { name: '🧙 Your Stats', value: `HP: ${char.hp}/${char.maxHp}\nMP: ${char.mp}/${char.maxMp}\nATK: ${char.atk}\nDEF: ${char.def}\nSPD: ${char.spd}`, inline: true },
             { name: '👹 Enemy Stats', value: `${monster.name}\nHP: ${monster.hp}\nATK: ${monster.atk}`, inline: true }
           );
 
@@ -1139,68 +1400,263 @@ client.on('interactionCreate', async interaction => {
           new ButtonBuilder().setCustomId(`combat_flee:${monster.name}:${userId}`).setLabel('🏃 Flee').setStyle(ButtonStyle.Secondary)
         );
 
-        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        await safeInteractionReply(interaction, { embeds: [embed], components: [row], ephemeral: true });
         return;
       }
       if (action === 'combat_attack') {
         const [, monsterName, targetUser] = interaction.customId.split(':');
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot attack for another user.', ephemeral: true });
 
-        // Simulate combat turn
-        const { getCharacter, encounterMonster, fightTurn, applyXp, addBalance } = await import('./rpg.js');
+        // Get persistent combat state
+        const combatState = combatGames.get(userId);
+        if (!combatState) {
+          return interaction.reply({ content: '❌ No active combat session. Start a new exploration!', ephemeral: true });
+        }
+
+        const { getCharacter, fightTurn, applyXp, addBalance } = await import('./rpg.js');
         const char = getCharacter(userId);
         if (!char) return interaction.reply({ content: 'Character not found.', ephemeral: true });
 
-        const monster = encounterMonster(char.lvl || 1); // Simplified, in real use store monster state
+        const monster = combatState.monster;
         const playerDamage = fightTurn(char, monster);
-        const monsterDamage = fightTurn(monster, char);
 
-        let resultMessage = `⚔️ **Attack Turn!**\nYou dealt ${playerDamage} damage!\n${monster.name} dealt ${monsterDamage} damage!\n`;
+        let resultMessage = `⚔️ **Turn ${combatState.turnCount} - Attack!**\n`;
+        resultMessage += `You attack ${monster.name} and deal **${playerDamage}** damage!\n`;
+
         if (monster.hp <= 0) {
+          // Victory!
           const xpGain = char.lvl * 5;
           const goldGain = char.lvl * 3;
           applyXp(userId, char, xpGain);
-          addBalance(userId, goldGain);
-          resultMessage += `🎉 **Victory!** Gained ${xpGain} XP and ${goldGain} gold!`;
-        } else if (char.hp <= 0) {
-          resultMessage += '💀 **Defeat!** You have fallen in battle.';
+          char.gold = (char.gold || 0) + goldGain;
+          saveCharacter(userId, char);
+
+          resultMessage += `🎉 **Victory!** ${monster.name} has been defeated!\n`;
+          resultMessage += `💎 **Rewards:** ${xpGain} XP, ${goldGain} gold!`;
+
+          // Clear combat state
+          combatGames.delete(userId);
+
+          await safeInteractionUpdate(interaction, { content: resultMessage, embeds: [], components: [] });
         } else {
-          resultMessage += `🧙 Your HP: ${char.hp}/${char.maxHp}\n👹 ${monster.name} HP: ${monster.hp}`;
-          // Add buttons for next turn if not ended
-          if (monster.hp > 0 && char.hp > 0) {
+          // Monster attacks back
+          const monsterDamage = fightTurn(monster, char);
+          resultMessage += `${monster.name} attacks back and deals **${monsterDamage}** damage!\n\n`;
+
+          if (char.hp <= 0) {
+            // Defeat!
+            resultMessage += `💀 **Defeat!** You have fallen in battle.\n`;
+            resultMessage += `❤️ You recover to half health and retreat.`;
+
+            char.hp = Math.max(1, Math.floor(char.maxHp / 2));
+            saveCharacter(userId, char);
+
+            // Clear combat state
+            combatGames.delete(userId);
+
+            await safeInteractionUpdate(interaction, { content: resultMessage, embeds: [], components: [] });
+          } else {
+            // Continue combat
+            resultMessage += `📊 **Current Status:**\n`;
+            resultMessage += `🧙 Your HP: ${char.hp}/${char.maxHp}\n`;
+            resultMessage += `👹 ${monster.name} HP: ${monster.hp}\n\n`;
+            resultMessage += `**Turn ${combatState.turnCount + 1}** - Choose your action!`;
+
+            combatState.turnCount++;
+            combatState.playerTurn = true;
+
             const row = new ActionRowBuilder().addComponents(
               new ButtonBuilder().setCustomId(`combat_attack:${monster.name}:${userId}`).setLabel('⚔️ Attack').setStyle(ButtonStyle.Danger),
               new ButtonBuilder().setCustomId(`combat_defend:${monster.name}:${userId}`).setLabel('🛡️ Defend').setStyle(ButtonStyle.Primary),
               new ButtonBuilder().setCustomId(`combat_flee:${monster.name}:${userId}`).setLabel('🏃 Flee').setStyle(ButtonStyle.Secondary)
             );
-            await interaction.update({ content: resultMessage, components: [row] });
-            return;
+
+            await safeInteractionUpdate(interaction, { content: resultMessage, embeds: [], components: [row] });
           }
         }
-
-        await interaction.update({ content: resultMessage, components: [] });
         return;
       }
       if (action === 'combat_defend') {
         const [, monsterName, targetUser] = interaction.customId.split(':');
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot defend for another user.', ephemeral: true });
 
-        await interaction.update({ content: '🛡️ **Defend Turn!**\nYou raise your guard, reducing incoming damage next turn.', components: [] });
+        // Get persistent combat state
+        const combatState = combatGames.get(userId);
+        if (!combatState) {
+          return interaction.reply({ content: '❌ No active combat session.', ephemeral: true });
+        }
+
+        const { getCharacter, fightTurn } = await import('./rpg.js');
+        const char = getCharacter(userId);
+        if (!char) return interaction.reply({ content: 'Character not found.', ephemeral: true });
+
+        const monster = combatState.monster;
+
+        let resultMessage = `🛡️ **Turn ${combatState.turnCount} - Defend!**\n`;
+        resultMessage += `You raise your guard to defend against ${monster.name}!\n\n`;
+
+        // Monster attacks with reduced damage (defend reduces damage by 50%)
+        const baseDamage = fightTurn(monster, char);
+        const reducedDamage = Math.max(1, Math.floor(baseDamage * 0.5));
+        char.hp = Math.max(0, char.hp - reducedDamage);
+
+        resultMessage += `${monster.name} attacks but you defend well! Damage reduced from ${baseDamage} to ${reducedDamage}!\n\n`;
+
+        if (char.hp <= 0) {
+          // Defeat!
+          resultMessage += `💀 **Defeat!** Despite your defense, you have fallen in battle.\n`;
+          resultMessage += `❤️ You recover to half health and retreat.`;
+
+          char.hp = Math.max(1, Math.floor(char.maxHp / 2));
+          saveCharacter(userId, char);
+
+          // Clear combat state
+          combatGames.delete(userId);
+
+          await safeInteractionUpdate(interaction, { content: resultMessage, embeds: [], components: [] });
+        } else {
+          // Continue combat
+          resultMessage += `📊 **Current Status:**\n`;
+          resultMessage += `🧙 Your HP: ${char.hp}/${char.maxHp}\n`;
+          resultMessage += `👹 ${monster.name} HP: ${monster.hp}\n\n`;
+          resultMessage += `**Turn ${combatState.turnCount + 1}** - Monster's turn!`;
+
+          combatState.turnCount++;
+          combatState.playerTurn = false;
+
+          await safeInteractionUpdate(interaction, { content: resultMessage, embeds: [], components: [] });
+
+          // Auto-advance to next turn after a delay
+          setTimeout(async () => {
+            const currentState = combatGames.get(userId);
+            if (currentState && !currentState.playerTurn) {
+              // Trigger monster attack automatically
+              const currentChar = getCharacter(userId);
+              if (currentChar && currentChar.hp > 0 && currentState.monster.hp > 0) {
+                const attackDamage = fightTurn(currentState.monster, currentChar);
+
+                let autoMessage = `👹 **Monster Turn!**\n`;
+                autoMessage += `${currentState.monster.name} attacks and deals **${attackDamage}** damage!\n\n`;
+
+                if (currentChar.hp <= 0) {
+                  autoMessage += `💀 **Defeat!** You have fallen in battle.\n`;
+                  autoMessage += `❤️ You recover to half health and retreat.`;
+
+                  currentChar.hp = Math.max(1, Math.floor(currentChar.maxHp / 2));
+                  saveCharacter(userId, currentChar);
+
+                  combatGames.delete(userId);
+
+                  // Find the original message and update it
+                  try {
+                    await interaction.followUp({ content: autoMessage, ephemeral: true });
+                  } catch (err) {
+                    console.error('Failed to send follow-up message:', err);
+                  }
+                } else {
+                  autoMessage += `📊 **Current Status:**\n`;
+                  autoMessage += `🧙 Your HP: ${currentChar.hp}/${currentChar.maxHp}\n`;
+                  autoMessage += `👹 ${currentState.monster.name} HP: ${currentState.monster.hp}\n\n`;
+                  autoMessage += `**Turn ${currentState.turnCount + 1}** - Your turn!`;
+
+                  currentState.playerTurn = true;
+
+                  const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`combat_attack:${currentState.monster.name}:${userId}`).setLabel('⚔️ Attack').setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder().setCustomId(`combat_defend:${currentState.monster.name}:${userId}`).setLabel('🛡️ Defend').setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId(`combat_flee:${currentState.monster.name}:${userId}`).setLabel('🏃 Flee').setStyle(ButtonStyle.Secondary)
+                  );
+
+                  try {
+                    await interaction.followUp({ content: autoMessage, components: [row], ephemeral: true });
+                  } catch (err) {
+                    console.error('Failed to send follow-up message:', err);
+                  }
+                }
+              }
+            }
+          }, 3000); // 3 second delay for monster turn
+        }
         return;
       }
       if (action === 'combat_flee') {
         const [, monsterName, targetUser] = interaction.customId.split(':');
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot flee for another user.', ephemeral: true });
 
-        await interaction.update({ content: '🏃 **Fled Successfully!**\nYou retreat from the battle unharmed.', components: [] });
+        // Get persistent combat state
+        const combatState = combatGames.get(userId);
+        if (!combatState) {
+          return interaction.reply({ content: '❌ No active combat session.', ephemeral: true });
+        }
+
+        const { getCharacter } = await import('./rpg.js');
+        const char = getCharacter(userId);
+        if (!char) return interaction.reply({ content: 'Character not found.', ephemeral: true });
+
+        let resultMessage = `🏃 **Turn ${combatState.turnCount} - Flee!**\n`;
+        resultMessage += `You successfully flee from ${combatState.monster.name}!\n`;
+        resultMessage += `✨ You retreat safely back to ${combatState.locationName}.`;
+
+        // Clear combat state
+        combatGames.delete(userId);
+
+        await interaction.update({ content: resultMessage, embeds: [], components: [] });
         return;
       }
       if (action === 'explore_search') {
         const [, locationName, targetUser] = interaction.customId.split(':');
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot search for another user.', ephemeral: true });
 
-        // Handle search/puzzle encounter
-        await interaction.reply({ content: '🔍 **Discovery!**\n*Search mechanics would reveal hidden treasures or trigger puzzles.*', ephemeral: true });
+        // Handle search/puzzle encounter - implement treasure finding
+        const { getCharacter, addItemToInventory, generateRandomItem, applyXp } = await import('./rpg.js');
+
+        const char = getCharacter(userId);
+        if (!char) return interaction.reply({ content: 'You need a character first. Use /rpg start', ephemeral: true });
+
+        // Random chance to find treasure
+        const treasureChance = Math.random();
+        let resultMessage = '🔍 **You search the area thoroughly...**\n\n';
+
+        if (treasureChance > 0.6) {
+          // Found treasure!
+          const randomItem = generateRandomItem(char.lvl);
+          const addResult = addItemToInventory(userId, randomItem.id, 1);
+
+          if (addResult.success) {
+            const xpGain = Math.floor(char.lvl * 2);
+            applyXp(userId, char, xpGain);
+
+            resultMessage += `🎉 **Treasure Found!**\n`;
+            resultMessage += `💎 You discovered: **${randomItem.name}** (${randomItem.rarity})\n`;
+            resultMessage += `📝 ${randomItem.description}\n`;
+            resultMessage += `⭐ **Bonus:** ${xpGain} XP gained!`;
+          } else {
+            resultMessage += `💨 You found something interesting, but couldn't carry it.\n`;
+            resultMessage += `Try freeing up inventory space!`;
+          }
+        } else if (treasureChance > 0.3) {
+          // Found minor item or gold
+          const goldGain = Math.floor(char.lvl * 3) + Math.floor(Math.random() * 10);
+          const { addBalance } = await import('./economy.js');
+          addBalance(userId, goldGain);
+
+          const xpGain = Math.floor(char.lvl * 1);
+          applyXp(userId, char, xpGain);
+
+          resultMessage += `💰 **Minor Discovery!**\n`;
+          resultMessage += `You found a small pouch with **${goldGain} gold**!\n`;
+          resultMessage += `⭐ **Bonus:** ${xpGain} XP gained!`;
+        } else {
+          // Nothing found
+          const xpGain = Math.floor(char.lvl * 0.5);
+          applyXp(userId, char, xpGain);
+
+          resultMessage += `🔍 **Nothing Found...**\n`;
+          resultMessage += `The area appears to be empty, but you gained some exploration experience.\n`;
+          resultMessage += `⭐ **Bonus:** ${xpGain} XP gained!`;
+        }
+
+        await interaction.reply({ content: resultMessage, ephemeral: true });
         return;
       }
       if (action === 'explore_leave') {
@@ -1256,16 +1712,114 @@ client.on('interactionCreate', async interaction => {
         const [, locationName, targetUser] = interaction.customId.split(':');
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot investigate for another user.', ephemeral: true });
 
-        // Handle investigation encounter
-        await interaction.reply({ content: '🔍 **Investigation reveals:**\n*You discover hidden secrets and gain bonus experience!*', ephemeral: true });
+        // Handle investigation encounter - reveal location lore and secrets
+        const { getCharacter, applyXp } = await import('./rpg.js');
+        const { getLocations } = await import('./locations.js');
+
+        const char = getCharacter(userId);
+        if (!char) return interaction.reply({ content: 'You need a character first. Use /rpg start', ephemeral: true });
+
+        const locations = getLocations();
+        const location = locations[locationName];
+
+        if (!location) {
+          return interaction.reply({ content: '❌ Location not found.', ephemeral: true });
+        }
+
+        // Generate investigation results based on location
+        const investigationResults = {
+          forest: [
+            "You discover ancient carvings on tree trunks that tell stories of the forest's guardians.",
+            "Hidden among the roots, you find a small crystal that hums with natural energy.",
+            "You uncover a forgotten shrine dedicated to the spirits of the woods."
+          ],
+          mountain: [
+            "You find cave paintings depicting the mountain's volcanic history and ancient inhabitants.",
+            "Between the rocks, you discover a naturally formed crystal formation with unique properties.",
+            "You stumble upon an old hermit's cabin with journals revealing mountain secrets."
+          ],
+          desert: [
+            "You uncover ancient ruins partially buried in the sand, hinting at a lost civilization.",
+            "In a hidden oasis, you find a well-preserved artifact from a forgotten era.",
+            "You discover nomadic trade routes marked with mysterious symbols."
+          ],
+          ocean: [
+            "You find a message in a bottle containing coordinates to a hidden underwater cave.",
+            "Shells and coral formations reveal patterns that seem to form a map.",
+            "You discover a school of fish that leads you to an underwater treasure chest."
+          ]
+        };
+
+        const locationResults = investigationResults[locationName] || investigationResults.forest;
+        const discovery = locationResults[Math.floor(Math.random() * locationResults.length)];
+
+        const xpGain = Math.floor(char.lvl * 3);
+        applyXp(userId, char, xpGain);
+
+        const embed = new EmbedBuilder()
+          .setTitle(`🔍 Investigation Results - ${location.name}`)
+          .setColor(location.color)
+          .setDescription(discovery)
+          .addFields(
+            { name: '📚 Knowledge Gained', value: 'You learned valuable information about this location!', inline: true },
+            { name: '⭐ Experience Gained', value: `${xpGain} XP`, inline: true }
+          );
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
       }
       if (action === 'explore_rest') {
         const [, locationName, targetUser] = interaction.customId.split(':');
         if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot rest for another user.', ephemeral: true });
 
-        // Handle rest encounter - restore HP/MP
-        await interaction.reply({ content: '🛌 **You take a well-deserved rest.**\n❤️ HP fully restored!\n✨ You feel refreshed and ready for more adventure!', ephemeral: true });
+        // Handle rest encounter - restore HP/MP with proper implementation
+        const { getCharacter, saveCharacter, applyXp } = await import('./rpg.js');
+        const { getLocations } = await import('./locations.js');
+
+        const char = getCharacter(userId);
+        if (!char) return interaction.reply({ content: 'You need a character first. Use /rpg start', ephemeral: true });
+
+        const locations = getLocations();
+        const location = locations[locationName];
+
+        if (!location) {
+          return interaction.reply({ content: '❌ Location not found.', ephemeral: true });
+        }
+
+        // Calculate rest effectiveness based on location
+        const restMultiplier = {
+          forest: 1.2,
+          mountain: 1.0,
+          desert: 0.8,
+          ocean: 1.1
+        }[locationName] || 1.0;
+
+        const hpRestored = Math.floor(char.maxHp * 0.8 * restMultiplier);
+        const mpRestored = Math.floor(char.maxMp * 0.6 * restMultiplier);
+
+        char.hp = Math.min(char.maxHp, char.hp + hpRestored);
+        char.mp = Math.min(char.maxMp, char.mp + mpRestored);
+
+        // Save the updated character
+        saveCharacter(userId, char);
+
+        const xpGain = Math.floor(char.lvl * 1);
+        applyXp(userId, char, xpGain);
+
+        let restMessage = `🛌 **You take a well-deserved rest in ${location.name}**\n\n`;
+
+        if (restMultiplier > 1.0) {
+          restMessage += `🌿 The peaceful atmosphere enhances your recovery!\n`;
+        } else if (restMultiplier < 1.0) {
+          restMessage += `🏜️ The harsh environment makes resting difficult.\n`;
+        }
+
+        restMessage += `❤️ **HP Restored:** ${hpRestored} → ${char.hp}/${char.maxHp}\n`;
+        restMessage += `🔮 **MP Restored:** ${mpRestored} → ${char.mp}/${char.maxMp}\n`;
+        restMessage += `⭐ **Meditation Bonus:** ${xpGain} XP gained!\n\n`;
+        restMessage += `✨ You feel refreshed and ready for more adventure!`;
+
+        await interaction.reply({ content: restMessage, ephemeral: true });
         return;
       }
       if (action.startsWith('ttt_')) {
@@ -1479,7 +2033,19 @@ client.on('interactionCreate', async interaction => {
       }
       if (action === 'guess_modal') {
         const [, gameId, min, max] = interaction.customId.split(':');
-        // Show guess input modal (this would be handled by the guess command)
+        if (targetUser && targetUser !== userId) return interaction.reply({ content: 'You cannot start guess games for another user.', ephemeral: true });
+
+        // Show guess input modal
+        const modal = new ModalBuilder().setCustomId(`guess_submit:${gameId}:${min || 1}:${max || 100}`).setTitle('Number Guessing Game');
+        const guessInput = new TextInputBuilder()
+          .setCustomId('guess_number')
+          .setLabel(`Guess a number between ${min || 1} and ${max || 100}`)
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setPlaceholder('42');
+
+        modal.addComponents({ type: 1, components: [guessInput] });
+        await interaction.showModal(modal);
         return;
       }
       if (action.startsWith('c4_')) {

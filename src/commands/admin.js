@@ -247,13 +247,13 @@ export async function execute(interaction) {
     if (isUserMuted(guildId, targetUser.id)) {
       row.addComponents(new ButtonBuilder().setCustomId(`admin_unmute:${targetUser.id}:${guildId}`).setLabel('🔊 Unmute').setStyle(ButtonStyle.Success));
     } else {
-      row.addComponents(new ButtonBuilder().setCustomId(`admin_mute:${targetUser.id}:${guildId}`).setLabel('🔇 Mute').setStyle(ButtonStyle.Danger));
+      row.addComponents(new ButtonBuilder().setCustomId(`admin_warn:${targetUser.id}:${guildId}`).setLabel('⚠️ Warn').setStyle(ButtonStyle.Secondary));
     }
 
     if (isUserBanned(guildId, targetUser.id)) {
       row.addComponents(new ButtonBuilder().setCustomId(`admin_unban:${targetUser.id}:${guildId}`).setLabel('✅ Unban').setStyle(ButtonStyle.Success));
     } else {
-      row.addComponents(new ButtonBuilder().setCustomId(`admin_warn:${targetUser.id}:${guildId}`).setLabel('⚠️ Warn').setStyle(ButtonStyle.Secondary));
+      row.addComponents(new ButtonBuilder().setCustomId(`admin_mute:${targetUser.id}:${guildId}`).setLabel('🔇 Mute').setStyle(ButtonStyle.Danger));
     }
 
     await interaction.reply({ embeds: [embed], components: [row] });

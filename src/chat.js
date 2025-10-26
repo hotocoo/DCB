@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { getGuild } from './storage.js';
+import { logger } from './logger.js';
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const LOCAL_MODEL_URL = process.env.LOCAL_MODEL_URL; // e.g. http://host.docker.internal:8000

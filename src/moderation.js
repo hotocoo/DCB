@@ -334,9 +334,10 @@ class ModerationManager {
   }
 
   checkCaps(message) {
-    const capsRatio = (message.match(/[A-Z]/g) || []).length / message.length;
+    const content = typeof message === 'string' ? message : message.content;
+    const capsRatio = (content.match(/[A-Z]/g) || []).length / content.length;
 
-    if (capsRatio > 0.7 && message.length > 10) {
+    if (capsRatio > 0.7 && content.length > 10) {
       return {
         triggered: true,
         type: 'caps',
@@ -500,6 +501,14 @@ export function getModActions(guildId, limit = 50) {
 
 export function getUserModStats(guildId, userId) {
   return moderationManager.getUserModStats(guildId, userId);
+}
+
+export function unmuteUser(guildId, userId, moderatorId, reason = 'Manual unmute') {
+  return moderationManager.unmuteUser(guildId, userId, moderatorId, reason);
+}
+
+export function unbanUser(guildId, userId, moderatorId, reason = 'Manual unban') {
+  return moderationManager.unbanUser(guildId, userId, moderatorId, reason);
 }
 
 // Auto-cleanup every 5 minutes

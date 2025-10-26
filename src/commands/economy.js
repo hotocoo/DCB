@@ -23,9 +23,10 @@ export const data = new SlashCommandBuilder()
     .addUserOption(opt => opt.setName('user').setDescription('User to transfer to').setRequired(true))
     .addIntegerOption(opt => opt.setName('amount').setDescription('Amount to transfer').setRequired(true)))
   .addSubcommand(sub => sub.setName('business').setDescription('Business management')
-    .addStringOption(opt => opt.setName('action').setDescription('create|collect|list').setRequired(true))
-    .addStringOption(opt => opt.setName('type').setDescription('shop|farm|mine|factory|bank|casino'))
-    .addIntegerOption(opt => opt.setName('investment').setDescription('Initial investment amount')))
+    .addStringOption(opt => opt.setName('action').setDescription('create|collect|list|upgrade').setRequired(true))
+    .addStringOption(opt => opt.setName('type').setDescription('shop|farm|mine|factory|bank|casino|restaurant|tech|trading'))
+    .addIntegerOption(opt => opt.setName('investment').setDescription('Initial investment amount'))
+    .addStringOption(opt => opt.setName('business_id').setDescription('Business ID to upgrade')))
   .addSubcommand(sub => sub.setName('market').setDescription('Marketplace').addStringOption(opt => opt.setName('action').setDescription('buy|sell|prices').setRequired(true)).addStringOption(opt => opt.setName('item').setDescription('Item to buy/sell')).addIntegerOption(opt => opt.setName('quantity').setDescription('Quantity')))
   .addSubcommand(sub => sub.setName('lottery').setDescription('Play the lottery').addIntegerOption(opt => opt.setName('ticket_price').setDescription('Ticket price').setRequired(true)))
   .addSubcommand(sub => sub.setName('history').setDescription('Transaction history').addIntegerOption(opt => opt.setName('limit').setDescription('Number of transactions')))
@@ -158,15 +159,46 @@ export async function execute(interaction) {
         const now = Date.now();
         const hoursSinceCollection = (now - business.lastCollected) / (1000 * 60 * 60);
         const pendingIncome = Math.floor(business.income * hoursSinceCollection);
+        const upgradeCost = business.level * 500;
 
         embed.addFields({
-          name: `${index + 1}. ${business.type.charAt(0).toUpperCase() + business.type.slice(1)} (${business.level})`,
-          value: `💰 Income: ${business.income}/hour\n🕐 Pending: ${pendingIncome} gold\n👥 Employees: ${business.employees}\n🔧 Upgrades: ${business.upgrades}`,
+          name: `${index + 1}. ${business.type.charAt(0).toUpperCase() + business.type.slice(1)} (${business.level}) [${business.id}]`,
+          value: `💰 Income: ${business.income}/hour\n🕐 Pending: ${pendingIncome} gold\n👥 Employees: ${business.employees}\n🔧 Upgrades: ${business.upgrades}\n💸 Next Upgrade: ${upgradeCost} gold`,
           inline: true
         });
       });
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`economy_business:${interaction.user.id}`).setLabel('🏪 Collect Income').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`economy_invest:${interaction.user.id}`).setLabel('📈 Investments').setStyle(ButtonStyle.Secondary)
+      );
+
+      await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+    } else if (action === 'upgrade') {
+      const businessId = interaction.options.getString('business_id');
+
+      if (!businessId) {
+        return interaction.reply({ content: '❌ Please specify a business ID to upgrade. Use `/economy business action:list` to see your businesses.', ephemeral: true });
+      }
+
+      const { upgradeBusiness } = await import('../economy.js');
+      const result = upgradeBusiness(interaction.user.id, businessId);
+
+      if (result.success) {
+        const embed = new EmbedBuilder()
+          .setTitle('🔧 Business Upgraded!')
+          .setColor(0x00FF00)
+          .setDescription(`Successfully upgraded your **${result.business.type}** business!`)
+          .addFields(
+            { name: '🏢 Business', value: `${result.business.type} (Level ${result.business.level})`, inline: true },
+            { name: '💰 New Income', value: `${result.business.income}/hour`, inline: true },
+            { name: '🔧 Total Upgrades', value: result.business.upgrades, inline: true }
+          );
+
+        await interaction.reply({ embeds: [embed] });
+      } else {
+        await interaction.reply({ content: `❌ Upgrade failed: ${result.reason}`, ephemeral: true });
+      }
     }
 
   } else if (sub === 'market') {

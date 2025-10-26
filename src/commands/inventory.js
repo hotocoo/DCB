@@ -8,7 +8,10 @@ import {
   unequipItem,
   getInventoryValue,
   addItemToInventory,
-  generateRandomItem
+  generateRandomItem,
+  getCharacter,
+  saveCharacter,
+  removeItemFromInventory
 } from '../rpg.js';
 
 export const data = new SlashCommandBuilder()
@@ -46,8 +49,24 @@ export async function execute(interaction) {
       .setColor(0x0099FF)
       .setDescription(`💰 Total Value: ${inventoryValue} gold`);
 
-    // Add equipped items section (this would need to be added to character data)
-    embed.addFields({ name: '📦 Items', value: 'Loading items...', inline: false });
+    // Add equipped items section
+    const character = getCharacter(userId);
+    if (character && (character.equipped?.weapon || character.equipped?.armor)) {
+      const equippedItems = [];
+      if (character.equipped.weapon) {
+        const weapon = getItemInfo(character.equipped.weapon);
+        if (weapon) equippedItems.push(`⚔️ ${weapon.name}`);
+      }
+      if (character.equipped.armor) {
+        const armor = getItemInfo(character.equipped.armor);
+        if (armor) equippedItems.push(`🛡️ ${armor.name}`);
+      }
+      embed.addFields({
+        name: '⚡ Equipped',
+        value: equippedItems.join('\n') || 'None',
+        inline: true
+      });
+    }
 
     // Add buttons for inventory actions
     const row = new ActionRowBuilder().addComponents(
@@ -93,6 +112,76 @@ export async function execute(interaction) {
     }
 
     await interaction.reply({ content: response });
+  } else if (sub === 'equip') {
+    const itemName = interaction.options.getString('item');
+    const inventory = getInventory(userId);
+
+    // Find item by name
+    let targetItemId = null;
+    for (const [itemId, quantity] of Object.entries(inventory)) {
+      const item = getItemInfo(itemId);
+      if (item && item.name.toLowerCase() === itemName.toLowerCase()) {
+        targetItemId = itemId;
+        break;
+      }
+    }
+
+    if (!targetItemId) {
+      return interaction.reply({ content: `❌ You don't have "${itemName}" in your inventory.`, ephemeral: true });
+    }
+
+    const item = getItemInfo(targetItemId);
+    if (item.type !== 'weapon' && item.type !== 'armor') {
+      return interaction.reply({ content: `❌ You can only equip weapons and armor, not ${item.type}s.`, ephemeral: true });
+    }
+
+    const character = getCharacter(userId);
+    if (!character) {
+      return interaction.reply({ content: '❌ You need a character first. Use /rpg start', ephemeral: true });
+    }
+
+    const slot = item.type === 'weapon' ? 'weapon' : 'armor';
+
+    // Unequip current item in that slot if any
+    if (character.equipped && character.equipped[slot]) {
+      const currentItem = getItemInfo(character.equipped[slot]);
+      addItemToInventory(userId, character.equipped[slot], 1);
+    }
+
+    // Equip new item
+    if (!character.equipped) character.equipped = {};
+    character.equipped[slot] = targetItemId;
+    removeItemFromInventory(userId, targetItemId, 1);
+    saveCharacter(userId, character);
+
+    await interaction.reply({ content: `✅ Equipped **${item.name}** in ${slot} slot!` });
+  } else if (sub === 'unequip') {
+    const slot = interaction.options.getString('slot');
+
+    if (slot !== 'weapon' && slot !== 'armor') {
+      return interaction.reply({ content: '❌ Invalid slot. Use weapon or armor.', ephemeral: true });
+    }
+
+    const character = getCharacter(userId);
+    if (!character) {
+      return interaction.reply({ content: '❌ You need a character first. Use /rpg start', ephemeral: true });
+    }
+
+    if (!character.equipped || !character.equipped[slot]) {
+      return interaction.reply({ content: `❌ You don't have anything equipped in the ${slot} slot.`, ephemeral: true });
+    }
+
+    const itemId = character.equipped[slot];
+    const item = getItemInfo(itemId);
+
+    // Add item back to inventory
+    addItemToInventory(userId, itemId, 1);
+
+    // Unequip item
+    character.equipped[slot] = null;
+    saveCharacter(userId, character);
+
+    await interaction.reply({ content: `✅ Unequipped **${item.name}** from ${slot} slot!` });
   }
 }
 
@@ -123,6 +212,7 @@ async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
     });
   }
 
-  embed.spliceFields(0, embed.data.fields.length, ...fields);
+  // Clear existing fields and add new ones
+  embed.setFields(fields);
   await interaction.editReply({ embeds: [embed] });
 }

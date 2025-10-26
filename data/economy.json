@@ -1,7 +1,115 @@
 {
-  "userBalances": {},
-  "transactions": [],
+  "userBalances": {
+    "333133024520568833": 11,
+    "testuser1": 2748,
+    "testuser2": 936
+  },
+  "transactions": [
+    {
+      "type": "transfer",
+      "from": "testuser1",
+      "to": "testuser2",
+      "amount": 500,
+      "timestamp": 1761465203771,
+      "id": "txn_1761465203771_k6s6up91h"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 52,
+      "timestamp": 1761465203772,
+      "id": "txn_1761465203772_wigxmkdgs"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 20,
+      "timestamp": 1761465203773,
+      "id": "txn_1761465203773_67qjao6gy"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 26,
+      "timestamp": 1761465204976,
+      "id": "txn_1761465204976_k2wu58l6f"
+    },
+    {
+      "type": "transfer",
+      "from": "testuser1",
+      "to": "testuser2",
+      "amount": 500,
+      "timestamp": 1761465242868,
+      "id": "txn_1761465242868_bty939qps"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 52,
+      "timestamp": 1761465242869,
+      "id": "txn_1761465242869_rtgcmb5t2"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 20,
+      "timestamp": 1761465242870,
+      "id": "txn_1761465242870_bnv72zzwl"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 26,
+      "timestamp": 1761465244188,
+      "id": "txn_1761465244188_5nc8r3lcg"
+    }
+  ],
   "marketItems": {},
   "businessData": {},
-  "investments": {}
+  "investments": {
+    "testuser1": [
+      {
+        "id": "investment_1761465203774_edc6jkej6",
+        "user": "testuser1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1761465203774,
+        "maturity": 1764057203774,
+        "rate": 0.05,
+        "status": "active"
+      },
+      {
+        "id": "investment_1761465242871_z6w0xm1j9",
+        "user": "testuser1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1761465242871,
+        "maturity": 1764057242871,
+        "rate": 0.05,
+        "status": "active"
+      }
+    ]
+  }
 }

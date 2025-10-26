@@ -239,9 +239,9 @@ class MusicTestSuite {
       const searchResults = await searchSongs('test song', 3);
       if (searchResults.length > 0) {
         await this.log(`Discord search command simulation: Found ${searchResults.length} results`);
-        // Check if Deezer results are prioritized
-        const deezerCount = searchResults.filter(r => r.source === 'deezer').length;
-        await this.log(`Deezer results prioritized: ${deezerCount > 0}`, deezerCount > 0);
+        // Check if YouTube results are prioritized (new priority system)
+        const youtubeCount = searchResults.filter(r => r.source === 'youtube').length;
+        await this.log(`YouTube results prioritized: ${youtubeCount > 0}`, youtubeCount > 0);
       }
 
       // Test 2: Simulate /music play command with Deezer track

@@ -3,7 +3,7 @@ import { searchSongs, play, pause, resume, skip, stop, getQueue, getMusicStats, 
 
 export const data = new SlashCommandBuilder()
   .setName('music')
-  .setDescription('🎵 ULTRA Music System - The Most Advanced Music Bot!')
+  .setDescription('🎵 ULTRA Music System - YouTube & Spotify Priority!')
   .addSubcommand(sub => sub.setName('play').setDescription('🎵 Play any song instantly').addStringOption(opt => opt.setName('query').setDescription('Song name or URL').setRequired(true)))
   .addSubcommand(sub => sub.setName('search').setDescription('🔍 Search millions of songs').addStringOption(opt => opt.setName('query').setDescription('Search term').setRequired(true)))
   .addSubcommand(sub => sub.setName('back').setDescription('⬅️ Go back to previous song'))
@@ -61,10 +61,12 @@ export async function execute(interaction) {
         let noResultsMessage = '❌ **No results found for that query.**';
 
         // Provide more specific messaging for URL queries
-        if (query.includes('deezer.com')) {
-          noResultsMessage = '❌ **Track unavailable on Deezer**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
+        if (query.includes('spotify.com')) {
+          noResultsMessage = '❌ **Track unavailable on Spotify**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
         } else if (query.includes('youtube.com') || query.includes('youtu.be')) {
           noResultsMessage = '❌ **Video unavailable**\n\n📹 The requested video is not available, private, or has been deleted.\n🔍 Try searching for the song title instead of using the direct URL.';
+        } else if (query.includes('deezer.com')) {
+          noResultsMessage = '❌ **Track unavailable on Deezer**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
         } else {
           noResultsMessage = '❌ **No results found**\n\n🔍 No tracks found for your search query.\n💡 Try different keywords or check the spelling.';
         }
@@ -85,14 +87,16 @@ export async function execute(interaction) {
         // Provide specific error messages based on error type
         switch (result.errorType) {
           case 'validation_failed':
-            if (song.source === 'deezer') {
+            if (song.source === 'spotify') {
+              errorMessage += `\n\n🎵 **Track unavailable on Spotify**\nThe requested track is no longer available or has no preview.`;
+            } else if (song.source === 'deezer') {
               errorMessage += `\n\n🎵 **Track unavailable on Deezer**\nThe requested track is no longer available or has no preview.`;
             } else {
               errorMessage += `\n\n📹 **Video unavailable or deleted**\nThe requested video is no longer available on YouTube.`;
             }
             break;
           case 'stream_creation':
-            errorMessage += `\n\n🔊 **Audio stream error**\nThere was an issue creating the audio stream for this video.`;
+            errorMessage += `\n\n🔊 **Audio stream error**\nThere was an issue creating the audio stream for this track.`;
             break;
           case 'connection_failed':
             errorMessage += `\n\n🔗 **Voice connection error**\nFailed to establish a stable connection to the voice channel.`;
@@ -105,7 +109,10 @@ export async function execute(interaction) {
             errorMessage += `\n\n⏹️ **Playback stopped**\nNo more songs in the queue.`;
             break;
           case 'no_preview':
-            errorMessage += `\n\n🎵 **No preview available**\nThis Deezer track does not have a preview clip.`;
+            errorMessage += `\n\n🎵 **No preview available**\nThis Spotify track does not have a preview clip.`;
+            break;
+          case 'spotify_stream':
+            errorMessage += `\n\n🎵 **Spotify stream error**\nFailed to play the preview clip.`;
             break;
           case 'deezer_stream':
             errorMessage += `\n\n🎵 **Deezer stream error**\nFailed to play the preview clip.`;
@@ -132,8 +139,12 @@ export async function execute(interaction) {
         )
         .setThumbnail(song.thumbnail || 'https://i.imgur.com/SjIgjlE.png');
 
-      if (song.source === 'deezer') {
-        embed.addFields({ name: 'ℹ️ Note', value: 'Playing 30-second preview from Deezer', inline: false });
+      if (song.source === 'spotify') {
+        embed.addFields({ name: 'ℹ️ Note', value: 'Playing 30-second preview from Spotify', inline: false });
+      } else if (song.source === 'deezer') {
+        embed.addFields({ name: 'ℹ️ Note', value: 'Playing 30-second preview from Deezer (Legacy)', inline: false });
+      } else if (song.source === 'youtube') {
+        embed.addFields({ name: 'ℹ️ Note', value: 'Playing full track from YouTube', inline: false });
       }
 
       const row = new ActionRowBuilder().addComponents(
@@ -162,10 +173,12 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
         let noResultsMessage = '❌ **No search results found**';
 
         // Provide more specific messaging for URL queries
-        if (query.includes('deezer.com')) {
-          noResultsMessage = '❌ **Track unavailable on Deezer**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
+        if (query.includes('spotify.com')) {
+          noResultsMessage = '❌ **Track unavailable on Spotify**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
         } else if (query.includes('youtube.com') || query.includes('youtu.be')) {
           noResultsMessage = '❌ **Video unavailable**\n\n📹 The requested video is not available, private, or has been deleted.\n🔍 Try searching for the song title instead of using the direct URL.';
+        } else if (query.includes('deezer.com')) {
+          noResultsMessage = '❌ **Track unavailable on Deezer**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
         } else {
           noResultsMessage = '❌ **No search results found**\n\n🔍 No tracks found for your search query.\n💡 Try different keywords or check the spelling.';
         }

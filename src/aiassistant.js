@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { getGuild } from './storage.js';
 
+// Use native fetch for Node.js 18+
+
 // Advanced AI Assistant System with Multiple AI Models and Capabilities
 class AIAssistantManager {
   constructor() {
@@ -325,12 +327,77 @@ Provide a response that matches the specified model and personality.`;
 
   async generateCodeSnippet(language, description) {
     const snippets = {
-      'javascript': `// ${description}\nfunction example() {\n  console.log('Hello, World!');\n  // TODO: Implement ${description}\n}`,
-      'python': `# ${description}\ndef example():\n    print('Hello, World!')\n    # TODO: Implement ${description}\n    pass`,
-      'java': `// ${description}\npublic class Example {\n    public static void main(String[] args) {\n        System.out.println('Hello, World!');\n        // TODO: Implement ${description}\n    }\n}`
+      'javascript': this.generateJavaScriptSnippet(description),
+      'python': this.generatePythonSnippet(description),
+      'java': this.generateJavaSnippet(description),
+      'cpp': this.generateCppSnippet(description),
+      'c#': this.generateCSharpSnippet(description),
+      'go': this.generateGoSnippet(description),
+      'rust': this.generateRustSnippet(description),
+      'php': this.generatePhpSnippet(description),
+      'ruby': this.generateRubySnippet(description),
+      'swift': this.generateSwiftSnippet(description)
     };
 
-    return snippets[language.toLowerCase()] || snippets.javascript;
+    return snippets[language.toLowerCase()] || this.generateJavaScriptSnippet(description);
+  }
+
+  generateJavaScriptSnippet(description) {
+    const lowerDesc = description.toLowerCase();
+    if (lowerDesc.includes('function') || lowerDesc.includes('method')) {
+      return `// ${description}\nfunction performTask(data) {\n  // Implementation for ${description.toLowerCase()}\n  try {\n    // Your logic here\n    return processData(data);\n  } catch (error) {\n    console.error('Error:', error.message);\n    throw error;\n  }\n}\n\n// Usage example\nconst result = performTask(inputData);`;
+    } else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
+      return `// ${description}\nclass DataProcessor {\n  constructor(options = {}) {\n    this.options = options;\n    this.cache = new Map();\n  }\n\n  // Main method implementation\n  process(data) {\n    // Implementation for ${description.toLowerCase()}\n    if (this.cache.has(data)) {\n      return this.cache.get(data);\n    }\n\n    const result = this.transformData(data);\n    this.cache.set(data, result);\n    return result;\n  }\n\n  transformData(data) {\n    // Transform logic here\n    return data;\n  }\n}`;
+    }
+    return `// ${description}\n// Implementation example\nconst ${description.replace(/\s+/g, '').toLowerCase()} = (input) => {\n  // Your implementation here\n  return input;\n};\n\n// Usage\nconst result = ${description.replace(/\s+/g, '').toLowerCase()}(inputValue);`;
+  }
+
+  generatePythonSnippet(description) {
+    const lowerDesc = description.toLowerCase();
+    if (lowerDesc.includes('function') || lowerDesc.includes('method')) {
+      return `# ${description}\ndef perform_task(data):\n    """\n    Implementation for ${description.lower()}\n    """\n    try:\n        # Your logic here\n        return process_data(data)\n    except Exception as e:\n        print(f"Error: {e}")\n        raise\n\n# Usage example\nresult = perform_task(input_data)`;
+    } else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
+      return `# ${description}\nclass DataProcessor:\n    def __init__(self, options=None):\n        self.options = options or {}\n        self.cache = {}\n\n    def process(self, data):\n        """\n        Implementation for ${description.lower()}\n        """\n        if data in self.cache:\n            return self.cache[data]\n\n        result = self.transform_data(data)\n        self.cache[data] = result\n        return result\n\n    def transform_data(self, data):\n        """Transform logic here"""\n        return data\n\n# Usage\nprocessor = DataProcessor()\nresult = processor.process(input_data)`;
+    }
+    return `# ${description}\ndef ${description.replace(/\s+/g, '_').lower()}():\n    # Your implementation here\n    return input_value`;
+  }
+
+  generateJavaSnippet(description) {
+    const lowerDesc = description.toLowerCase();
+    if (lowerDesc.includes('function') || lowerDesc.includes('method')) {
+      return `// ${description}\npublic class TaskProcessor {\n    public static Object performTask(Object data) {\n        try {\n            // Implementation for ${description.toLowerCase()}\n            return processData(data);\n        } catch (Exception e) {\n            System.err.println("Error: " + e.getMessage());\n            throw e;\n        }\n    }\n\n    private static Object processData(Object data) {\n        // Your logic here\n        return data;\n    }\n\n    // Usage\n    public static void main(String[] args) {\n        Object result = performTask(inputData);\n    }\n}`;
+    } else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
+      return `// ${description}\npublic class DataProcessor {\n    private Map<Object, Object> cache;\n    private Map<String, Object> options;\n\n    public DataProcessor(Map<String, Object> options) {\n        this.options = options;\n        this.cache = new HashMap<>();\n    }\n\n    public Object process(Object data) {\n        // Implementation for ${description.toLowerCase()}\n        if (cache.containsKey(data)) {\n            return cache.get(data);\n        }\n\n        Object result = transformData(data);\n        cache.put(data, result);\n        return result;\n    }\n\n    private Object transformData(Object data) {\n        // Transform logic here\n        return data;\n    }\n}`;
+    }
+    return `// ${description}\n// Implementation example\npublic class ${description.replace(/\s+/g, '')} {\n    public static void main(String[] args) {\n        // Your implementation here\n    }\n}`;
+  }
+
+  generateCppSnippet(description) {
+    return `// ${description}\n#include <iostream>\n#include <string>\n#include <map>\n\nclass DataProcessor {\nprivate:\n    std::map<std::string, std::string> cache;\n    std::map<std::string, std::string> options;\n\npublic:\n    DataProcessor() {}\n\n    // Implementation for ${description.toLowerCase()}\n    std::string process(std::string data) {\n        if (cache.find(data) != cache.end()) {\n            return cache[data];\n        }\n\n        std::string result = transformData(data);\n        cache[data] = result;\n        return result;\n    }\n\nprivate:\n    std::string transformData(std::string data) {\n        // Transform logic here\n        return data;\n    }\n};\n\n// Usage\nint main() {\n    DataProcessor processor;\n    std::string result = processor.process("input");\n    return 0;\n}`;
+  }
+
+  generateCSharpSnippet(description) {
+    return `// ${description}\nusing System;\nusing System.Collections.Generic;\n\npublic class DataProcessor\n{\n    private Dictionary<string, object> cache;\n    private Dictionary<string, object> options;\n\n    public DataProcessor(Dictionary<string, object> options = null)\n    {\n        this.options = options ?? new Dictionary<string, object>();\n        this.cache = new Dictionary<string, object>();\n    }\n\n    // Implementation for ${description.toLowerCase()}\n    public object Process(object data)\n    {\n        string key = data.ToString();\n        if (cache.ContainsKey(key))\n        {\n            return cache[key];\n        }\n\n        object result = TransformData(data);\n        cache[key] = result;\n        return result;\n    }\n\n    private object TransformData(object data)\n    {\n        // Transform logic here\n        return data;\n    }\n}\n\n// Usage\nclass Program\n{\n    static void Main()\n    {\n        var processor = new DataProcessor();\n        var result = processor.Process("input");\n    }\n}`;
+  }
+
+  generateGoSnippet(description) {
+    return `// ${description}\npackage main\n\nimport (\n\t"fmt"\n\t"sync"\n)\n\ntype DataProcessor struct {\n\tcache   map[string]interface{}\n\toptions map[string]interface{}\n\tmutex   sync.RWMutex\n}\n\nfunc NewDataProcessor(options map[string]interface{}) *DataProcessor {\n\treturn &DataProcessor{\n\t\tcache:   make(map[string]interface{}),\n\t\toptions: options,\n\t}\n}\n\n// Implementation for ${description.toLowerCase()}\nfunc (dp *DataProcessor) Process(data interface{}) interface{} {\n\tkey := fmt.Sprintf("%v", data)\n\tdp.mutex.RLock()\n\tif result, exists := dp.cache[key]; exists {\n\t\tdp.mutex.RUnlock()\n\t\treturn result\n\t}\n\tdp.mutex.RUnlock()\n\n\tresult := dp.transformData(data)\n\tdp.mutex.Lock()\n\tdp.cache[key] = result\n\tdp.mutex.Unlock()\n\treturn result\n}\n\nfunc (dp *DataProcessor) transformData(data interface{}) interface{} {\n\t// Transform logic here\n\treturn data\n}\n\n// Usage\nfunc main() {\n\tprocessor := NewDataProcessor(nil)\n\tresult := processor.Process("input")\n\tfmt.Println(result)\n}`;
+  }
+
+  generateRustSnippet(description) {
+    return `// ${description}\nuse std::collections::HashMap;\n\nstruct DataProcessor {\n    cache: HashMap<String, String>,\n    options: HashMap<String, String>,\n}\n\nimpl DataProcessor {\n    fn new(options: HashMap<String, String>) -> Self {\n        DataProcessor {\n            cache: HashMap::new(),\n            options,\n        }\n    }\n\n    // Implementation for ${description.toLowerCase()}\n    fn process(&mut self, data: &str) -> String {\n        if let Some(result) = self.cache.get(data) {\n            return result.clone();\n        }\n\n        let result = self.transform_data(data);\n        self.cache.insert(data.to_string(), result.clone());\n        result\n    }\n\n    fn transform_data(&self, data: &str) -> String {\n        // Transform logic here\n        data.to_string()\n    }\n}\n\n// Usage\nfn main() {\n    let mut processor = DataProcessor::new(HashMap::new());\n    let result = processor.process("input");\n    println!("{}", result);\n}`;
+  }
+
+  generatePhpSnippet(description) {
+    return `<?php\n// ${description}\nclass DataProcessor {\n    private $cache = [];\n    private $options = [];\n\n    public function __construct(array $options = []) {\n        $this->options = $options;\n    }\n\n    // Implementation for ${description.toLowerCase()}\n    public function process($data) {\n        $key = serialize($data);\n        if (isset($this->cache[$key])) {\n            return $this->cache[$key];\n        }\n\n        $result = $this->transformData($data);\n        $this->cache[$key] = $result;\n        return $result;\n    }\n\n    private function transformData($data) {\n        // Transform logic here\n        return $data;\n    }\n}\n\n// Usage\n$processor = new DataProcessor();\n$result = $processor->process('input');\necho $result;\n?>`;
+  }
+
+  generateRubySnippet(description) {
+    return `# ${description}\nclass DataProcessor\n  def initialize(options = {})\n    @cache = {}\n    @options = options\n  end\n\n  # Implementation for ${description.lower()}\n  def process(data)\n    key = data.hash\n    return @cache[key] if @cache.key?(key)\n\n    result = transform_data(data)\n    @cache[key] = result\n    result\n  end\n\n  private\n\n  def transform_data(data)\n    # Transform logic here\n    data\n  end\nend\n\n# Usage\nprocessor = DataProcessor.new\nresult = processor.process('input')\nputs result`;
+  }
+
+  generateSwiftSnippet(description) {
+    return `// ${description}\nimport Foundation\n\nclass DataProcessor {\n    private var cache: [String: Any] = [:]\n    private var options: [String: Any]\n\n    init(options: [String: Any] = [:]) {\n        self.options = options\n    }\n\n    // Implementation for ${description.lower()}\n    func process(_ data: Any) -> Any {\n        let key = String(describing: data)\n        if let cached = cache[key] {\n            return cached\n        }\n\n        let result = transformData(data)\n        cache[key] = result\n        return result\n    }\n\n    private func transformData(_ data: Any) -> Any {\n        // Transform logic here\n        return data\n    }\n}\n\n// Usage\nlet processor = DataProcessor()\nlet result = processor.process("input")\nprint(result)`;
   }
 
   // AI Learning and Improvement

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
-// import { updateUserStats } from '../achievements.js';
+import { wordleGames } from '../index.js';
+import { updateUserStats } from '../achievements.js';
 
 const WORD_LIST = [
   'HOUSE', 'PLANE', 'TIGER', 'OCEAN', 'FLAME', 'CLOUD', 'BRAIN', 'CHAIR', 'DANCE', 'EAGLE',
@@ -47,6 +48,8 @@ export async function execute(interaction) {
     startTime: Date.now()
   };
 
+  // Store game state globally for button handlers
+  wordleGames.set(interaction.user.id, gameState);
   await sendWordleBoard(interaction, gameState);
 }
 
@@ -161,7 +164,7 @@ async function sendWordleBoard(interaction, gameState) {
 
   // Create guess button
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`wordle_guess:${gameState.id}`).setLabel('🔤 Make Guess').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId(`wordle_guess:${interaction.user.id}`).setLabel('🔤 Make Guess').setStyle(ButtonStyle.Primary)
   );
 
   if (interaction.replied || interaction.deferred) {

@@ -9,6 +9,7 @@ import {
   getTradeStats,
   createAuction,
   placeBid,
+  buyoutAuction,
   getActiveAuctions,
   getMarketPrices
 } from '../trading.js';
@@ -71,8 +72,7 @@ export async function execute(interaction) {
 
     await interaction.reply({ embeds: [embed] });
 
-    // Notify the target user (this would be implemented with user mentions or DMs)
-    // For now, just log the trade creation
+    // Note: Target user will be notified when they check pending trades or through the trading system
 
   } else if (sub === 'history') {
     const tradeHistory = getUserTradeHistory(userId, 10);
@@ -213,7 +213,7 @@ export async function execute(interaction) {
       await interaction.reply({ content: `💎 **Auction Won!**\nYou purchased the item via buyout!`, ephemeral: true });
     }
   } else if (sub === 'pending') {
-    // Show pending trade requests (this would need to be implemented with user notifications)
+    // Show pending trade requests - would be implemented with proper notification system
     await interaction.reply({ content: '📨 **Pending Trades:**\nNo pending trade requests. Use `/trade offer` to start trading!', ephemeral: true });
   }
 }

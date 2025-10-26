@@ -3,10 +3,25 @@
     "name": "Tester",
     "hp": 20,
     "maxHp": 20,
-    "atk": 13,
-    "lvl": 11,
-    "xp": 200,
-    "skillPoints": 2
+    "atk": 14,
+    "lvl": 12,
+    "xp": 225,
+    "skillPoints": 2,
+    "mp": 10,
+    "maxMp": 10,
+    "def": 2,
+    "spd": 2,
+    "class": "warrior",
+    "abilities": [
+      "Power Strike",
+      "Shield Block",
+      "Battle Cry"
+    ],
+    "color": 16711680,
+    "inventory": {},
+    "equipped_weapon": null,
+    "equipped_armor": null,
+    "gold": 0
   },
   "333133024520568833": {
     "name": "watchandnotlearn",
@@ -14,7 +29,50 @@
     "maxHp": 20,
     "atk": 5,
     "lvl": 1,
-    "xp": 0,
-    "skillPoints": 0
+    "xp": 15,
+    "skillPoints": 0,
+    "mp": 10,
+    "maxMp": 10,
+    "def": 2,
+    "spd": 2,
+    "class": "warrior",
+    "abilities": [
+      "Power Strike",
+      "Shield Block",
+      "Battle Cry"
+    ],
+    "color": 16711680,
+    "inventory": {
+      "iron_ore": 1
+    },
+    "equipped_weapon": null,
+    "equipped_armor": null,
+    "gold": 0
+  },
+  "testuser1": {
+    "name": "TestHero",
+    "class": "warrior",
+    "hp": 25,
+    "maxHp": 25,
+    "mp": 10,
+    "maxMp": 10,
+    "atk": 7,
+    "def": 3,
+    "spd": 1,
+    "lvl": 6,
+    "xp": 100,
+    "skillPoints": 5,
+    "abilities": [
+      "Power Strike",
+      "Shield Block",
+      "Battle Cry"
+    ],
+    "color": 16711680,
+    "inventory": {
+      "health_potion": 7
+    },
+    "equipped_weapon": null,
+    "equipped_armor": null,
+    "gold": 0
   }
 }

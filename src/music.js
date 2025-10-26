@@ -2,15 +2,17 @@
 import { logger } from './logger.js';
 import 'dotenv/config';
 import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
-import ytdl from 'ytdl-core';
+import ytdl from '@distube/ytdl-core';
 import axios from 'axios';
 import yts from 'yt-search';
 import ffmpeg from 'ffmpeg-static';
 import { spawn } from 'child_process';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
-import { ready as sodiumReady } from 'libsodium-wrappers';
+import SpotifyWebApi from 'spotify-web-api-node';
+import pkg from 'libsodium-wrappers';
+const { ready: sodiumReady } = pkg;
 
-// Enhanced Music System with Real Audio Streaming
+// Enhanced Music System with YouTube & Spotify Priority
 class MusicManager {
   constructor() {
     this.queue = new Map(); // guildId -> queue array
@@ -20,12 +22,55 @@ class MusicManager {
     this.voiceChannels = new Map(); // guildId -> voice channel info
     this.audioPlayers = new Map(); // guildId -> audio player
     this.history = new Map(); // guildId -> history array
-    // Rate limiter for Deezer API (100 requests per minute)
-    this.rateLimiter = new RateLimiterMemory({
-      keyPrefix: 'deezer_api',
-      points: 100,
-      duration: 60,
+
+    // Initialize Spotify API
+    this.spotifyApi = new SpotifyWebApi({
+      clientId: process.env.SPOTIFY_CLIENT_ID,
+      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
     });
+
+    // Refresh Spotify token periodically
+    this.refreshSpotifyToken();
+
+    // Rate limiter for Spotify API (1000 requests per hour - higher limit than Deezer)
+    this.rateLimiter = new RateLimiterMemory({
+      keyPrefix: 'spotify_api',
+      points: 1000,
+      duration: 3600,
+    });
+
+    // Rate limiter for YouTube API (10000 requests per day)
+    this.youtubeRateLimiter = new RateLimiterMemory({
+      keyPrefix: 'youtube_api',
+      points: 10000,
+      duration: 86400,
+    });
+  }
+
+  // Spotify Authentication Management
+  async refreshSpotifyToken() {
+    try {
+      // Check if credentials are provided
+      if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET ||
+          process.env.SPOTIFY_CLIENT_ID === 'your-spotify-client-id-here' ||
+          process.env.SPOTIFY_CLIENT_SECRET === 'your-spotify-client-secret-here') {
+        console.log('[MUSIC] Spotify credentials not configured, skipping token refresh');
+        return;
+      }
+
+      const data = await this.spotifyApi.clientCredentialsGrant();
+      this.spotifyApi.setAccessToken(data.body['access_token']);
+
+      // Refresh token before it expires
+      const refreshTime = Math.max((data.body['expires_in'] - 60) * 1000, 60 * 1000); // At least 1 minute
+      setTimeout(() => this.refreshSpotifyToken(), refreshTime);
+      console.log('[MUSIC] Spotify token refreshed successfully');
+    } catch (error) {
+      console.error('[MUSIC] Failed to refresh Spotify token:', error.message);
+      console.log('[MUSIC] Please check your Spotify API credentials in .env file');
+      // Retry in 10 minutes for credential issues
+      setTimeout(() => this.refreshSpotifyToken(), 10 * 60 * 1000);
+    }
   }
 
   // Queue Management
@@ -173,10 +218,103 @@ class MusicManager {
     return settings?.playlists?.get(playlistId) || null;
   }
 
-  // Search and Discovery
+  // Search and Discovery - YouTube & Spotify Priority
   async searchSongs(query, limit = 10) {
     try {
-      // Check if query is a Deezer URL
+      const results = [];
+
+      // Check if query is a Spotify URL
+      const spotifyMatch = query.match(/(?:spotify\.com\/track\/|spotify:track:)([a-zA-Z0-9]{22})/);
+      if (spotifyMatch) {
+        try {
+          await this.rateLimiter.consume('spotify_api');
+          const trackId = spotifyMatch[1];
+          const data = await this.spotifyApi.getTrack(trackId);
+          const track = data.body;
+
+          if (track && track.name) {
+            return [{
+              title: track.name,
+              artist: track.artists.map(a => a.name).join(', '),
+              duration: track.duration_ms ? `${Math.floor(track.duration_ms / 60000)}:${Math.floor((track.duration_ms % 60000) / 1000).toString().padStart(2, '0')}` : 'Unknown',
+              url: query,
+              thumbnail: track.album?.images?.[0]?.url || '',
+              source: 'spotify',
+              spotifyId: track.id,
+              preview: track.preview_url || null
+            }];
+          }
+        } catch (urlError) {
+          console.error(`[MUSIC] Spotify URL validation failed for ${query}:`, urlError.message);
+        }
+      }
+
+      // Check if query is a YouTube URL (high priority)
+      if (ytdl.validateURL(query)) {
+        try {
+          await this.youtubeRateLimiter.consume('youtube_api');
+
+          // Add retry logic for YouTube API issues
+          let info;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              info = await ytdl.getInfo(query, {
+                requestOptions: {
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                  }
+                }
+              });
+              break; // Success, exit retry loop
+            } catch (retryError) {
+              console.log(`[MUSIC] YouTube attempt ${attempt} failed for ${query}: ${retryError.message}`);
+              if (attempt === 3) throw retryError;
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Wait before retry
+            }
+          }
+
+          const video = info.videoDetails;
+
+          if (video.isPrivate || !video.title || video.title === 'Deleted video' || video.title === 'Private video') {
+            console.log(`[MUSIC] Video unavailable: ${query} (Title: ${video.title})`);
+            return [];
+          }
+
+          return [{
+            title: video.title,
+            artist: video.author.name,
+            duration: video.lengthSeconds ? `${Math.floor(video.lengthSeconds / 60)}:${(video.lengthSeconds % 60).toString().padStart(2, '0')}` : 'Unknown',
+            url: query,
+            thumbnail: video.thumbnails[0]?.url || '',
+            source: 'youtube',
+            youtubeId: video.videoId
+          }];
+        } catch (urlError) {
+          console.error(`[MUSIC] YouTube URL validation failed for ${query}:`, urlError.message);
+          // Try to extract basic info without full validation
+          try {
+            const urlObj = new URL(query);
+            const videoId = urlObj.searchParams.get('v') || urlObj.pathname.split('/').pop();
+            if (videoId) {
+              console.log(`[MUSIC] Falling back to basic YouTube info for ${videoId}`);
+              return [{
+                title: `YouTube Video ${videoId}`,
+                artist: 'Unknown Artist',
+                duration: 'Unknown',
+                url: query,
+                thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                source: 'youtube',
+                youtubeId: videoId
+              }];
+            }
+          } catch (fallbackError) {
+            console.error(`[MUSIC] YouTube fallback failed:`, fallbackError.message);
+          }
+          return [];
+        }
+      }
+
+      // Check if query is a Deezer URL (legacy support)
       const deezerMatch = query.match(/deezer\.com\/track\/(\d+)/);
       if (deezerMatch) {
         try {
@@ -200,34 +338,110 @@ class MusicManager {
         }
       }
 
-      // Check if query is a YouTube URL (fallback)
-      if (ytdl.validateURL(query)) {
-        try {
-          const info = await ytdl.getInfo(query);
-          const video = info.videoDetails;
+      // For text queries, try YouTube first (primary)
+      try {
+        await this.youtubeRateLimiter.consume('youtube_api');
+        const searchResults = await yts(query);
+        const videos = searchResults.videos.slice(0, limit);
 
-          if (video.isPrivate || !video.title || video.title === 'Deleted video' || video.title === 'Private video') {
-            console.log(`[MUSIC] Video unavailable: ${query} (Title: ${video.title})`);
-            return [];
+        const validVideos = [];
+        for (const video of videos) {
+          try {
+            // Quick validation without full info fetch
+            if (video.title && video.author && video.duration) {
+              // Validate URL format to ensure it's a proper YouTube URL
+              if (ytdl.validateURL(video.url)) {
+                validVideos.push({
+                  title: video.title,
+                  artist: video.author.name,
+                  duration: video.duration.timestamp,
+                  url: video.url,
+                  thumbnail: video.thumbnail,
+                  source: 'youtube',
+                  youtubeId: video.videoId
+                });
+              } else {
+                console.log(`[MUSIC] Skipping invalid YouTube URL: ${video.url}`);
+              }
+            }
+          } catch (videoError) {
+            console.log(`[MUSIC] Skipping unavailable video: ${video.title} (${video.url}) - ${videoError.message}`);
+          }
+        }
+
+        if (validVideos.length > 0) {
+          console.log(`[MUSIC] YouTube search successful for "${query}": ${validVideos.length} results`);
+          return validVideos;
+        }
+      } catch (error) {
+        console.error('[MUSIC] YouTube search failed:', error.message);
+        // Try with different search options
+        try {
+          console.log(`[MUSIC] Retrying YouTube search with different options...`);
+          const searchResults = await yts(query, { pages: 1 });
+          const videos = searchResults.videos.slice(0, limit);
+
+          const validVideos = [];
+          for (const video of videos) {
+            if (video.title && video.author && video.duration && ytdl.validateURL(video.url)) {
+              validVideos.push({
+                title: video.title,
+                artist: video.author.name,
+                duration: video.duration.timestamp,
+                url: video.url,
+                thumbnail: video.thumbnail,
+                source: 'youtube',
+                youtubeId: video.videoId
+              });
+            }
           }
 
-          return [{
-            title: video.title,
-            artist: video.author.name,
-            duration: video.lengthSeconds ? `${Math.floor(video.lengthSeconds / 60)}:${(video.lengthSeconds % 60).toString().padStart(2, '0')}` : 'Unknown',
-            url: query,
-            thumbnail: video.thumbnails[0]?.url || '',
-            source: 'youtube'
-          }];
-        } catch (urlError) {
-          console.error(`[MUSIC] YouTube URL validation failed for ${query}:`, urlError.message);
-          return [];
+          if (validVideos.length > 0) {
+            console.log(`[MUSIC] YouTube retry search successful for "${query}": ${validVideos.length} results`);
+            return validVideos;
+          }
+        } catch (retryError) {
+          console.error('[MUSIC] YouTube retry search also failed:', retryError.message);
         }
       }
 
-      // For text queries, try Deezer first
+      // If YouTube fails, try Spotify before Deezer
       try {
-        await this.rateLimiter.consume('deezer_api');
+        await this.rateLimiter.consume('spotify_api');
+
+        // Check if we have a valid token
+        if (!this.spotifyApi.getAccessToken()) {
+          console.log('[MUSIC] No Spotify token available, attempting to refresh...');
+          await this.refreshSpotifyToken();
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait a moment for token refresh
+        }
+
+        const data = await this.spotifyApi.searchTracks(query, { limit });
+        if (data.body.tracks && data.body.tracks.items.length > 0) {
+          const tracks = data.body.tracks.items;
+          const results = tracks.map(track => ({
+            title: track.name,
+            artist: track.artists.map(a => a.name).join(', '),
+            duration: track.duration_ms ? `${Math.floor(track.duration_ms / 60000)}:${Math.floor((track.duration_ms % 60000) / 1000).toString().padStart(2, '0')}` : 'Unknown',
+            url: track.external_urls.spotify,
+            thumbnail: track.album?.images?.[0]?.url || '',
+            source: 'spotify',
+            spotifyId: track.id,
+            preview: track.preview_url || null
+          }));
+          console.log(`[MUSIC] Spotify fallback search successful for "${query}": ${results.length} results`);
+          return results;
+        }
+      } catch (error) {
+        if (error.message.includes('No token provided') || error.message.includes('invalid_client')) {
+          console.log('[MUSIC] Spotify credentials not configured or invalid, skipping Spotify search');
+        } else {
+          console.error('[MUSIC] Spotify search failed:', error.message);
+        }
+      }
+
+      // Final fallback to Deezer (legacy support)
+      try {
         const response = await axios.get(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=${limit}`);
         if (response.data && response.data.data && response.data.data.length > 0) {
           const tracks = response.data.data.slice(0, limit);
@@ -240,45 +454,14 @@ class MusicManager {
             source: 'deezer',
             preview: track.preview || null
           }));
-          console.log(`[MUSIC] Deezer search successful for "${query}": ${results.length} results`);
+          console.log(`[MUSIC] Deezer legacy search successful for "${query}": ${results.length} results`);
           return results;
         }
       } catch (error) {
-        if (error.message.includes('rate limit') || error.message.includes('Too Many Requests')) {
-          console.error('[MUSIC] Deezer API rate limit exceeded:', error.message);
-        } else {
-          console.error('[MUSIC] Deezer search failed:', error.message);
-        }
+        console.error('[MUSIC] Deezer legacy search failed:', error.message);
       }
 
-      // Fallback to YouTube search
-      try {
-        const searchResults = await yts(query);
-        const videos = searchResults.videos.slice(0, limit);
-
-        const validVideos = [];
-        for (const video of videos) {
-          try {
-            await ytdl.getInfo(video.url);
-            validVideos.push({
-              title: video.title,
-              artist: video.author.name,
-              duration: video.duration.timestamp,
-              url: video.url,
-              thumbnail: video.thumbnail,
-              source: 'youtube'
-            });
-          } catch (videoError) {
-            console.log(`[MUSIC] Skipping unavailable video: ${video.title} (${video.url}) - ${videoError.message}`);
-          }
-        }
-
-        console.log(`[MUSIC] YouTube fallback search for "${query}": ${validVideos.length} results`);
-        return validVideos;
-      } catch (fallbackError) {
-        console.error('[MUSIC] YouTube fallback search failed:', fallbackError.message);
-        return [];
-      }
+      return [];
     } catch (error) {
       console.error('Music search error:', error);
       return [];
@@ -287,8 +470,31 @@ class MusicManager {
 
   // Enhanced URL validation before playback
   async validateSongUrl(song) {
-    if (song.source === 'deezer') {
-      // For Deezer, check if track exists
+    if (song.source === 'spotify') {
+      // For Spotify, check if track exists and has preview
+      try {
+        await this.rateLimiter.consume('spotify_api');
+        const trackId = song.spotifyId || song.url.match(/spotify\.com\/track\/([a-zA-Z0-9]{22})/)?.[1];
+        if (trackId) {
+          const data = await this.spotifyApi.getTrack(trackId);
+          if (data.body && data.body.name) {
+            return {
+              valid: true,
+              hasPreview: !!data.body.preview_url
+            };
+          }
+        }
+        throw new Error('Track not found');
+      } catch (error) {
+        console.error(`[MUSIC] Spotify URL validation failed for "${song.title}":`, error.message);
+        return {
+          valid: false,
+          error: error.message,
+          canFallback: true
+        };
+      }
+    } else if (song.source === 'deezer') {
+      // For Deezer, check if track exists (legacy support)
       try {
         const trackId = song.url.match(/deezer\.com\/track\/(\d+)/)?.[1];
         if (trackId) {
@@ -308,7 +514,27 @@ class MusicManager {
       }
     } else if (ytdl.validateURL(song.url)) {
       try {
-        const info = await ytdl.getInfo(song.url);
+        await this.youtubeRateLimiter.consume('youtube_api');
+
+        // Add retry logic for YouTube validation
+        let info;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            info = await ytdl.getInfo(song.url, {
+              requestOptions: {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+              }
+            });
+            break; // Success, exit retry loop
+          } catch (retryError) {
+            console.log(`[MUSIC] YouTube validation attempt ${attempt} failed for "${song.title}": ${retryError.message}`);
+            if (attempt === 3) throw retryError;
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Wait before retry
+          }
+        }
+
         const video = info.videoDetails;
 
         // Check if video is available
@@ -326,7 +552,7 @@ class MusicManager {
         };
       }
     }
-    return { valid: true }; // Non-YouTube/Deezer URLs are assumed valid
+    return { valid: true }; // Non-YouTube/Spotify/Deezer URLs are assumed valid
   }
 
   // Enhanced playback with comprehensive error handling
@@ -353,9 +579,68 @@ class MusicManager {
 
     const currentVolume = this.getVolume(guildId) / 100;
 
-    if (song.source === 'deezer') {
-      // For Deezer tracks, use test audio URL for testing voice playback
-      // TODO: Replace with actual Deezer preview URL when testing is complete
+    if (song.source === 'spotify') {
+      // For Spotify tracks, use preview URL if available
+      console.log(`[MUSIC] Creating Spotify stream for: ${song.title}`);
+
+      try {
+        if (song.preview) {
+          // Use Spotify preview URL (30-second clip)
+          const ffmpegProcess = spawn(ffmpeg, [
+            '-i', song.preview,
+            '-f', 'opus',
+            '-ar', '48000',
+            '-ac', '2',
+            'pipe:1'
+          ]);
+
+          ffmpegProcess.stderr.on('data', (data) => {
+            const errorMsg = data.toString();
+            console.error(`[MUSIC] FFmpeg Spotify stderr for "${song.title}": ${errorMsg}`);
+          });
+
+          ffmpegProcess.on('close', (code) => {
+            console.log(`[MUSIC] FFmpeg Spotify process exited with code ${code} for "${song.title}"`);
+          });
+
+          const resource = createAudioResource(ffmpegProcess.stdout, {
+            inputType: 'arbitrary',
+            inlineVolume: true
+          });
+
+          resource.volume.setVolume(currentVolume);
+          logger.debug(`About to play resource for Spotify song: ${song.title}`);
+          player.play(resource);
+
+          return { success: true };
+        } else {
+          // No preview available, try to find YouTube version as fallback
+          console.log(`[MUSIC] No Spotify preview available for "${song.title}", attempting YouTube fallback`);
+          const fallbackQuery = `${song.title} ${song.artist}`;
+          const fallbackResults = await this.searchSongs(fallbackQuery, 1);
+
+          if (fallbackResults.length > 0 && fallbackResults[0].source === 'youtube') {
+            const youtubeSong = fallbackResults[0];
+            youtubeSong.isFallback = true;
+            return this.playWithErrorHandling(guildId, voiceChannel, youtubeSong, player, connection);
+          }
+
+          return {
+            success: false,
+            error: 'No preview available for this Spotify track',
+            errorType: 'no_preview'
+          };
+        }
+      } catch (streamError) {
+        console.error(`[MUSIC] Spotify stream error for "${song.title}":`, streamError.message);
+        return {
+          success: false,
+          error: `Failed to play Spotify track: ${streamError.message}`,
+          errorType: 'spotify_stream'
+        };
+      }
+    } else if (song.source === 'deezer') {
+      // For Deezer tracks, use test audio URL for testing voice playback (legacy)
       const streamUrl = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
       logger.debug(`Stream URL for Deezer (TEST MODE): ${streamUrl}`);
 
@@ -1024,17 +1309,20 @@ class MusicManager {
         console.log('Lyrics.ovh API failed, trying alternative');
       }
 
-      // Alternative: Return formatted placeholder with search suggestion
+      // Alternative: Return formatted message with search suggestion
       return {
         title: songTitle,
         artist,
-        lyrics: `Lyrics for "${songTitle}" by ${artist} would be displayed here.\n\n` +
-               `To get lyrics, you can:\n` +
-               `• Search on Genius: https://genius.com/search?q=${encodeURIComponent(searchQuery)}\n` +
-               `• Search on AZLyrics: https://www.azlyrics.com/lyrics/${encodeURIComponent(artist.toLowerCase())}/${encodeURIComponent(songTitle.toLowerCase())}.html\n` +
-               `• Use Spotify or YouTube Music for synced lyrics`,
+        lyrics: `🎵 **Lyrics for "${songTitle}" by ${artist}**\n\n` +
+                `Lyrics are not currently available for this song.\n\n` +
+                `**To find lyrics, try:**\n` +
+                `• 🎤 Search on Genius: https://genius.com/search?q=${encodeURIComponent(searchQuery)}\n` +
+                `• 📝 Search on AZLyrics: https://www.azlyrics.com/lyrics/${encodeURIComponent(artist.toLowerCase())}/${encodeURIComponent(songTitle.toLowerCase())}.html\n` +
+                `• 🎧 Use Spotify or YouTube Music for synced lyrics\n` +
+                `• 📱 Check the official music video on YouTube\n\n` +
+                `💡 *Full lyrics integration would require API keys from Genius, Musixmatch, or similar services*`,
         source: 'Search Suggestions',
-        note: 'Full lyrics integration requires API keys from Genius, Musixmatch, or similar services'
+        note: 'Consider upgrading to premium music services for synced lyrics'
       };
     } catch (error) {
       console.error('Lyrics fetch error:', error);

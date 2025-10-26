@@ -1,0 +1,128 @@
+[
+  {
+    "message": "Initial balance: 1374",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.867Z"
+  },
+  {
+    "message": "Balance after add: 2374",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.867Z"
+  },
+  {
+    "message": "Transfer successful: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.868Z"
+  },
+  {
+    "message": "Balance after transfer: 1874, 968",
+    "success": false,
+    "timestamp": "2025-10-26T07:54:02.868Z"
+  },
+  {
+    "message": "Market price: 26",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.869Z"
+  },
+  {
+    "message": "Buy successful: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.869Z"
+  },
+  {
+    "message": "Sell successful: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.870Z"
+  },
+  {
+    "message": "Investment created: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.872Z"
+  },
+  {
+    "message": "Investments count: 2",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.872Z"
+  },
+  {
+    "message": "Warning issued: warn_1761465242872_t80n8tl22",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.873Z"
+  },
+  {
+    "message": "Mute issued: mute_1761465242873_4ivjref6m",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.873Z"
+  },
+  {
+    "message": "User is muted: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.874Z"
+  },
+  {
+    "message": "Auto mod triggered: false",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.874Z"
+  },
+  {
+    "message": "Auto mod spam detected: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.874Z"
+  },
+  {
+    "message": "User mod stats: warnings 2",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:02.874Z"
+  },
+  {
+    "message": "RPG test failed: Cannot read properties of null (reading 'name')",
+    "success": false,
+    "timestamp": "2025-10-26T07:54:02.875Z",
+    "error": "TypeError: Cannot read properties of null (reading 'name')\n    at ComprehensiveTestSuite.testRPG (file:///workspaces/test/comprehensive-tests.js:116:43)\n    at ComprehensiveTestSuite.runAllTests (file:///workspaces/test/comprehensive-tests.js:206:16)"
+  },
+  {
+    "message": "Search results: 3",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:04.186Z"
+  },
+  {
+    "message": "Queue length: 0",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:04.186Z"
+  },
+  {
+    "message": "Pause executed: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:04.186Z"
+  },
+  {
+    "message": "Stop executed: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:04.187Z"
+  },
+  {
+    "message": "RPG-Economy integration: Balance decreased by 26",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:04.188Z"
+  },
+  {
+    "message": "Inventory updated after purchase: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:04.188Z"
+  },
+  {
+    "message": "Invalid transfer rejected: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:04.189Z"
+  },
+  {
+    "message": "Insufficient funds rejected: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:04.189Z"
+  },
+  {
+    "message": "Invalid character handled: true",
+    "success": true,
+    "timestamp": "2025-10-26T07:54:04.189Z"
+  }
+]
