@@ -1367,12 +1367,15 @@ client.on('interactionCreate', async interaction => {
               color: embed.color,
               description: `**${nextSong.title}** by **${nextSong.artist}**`,
               fields: [
-                { name: '⏱️ Duration', value: nextSong.duration, inline: true },
+                { name: '⏱️ Duration', value: nextSong.duration || 'Unknown', inline: true },
                 { name: '👤 Requested by', value: embed.fields[2]?.value || 'Unknown', inline: true }
               ],
               thumbnail: nextSong.thumbnail || embed.thumbnail
             };
 
+            console.log('DEBUG: nextSong.duration:', nextSong.duration);
+            console.log('DEBUG: newEmbed.fields:', JSON.stringify(newEmbed.fields, null, 2));
+            console.log('DEBUG: interaction.id in music_skip:', interaction.id);
             await interaction.update({
               embeds: [newEmbed],
               components: interaction.message.components

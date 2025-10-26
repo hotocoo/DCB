@@ -6,7 +6,7 @@ const FILE = path.join(process.cwd(), 'data', 'novels.json');
 
 function ensureDir() { const dir = path.dirname(FILE); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); }
 
-function readAll() { ensureDir(); if (!fs.existsSync(FILE)) return {}; try { return JSON.parse(fs.readFileSync(FILE, 'utf8')) || {}; } catch { return {}; } }
+function readAll() { ensureDir(); if (!fs.existsSync(FILE)) return {}; try { return JSON.parse(fs.readFileSync(FILE, 'utf8')) || {}; } catch (error) { return {}; } }
 function writeAll(obj) { ensureDir(); fs.writeFileSync(FILE, JSON.stringify(obj, null, 2), 'utf8'); }
 
 export function listNovels() { return Object.keys(readAll()); }

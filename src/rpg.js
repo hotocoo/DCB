@@ -489,7 +489,7 @@ export function bossEncounter(lvl = 5) {
 function readQuests() {
   const p = path.join(process.cwd(), 'data', 'quests.json');
   if (!fs.existsSync(p)) return {};
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')) || {}; } catch { return {}; }
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')) || {}; } catch (error) { return {}; }
 }
 
 function writeQuests(q) {

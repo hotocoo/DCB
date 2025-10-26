@@ -1,4 +1,5 @@
 
+import { logger } from './logger.js';
 import 'dotenv/config';
 import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
 import ytdl from 'ytdl-core';
@@ -7,6 +8,7 @@ import yts from 'yt-search';
 import ffmpeg from 'ffmpeg-static';
 import { spawn } from 'child_process';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
+import { ready as sodiumReady } from 'libsodium-wrappers';
 
 // Enhanced Music System with Real Audio Streaming
 class MusicManager {
@@ -329,21 +331,35 @@ class MusicManager {
 
   // Enhanced playback with comprehensive error handling
   async playWithErrorHandling(guildId, voiceChannel, song, player, connection) {
+    logger.debug('Checking encryption packages in playWithErrorHandling');
+    try {
+      const sodiumModule = await import('sodium');
+      logger.debug(`Sodium available: ${!!sodiumModule.default}`);
+    } catch (e) {
+      logger.debug(`Sodium error: ${e.message}`);
+    }
+    try {
+      const tweetnaclModule = await import('tweetnacl');
+      logger.debug(`TweetNaCl available: ${!!tweetnaclModule.default}`);
+    } catch (e) {
+      logger.debug(`TweetNaCl error: ${e.message}`);
+    }
+    try {
+      await sodiumReady;
+      logger.debug('libsodium-wrappers loaded');
+    } catch (e) {
+      logger.debug(`libsodium-wrappers error: ${e.message}`);
+    }
+
     const currentVolume = this.getVolume(guildId) / 100;
 
     if (song.source === 'deezer') {
-      // For Deezer tracks, use preview URL
-      const streamUrl = song.preview;
-      if (!streamUrl) {
-        console.error(`[MUSIC] No preview URL available for Deezer track: ${song.title}`);
-        return {
-          success: false,
-          error: 'No preview available for this track. Deezer previews are 30 seconds long.',
-          errorType: 'no_preview'
-        };
-      }
+      // For Deezer tracks, use test audio URL for testing voice playback
+      // TODO: Replace with actual Deezer preview URL when testing is complete
+      const streamUrl = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+      logger.debug(`Stream URL for Deezer (TEST MODE): ${streamUrl}`);
 
-      console.log(`[MUSIC] Creating direct stream for Deezer preview: ${song.title}`);
+      console.log(`[MUSIC] Creating direct stream for Deezer test audio: ${song.title}`);
       try {
         const ffmpegProcess = spawn(ffmpeg, [
           '-i', streamUrl,
@@ -368,6 +384,7 @@ class MusicManager {
         });
 
         resource.volume.setVolume(currentVolume);
+        logger.debug(`About to play resource for Deezer song: ${song.title}`);
         player.play(resource);
 
         return { success: true };
@@ -376,12 +393,13 @@ class MusicManager {
         console.error(`[MUSIC] Deezer stream error for "${song.title}":`, streamError.message);
         return {
           success: false,
-          error: `Failed to play Deezer preview: ${streamError.message}`,
+          error: `Failed to play Deezer test audio: ${streamError.message}`,
           errorType: 'deezer_stream'
         };
       }
     } else if (ytdl.validateURL(song.url)) {
       console.log(`[MUSIC] Creating ytdl stream for YouTube URL: ${song.title}`);
+      logger.debug(`Stream URL for YouTube: ${song.url}`);
 
       try {
         const ytdlStream = ytdl(song.url, {
@@ -443,6 +461,7 @@ class MusicManager {
         });
 
         resource.volume.setVolume(currentVolume);
+        logger.debug(`About to play resource for YouTube song: ${song.title}`);
         player.play(resource);
 
         return { success: true };
@@ -458,6 +477,7 @@ class MusicManager {
     } else {
       // For direct stream URLs (like radio)
       console.log(`[MUSIC] Creating direct stream for URL: ${song.title}`);
+      logger.debug(`Stream URL for direct: ${song.url}`);
 
       try {
         const ffmpegProcess = spawn(ffmpeg, [
@@ -488,6 +508,7 @@ class MusicManager {
         });
 
         resource.volume.setVolume(currentVolume);
+        logger.debug(`About to play resource for direct song: ${song.title}`);
         player.play(resource);
 
         return { success: true };
@@ -616,6 +637,7 @@ class MusicManager {
       }
 
       // Set currently playing
+      console.log('DEBUG: song.duration in play:', song.duration);
       this.currentlyPlaying.set(guildId, {
         ...song,
         startedAt: Date.now(),
