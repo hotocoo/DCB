@@ -1,6 +1,21 @@
 node_modules/
 .env
 .env.backup
-# Ignore local env files
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+# Ignore all .env files except .env.template
 # Create a local .env (not committed) with your tokens and config
 # .env should contain DISCORD_TOKEN, CLIENT_ID, GUILD_ID, etc.
+
+# Security: Ignore common secret file patterns
+*.key
+*.pem
+*.p12
+*.pfx
+config/*.key
+secrets.json
+.secrets/
+# Ignore local env files
