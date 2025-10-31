@@ -1,11 +1,33 @@
-// Comprehensive Input Validation System
+/**
+ * Comprehensive Input Validation System for Discord Bot.
+ * Provides validation for various data types and command inputs with security measures.
+ */
+
+import { logger } from './logger.js';
+
+/**
+ * Configuration constants for validation.
+ */
+const DISCORD_ID_REGEX = /^\d{17,19}$/;
+const MAX_STRING_LENGTH = 1000;
+const MAX_USERNAME_LENGTH = 32;
+const MAX_GUILD_NAME_LENGTH = 20;
+const MAX_LOCATION_LENGTH = 50;
+const MAX_QUESTION_LENGTH = 200;
+const MAX_OPTION_LENGTH = 50;
+
 class InputValidator {
 
-  // String validation
+  /**
+   * Validates string input with various constraints.
+   * @param {string} input - The string to validate
+   * @param {object} options - Validation options
+   * @returns {object} Validation result with valid boolean and reason
+   */
   validateString(input, options = {}) {
     const {
       minLength = 0,
-      maxLength = 1000,
+      maxLength = MAX_STRING_LENGTH,
       allowedChars = null,
       blockedWords = [],
       required = false
@@ -24,13 +46,14 @@ class InputValidator {
     }
 
     if (input && allowedChars && !new RegExp(`^[${allowedChars}]+$`).test(input)) {
-      return { valid: false, reason: `Contains invalid characters` };
+      return { valid: false, reason: `Contains invalid characters. Allowed: ${allowedChars}` };
     }
 
     if (input && blockedWords.length > 0) {
       const lowerInput = input.toLowerCase();
       for (const word of blockedWords) {
         if (lowerInput.includes(word.toLowerCase())) {
+          logger.warn('Blocked word detected in input', { word: word.toLowerCase() });
           return { valid: false, reason: 'Contains inappropriate content' };
         }
       }
@@ -39,7 +62,12 @@ class InputValidator {
     return { valid: true };
   }
 
-  // Number validation
+  /**
+   * Validates number input with various constraints.
+   * @param {any} input - The value to validate as a number
+   * @param {object} options - Validation options
+   * @returns {object} Validation result with valid boolean, reason, and parsed value
+   */
   validateNumber(input, options = {}) {
     const {
       min = -Infinity,
@@ -77,11 +105,16 @@ class InputValidator {
     return { valid: true, value: num };
   }
 
-  // Username validation
+  /**
+   * Validates username with character constraints.
+   * @param {string} username - Username to validate
+   * @param {object} options - Validation options
+   * @returns {object} Validation result
+   */
   validateUsername(username, options = {}) {
     const {
       minLength = 2,
-      maxLength = 32,
+      maxLength = MAX_USERNAME_LENGTH,
       allowSpaces = false,
       allowSpecialChars = false
     } = options;
@@ -98,7 +131,11 @@ class InputValidator {
     });
   }
 
-  // Item name validation
+  /**
+   * Validates item name against allowed items list.
+   * @param {string} itemName - Item name to validate
+   * @returns {object} Validation result
+   */
   validateItemName(itemName) {
     const validItems = [
       'rusty_sword', 'iron_sword', 'magic_staff', 'legendary_blade',
@@ -108,17 +145,21 @@ class InputValidator {
     ];
 
     if (!validItems.includes(itemName)) {
-      return { valid: false, reason: 'Invalid item name' };
+      return { valid: false, reason: `Invalid item name. Valid items: ${validItems.join(', ')}` };
     }
 
     return { valid: true };
   }
 
-  // Guild name validation
+  /**
+   * Validates guild name with length and character constraints.
+   * @param {string} guildName - Guild name to validate
+   * @returns {object} Validation result
+   */
   validateGuildName(guildName) {
     return this.validateString(guildName, {
       minLength: 3,
-      maxLength: 20,
+      maxLength: MAX_GUILD_NAME_LENGTH,
       allowedChars: 'a-zA-Z0-9 ',
       required: true
     });
@@ -372,7 +413,11 @@ class InputValidator {
     return { valid: true };
   }
 
-  // Sanitize user input
+  /**
+   * Sanitizes user input to prevent XSS and other security issues.
+   * @param {any} input - Input to sanitize
+   * @returns {any} Sanitized input
+   */
   sanitizeInput(input) {
     if (typeof input !== 'string') return input;
 
@@ -381,29 +426,53 @@ class InputValidator {
       .replace(/[<>]/g, '') // Remove potential HTML tags
       .replace(/javascript:/gi, '') // Remove javascript: protocol
       .replace(/on\w+=/gi, '') // Remove event handlers
-      .slice(0, 1000); // Limit length
+      .replace(/[^\x20-\x7E]/g, '') // Remove non-printable characters
+      .slice(0, MAX_STRING_LENGTH); // Limit length
   }
 
-  // Validate Discord mentions and IDs
+  /**
+   * Validates Discord user ID format.
+   * @param {string} userId - User ID to validate
+   * @returns {object} Validation result
+   */
   validateUserId(userId) {
-    const discordIdRegex = /^\d{17,19}$/;
-    if (!discordIdRegex.test(userId)) {
+    if (!userId || typeof userId !== 'string') {
+      return { valid: false, reason: 'User ID must be a string' };
+    }
+
+    if (!DISCORD_ID_REGEX.test(userId)) {
       return { valid: false, reason: 'Invalid user ID format' };
     }
     return { valid: true };
   }
 
+  /**
+   * Validates Discord channel ID format.
+   * @param {string} channelId - Channel ID to validate
+   * @returns {object} Validation result
+   */
   validateChannelId(channelId) {
-    const discordIdRegex = /^\d{17,19}$/;
-    if (!discordIdRegex.test(channelId)) {
+    if (!channelId || typeof channelId !== 'string') {
+      return { valid: false, reason: 'Channel ID must be a string' };
+    }
+
+    if (!DISCORD_ID_REGEX.test(channelId)) {
       return { valid: false, reason: 'Invalid channel ID format' };
     }
     return { valid: true };
   }
 
+  /**
+   * Validates Discord role ID format.
+   * @param {string} roleId - Role ID to validate
+   * @returns {object} Validation result
+   */
   validateRoleId(roleId) {
-    const discordIdRegex = /^\d{17,19}$/;
-    if (!discordIdRegex.test(roleId)) {
+    if (!roleId || typeof roleId !== 'string') {
+      return { valid: false, reason: 'Role ID must be a string' };
+    }
+
+    if (!DISCORD_ID_REGEX.test(roleId)) {
       return { valid: false, reason: 'Invalid role ID format' };
     }
     return { valid: true };

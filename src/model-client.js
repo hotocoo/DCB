@@ -1,12 +1,25 @@
+/**
+ * Model client for AI-powered content generation.
+ * Supports local models and OpenAI API with fallback mechanisms.
+ */
+
 import 'dotenv/config';
 import { getGuild } from './storage.js';
+import { logger } from './logger.js';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 
+/**
+ * Configuration constants for model clients.
+ */
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const DEFAULT_LOCAL_URL = process.env.LOCAL_MODEL_URL;
 const DEFAULT_LOCAL_API = process.env.LOCAL_MODEL_API || 'openai-compatible';
 const OPENWEBUI_BASE = process.env.OPENWEBUI_BASE;
 const OPENWEBUI_PATH = process.env.OPENWEBUI_PATH || '/api/chat';
+
+// Request limits and timeouts
+const REQUEST_TIMEOUT_MS = 30000;
+const MAX_RESPONSE_LENGTH = 2000;
 
 // Rate limiters for external API calls
 const openAIRateLimiter = new RateLimiterMemory({
@@ -21,20 +34,32 @@ const localModelRateLimiter = new RateLimiterMemory({
   duration: 3600,
 });
 
+/**
+ * Calls a local AI model with the given prompt.
+ * @param {string} prompt - The prompt to send to the model
+ * @param {string} url - The model API URL
+ * @param {string} api - The API type ('openai-compatible', 'openwebui', or 'generic')
+ * @returns {Promise<string>} The model's response
+ */
 async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOCAL_API) {
-  if (!url) throw new Error('No local model URL configured');
+  if (!url) {
+    throw new Error('No local model URL configured');
+  }
 
   // Rate limiting for local model API
   try {
     await localModelRateLimiter.consume('local_model_api');
   } catch (rejRes) {
-    throw new Error(`Rate limit exceeded. Try again in ${Math.round(rejRes.msBeforeNext / 1000)} seconds.`);
+    const waitTime = Math.round(rejRes.msBeforeNext / 1000);
+    throw new Error(`Rate limit exceeded. Try again in ${waitTime} seconds.`);
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
+    logger.debug('Calling local model', { url, api, promptLength: prompt.length });
+
     if (api === 'openai-compatible') {
       const response = await fetch(`${url.replace(/\/$/, '')}/v1/chat/completions`, {
         method: 'POST',
@@ -59,10 +84,13 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
       }
 
       const data = await response.json();
-      return data.choices?.[0]?.message?.content ??
-             data.result ??
-             data.response ??
-             'No response generated from local model';
+      const content = data.choices?.[0]?.message?.content ??
+                     data.result ??
+                     data.response ??
+                     'No response generated from local model';
+
+      logger.debug('Local model response received', { contentLength: content.length });
+      return content;
     }
 
     if (api === 'openwebui') {
@@ -82,7 +110,9 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
       }
 
       const data = await response.json();
-      return data.response ?? data.output ?? data.result ?? 'No response from OpenWebUI';
+      const content = data.response ?? data.output ?? data.result ?? 'No response from OpenWebUI';
+      logger.debug('OpenWebUI response received', { contentLength: content.length });
+      return content;
     }
 
     // Generic endpoint fallback
@@ -104,34 +134,46 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
     }
 
     const data = await response.json();
-    return data.result ?? data.output ?? data.response ?? data.text ?? 'No response from generic API';
+    const content = data.result ?? data.output ?? data.response ?? data.text ?? 'No response from generic API';
+    logger.debug('Generic API response received', { contentLength: content.length });
+    return content;
 
   } catch (err) {
     clearTimeout(timeoutId);
 
     if (err.name === 'AbortError') {
-      throw new Error('Local model request timed out after 30 seconds');
+      throw new Error(`Local model request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds`);
     }
 
-    console.error('Local model error:', err.message);
+    logger.error('Local model error', err);
     throw new Error(`Local model connection failed: ${err.message}`);
   }
 }
 
+/**
+ * Calls OpenAI API with the given messages.
+ * @param {Array} messages - Array of message objects with role and content
+ * @returns {Promise<string>} The AI response
+ */
 async function callOpenAI(messages) {
-  if (!OPENAI_KEY) throw new Error('OpenAI API key not configured');
+  if (!OPENAI_KEY) {
+    throw new Error('OpenAI API key not configured');
+  }
 
   // Rate limiting for OpenAI API
   try {
     await openAIRateLimiter.consume('openai_api');
   } catch (rejRes) {
-    throw new Error(`Rate limit exceeded. Try again in ${Math.round(rejRes.msBeforeNext / 1000)} seconds.`);
+    const waitTime = Math.round(rejRes.msBeforeNext / 1000);
+    throw new Error(`Rate limit exceeded. Try again in ${waitTime} seconds.`);
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
+    logger.debug('Calling OpenAI API', { messageCount: messages.length });
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -157,35 +199,50 @@ async function callOpenAI(messages) {
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content?.trim() ?? 'No response generated';
+    const content = data.choices?.[0]?.message?.content?.trim() ?? 'No response generated';
+
+    logger.debug('OpenAI response received', { contentLength: content.length });
+    return content.slice(0, MAX_RESPONSE_LENGTH); // Limit response length
 
   } catch (err) {
     clearTimeout(timeoutId);
 
     if (err.name === 'AbortError') {
-      throw new Error('OpenAI request timed out after 30 seconds');
+      throw new Error(`OpenAI request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds`);
     }
 
-    console.error('OpenAI API error:', err.message);
+    logger.error('OpenAI API error', err);
     throw new Error(`OpenAI connection failed: ${err.message}`);
   }
 }
 
+/**
+ * Generates AI content using available models with fallback mechanisms.
+ * @param {string} guildId - Guild ID for configuration lookup
+ * @param {string} prompt - The prompt to generate content for
+ * @returns {Promise<string>} Generated content
+ */
 export async function generate(guildId, prompt) {
+  if (!prompt || typeof prompt !== 'string') {
+    throw new Error('Invalid prompt provided');
+  }
+
   const guildCfg = guildId ? getGuild(guildId) : null;
   const url = guildCfg?.modelUrl || DEFAULT_LOCAL_URL;
   const api = guildCfg?.modelApi || DEFAULT_LOCAL_API;
+
+  logger.debug('Generating content', { guildId, promptLength: prompt.length, url, api });
 
   // Try local model first if configured
   if (url) {
     try {
       const response = await callLocalModel(prompt, url, api);
       if (response && response.length > 0) {
-        console.log('Local model response generated successfully');
+        logger.info('Local model response generated successfully');
         return response;
       }
     } catch (err) {
-      console.warn('Local model failed, trying OpenAI fallback:', err.message);
+      logger.warn('Local model failed, trying OpenAI fallback', err);
     }
   }
 
@@ -205,11 +262,11 @@ export async function generate(guildId, prompt) {
 
       const response = await callOpenAI(messages);
       if (response && response.length > 0) {
-        console.log('OpenAI response generated successfully');
+        logger.info('OpenAI response generated successfully');
         return response;
       }
     } catch (err) {
-      console.error('OpenAI fallback failed:', err.message);
+      logger.error('OpenAI fallback failed', err);
     }
   }
 
@@ -224,6 +281,6 @@ export async function generate(guildId, prompt) {
   ];
 
   const fallback = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-  console.log('Using fallback response for RPG generation');
+  logger.info('Using fallback response for content generation');
   return fallback;
 }

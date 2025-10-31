@@ -768,6 +768,13 @@ class MusicManager {
 
   // Enhanced playback with comprehensive error handling
   async playWithErrorHandling(guildId, voiceChannel, song, player, connection) {
+    logger.debug('Starting playWithErrorHandling', {
+      guildId,
+      songTitle: song.title,
+      songSource: song.source,
+      songUrl: song.url
+    });
+
     logger.debug('Checking encryption packages in playWithErrorHandling');
     try {
       const sodiumModule = await import('sodium');
@@ -789,14 +796,26 @@ class MusicManager {
     }
 
     const currentVolume = this.getVolume(guildId) / 100;
+    logger.debug('Current volume for playback', { guildId, volume: currentVolume });
 
     if (song.source === 'spotify') {
       // For Spotify tracks, use preview URL if available
       console.log(`[MUSIC] Creating Spotify stream for: ${song.title}`);
+      logger.debug('Creating Spotify stream', {
+        guildId,
+        songTitle: song.title,
+        hasPreview: !!song.preview,
+        previewUrl: song.preview
+      });
 
       try {
         if (song.preview) {
           // Use Spotify preview URL (30-second clip)
+          logger.debug('Spawning FFmpeg for Spotify preview', {
+            guildId,
+            songTitle: song.title,
+            previewUrl: song.preview
+          });
           const ffmpegProcess = spawn(ffmpeg, [
             '-hide_banner',
             '-loglevel', 'error',
@@ -814,10 +833,20 @@ class MusicManager {
           ffmpegProcess.stderr.on('data', (data) => {
             const errorMsg = data.toString();
             console.error(`[MUSIC] FFmpeg Spotify stderr for "${song.title}": ${errorMsg}`);
+            logger.warn('FFmpeg Spotify stderr', {
+              guildId,
+              songTitle: song.title,
+              error: errorMsg
+            });
           });
 
           ffmpegProcess.on('close', (code) => {
             console.log(`[MUSIC] FFmpeg Spotify process exited with code ${code} for "${song.title}"`);
+            logger.info('FFmpeg Spotify process exited', {
+              guildId,
+              songTitle: song.title,
+              exitCode: code
+            });
           });
 
           const resource = createAudioResource(ffmpegProcess.stdout, {
@@ -833,15 +862,31 @@ class MusicManager {
         } else {
           // No preview available, try to find YouTube version as fallback
           console.log(`[MUSIC] No Spotify preview available for "${song.title}", attempting YouTube fallback`);
+          logger.info('No Spotify preview, attempting YouTube fallback', {
+            guildId,
+            songTitle: song.title,
+            artist: song.artist
+          });
           const fallbackQuery = `${song.title} ${song.artist}`;
           const fallbackResults = await this.searchSongs(fallbackQuery, 1);
 
           if (fallbackResults.length > 0 && fallbackResults[0].source === 'youtube') {
             const youtubeSong = fallbackResults[0];
             youtubeSong.isFallback = true;
+            logger.info('Using YouTube fallback for Spotify song', {
+              guildId,
+              originalSong: song.title,
+              fallbackSong: youtubeSong.title,
+              fallbackUrl: youtubeSong.url
+            });
             return this.playWithErrorHandling(guildId, voiceChannel, youtubeSong, player, connection);
           }
 
+          logger.error('No YouTube fallback available for Spotify song', {
+            guildId,
+            songTitle: song.title,
+            fallbackResultsCount: fallbackResults.length
+          });
           return {
             success: false,
             error: 'No preview available for this Spotify track',
@@ -850,6 +895,12 @@ class MusicManager {
         }
       } catch (streamError) {
         console.error(`[MUSIC] Spotify stream error for "${song.title}":`, streamError.message);
+        logger.error('Spotify stream creation failed', {
+          guildId,
+          songTitle: song.title,
+          error: streamError.message,
+          stack: streamError.stack
+        });
         return {
           success: false,
           error: `Failed to play Spotify track: ${streamError.message}`,
@@ -857,13 +908,35 @@ class MusicManager {
         };
       }
     } else if (song.source === 'deezer') {
-      // For Deezer tracks, use test audio URL for testing voice playback (legacy)
-      const streamUrl = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
-      logger.debug(`Stream URL for Deezer (TEST MODE): ${streamUrl}`);
+      // For Deezer tracks, try to use preview URL if available, fallback to test audio
+      let streamUrl;
+      if (song.preview) {
+        streamUrl = song.preview;
+        logger.debug(`Using Deezer preview URL: ${streamUrl}`, {
+          guildId,
+          songTitle: song.title
+        });
+      } else {
+        streamUrl = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+        logger.debug(`Stream URL for Deezer (TEST MODE - no preview): ${streamUrl}`, {
+          guildId,
+          songTitle: song.title
+        });
+        logger.warn('Using test audio URL for Deezer (no preview available)', {
+          guildId,
+          songTitle: song.title,
+          streamUrl
+        });
+      }
 
-      console.log(`[MUSIC] Creating direct stream for Deezer test audio: ${song.title}`);
+      console.log(`[MUSIC] Creating direct stream for Deezer: ${song.title}`);
       try {
-        const ffmpegProcess = spawn(ffmpeg, [
+        logger.debug('Spawning FFmpeg for Deezer test audio', {
+          guildId,
+          songTitle: song.title,
+          streamUrl
+        });
+        const ffmpegArgs = [
           '-hide_banner',
           '-loglevel', 'error',
           '-reconnect', '1',
@@ -875,15 +948,34 @@ class MusicManager {
           '-ar', '48000',
           '-ac', '2',
           'pipe:1'
-        ]);
+        ];
+
+        logger.debug('Spawning FFmpeg for Deezer with args', {
+          guildId,
+          songTitle: song.title,
+          streamUrl,
+          ffmpegArgs
+        });
+
+        const ffmpegProcess = spawn(ffmpeg, ffmpegArgs);
 
         ffmpegProcess.stderr.on('data', (data) => {
           const errorMsg = data.toString();
           console.error(`[MUSIC] FFmpeg Deezer stderr for "${song.title}": ${errorMsg}`);
+          logger.warn('FFmpeg Deezer stderr', {
+            guildId,
+            songTitle: song.title,
+            error: errorMsg
+          });
         });
 
         ffmpegProcess.on('close', (code) => {
           console.log(`[MUSIC] FFmpeg Deezer process exited with code ${code} for "${song.title}"`);
+          logger.info('FFmpeg Deezer process exited', {
+            guildId,
+            songTitle: song.title,
+            exitCode: code
+          });
         });
 
         const resource = createAudioResource(ffmpegProcess.stdout, {
@@ -899,17 +991,52 @@ class MusicManager {
 
       } catch (streamError) {
         console.error(`[MUSIC] Deezer stream error for "${song.title}":`, streamError.message);
+        logger.error('Deezer stream creation failed', {
+          guildId,
+          songTitle: song.title,
+          error: streamError.message,
+          stack: streamError.stack,
+          streamUrl,
+          ffmpegPath: ffmpeg
+        });
+
+        // If preview URL failed, try fallback to test audio
+        if (song.preview && streamUrl === song.preview) {
+          logger.info('Deezer preview failed, trying fallback test audio', {
+            guildId,
+            songTitle: song.title
+          });
+          const fallbackSong = { ...song, preview: null };
+          return this.playWithErrorHandling(guildId, voiceChannel, fallbackSong, player, connection);
+        }
+
         return {
           success: false,
-          error: `Failed to play Deezer test audio: ${streamError.message}`,
+          error: `Failed to play Deezer track: ${streamError.message}`,
           errorType: 'deezer_stream'
         };
       }
     } else if (ytdl.validateURL(song.url)) {
       console.log(`[MUSIC] Creating ytdl stream for YouTube URL: ${song.title}`);
       logger.debug(`Stream URL for YouTube: ${song.url}`);
+      logger.info('Starting YouTube stream creation', {
+        guildId,
+        songTitle: song.title,
+        songUrl: song.url
+      });
 
       try {
+        logger.debug('Creating ytdl stream', {
+          guildId,
+          songTitle: song.title,
+          options: {
+            filter: 'audioonly',
+            highWaterMark: 1 << 62,
+            dlChunkSize: 0,
+            bitrate: 128,
+            quality: 'lowestaudio'
+          }
+        });
         const ytdlStream = ytdl(song.url, {
           filter: 'audioonly',
           highWaterMark: 1 << 62,
@@ -922,10 +1049,39 @@ class MusicManager {
         let streamError = null;
         ytdlStream.on('error', (error) => {
           console.error(`[MUSIC] YTDL stream error for "${song.title}":`, error);
+          logger.error('YTDL stream error', {
+            guildId,
+            songTitle: song.title,
+            error: error.message,
+            stack: error.stack
+          });
           streamError = error;
         });
 
+        ytdlStream.on('info', (info) => {
+          logger.debug('YTDL stream info received', {
+            guildId,
+            songTitle: song.title,
+            videoId: info.videoDetails.videoId,
+            duration: info.videoDetails.lengthSeconds
+          });
+        });
+
         // Transcode to Opus using ffmpeg
+        logger.debug('Spawning FFmpeg for YouTube audio transcoding', {
+          guildId,
+          songTitle: song.title,
+          ffmpegArgs: [
+            '-hide_banner',
+            '-loglevel', 'error',
+            '-analyzeduration', '0',
+            '-i', 'pipe:0',
+            '-f', 's16le',
+            '-ar', '48000',
+            '-ac', '2',
+            'pipe:1'
+          ]
+        });
         const ffmpegProcess = spawn(ffmpeg, [
           '-hide_banner',
           '-loglevel', 'error',
@@ -945,25 +1101,107 @@ class MusicManager {
           // Check for specific error patterns
           if (errorMsg.includes('410') || errorMsg.includes('404') || errorMsg.includes('Video unavailable')) {
             console.error(`[MUSIC] Video became unavailable during playback: ${song.title}`);
+            logger.error('Video became unavailable during playback', {
+              guildId,
+              songTitle: song.title,
+              errorMsg
+            });
+          } else if (errorMsg.includes('No such file or directory')) {
+            logger.error('FFmpeg binary not found', {
+              guildId,
+              songTitle: song.title,
+              ffmpegPath: ffmpeg,
+              errorMsg
+            });
+          } else if (errorMsg.includes('Permission denied')) {
+            logger.error('FFmpeg permission denied', {
+              guildId,
+              songTitle: song.title,
+              ffmpegPath: ffmpeg,
+              errorMsg
+            });
+          } else {
+            logger.warn('FFmpeg stderr output', {
+              guildId,
+              songTitle: song.title,
+              errorMsg
+            });
           }
         });
 
         ffmpegProcess.on('error', (error) => {
           console.error(`[MUSIC] FFmpeg process error for "${song.title}":`, error);
+          logger.error('FFmpeg process error', {
+            guildId,
+            songTitle: song.title,
+            error: error.message,
+            stack: error.stack,
+            ffmpegPath: ffmpeg,
+            ffmpegExists: require('fs').existsSync(ffmpeg),
+            errorCode: error.code
+          });
           streamError = error;
         });
 
         ffmpegProcess.on('close', (code) => {
           console.log(`[MUSIC] FFmpeg process exited with code ${code} for "${song.title}"`);
+          logger.info('FFmpeg process exited', {
+            guildId,
+            songTitle: song.title,
+            exitCode: code,
+            hadError: !!streamError
+          });
           if (code !== 0 && streamError) {
             console.error(`[MUSIC] FFmpeg failed for "${song.title}":`, streamError.message);
           }
         });
 
         // Pipe ytdl stream to ffmpeg
+        logger.debug('Piping ytdl stream to ffmpeg', {
+          guildId,
+          songTitle: song.title
+        });
         ytdlStream.pipe(ffmpegProcess.stdin);
+
+        // Handle ytdl stream events
+        ytdlStream.on('error', (err) => {
+          console.error(`[MUSIC] YTDL stream error during piping for "${song.title}":`, err);
+          logger.error('YTDL stream error during piping', {
+            guildId,
+            songTitle: song.title,
+            error: err.message
+          });
+        });
+
         ffmpegProcess.stdin.on('error', (err) => {
           console.error(`[MUSIC] FFmpeg stdin error for "${song.title}":`, err);
+          logger.error('FFmpeg stdin pipe error', {
+            guildId,
+            songTitle: song.title,
+            error: err.message,
+            ffmpegPath: ffmpeg
+          });
+        });
+
+        // Handle successful piping
+        ffmpegProcess.stdin.on('finish', () => {
+          logger.debug('Successfully piped ytdl stream to ffmpeg', {
+            guildId,
+            songTitle: song.title
+          });
+        });
+
+        // Monitor stream flow
+        let bytesReceived = 0;
+        ytdlStream.on('data', (chunk) => {
+          bytesReceived += chunk.length;
+          if (bytesReceived % (1024 * 1024) === 0) { // Log every 1MB
+            logger.debug('YTDL stream progress', {
+              guildId,
+              songTitle: song.title,
+              bytesReceived: `${(bytesReceived / (1024 * 1024)).toFixed(2)}MB`
+            });
+          }
         });
 
         const resource = createAudioResource(ffmpegProcess.stdout, {
@@ -973,12 +1211,36 @@ class MusicManager {
 
         resource.volume.setVolume(currentVolume);
         logger.debug(`About to play resource for YouTube song: ${song.title}`);
+        logger.info('Starting YouTube audio playback', {
+          guildId,
+          songTitle: song.title,
+          volume: currentVolume
+        });
         player.play(resource);
 
         return { success: true };
 
       } catch (streamError) {
         console.error(`[MUSIC] Stream creation error for "${song.title}":`, streamError.message);
+        logger.error('YouTube stream creation failed', {
+          guildId,
+          songTitle: song.title,
+          error: streamError.message,
+          stack: streamError.stack,
+          ffmpegPath: ffmpeg,
+          ffmpegAccessible: require('fs').existsSync(ffmpeg)
+        });
+
+        // Check if it's an FFmpeg issue
+        if (streamError.message.includes('spawn') || streamError.message.includes('ENOENT')) {
+          logger.error('FFmpeg spawn/access issue detected', {
+            guildId,
+            songTitle: song.title,
+            ffmpegPath: ffmpeg,
+            errorCode: streamError.code
+          });
+        }
+
         return {
           success: false,
           error: `Failed to create audio stream: ${streamError.message}`,
@@ -989,9 +1251,26 @@ class MusicManager {
       // For direct stream URLs (like radio)
       console.log(`[MUSIC] Creating direct stream for URL: ${song.title}`);
       logger.debug(`Stream URL for direct: ${song.url}`);
+      logger.info('Starting direct stream creation', {
+        guildId,
+        songTitle: song.title,
+        songUrl: song.url
+      });
 
       try {
-        const ffmpegProcess = spawn(ffmpeg, [
+        // Use alternative FFmpeg arguments if this is a retry attempt
+        const useAlternativeArgs = song.retryAttempted;
+        const ffmpegArgs = useAlternativeArgs ? [
+          '-hide_banner',
+          '-loglevel', 'error',
+          '-reconnect', '1',
+          '-reconnect_streamed', '1',
+          '-reconnect_delay_max', '5',
+          '-i', song.url,
+          '-c:a', 'libmp3lame',
+          '-f', 'mp3',
+          'pipe:1'
+        ] : [
           '-hide_banner',
           '-loglevel', 'error',
           '-reconnect', '1',
@@ -1003,7 +1282,17 @@ class MusicManager {
           '-ar', '48000',
           '-ac', '2',
           'pipe:1'
-        ]);
+        ];
+
+        logger.debug('Spawning FFmpeg for direct stream', {
+          guildId,
+          songTitle: song.title,
+          streamUrl: song.url,
+          useAlternativeArgs,
+          ffmpegArgs
+        });
+
+        const ffmpegProcess = spawn(ffmpeg, ffmpegArgs);
 
         ffmpegProcess.stderr.on('data', (data) => {
           const errorMsg = data.toString();
@@ -1012,11 +1301,27 @@ class MusicManager {
           // Check for specific error patterns
           if (errorMsg.includes('410') || errorMsg.includes('404') || errorMsg.includes('unavailable')) {
             console.error(`[MUSIC] Direct stream became unavailable: ${song.title}`);
+            logger.error('Direct stream became unavailable', {
+              guildId,
+              songTitle: song.title,
+              errorMsg
+            });
+          } else {
+            logger.warn('FFmpeg direct stderr', {
+              guildId,
+              songTitle: song.title,
+              errorMsg
+            });
           }
         });
 
         ffmpegProcess.on('close', (code) => {
           console.log(`[MUSIC] FFmpeg direct process exited with code ${code} for "${song.title}"`);
+          logger.info('FFmpeg direct process exited', {
+            guildId,
+            songTitle: song.title,
+            exitCode: code
+          });
         });
 
         const resource = createAudioResource(ffmpegProcess.stdout, {
@@ -1026,12 +1331,36 @@ class MusicManager {
 
         resource.volume.setVolume(currentVolume);
         logger.debug(`About to play resource for direct song: ${song.title}`);
+        logger.info('Starting direct stream playback', {
+          guildId,
+          songTitle: song.title,
+          volume: currentVolume
+        });
         player.play(resource);
 
         return { success: true };
 
       } catch (streamError) {
         console.error(`[MUSIC] Direct stream error for "${song.title}":`, streamError.message);
+        logger.error('Direct stream creation failed', {
+          guildId,
+          songTitle: song.title,
+          error: streamError.message,
+          stack: streamError.stack,
+          streamUrl: song.url,
+          ffmpegPath: ffmpeg
+        });
+
+        // For direct streams, try alternative FFmpeg arguments if the first attempt fails
+        if (!song.retryAttempted) {
+          logger.info('Attempting direct stream with alternative FFmpeg arguments', {
+            guildId,
+            songTitle: song.title
+          });
+          const retrySong = { ...song, retryAttempted: true };
+          return this.playWithErrorHandling(guildId, voiceChannel, retrySong, player, connection);
+        }
+
         return {
           success: false,
           error: `Failed to play stream: ${streamError.message}`,
@@ -1044,11 +1373,24 @@ class MusicManager {
   // Real Music Playback with Voice Integration
   async play(guildId, voiceChannel, song) {
     console.log(`[MUSIC] Starting play for guild ${guildId}, song: ${song.title}`);
+    logger.debug('Play initiated', {
+      guildId,
+      songTitle: song.title,
+      songSource: song.source,
+      songUrl: song.url,
+      voiceChannelId: voiceChannel?.id,
+      voiceChannelName: voiceChannel?.name
+    });
     try {
       // Check if already connected to a voice channel
       const existingConnection = getVoiceConnection(guildId);
       let connection = existingConnection;
       console.log(`[MUSIC] Existing connection: ${connection ? connection.state.status : 'none'}`);
+      logger.debug('Voice connection status', {
+        guildId,
+        existingConnection: !!existingConnection,
+        connectionState: existingConnection?.state?.status || 'none'
+      });
 
       if (!connection || connection.state.status === 'disconnected' || connection.state.status === 'destroyed') {
         console.log(`[MUSIC] Joining voice channel: ${voiceChannel.name}`);
@@ -1076,8 +1418,18 @@ class MusicManager {
       // Ensure connection stability
       if (!this.ensureConnectionStability(guildId)) {
         console.log(`[MUSIC] Connection unstable, attempting reconnection`);
+        logger.warn('Connection instability detected, attempting reconnection', {
+          guildId,
+          voiceChannelId: voiceChannel.id,
+          voiceChannelName: voiceChannel.name
+        });
         connection = await this.reconnectToVoice(guildId, voiceChannel);
         if (!connection) {
+          logger.error('Failed to establish stable voice connection', {
+            guildId,
+            voiceChannelId: voiceChannel.id,
+            voiceChannelName: voiceChannel.name
+          });
           return {
             success: false,
             error: 'Failed to establish stable voice connection',
@@ -1089,33 +1441,64 @@ class MusicManager {
       // Create audio player if not exists
       let player = this.audioPlayers.get(guildId);
       if (!player) {
+        logger.debug('Creating new audio player', { guildId });
         player = createAudioPlayer({ behaviors: { noSubscriber: NoSubscriberBehavior.Play } });
         this.audioPlayers.set(guildId, player);
 
         connection.on('stateChange', (oldState, newState) => {
           console.log(`[MUSIC] Connection state change: ${oldState.status} -> ${newState.status}`);
+          logger.info('Voice connection state change', {
+            guildId,
+            oldState: oldState.status,
+            newState: newState.status
+          });
         });
 
         player.on(AudioPlayerStatus.Idle, () => {
           console.log(`[MUSIC] Player idle for guild ${guildId}, playing next song`);
+          logger.debug('Audio player idle, playing next song', { guildId });
           this.playNext(guildId);
         });
 
         player.on(AudioPlayerStatus.Playing, () => {
           console.log(`[MUSIC] Audio player is playing for guild ${guildId}`);
+          logger.debug('Audio player started playing', { guildId });
+        });
+
+        player.on(AudioPlayerStatus.Buffering, () => {
+          logger.debug('Audio player buffering', { guildId });
+        });
+
+        player.on(AudioPlayerStatus.AutoPaused, () => {
+          logger.warn('Audio player auto-paused', { guildId });
         });
 
         player.on('error', error => {
           console.error(`[MUSIC] Audio player error for guild ${guildId}:`, error);
+          logger.error('Audio player error', {
+            guildId,
+            error: error.message,
+            resource: error.resource?.playbackDuration,
+            stack: error.stack
+          });
           this.handlePlaybackError(guildId, error);
         });
 
         // Subscribe to connection
+        logger.debug('Subscribing audio player to voice connection', { guildId });
         connection.subscribe(player);
       }
 
       // Ensure subscription before each playback attempt (handles reconnections)
-      try { connection.subscribe(player); } catch (_) {}
+      try {
+        connection.subscribe(player);
+        logger.debug('Ensured audio player subscription', { guildId });
+      } catch (subscriptionError) {
+        logger.error('Failed to subscribe audio player to connection', {
+          guildId,
+          error: subscriptionError.message
+        });
+      }
 
       // Store voice channel info
       this.voiceChannels.set(guildId, {
@@ -1125,19 +1508,48 @@ class MusicManager {
       });
 
       // Validate song URL before attempting playback
+      logger.debug('Validating song URL before playback', {
+        guildId,
+        songTitle: song.title,
+        songUrl: song.url,
+        songSource: song.source
+      });
       const validation = await this.validateSongUrl(song);
       if (!validation.valid) {
         console.error(`[MUSIC] Song validation failed for "${song.title}": ${validation.error}`);
+        logger.error('Song validation failed', {
+          guildId,
+          songTitle: song.title,
+          songUrl: song.url,
+          songSource: song.source,
+          validationError: validation.error,
+          canFallback: validation.canFallback
+        });
 
         if (validation.canFallback) {
           // Try fallback search
           try {
             const fallbackQuery = song.title + ' ' + song.artist;
+            logger.debug('Attempting fallback search', {
+              guildId,
+              originalSong: song.title,
+              fallbackQuery
+            });
             const fallbackResults = await this.searchSongs(fallbackQuery, 1);
             if (fallbackResults.length > 0 && !fallbackResults[0].isFallback) {
               console.log(`[MUSIC] Using fallback song: ${fallbackResults[0].title}`);
+              logger.info('Using fallback song', {
+                guildId,
+                originalSong: song.title,
+                fallbackSong: fallbackResults[0].title,
+                fallbackUrl: fallbackResults[0].url
+              });
               song = fallbackResults[0];
             } else {
+              logger.error('No suitable fallback found', {
+                guildId,
+                fallbackResultsCount: fallbackResults.length
+              });
               return {
                 success: false,
                 error: `Video unavailable and no suitable fallback found. Original error: ${validation.error}`,
@@ -1146,6 +1558,11 @@ class MusicManager {
             }
           } catch (fallbackError) {
             console.error('[MUSIC] Fallback search failed:', fallbackError.message);
+            logger.error('Fallback search failed', {
+              guildId,
+              fallbackError: fallbackError.message,
+              originalValidationError: validation.error
+            });
             return {
               success: false,
               error: `Video unavailable: ${validation.error}`,
@@ -1153,12 +1570,23 @@ class MusicManager {
             };
           }
         } else {
+          logger.error('Song validation failed with no fallback possible', {
+            guildId,
+            songTitle: song.title,
+            validationError: validation.error
+          });
           return {
             success: false,
             error: `Video unavailable: ${validation.error}`,
             errorType: 'validation_failed'
           };
         }
+      } else {
+        logger.debug('Song validation successful', {
+          guildId,
+          songTitle: song.title,
+          hasPreview: validation.hasPreview
+        });
       }
 
       // Set currently playing
@@ -1180,18 +1608,44 @@ class MusicManager {
       this.musicSettings.set(guildId, settings);
 
       // Attempt playback with enhanced error handling
+      logger.debug('Attempting playback with error handling', {
+        guildId,
+        songTitle: song.title,
+        songUrl: song.url,
+        songSource: song.source
+      });
       const playResult = await this.playWithErrorHandling(guildId, voiceChannel, song, player, connection);
 
       if (playResult.success) {
         console.log(`[MUSIC] Play successful for guild ${guildId}, song: ${song.title}`);
+        logger.info('Playback successful', {
+          guildId,
+          songTitle: song.title,
+          songSource: song.source,
+          audioPlayerStatus: player.state.status,
+          voiceConnectionState: connection.state.status
+        });
         return { success: true, song };
       } else {
         // Handle playback failure
+        logger.error('Playback failed in playWithErrorHandling', {
+          guildId,
+          songTitle: song.title,
+          error: playResult.error,
+          errorType: playResult.errorType
+        });
         return this.handlePlaybackError(guildId, new Error(playResult.error), playResult.errorType);
       }
 
     } catch (error) {
       console.error(`[MUSIC] Play music error for guild ${guildId}:`, error);
+      logger.error('Unexpected error in play method', {
+        guildId,
+        songTitle: song.title,
+        error: error.message,
+        stack: error.stack,
+        voiceConnectionState: getVoiceConnection(guildId)?.state?.status || 'unknown'
+      });
       return this.handlePlaybackError(guildId, error);
     }
   }
@@ -1199,6 +1653,13 @@ class MusicManager {
   // Enhanced error handling and recovery
   handlePlaybackError(guildId, error, errorType = 'unknown') {
     console.error(`[MUSIC] Handling playback error for guild ${guildId}:`, error.message);
+    logger.error('Handling playback error', {
+      guildId,
+      error: error.message,
+      errorType,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
 
     // Log detailed error information
     const errorDetails = {
@@ -1208,15 +1669,50 @@ class MusicManager {
       timestamp: new Date().toISOString(),
       connectionStatus: getVoiceConnection(guildId)?.state?.status || 'no_connection',
       queueLength: this.getQueue(guildId).length,
-      currentlyPlaying: this.currentlyPlaying.get(guildId)?.title || 'none'
+      currentlyPlaying: this.currentlyPlaying.get(guildId)?.title || 'none',
+      audioPlayerStatus: this.audioPlayers.get(guildId)?.state?.status || 'no_player'
     };
 
     console.error(`[MUSIC] Error details:`, JSON.stringify(errorDetails, null, 2));
+    logger.error('Detailed playback error information', errorDetails);
+
+    // Attempt to recover from FFmpeg issues
+    if (error.message.includes('spawn') || error.message.includes('ENOENT') || errorType === 'stream_creation') {
+      logger.warn('FFmpeg-related error detected, attempting recovery', {
+        guildId,
+        errorType,
+        ffmpegPath: ffmpeg
+      });
+
+      // Try to restart the player and connection
+      const player = this.audioPlayers.get(guildId);
+      const connection = getVoiceConnection(guildId);
+
+      if (player && connection) {
+        try {
+          // Reset player state
+          player.stop(true);
+          // Re-subscribe connection
+          connection.subscribe(player);
+          logger.info('Player and connection reset for recovery', { guildId });
+        } catch (resetError) {
+          logger.error('Failed to reset player/connection', {
+            guildId,
+            resetError: resetError.message
+          });
+        }
+      }
+    }
 
     // Check if we should skip to next song
     const queue = this.getQueue(guildId);
     if (queue.length > 0) {
       console.log(`[MUSIC] Skipping to next song in queue due to error`);
+      logger.info('Skipping to next song due to playback error', {
+        guildId,
+        errorType,
+        queueLength: queue.length
+      });
       // The player's error event handler will trigger playNext automatically
       return {
         success: false,
@@ -1225,6 +1721,10 @@ class MusicManager {
       };
     } else {
       console.log(`[MUSIC] No songs in queue, stopping playback`);
+      logger.info('Stopping playback due to error with no queue', {
+        guildId,
+        errorType
+      });
       this.stop(guildId);
       return {
         success: false,
@@ -1239,47 +1739,77 @@ class MusicManager {
     const connection = getVoiceConnection(guildId);
     if (!connection) {
       console.log(`[MUSIC] No voice connection found for guild ${guildId}`);
+      logger.warn('No voice connection found', { guildId });
       return false;
     }
 
     const connectionState = connection.state.status;
     console.log(`[MUSIC] Connection status for guild ${guildId}: ${connectionState}`);
+    logger.debug('Voice connection stability check', {
+      guildId,
+      connectionState,
+      connectionDestroyed: connection.state.status === 'destroyed',
+      connectionDisconnected: connection.state.status === 'disconnected'
+    });
 
     // Check if connection is in a problematic state
     if (connectionState === 'disconnected' || connectionState === 'destroyed') {
       console.log(`[MUSIC] Connection is ${connectionState}, attempting recovery`);
+      logger.warn('Voice connection in problematic state', {
+        guildId,
+        connectionState,
+        needsRecovery: true
+      });
       return false;
     }
 
     // Check if connection is ready
     if (connectionState === 'ready') {
       console.log(`[MUSIC] Connection is stable for guild ${guildId}`);
+      logger.debug('Voice connection is stable', { guildId });
       return true;
     }
 
     // For connecting state, wait a bit and check again
     if (connectionState === 'connecting') {
       console.log(`[MUSIC] Connection is still connecting for guild ${guildId}`);
+      logger.debug('Voice connection still connecting', { guildId });
       return true; // Assume it's okay for now
     }
 
     console.log(`[MUSIC] Unknown connection state for guild ${guildId}: ${connectionState}`);
+    logger.warn('Unknown voice connection state', {
+      guildId,
+      connectionState
+    });
     return false;
   }
 
   // Reconnect to voice channel if needed
   async reconnectToVoice(guildId, voiceChannel) {
     console.log(`[MUSIC] Attempting to reconnect to voice channel for guild ${guildId}`);
+    logger.info('Attempting voice channel reconnection', {
+      guildId,
+      voiceChannelId: voiceChannel.id,
+      voiceChannelName: voiceChannel.name
+    });
 
     try {
       const connection = getVoiceConnection(guildId);
       if (connection) {
+        logger.debug('Destroying existing connection before reconnect', { guildId });
         connection.destroy();
       }
 
       // Wait a moment before reconnecting
+      logger.debug('Waiting before reconnection attempt', { guildId, delay: 1000 });
       await new Promise(resolve => setTimeout(resolve, 1000));
 
+      logger.debug('Joining voice channel for reconnection', {
+        guildId,
+        channelId: voiceChannel.id,
+        adapterCreator: !!voiceChannel.adapterCreator || !!voiceChannel.guild?.voiceAdapterCreator
+      });
       const newConnection = joinVoiceChannel({
         channelId: voiceChannel.id,
         guildId: guildId,
@@ -1287,17 +1817,59 @@ class MusicManager {
         selfDeaf: true,
         selfMute: false,
       });
+
       try {
+        logger.debug('Waiting for connection to reach ready state', {
+          guildId,
+          timeout: 5000
+        });
         await entersState(newConnection, VoiceConnectionStatus.Ready, 5000);
         console.log(`[MUSIC] Successfully reconnected to voice channel: ${voiceChannel.name}`);
+        logger.info('Voice channel reconnection successful', {
+          guildId,
+          voiceChannelName: voiceChannel.name
+        });
         return newConnection;
       } catch (stateError) {
         console.error(`[MUSIC] Failed to reach ready state after reconnection:`, stateError.message);
+        logger.error('Failed to reach ready state after reconnection', {
+          guildId,
+          voiceChannelName: voiceChannel.name,
+          error: stateError.message
+        });
         newConnection.destroy();
         return null;
       }
     } catch (error) {
       console.error(`[MUSIC] Failed to reconnect to voice channel:`, error);
+      logger.error('Voice channel reconnection failed', {
+        guildId,
+        voiceChannelId: voiceChannel.id,
+        error: error.message,
+        stack: error.stack
+      });
+
+      // Try alternative reconnection method
+      try {
+        logger.info('Attempting alternative reconnection method', { guildId });
+        const altConnection = joinVoiceChannel({
+          channelId: voiceChannel.id,
+          guildId: guildId,
+          adapterCreator: voiceChannel.adapterCreator || voiceChannel.guild?.voiceAdapterCreator,
+          selfDeaf: false, // Try without selfDeaf first
+          selfMute: false,
+        });
+
+        await entersState(altConnection, VoiceConnectionStatus.Ready, 3000); // Shorter timeout
+        logger.info('Alternative reconnection successful', { guildId });
+        return altConnection;
+      } catch (altError) {
+        logger.error('Alternative reconnection also failed', {
+          guildId,
+          error: altError.message
+        });
+      }
+
       return null;
     }
   }
@@ -1305,13 +1877,22 @@ class MusicManager {
 
   // Simplified Music Controls
   pause(guildId) {
+    logger.debug('Attempting to pause music', { guildId });
     const isPlaying = this.isPlaying.get(guildId);
-    if (!isPlaying) return false;
+    if (!isPlaying) {
+      logger.debug('Cannot pause - nothing is playing', { guildId });
+      return false;
+    }
 
     const current = this.currentlyPlaying.get(guildId);
     if (current) {
       current.status = 'paused';
       current.pausedAt = Date.now();
+      logger.info('Song paused', {
+        guildId,
+        songTitle: current.title,
+        pausedAt: current.pausedAt
+      });
     }
 
     this.isPlaying.set(guildId, false);
@@ -1319,27 +1900,63 @@ class MusicManager {
     // Pause the audio player
     const player = this.audioPlayers.get(guildId);
     if (player) {
-      player.pause();
+      try {
+        player.pause();
+        logger.debug('Audio player paused successfully', { guildId });
+      } catch (error) {
+        logger.error('Failed to pause audio player', {
+          guildId,
+          error: error.message
+        });
+        return false;
+      }
+    } else {
+      logger.warn('No audio player found to pause', { guildId });
+      return false;
     }
 
     return true;
   }
 
   resume(guildId) {
+    logger.debug('Attempting to resume music', { guildId });
     const current = this.currentlyPlaying.get(guildId);
-    if (!current || current.status !== 'paused') return false;
+    if (!current || current.status !== 'paused') {
+      logger.debug('Cannot resume - nothing is paused', { guildId });
+      return false;
+    }
 
     if (current.pausedAt) {
       current.totalPaused += (Date.now() - current.pausedAt);
       current.pausedAt = null;
+      logger.debug('Updated pause timing', {
+        guildId,
+        totalPaused: current.totalPaused
+      });
     }
     current.status = 'playing';
     this.isPlaying.set(guildId, true);
+    logger.info('Song resumed', {
+      guildId,
+      songTitle: current.title
+    });
 
     // Resume the audio player
     const player = this.audioPlayers.get(guildId);
     if (player) {
-      player.unpause();
+      try {
+        player.unpause();
+        logger.debug('Audio player resumed successfully', { guildId });
+      } catch (error) {
+        logger.error('Failed to resume audio player', {
+          guildId,
+          error: error.message
+        });
+        return false;
+      }
+    } else {
+      logger.warn('No audio player found to resume', { guildId });
+      return false;
     }
 
     return true;
@@ -1678,6 +2295,15 @@ class MusicManager {
 
 // Export the music manager instance
 export const musicManager = new MusicManager();
+
+// Debug: Log initialization
+logger.info('MusicManager initialized', {
+  initializationTime: new Date().toISOString(),
+  hasSpotifyCredentials: !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET),
+  hasYouTubeAccess: true, // ytdl-core always available
+  hasDeezzerAccess: true, // axios available
+  ffmpegStaticAvailable: !!ffmpeg
+});
 
 // Convenience functions for external use
 export async function searchSongs(query, limit = 10) {

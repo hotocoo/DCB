@@ -424,7 +424,8 @@ export function generateRandomItem(level = 1) {
   );
 
   if (availableItems.length === 0) {
-    return ITEMS['health_potion']; // Fallback
+    console.warn(`No items available for rarity ${selectedRarity} at level ${level}, falling back to health_potion`);
+    return { id: 'health_potion', ...ITEMS['health_potion'] };
   }
 
   const randomItem = availableItems[Math.floor(Math.random() * availableItems.length)];
@@ -565,12 +566,16 @@ export function equipItem(userId, itemId) {
   // Unequip current item of same type
   if (item.type === 'weapon' && char.equipped_weapon) {
     addItemToInventory(userId, char.equipped_weapon, 1);
-    char.atk -= ITEMS[char.equipped_weapon].atk || 0;
+    if (ITEMS[char.equipped_weapon]) {
+      char.atk -= ITEMS[char.equipped_weapon].atk || 0;
+    }
   }
 
   if (item.type === 'armor' && char.equipped_armor) {
     addItemToInventory(userId, char.equipped_armor, 1);
-    char.def -= ITEMS[char.equipped_armor].def || 0;
+    if (ITEMS[char.equipped_armor]) {
+      char.def -= ITEMS[char.equipped_armor].def || 0;
+    }
   }
 
   // Equip new item
@@ -600,11 +605,15 @@ export function unequipItem(userId, slot) {
   let itemId = null;
   if (slot === 'weapon' && char.equipped_weapon) {
     itemId = char.equipped_weapon;
-    char.atk -= ITEMS[itemId].atk || 0;
+    if (ITEMS[itemId]) {
+      char.atk -= ITEMS[itemId].atk || 0;
+    }
     char.equipped_weapon = null;
   } else if (slot === 'armor' && char.equipped_armor) {
     itemId = char.equipped_armor;
-    char.def -= ITEMS[itemId].def || 0;
+    if (ITEMS[itemId]) {
+      char.def -= ITEMS[itemId].def || 0;
+    }
     char.equipped_armor = null;
   } else {
     return { success: false, reason: 'no_item_equipped' };

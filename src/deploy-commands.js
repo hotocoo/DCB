@@ -1,39 +1,119 @@
+/**
+ * Command deployment script for Discord bot.
+ * Registers slash commands with Discord's API.
+ */
+
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import { REST, Routes } from 'discord.js';
+import { logger } from './logger.js';
 
-const TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID;
-const GUILD_ID = process.env.GUILD_ID;
+/**
+ * Supported command file extensions.
+ */
+const COMMAND_EXTENSIONS = ['.js', '.mjs', '.cjs'];
 
-if (!TOKEN || !CLIENT_ID) {
-  console.error('DISCORD_TOKEN and CLIENT_ID must be set in environment');
-  process.exit(1);
+/**
+ * Validates required environment variables.
+ * @returns {object} Validated environment configuration
+ * @throws {Error} If required environment variables are missing
+ */
+function validateEnvironment() {
+  const token = process.env.DISCORD_TOKEN;
+  const clientId = process.env.CLIENT_ID;
+  const guildId = process.env.GUILD_ID;
+
+  if (!token || !clientId) {
+    throw new Error('DISCORD_TOKEN and CLIENT_ID must be set in environment variables');
+  }
+
+  return { token, clientId, guildId };
 }
 
-const commands = [];
-const commandsPath = path.join(process.cwd(), 'src', 'commands');
-for (const file of fs.readdirSync(commandsPath)) {
-   if (file.endsWith('.js') || file.endsWith('.mjs')) {
-     const { data } = await import(path.join(commandsPath, file));
-     commands.push(data.toJSON());
-   }
- }
+/**
+ * Loads command data from all command files.
+ * @returns {Array} Array of command data objects
+ */
+async function loadCommandData() {
+  const commandsPath = path.join(process.cwd(), 'src', 'commands');
+  const commands = [];
 
-const rest = new REST({ version: '10' }).setToken(TOKEN);
+  logger.info('Loading command data for deployment', { path: commandsPath });
 
-(async () => {
   try {
-    console.log('Registering commands...');
-    if (GUILD_ID) {
-      await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
-      console.log('Registered guild commands');
-    } else {
-      await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
-      console.log('Registered global commands');
+    const files = fs.readdirSync(commandsPath).filter(file =>
+      COMMAND_EXTENSIONS.some(ext => file.endsWith(ext))
+    );
+
+    for (const file of files) {
+      try {
+        const filePath = path.join(commandsPath, file);
+        const { data } = await import(filePath);
+
+        if (data && typeof data.toJSON === 'function') {
+          commands.push(data.toJSON());
+          logger.debug('Loaded command data', { file, name: data.name });
+        } else {
+          logger.warn('Command file missing data export or toJSON method', { file });
+        }
+      } catch (error) {
+        logger.error('Failed to load command data', error, { file });
+      }
     }
-  } catch (err) {
-    console.error(err);
+
+    logger.info('Command data loaded', { count: commands.length });
+  } catch (error) {
+    logger.error('Failed to read commands directory', error, { path: commandsPath });
+    throw error;
   }
-})();
+
+  return commands;
+}
+
+/**
+ * Deploys commands to Discord.
+ * @param {Array} commands - Command data to deploy
+ * @param {object} config - Environment configuration
+ */
+async function deployCommands(commands, { token, clientId, guildId }) {
+  const rest = new REST({ version: '10' }).setToken(token);
+
+  try {
+    if (guildId) {
+      logger.info('Registering guild-specific commands', { guildId, commandCount: commands.length });
+      await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
+      logger.success('Guild commands registered successfully');
+    } else {
+      logger.info('Registering global commands', { commandCount: commands.length });
+      await rest.put(Routes.applicationCommands(clientId), { body: commands });
+      logger.success('Global commands registered successfully');
+    }
+  } catch (error) {
+    logger.error('Failed to register commands', error);
+    throw error;
+  }
+}
+
+/**
+ * Main deployment function.
+ */
+async function main() {
+  try {
+    const config = validateEnvironment();
+    const commands = await loadCommandData();
+
+    if (commands.length === 0) {
+      logger.warn('No commands to deploy');
+      return;
+    }
+
+    await deployCommands(commands, config);
+  } catch (error) {
+    logger.error('Command deployment failed', error);
+    process.exit(1);
+  }
+}
+
+// Execute deployment
+main();

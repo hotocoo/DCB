@@ -1,9 +1,21 @@
+/**
+ * Advanced AI Assistant System for Discord bot.
+ * Provides multiple AI models, personalities, and content generation capabilities.
+ */
+
 import 'dotenv/config';
 import { getGuild } from './storage.js';
+import { logger } from './logger.js';
 
-// Use native fetch for Node.js 18+
+/**
+ * Configuration constants for AI assistant.
+ */
+const CACHE_DURATION_MS = 300000; // 5 minutes
+const MAX_CONVERSATION_HISTORY = 10;
 
-// Advanced AI Assistant System with Multiple AI Models and Capabilities
+/**
+ * Advanced AI Assistant System with Multiple AI Models and Capabilities.
+ */
 class AIAssistantManager {
   constructor() {
     this.conversationHistory = new Map();
@@ -13,7 +25,12 @@ class AIAssistantManager {
     this.initializeAI();
   }
 
+  /**
+   * Initializes AI models and personality profiles.
+   */
   initializeAI() {
+    logger.info('Initializing AI models and personality profiles');
+
     // Initialize different AI model configurations
     this.aiModels.set('creative', {
       name: 'Creative Writer',
@@ -79,8 +96,20 @@ class AIAssistantManager {
       style: 'thoughtful, reflective, and insightful',
       responses: 'profound and meaningful'
     });
+
+    logger.info('AI initialization completed', {
+      modelsCount: this.aiModels.size,
+      personalitiesCount: this.personalityProfiles.size
+    });
   }
 
+  /**
+   * Generates an AI response based on user message and options.
+   * @param {string} userId - User identifier
+   * @param {string} message - User message
+   * @param {object} options - Generation options
+   * @returns {Promise<string>} AI response
+   */
   async generateResponse(userId, message, options = {}) {
     const {
       model = 'helpful',
@@ -89,17 +118,32 @@ class AIAssistantManager {
       context = ''
     } = options;
 
-    const cacheKey = `${userId}_${message.substring(0, 50)}_${model}`;
+    if (!message || typeof message !== 'string') {
+      throw new Error('Invalid message provided');
+    }
+
+    const cacheKey = `${userId}_${message.substring(0, 50)}_${model}_${personality}`;
     const cached = this.responseCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < 300000) { // 5 minute cache
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
+      logger.debug('Using cached response', { userId, cacheKey });
       return cached.response;
     }
 
     try {
+      logger.debug('Generating AI response', { userId, model, personality, messageLength: message.length });
+
       // Build enhanced context
       const history = this.conversationHistory.get(userId) || [];
       const modelConfig = this.aiModels.get(model);
       const personalityConfig = this.personalityProfiles.get(personality);
+
+      if (!modelConfig) {
+        throw new Error(`Unknown model: ${model}`);
+      }
+
+      if (!personalityConfig) {
+        throw new Error(`Unknown personality: ${personality}`);
+      }
 
       const systemPrompt = `${modelConfig.prompt}
 
@@ -121,23 +165,28 @@ Provide a response that matches the specified model and personality.`;
       const localUrl = guildCfg?.modelUrl || process.env.LOCAL_MODEL_URL;
 
       if (localUrl) {
+        logger.debug('Attempting local AI call', { userId, localUrl });
         response = await this.callLocalAI(localUrl, systemPrompt, modelConfig);
       }
 
       // Fallback to OpenAI
       if (!response && process.env.OPENAI_API_KEY) {
+        logger.debug('Attempting OpenAI call', { userId });
         response = await this.callOpenAI(systemPrompt, modelConfig);
       }
 
       // Enhanced fallback with personality
       if (!response) {
+        logger.debug('Using fallback response', { userId, model, personality });
         response = this.generateFallbackResponse(message, model, personality);
       }
 
       // Store in history
       history.push({ role: 'user', content: message });
       history.push({ role: 'assistant', content: response });
-      if (history.length > 10) history.splice(0, history.length - 10);
+      if (history.length > MAX_CONVERSATION_HISTORY) {
+        history.splice(0, history.length - MAX_CONVERSATION_HISTORY);
+      }
       this.conversationHistory.set(userId, history);
 
       // Cache response
@@ -146,16 +195,26 @@ Provide a response that matches the specified model and personality.`;
         timestamp: Date.now()
       });
 
+      logger.debug('Response generated successfully', { userId, responseLength: response.length });
       return response;
 
     } catch (error) {
-      console.error('AI Assistant error:', error);
+      logger.error('AI Assistant error', error, { userId, model, personality });
       return this.generateFallbackResponse(message, model, personality);
     }
   }
 
+  /**
+   * Calls a local AI model.
+   * @param {string} url - Local model URL
+   * @param {string} prompt - Prompt to send
+   * @param {object} config - Model configuration
+   * @returns {Promise<string|null>} Response or null if failed
+   */
   async callLocalAI(url, prompt, config) {
     try {
+      logger.debug('Calling local AI', { url, maxTokens: config.maxTokens, temperature: config.temperature });
+
       const response = await fetch(`${url.replace(/\/$/, '')}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -169,16 +228,27 @@ Provide a response that matches the specified model and personality.`;
 
       if (response.ok) {
         const data = await response.json();
-        return data.choices?.[0]?.message?.content || 'No response from local AI';
+        const content = data.choices?.[0]?.message?.content;
+        return content || 'No response from local AI';
       }
+
+      logger.warn('Local AI call failed with status', { status: response.status, url });
     } catch (error) {
-      console.error('Local AI call failed:', error);
+      logger.error('Local AI call error', error, { url });
     }
     return null;
   }
 
+  /**
+   * Calls OpenAI API.
+   * @param {string} prompt - Prompt to send
+   * @param {object} config - Model configuration
+   * @returns {Promise<string|null>} Response or null if failed
+   */
   async callOpenAI(prompt, config) {
     try {
+      logger.debug('Calling OpenAI API', { maxTokens: config.maxTokens, temperature: config.temperature });
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -195,15 +265,27 @@ Provide a response that matches the specified model and personality.`;
 
       if (response.ok) {
         const data = await response.json();
-        return data.choices?.[0]?.message?.content || 'No response from OpenAI';
+        const content = data.choices?.[0]?.message?.content;
+        return content || 'No response from OpenAI';
       }
+
+      logger.warn('OpenAI call failed with status', { status: response.status });
     } catch (error) {
-      console.error('OpenAI call failed:', error);
+      logger.error('OpenAI call error', error);
     }
     return null;
   }
 
+  /**
+   * Generates a fallback response when AI models are unavailable.
+   * @param {string} message - Original user message
+   * @param {string} model - AI model type
+   * @param {string} personality - Personality type
+   * @returns {string} Fallback response
+   */
   generateFallbackResponse(message, model, personality) {
+    logger.debug('Generating fallback response', { model, personality, messageLength: message.length });
+
     const responses = {
       creative: [
         `🎨 Creatively speaking about "${message}" - I imagine a world where ideas flow like rivers of color!`,
@@ -233,7 +315,10 @@ Provide a response that matches the specified model and personality.`;
     };
 
     const modelResponses = responses[model] || responses.helpful;
-    return modelResponses[Math.floor(Math.random() * modelResponses.length)];
+    const response = modelResponses[Math.floor(Math.random() * modelResponses.length)];
+
+    logger.debug('Fallback response generated', { model, responseLength: response.length });
+    return response;
   }
 
   // Advanced AI Features

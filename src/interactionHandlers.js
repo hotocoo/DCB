@@ -1,5 +1,16 @@
+/**
+ * Interaction handlers for Discord bot commands and button interactions.
+ * Handles chat input commands, button clicks, modal submissions, and game interactions.
+ */
+
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
-import { logCommandExecution, logError } from './logger.js';
+
+// Core modules
+import { logCommandExecution, logError, logger } from './logger.js';
+import { CommandError, handleCommandError, safeExecuteCommand, validateUser, validateGuild, validatePermissions, validateRange, validateNotEmpty, createRateLimiter } from './errorHandler.js';
+import { inputValidator, sanitizeInput, validateUserId, validateNumber, validateString } from './validation.js';
+
+// Feature modules
 import { isOnCooldown, setCooldown, getFormattedCooldown, getButtonCooldownType } from './cooldowns.js';
 import { wordleGames, hangmanGames, guessGames, combatGames, explorationGames } from './game-states.js';
 import { getCharacter, resetCharacter, spendSkillPoints, encounterMonster, fightTurn, applyXp, narrate } from './rpg.js';
@@ -11,12 +22,26 @@ import { getRandomJoke, generateStory, getRiddle, getFunFact, getRandomQuote, ma
 import { getLocations } from './locations.js';
 import { getActiveAuctions, createAuction } from './trading.js';
 import { updateProfile } from './profiles.js';
-import { CommandError, handleCommandError, safeExecuteCommand, validateUser, validateGuild, validatePermissions, validateRange, validateNotEmpty, createRateLimiter } from './errorHandler.js';
-import { inputValidator, sanitizeInput, validateUserId, validateNumber, validateString } from './validation.js';
 
-// Helper function for Wordle guess modal
+// Constants for rate limiting and configuration
+const INTERACTION_RATE_LIMIT = 5;
+const INTERACTION_RATE_WINDOW = 10000; // 10 seconds
+
+/**
+ * Rate limiter for interactions to prevent abuse.
+ */
+const interactionRateLimiter = createRateLimiter(INTERACTION_RATE_LIMIT, INTERACTION_RATE_WINDOW, (key) => key);
+
+/**
+ * Sends a Wordle guess modal to the user.
+ * @param {object} interaction - Discord interaction object
+ * @param {string} gameId - The game identifier
+ */
 export async function sendWordleGuessModal(interaction, gameId) {
-  const modal = new ModalBuilder().setCustomId(`wordle_submit:${gameId}`).setTitle('Wordle Guess');
+  const modal = new ModalBuilder()
+    .setCustomId(`wordle_submit:${gameId}`)
+    .setTitle('Wordle Guess');
+
   const guessInput = new TextInputBuilder()
     .setCustomId('word_guess')
     .setLabel('Enter a 5-letter word')
@@ -30,141 +55,160 @@ export async function sendWordleGuessModal(interaction, gameId) {
   await interaction.showModal(modal);
 }
 
-// Rate limiter for interactions to prevent abuse
-const interactionRateLimiter = createRateLimiter(5, 10000, (key) => key); // 5 interactions per 10 seconds per user
+// Constants for interaction processing
+const PROCESSED_INTERACTION_CLEANUP_TIME = 5 * 60 * 1000; // 5 minutes
 
-// Helper function to safely handle interactions and prevent duplicate responses
+/**
+ * Safely handles interactions and prevents duplicate responses.
+ * @param {object} interaction - Discord interaction object
+ * @param {object} options - Reply options
+ * @returns {Promise<boolean>} True if reply was successful, false otherwise
+ */
 export async function safeInteractionReply(interaction, options) {
-   const interactionId = interaction.id;
+  const interactionId = interaction.id;
 
-   try {
-     // Rate limiting check
-     await interactionRateLimiter.consume(interaction.user.id);
-   } catch (error) {
-     if (error instanceof CommandError && error.code === 'RATE_LIMITED') {
-       logError('Interaction rate limited', error, {
-         userId: interaction.user.id,
-         interactionId
-       });
-       return false;
-     }
-   }
+  try {
+    // Rate limiting check
+    await interactionRateLimiter.consume(interaction.user.id);
+  } catch (error) {
+    if (error instanceof CommandError && error.code === 'RATE_LIMITED') {
+      logError('Interaction rate limited', error, {
+        userId: interaction.user.id,
+        interactionId
+      });
+      return false;
+    }
+  }
 
-   // Check if this interaction has already been processed
-   if (processedInteractions.has(interactionId)) {
-     logger.warn(`Interaction ${interactionId} already processed, ignoring`, {
-       userId: interaction.user.id,
-       interactionId
-     });
-     return false;
-   }
+  // Check if this interaction has already been processed
+  if (processedInteractions.has(interactionId)) {
+    logger.warn(`Interaction ${interactionId} already processed, ignoring`, {
+      userId: interaction.user.id,
+      interactionId
+    });
+    return false;
+  }
 
-   try {
-     // Validate interaction object
-     validateNotEmpty(interaction, 'interaction');
-     validateNotEmpty(interaction.user, 'interaction.user');
-     validateUserId(interaction.user.id);
+  try {
+    // Validate interaction object
+    validateNotEmpty(interaction, 'interaction');
+    validateNotEmpty(interaction.user, 'interaction.user');
+    validateUserId(interaction.user.id);
 
-     // Check if interaction is still valid (not expired)
-     if (interaction.replied || interaction.deferred) {
-       logger.warn(`Interaction ${interactionId} already replied/deferred`, {
-         userId: interaction.user.id,
-         interactionId,
-         replied: interaction.replied,
-         deferred: interaction.deferred
-       });
-       return false;
-     }
+    // Check if interaction is still valid (not expired)
+    if (interaction.replied || interaction.deferred) {
+      logger.warn(`Interaction ${interactionId} already replied/deferred`, {
+        userId: interaction.user.id,
+        interactionId,
+        replied: interaction.replied,
+        deferred: interaction.deferred
+      });
+      return false;
+    }
 
-     // Mark as processed
-     processedInteractions.set(interactionId, Date.now());
+    // Mark as processed
+    processedInteractions.set(interactionId, Date.now());
 
-     // Clean up old processed interactions (older than 5 minutes)
-     const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-     for (const [id, timestamp] of processedInteractions.entries()) {
-       if (timestamp < fiveMinutesAgo) {
-         processedInteractions.delete(id);
-       }
-     }
+    // Clean up old processed interactions
+    const cutoffTime = Date.now() - PROCESSED_INTERACTION_CLEANUP_TIME;
+    for (const [id, timestamp] of processedInteractions.entries()) {
+      if (timestamp < cutoffTime) {
+        processedInteractions.delete(id);
+      }
+    }
 
-     // Sanitize content if present
-     if (options.content) {
-       options.content = sanitizeInput(options.content);
-     }
+    // Sanitize content if present
+    if (options.content) {
+      options.content = sanitizeInput(options.content);
+    }
 
-     await interaction.reply(options);
-     return true;
-   } catch (error) {
-     logger.error(`Failed to reply to interaction ${interactionId}`, error, {
-       userId: interaction.user.id,
-       interactionType: interaction.type,
-       interactionId
-     });
-     return false;
-   }
+    await interaction.reply(options);
+    return true;
+  } catch (error) {
+    logger.error(`Failed to reply to interaction ${interactionId}`, error, {
+      userId: interaction.user.id,
+      interactionType: interaction.type,
+      interactionId
+    });
+    return false;
+  }
 }
 
-// Helper function to safely update interactions
+/**
+ * Safely updates interactions and prevents duplicate updates.
+ * @param {object} interaction - Discord interaction object
+ * @param {object} options - Update options
+ * @returns {Promise<boolean>} True if update was successful, false otherwise
+ */
 export async function safeInteractionUpdate(interaction, options) {
-   const interactionId = interaction.id;
+  const interactionId = interaction.id;
 
-   try {
-     // Rate limiting check for updates
-     await interactionRateLimiter.consume(interaction.user.id);
-   } catch (error) {
-     if (error instanceof CommandError && error.code === 'RATE_LIMITED') {
-       logError('Interaction update rate limited', error, {
-         userId: interaction.user.id,
-         interactionId
-       });
-       return false;
-     }
-   }
+  try {
+    // Rate limiting check for updates
+    await interactionRateLimiter.consume(interaction.user.id);
+  } catch (error) {
+    if (error instanceof CommandError && error.code === 'RATE_LIMITED') {
+      logError('Interaction update rate limited', error, {
+        userId: interaction.user.id,
+        interactionId
+      });
+      return false;
+    }
+  }
 
-   // Check if this interaction has already been processed
-   if (processedInteractions.has(interactionId)) {
-     logger.warn(`Interaction ${interactionId} already processed, ignoring`, {
-       userId: interaction.user.id,
-       interactionId
-     });
-     return false;
-   }
+  // Check if this interaction has already been processed
+  if (processedInteractions.has(interactionId)) {
+    logger.warn(`Interaction ${interactionId} already processed, ignoring`, {
+      userId: interaction.user.id,
+      interactionId
+    });
+    return false;
+  }
 
-   try {
-     // Validate interaction object
-     validateNotEmpty(interaction, 'interaction');
-     validateNotEmpty(interaction.user, 'interaction.user');
-     validateUserId(interaction.user.id);
+  logger.debug('Processing interaction update', {
+    userId: interaction.user.id,
+    interactionId,
+    hasEmbeds: !!options.embeds,
+    hasComponents: !!options.components,
+    hasContent: !!options.content,
+    isEphemeral: options.ephemeral || false
+  });
 
-     // Check if interaction is still valid
-     if (interaction.replied || interaction.deferred) {
-       logger.warn(`Interaction ${interactionId} already replied/deferred`, {
-         userId: interaction.user.id,
-         interactionId,
-         replied: interaction.replied,
-         deferred: interaction.deferred
-       });
-       return false;
-     }
+  try {
+    // Validate interaction object
+    validateNotEmpty(interaction, 'interaction');
+    validateNotEmpty(interaction.user, 'interaction.user');
+    validateUserId(interaction.user.id);
 
-     // Mark as processed
-     processedInteractions.set(interactionId, Date.now());
+    // Check if interaction is still valid
+    if (interaction.replied || interaction.deferred) {
+      logger.warn(`Interaction ${interactionId} already replied/deferred`, {
+        userId: interaction.user.id,
+        interactionId,
+        replied: interaction.replied,
+        deferred: interaction.deferred
+      });
+      return false;
+    }
 
-     // Sanitize content if present
-     if (options.content) {
-       options.content = sanitizeInput(options.content);
-     }
+    // Mark as processed
+    processedInteractions.set(interactionId, Date.now());
 
-     await interaction.update(options);
-     return true;
-   } catch (error) {
-     logger.error(`Failed to update interaction ${interactionId}`, error, {
-       userId: interaction.user.id,
-       interactionType: interaction.type,
-       interactionId
-     });
-     return false;
-   }
+    // Sanitize content if present
+    if (options.content) {
+      options.content = sanitizeInput(options.content);
+    }
+
+    await interaction.update(options);
+    return true;
+  } catch (error) {
+    logger.error(`Failed to update interaction ${interactionId}`, error, {
+      userId: interaction.user.id,
+      interactionType: interaction.type,
+      interactionId
+    });
+    return false;
+  }
 }
 
 // Helper function to update inventory embed
@@ -514,6 +558,12 @@ async function handleButtonInteraction(interaction, client) {
   logCommandExecution(interaction, true); // Log successful button interaction start
 
   try {
+    logger.debug(`Processing music button action: ${action}`, {
+      userId,
+      customId: interaction.customId,
+      action
+    });
+
     // Music button handlers
     if (action === 'music_pause') {
       const [, targetGuild] = interaction.customId.split(':');
@@ -523,6 +573,11 @@ async function handleButtonInteraction(interaction, client) {
       }
 
       const result = pause(interaction.guild.id);
+
+      logger.debug(`Music pause result: ${result}`, {
+        userId,
+        guildId: interaction.guild.id
+      });
 
       if (result) {
         const currentRow = interaction.message.components[0];
