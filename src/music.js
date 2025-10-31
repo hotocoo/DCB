@@ -1,7 +1,7 @@
 
 import { logger } from './logger.js';
 import 'dotenv/config';
-import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
+import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection, StreamType, NoSubscriberBehavior, entersState, VoiceConnectionStatus } from '@discordjs/voice';
 import ytdl from '@distube/ytdl-core';
 import axios from 'axios';
 import yts from 'yt-search';
@@ -640,8 +640,14 @@ class MusicManager {
         if (song.preview) {
           // Use Spotify preview URL (30-second clip)
           const ffmpegProcess = spawn(ffmpeg, [
+            '-hide_banner',
+            '-loglevel', 'error',
+            '-reconnect', '1',
+            '-reconnect_streamed', '1',
+            '-reconnect_delay_max', '5',
             '-i', song.preview,
-            '-f', 'opus',
+            '-analyzeduration', '0',
+            '-f', 's16le',
             '-ar', '48000',
             '-ac', '2',
             'pipe:1'
@@ -657,7 +663,7 @@ class MusicManager {
           });
 
           const resource = createAudioResource(ffmpegProcess.stdout, {
-            inputType: 'arbitrary',
+            inputType: StreamType.Raw,
             inlineVolume: true
           });
 
@@ -700,8 +706,14 @@ class MusicManager {
       console.log(`[MUSIC] Creating direct stream for Deezer test audio: ${song.title}`);
       try {
         const ffmpegProcess = spawn(ffmpeg, [
+          '-hide_banner',
+          '-loglevel', 'error',
+          '-reconnect', '1',
+          '-reconnect_streamed', '1',
+          '-reconnect_delay_max', '5',
           '-i', streamUrl,
-          '-f', 'opus',
+          '-analyzeduration', '0',
+          '-f', 's16le',
           '-ar', '48000',
           '-ac', '2',
           'pipe:1'
@@ -717,7 +729,7 @@ class MusicManager {
         });
 
         const resource = createAudioResource(ffmpegProcess.stdout, {
-          inputType: 'arbitrary',
+          inputType: StreamType.Raw,
           inlineVolume: true
         });
 
@@ -757,8 +769,11 @@ class MusicManager {
 
         // Transcode to Opus using ffmpeg
         const ffmpegProcess = spawn(ffmpeg, [
+          '-hide_banner',
+          '-loglevel', 'error',
+          '-analyzeduration', '0',
           '-i', 'pipe:0',
-          '-f', 'opus',
+          '-f', 's16le',
           '-ar', '48000',
           '-ac', '2',
           'pipe:1'
@@ -794,7 +809,7 @@ class MusicManager {
         });
 
         const resource = createAudioResource(ffmpegProcess.stdout, {
-          inputType: 'arbitrary',
+          inputType: StreamType.Raw,
           inlineVolume: true
         });
 
@@ -819,8 +834,14 @@ class MusicManager {
 
       try {
         const ffmpegProcess = spawn(ffmpeg, [
+          '-hide_banner',
+          '-loglevel', 'error',
+          '-reconnect', '1',
+          '-reconnect_streamed', '1',
+          '-reconnect_delay_max', '5',
           '-i', song.url,
-          '-f', 'opus',
+          '-analyzeduration', '0',
+          '-f', 's16le',
           '-ar', '48000',
           '-ac', '2',
           'pipe:1'
@@ -841,7 +862,7 @@ class MusicManager {
         });
 
         const resource = createAudioResource(ffmpegProcess.stdout, {
-          inputType: 'arbitrary',
+          inputType: StreamType.Raw,
           inlineVolume: true
         });
 
@@ -878,7 +899,12 @@ class MusicManager {
           channelId: voiceChannel.id,
           guildId: guildId,
           adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+          selfDeaf: true,
+          selfMute: false,
         });
+        try {
+          await entersState(connection, VoiceConnectionStatus.Ready, 5000);
+        } catch (_) {}
         console.log(`[MUSIC] Joined voice channel, connection status: ${connection.state.status}`);
       } else if (connection.state.status === 'connecting') {
         // Wait a moment for connection to stabilize
@@ -905,7 +931,7 @@ class MusicManager {
       // Create audio player if not exists
       let player = this.audioPlayers.get(guildId);
       if (!player) {
-        player = createAudioPlayer();
+        player = createAudioPlayer({ behaviors: { noSubscriber: NoSubscriberBehavior.Play } });
         this.audioPlayers.set(guildId, player);
 
         connection.on('stateChange', (oldState, newState) => {
@@ -929,6 +955,9 @@ class MusicManager {
         // Subscribe to connection
         connection.subscribe(player);
       }
+
+      // Ensure subscription before each playback attempt (handles reconnections)
+      try { connection.subscribe(player); } catch (_) {}
 
       // Store voice channel info
       this.voiceChannels.set(guildId, {
@@ -1097,8 +1126,12 @@ class MusicManager {
         channelId: voiceChannel.id,
         guildId: guildId,
         adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+        selfDeaf: true,
+        selfMute: false,
       });
-
+      try {
+        await entersState(newConnection, VoiceConnectionStatus.Ready, 5000);
+      } catch (_) {}
       console.log(`[MUSIC] Successfully reconnected to voice channel: ${voiceChannel.name}`);
       return newConnection;
     } catch (error) {

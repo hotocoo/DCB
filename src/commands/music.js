@@ -134,7 +134,7 @@ export async function execute(interaction) {
         .setDescription(`**${song.title}** by **${song.artist}**`)
         .addFields(
           { name: '⏱️ Duration', value: song.duration, inline: true },
-          { name: '🔊 Volume', value: '50%', inline: true },
+          { name: '🔊 Volume', value: `${getMusicStats(interaction.guild.id).volume}%`, inline: true },
           { name: '👤 Requested by', value: interaction.user.username, inline: true }
         )
         .setThumbnail(song.thumbnail || 'https://i.imgur.com/SjIgjlE.png');

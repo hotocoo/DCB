@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { pathToFileURL } from 'url';
 
 export async function loadCommands(client) {
   const commandsPath = path.join(process.cwd(), 'src', 'commands');
@@ -12,7 +13,8 @@ export async function loadCommands(client) {
       if (file.endsWith('.js') || file.endsWith('.mjs') || file.endsWith('.cjs')) {
         console.log('Loading command file:', file);
         try {
-          const { data, execute } = await import(path.join(commandsPath, file));
+          const moduleUrl = pathToFileURL(path.join(commandsPath, file)).href;
+          const { data, execute } = await import(moduleUrl);
           console.log('Loaded command:', data.name);
           client.commands.set(data.name, { data, execute });
         } catch (error) {
