@@ -78,6 +78,10 @@ function readAll() {
       if (typeof c.equipped_weapon === 'undefined') c.equipped_weapon = null;
       if (typeof c.equipped_armor === 'undefined') c.equipped_armor = null;
       if (typeof c.gold === 'undefined') c.gold = 0;
+      if (typeof c.dailyExplorations === 'undefined') c.dailyExplorations = 0;
+      if (typeof c.lastDailyReset === 'undefined') c.lastDailyReset = Date.now();
+      if (typeof c.sessionXpGained === 'undefined') c.sessionXpGained = 0;
+      if (typeof c.lastSessionReset === 'undefined') c.lastSessionReset = Date.now();
       raw[k] = c;
     }
     cache = raw;
@@ -187,6 +191,10 @@ export function applyXp(userId, char, amount = 0) {
   } else {
     char.lvl = newLvl;
   }
+
+  // Track session XP gained
+  char.sessionXpGained = (char.sessionXpGained || 0) + amount;
+
   return { char, oldLvl, newLvl, gained };
 }
 
@@ -803,74 +811,150 @@ export function completeQuest(userId, questId) {
 // Spend skill points for a character and persist change
 export function spendSkillPoints(userId, stat, amount = 1) {
    // Validate inputs
-   if (!userId || typeof userId !== 'string') {
-     throw new CommandError('Invalid user ID', 'INVALID_ARGUMENT');
-   }
+    if (!userId || typeof userId !== 'string') {
+      throw new CommandError('Invalid user ID', 'INVALID_ARGUMENT');
+    }
 
-   if (!stat || typeof stat !== 'string') {
-     throw new CommandError('Invalid stat specified', 'INVALID_ARGUMENT');
-   }
+    if (!stat || typeof stat !== 'string') {
+      throw new CommandError('Invalid stat specified', 'INVALID_ARGUMENT');
+    }
 
-   const amountValidation = validateNumber(amount, { min: 1, max: 100, integer: true, positive: true });
-   if (!amountValidation.valid) {
-     throw new CommandError(amountValidation.reason, 'INVALID_ARGUMENT');
-   }
+    const amountValidation = validateNumber(amount, { min: 1, max: 100, integer: true, positive: true });
+    if (!amountValidation.valid) {
+      throw new CommandError(amountValidation.reason, 'INVALID_ARGUMENT');
+    }
 
-   // Validate stat type
-   const validStats = ['hp', 'maxhp', 'mp', 'maxmp', 'atk', 'def', 'spd'];
-   if (!validStats.includes(stat)) {
-     throw new CommandError(`Invalid stat. Must be one of: ${validStats.join(', ')}`, 'INVALID_ARGUMENT');
-   }
+    // Validate stat type
+    const validStats = ['hp', 'maxhp', 'mp', 'maxmp', 'atk', 'def', 'spd'];
+    if (!validStats.includes(stat)) {
+      throw new CommandError(`Invalid stat. Must be one of: ${validStats.join(', ')}`, 'INVALID_ARGUMENT');
+    }
 
-   if (locks.has(userId)) {
-     throw new CommandError('Character update already in progress', 'RATE_LIMITED');
-   }
+    if (locks.has(userId)) {
+      throw new CommandError('Character update already in progress', 'RATE_LIMITED');
+    }
 
-   locks.add(userId);
-   try {
-     const all = cache || readAll();
-     const char = all[userId];
+    locks.add(userId);
+    try {
+      const all = cache || readAll();
+      const char = all[userId];
 
-     if (!char) {
-       throw new CommandError('Character not found', 'NOT_FOUND');
-     }
+      if (!char) {
+        throw new CommandError('Character not found', 'NOT_FOUND');
+      }
 
-     const pts = char.skillPoints || 0;
-     if (pts < amount) {
-       throw new CommandError(`Not enough skill points. Have: ${pts}, Need: ${amount}`, 'INSUFFICIENT_FUNDS');
-     }
+      const pts = char.skillPoints || 0;
+      if (pts < amount) {
+        throw new CommandError(`Not enough skill points. Have: ${pts}, Need: ${amount}`, 'INSUFFICIENT_FUNDS');
+      }
 
-     // Apply stat changes with validation
-     if (stat === 'hp') {
-       const currentHp = char.hp || 0;
-       const maxHp = char.maxHp || 20;
-       char.hp = Math.min(currentHp + amount * 2, maxHp);
-     } else if (stat === 'maxhp') {
-       char.maxHp = (char.maxHp || 20) + amount * 5;
-       char.hp = Math.min((char.hp || 0) + amount * 2, char.maxHp);
-     } else if (stat === 'mp') {
-       const currentMp = char.mp || 0;
-       const maxMp = char.maxMp || 10;
-       char.mp = Math.min(currentMp + amount * 3, maxMp);
-     } else if (stat === 'maxmp') {
-       char.maxMp = (char.maxMp || 10) + amount * 5;
-       char.mp = Math.min((char.mp || 0) + amount * 3, char.maxMp);
-     } else if (stat === 'atk') {
-       char.atk = (char.atk || 5) + amount;
-     } else if (stat === 'def') {
-       char.def = (char.def || 2) + amount;
-     } else if (stat === 'spd') {
-       char.spd = (char.spd || 2) + amount;
-     }
+      // Apply stat changes with validation
+      if (stat === 'hp') {
+        const currentHp = char.hp || 0;
+        const maxHp = char.maxHp || 20;
+        char.hp = Math.min(currentHp + amount * 2, maxHp);
+      } else if (stat === 'maxhp') {
+        char.maxHp = (char.maxHp || 20) + amount * 5;
+        char.hp = Math.min((char.hp || 0) + amount * 2, char.maxHp);
+      } else if (stat === 'mp') {
+        const currentMp = char.mp || 0;
+        const maxMp = char.maxMp || 10;
+        char.mp = Math.min(currentMp + amount * 3, maxMp);
+      } else if (stat === 'maxmp') {
+        char.maxMp = (char.maxMp || 10) + amount * 5;
+        char.mp = Math.min((char.mp || 0) + amount * 3, char.maxMp);
+      } else if (stat === 'atk') {
+        char.atk = (char.atk || 5) + amount;
+      } else if (stat === 'def') {
+        char.def = (char.def || 2) + amount;
+      } else if (stat === 'spd') {
+        char.spd = (char.spd || 2) + amount;
+      }
 
-     char.skillPoints = pts - amount;
-     all[userId] = char;
-     writeAll(all);
+      char.skillPoints = pts - amount;
+      all[userId] = char;
+      writeAll(all);
 
-     logger.info('Skill points spent', { userId, stat, amount, newValue: char[stat] });
-     return { success: true, char };
-   } finally {
-     locks.delete(userId);
-   }
+      logger.info('Skill points spent', { userId, stat, amount, newValue: char[stat] });
+      return { success: true, char };
+    } finally {
+      locks.delete(userId);
+    }
+}
+
+// Function to check daily exploration limit
+export function checkDailyLimit(userId) {
+  const all = cache || readAll();
+  const char = all[userId];
+  if (!char) return { allowed: false, reason: 'no_character' };
+
+  const now = Date.now();
+  const dayInMs = 24 * 60 * 60 * 1000;
+
+  // Check if we need to reset daily count
+  if (now - (char.lastDailyReset || 0) >= dayInMs) {
+    char.dailyExplorations = 0;
+    char.lastDailyReset = now;
+    writeAll(all);
+  }
+
+  const maxDaily = 10; // 10 explorations per day
+  const used = char.dailyExplorations || 0;
+  const allowed = used < maxDaily;
+
+  return {
+    allowed,
+    used,
+    max: maxDaily,
+    remaining: maxDaily - used,
+    resetTime: char.lastDailyReset
+  };
+}
+
+// Function to increment daily exploration count
+export function incrementDailyExploration(userId) {
+  const all = cache || readAll();
+  const char = all[userId];
+  if (!char) return { success: false, reason: 'no_character' };
+
+  // Check daily limit first
+  const check = checkDailyLimit(userId);
+  if (!check.allowed) {
+    return { success: false, reason: 'daily_limit_reached' };
+  }
+
+  char.dailyExplorations = (char.dailyExplorations || 0) + 1;
+  writeAll(all);
+
+  return { success: true, newCount: char.dailyExplorations };
+}
+
+// Function to check session XP cap
+export function checkSessionXpCap(userId) {
+  const all = cache || readAll();
+  const char = all[userId];
+  if (!char) return { allowed: false, reason: 'no_character' };
+
+  const now = Date.now();
+  const sessionDurationMs = 24 * 60 * 60 * 1000; // 24 hours
+
+  // Check if we need to reset session XP
+  if (now - (char.lastSessionReset || 0) >= sessionDurationMs) {
+    char.sessionXpGained = 0;
+    char.lastSessionReset = now;
+    writeAll(all);
+  }
+
+  const maxSessionXp = 1000; // 1000 XP per session
+  const used = char.sessionXpGained || 0;
+  const allowed = used < maxSessionXp;
+
+  return {
+    allowed,
+    used,
+    max: maxSessionXp,
+    remaining: maxSessionXp - used,
+    resetTime: char.lastSessionReset
+  };
 }
 
