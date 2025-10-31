@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { generate } from './model-client.js';
+import { logger } from './logger.js';
+import { inputValidator, sanitizeInput, validateString, validateNumber } from './validation.js';
+import { CommandError } from './errorHandler.js';
 
 const FILE = path.join(process.cwd(), 'data', 'rpg.json');
 
@@ -105,37 +108,62 @@ function writeAll(obj) {
 }
 
 export function createCharacter(userId, name, charClass = 'warrior') {
-  if (locks.has(userId)) return null;
+   // Validate inputs
+   if (!userId || typeof userId !== 'string') {
+     throw new CommandError('Invalid user ID', 'INVALID_ARGUMENT');
+   }
 
-  locks.add(userId);
-  try {
-    const all = cache || readAll();
-    if (all[userId]) return null;
+   const sanitizedName = sanitizeInput(name || `Player${userId.slice(0,4)}`);
+   const nameValidation = validateString(sanitizedName, { minLength: 2, maxLength: 32 });
+   if (!nameValidation.valid) {
+     throw new CommandError(nameValidation.reason, 'INVALID_ARGUMENT');
+   }
 
-    const classData = CHARACTER_CLASSES[charClass];
-    if (!classData) throw new Error(`Invalid character class: ${charClass}`);
+   // Validate character class
+   if (!charClass || typeof charClass !== 'string') {
+     throw new CommandError('Invalid character class', 'INVALID_ARGUMENT');
+   }
 
-    const char = {
-      name: name || `Player${userId.slice(0,4)}`,
-      class: charClass,
-      ...classData.baseStats,
-      lvl: 1,
-      xp: 0,
-      skillPoints: 0,
-      abilities: [...classData.abilities],
-      color: classData.color,
-      inventory: {},
-      equipped_weapon: null,
-      equipped_armor: null,
-      gold: 0
-    };
+   const classData = CHARACTER_CLASSES[charClass];
+   if (!classData) {
+     throw new CommandError(`Invalid character class: ${charClass}. Available classes: warrior, mage, rogue, paladin`, 'INVALID_ARGUMENT');
+   }
 
-    all[userId] = char;
-    writeAll(all);
-    return char;
-  } finally {
-    locks.delete(userId);
-  }
+   if (locks.has(userId)) {
+     throw new CommandError('Character creation already in progress', 'RATE_LIMITED');
+   }
+
+   locks.add(userId);
+   try {
+     const all = cache || readAll();
+     if (all[userId]) {
+       throw new CommandError('Character already exists for this user', 'ALREADY_EXISTS');
+     }
+
+     const char = {
+       name: sanitizedName,
+       class: charClass,
+       ...classData.baseStats,
+       lvl: 1,
+       xp: 0,
+       skillPoints: 0,
+       abilities: [...classData.abilities],
+       color: classData.color,
+       inventory: {},
+       equipped_weapon: null,
+       equipped_armor: null,
+       gold: 0,
+       createdAt: Date.now()
+     };
+
+     all[userId] = char;
+     writeAll(all);
+
+     logger.info('Character created', { userId, name: sanitizedName, class: charClass });
+     return char;
+   } finally {
+     locks.delete(userId);
+   }
 }
 
 export function levelFromXp(xp) {
@@ -211,6 +239,21 @@ export function resetCharacter(userId, charClass = 'warrior') {
     all[userId] = def;
     writeAll(all);
     return def;
+  } finally {
+    locks.delete(userId);
+  }
+}
+
+export function deleteCharacter(userId) {
+  if (locks.has(userId)) return false;
+
+  locks.add(userId);
+  try {
+    const all = cache || readAll();
+    if (!all[userId]) return false;
+    delete all[userId];
+    writeAll(all);
+    return true;
   } finally {
     locks.delete(userId);
   }
@@ -750,42 +793,75 @@ export function completeQuest(userId, questId) {
 
 // Spend skill points for a character and persist change
 export function spendSkillPoints(userId, stat, amount = 1) {
-  if (locks.has(userId)) return { success: false, reason: 'locked' };
-  locks.add(userId);
-  try {
-    const all = cache || readAll();
-    const char = all[userId];
-  if (!char) return { success: false, reason: 'no_character' };
-  const pts = char.skillPoints || 0;
-  if (amount <= 0) return { success: false, reason: 'invalid_amount' };
-  if (pts < amount) return { success: false, reason: 'not_enough_points', have: pts };
+   // Validate inputs
+   if (!userId || typeof userId !== 'string') {
+     throw new CommandError('Invalid user ID', 'INVALID_ARGUMENT');
+   }
 
-  if (stat === 'hp') {
-    char.hp = Math.min((char.hp || 0) + amount * 2, char.maxHp || 20);
-  } else if (stat === 'maxhp') {
-    char.maxHp = (char.maxHp || 20) + amount * 5;
-    char.hp = Math.min((char.hp || 0) + amount * 2, char.maxHp);
-  } else if (stat === 'mp') {
-    char.mp = Math.min((char.mp || 0) + amount * 3, char.maxMp || 10);
-  } else if (stat === 'maxmp') {
-    char.maxMp = (char.maxMp || 10) + amount * 5;
-    char.mp = Math.min((char.mp || 0) + amount * 3, char.maxMp);
-  } else if (stat === 'atk') {
-    char.atk = (char.atk || 5) + amount;
-  } else if (stat === 'def') {
-    char.def = (char.def || 2) + amount;
-  } else if (stat === 'spd') {
-    char.spd = (char.spd || 2) + amount;
-  } else {
-    return { success: false, reason: 'unknown_stat' };
-  }
+   if (!stat || typeof stat !== 'string') {
+     throw new CommandError('Invalid stat specified', 'INVALID_ARGUMENT');
+   }
 
-  char.skillPoints = pts - amount;
-  all[userId] = char;
-  writeAll(all);
-  return { success: true, char };
-  } finally {
-    locks.delete(userId);
-  }
+   const amountValidation = validateNumber(amount, { min: 1, max: 100, integer: true, positive: true });
+   if (!amountValidation.valid) {
+     throw new CommandError(amountValidation.reason, 'INVALID_ARGUMENT');
+   }
+
+   // Validate stat type
+   const validStats = ['hp', 'maxhp', 'mp', 'maxmp', 'atk', 'def', 'spd'];
+   if (!validStats.includes(stat)) {
+     throw new CommandError(`Invalid stat. Must be one of: ${validStats.join(', ')}`, 'INVALID_ARGUMENT');
+   }
+
+   if (locks.has(userId)) {
+     throw new CommandError('Character update already in progress', 'RATE_LIMITED');
+   }
+
+   locks.add(userId);
+   try {
+     const all = cache || readAll();
+     const char = all[userId];
+
+     if (!char) {
+       throw new CommandError('Character not found', 'NOT_FOUND');
+     }
+
+     const pts = char.skillPoints || 0;
+     if (pts < amount) {
+       throw new CommandError(`Not enough skill points. Have: ${pts}, Need: ${amount}`, 'INSUFFICIENT_FUNDS');
+     }
+
+     // Apply stat changes with validation
+     if (stat === 'hp') {
+       const currentHp = char.hp || 0;
+       const maxHp = char.maxHp || 20;
+       char.hp = Math.min(currentHp + amount * 2, maxHp);
+     } else if (stat === 'maxhp') {
+       char.maxHp = (char.maxHp || 20) + amount * 5;
+       char.hp = Math.min((char.hp || 0) + amount * 2, char.maxHp);
+     } else if (stat === 'mp') {
+       const currentMp = char.mp || 0;
+       const maxMp = char.maxMp || 10;
+       char.mp = Math.min(currentMp + amount * 3, maxMp);
+     } else if (stat === 'maxmp') {
+       char.maxMp = (char.maxMp || 10) + amount * 5;
+       char.mp = Math.min((char.mp || 0) + amount * 3, char.maxMp);
+     } else if (stat === 'atk') {
+       char.atk = (char.atk || 5) + amount;
+     } else if (stat === 'def') {
+       char.def = (char.def || 2) + amount;
+     } else if (stat === 'spd') {
+       char.spd = (char.spd || 2) + amount;
+     }
+
+     char.skillPoints = pts - amount;
+     all[userId] = char;
+     writeAll(all);
+
+     logger.info('Skill points spent', { userId, stat, amount, newValue: char[stat] });
+     return { success: true, char };
+   } finally {
+     locks.delete(userId);
+   }
 }
 

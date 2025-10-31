@@ -1,7 +1,9 @@
 import { getBalance, addBalance, transferBalance, buyFromMarket, sellToMarket, createInvestment, getUserInvestments, getMarketPrice } from './src/economy.js';
 import { warnUser, muteUser, isUserMuted, checkAutoMod, getUserModStats } from './src/moderation.js';
-import { createCharacter, getCharacter, applyXp, addItemToInventory, getInventory } from './src/rpg.js';
+import { createCharacter, getCharacter, applyXp, addItemToInventory, getInventory, deleteCharacter } from './src/rpg.js';
 import { searchSongs, play, pause, stop, getQueue } from './src/music.js';
+import { CommandError, validateUser, validateGuild, validatePermissions, validateRange, validateNotEmpty, createRateLimiter } from './src/errorHandler.js';
+import { inputValidator, sanitizeInput, validateUserId, validateNumber, validateString } from './src/validation.js';
 import assert from 'assert';
 import fs from 'fs';
 
@@ -11,7 +13,12 @@ class ComprehensiveTestSuite {
     this.testCount = 0;
     this.passCount = 0;
     this.failCount = 0;
-    this.testUsers = ['testuser1', 'testuser2', 'testuser3'];
+    // Generate unique user IDs for each test run to avoid conflicts
+    this.testUsers = [
+      `testuser_${Date.now()}_1`,
+      `testuser_${Date.now()}_2`,
+      `testuser_${Date.now()}_3`
+    ];
     this.testGuild = 'testguild1';
   }
 
@@ -33,6 +40,15 @@ class ComprehensiveTestSuite {
 
   async delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  cleanupTestCharacter(userId) {
+    try {
+      deleteCharacter(userId);
+      this.log(`Cleaned up character for ${userId}`, true);
+    } catch (error) {
+      this.logError(`Failed to clean up character for ${userId}`, error);
+    }
   }
 
   async testEconomy() {
@@ -111,6 +127,9 @@ class ComprehensiveTestSuite {
   async testRPG() {
     console.log('\n⚔️ Testing RPG System');
     try {
+      // Cleanup any existing character before creating
+      this.cleanupTestCharacter(this.testUsers[0]);
+
       // Test character creation
       const char = createCharacter(this.testUsers[0], 'TestHero');
       this.log(`Character created: ${char.name}`, char.name === 'TestHero');
@@ -159,7 +178,7 @@ class ComprehensiveTestSuite {
   }
 
   async testIntegrations() {
-    console.log('\n🔗 Testing System Integrations');
+    console.log('\n🔗 Testing System Integrations and Security');
     try {
       // Test RPG-Economy integration: Buy item with gold
       addBalance(this.testUsers[0], 1000);
@@ -172,14 +191,38 @@ class ComprehensiveTestSuite {
       const invResult = addItemToInventory(this.testUsers[0], 'health_potion', 1);
       this.log(`Inventory updated after purchase: ${invResult.success}`, invResult.success);
 
+      // Test input sanitization in integration
+      const unsafeContent = '<script>alert("xss")</script>Test message';
+      const safeContent = sanitizeInput(unsafeContent);
+      this.log(`Cross-site scripting prevented: ${safeContent !== unsafeContent}`, safeContent !== unsafeContent);
+
+      // Test SQL injection prevention (simulated)
+      const sqlInjectionAttempt = "'; DROP TABLE users; --";
+      const sanitizedSQL = sanitizeInput(sqlInjectionAttempt);
+      this.log(`SQL injection attempt sanitized: ${sanitizedSQL.length < sqlInjectionAttempt.length}`, sanitizedSQL.length < sqlInjectionAttempt.length);
+
     } catch (error) {
       this.logError('Integration test failed', error);
     }
   }
 
   async testErrorHandling() {
-    console.log('\n🚨 Testing Error Handling');
+    console.log('\n🚨 Testing Error Handling and Validation');
     try {
+      // Test validation functions
+      const stringValidation = validateString('test', { minLength: 2, maxLength: 10 });
+      this.log(`String validation: ${stringValidation.valid}`, stringValidation.valid);
+
+      const numberValidation = validateNumber(5, { min: 1, max: 10, integer: true });
+      this.log(`Number validation: ${numberValidation.valid}`, numberValidation.valid);
+
+      const userIdValidation = validateUserId('123456789012345678'); // Valid Discord snowflake
+      this.log(`User ID validation: ${userIdValidation.valid}`, userIdValidation.valid);
+
+      // Test input sanitization
+      const sanitized = sanitizeInput('<script>alert("xss")</script>Hello');
+      this.log(`Input sanitization: ${sanitized === 'alert("xss")Hello'}`, sanitized === 'alert("xss")Hello');
+
       // Test invalid transfer
       const invalidTransfer = transferBalance(this.testUsers[0], this.testUsers[1], 10000);
       this.log(`Invalid transfer rejected: ${!invalidTransfer.success}`, !invalidTransfer.success);
@@ -191,6 +234,20 @@ class ComprehensiveTestSuite {
       // Test invalid character
       const invalidChar = getCharacter('nonexistent');
       this.log(`Invalid character handled: ${!invalidChar}`, !invalidChar);
+
+      // Test rate limiter
+      const rateLimiter = createRateLimiter(3, 1000, (key) => key);
+      let rateLimitTriggered = false;
+      for (let i = 0; i < 5; i++) {
+        try {
+          await rateLimiter.consume('test_user');
+        } catch (error) {
+          if (error instanceof CommandError && error.code === 'RATE_LIMITED') {
+            rateLimitTriggered = true;
+          }
+        }
+      }
+      this.log(`Rate limiter working: ${rateLimitTriggered}`, rateLimitTriggered);
 
     } catch (error) {
       this.logError('Error handling test failed', error);
