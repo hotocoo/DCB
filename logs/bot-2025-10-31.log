@@ -13,3 +13,14 @@
 [2025-10-31T16:15:40.558Z] [SUCCESS] Login successful
 [2025-10-31T16:15:40.561Z] [SUCCESS] Bot started successfully as HNH#0111 | {"guilds":1,"users":3}
 [2025-10-31T16:16:24.359Z] [INFO] Received SIGINT, shutting down gracefully...
+[2025-10-31T16:32:13.190Z] [INFO] MusicManager initialized | {"initializationTime":"2025-10-31T16:32:13.189Z","hasSpotifyCredentials":true,"hasYouTubeAccess":true,"hasDeezzerAccess":true,"ffmpegStaticAvailable":true}
+[2025-10-31T16:32:13.218Z] [INFO] Loading commands | {"path":"C:\\Users\\9700X-5070\\Downloads\\DCB-1\\src\\commands"}
+[2025-10-31T16:32:13.219Z] [INFO] Found command files | {"count":35,"files":["8ball.js","achievements.js","admin.js","ai.js","api.js","coinflip.js","connect4.js","echo.js","economy.js","explore.js","fun.js","guess.js","guild.js","hangman.cjs","hangman.js","inventory.js","memory.js","minigame.js","music.js","novel.js","ping.js","poll.js","profile.js","remind.js","roll.js","rpg.js","rps.js","setmodel.js","tictactoe.js","togglechat.js","toggleplay.js","trade.js","trivia.js","weather.js","wordle.js"]}
+[2025-10-31T16:32:13.226Z] [INFO] Initializing AI models and personality profiles
+[2025-10-31T16:32:13.227Z] [INFO] AI initialization completed | {"modelsCount":5,"personalitiesCount":4}
+[2025-10-31T16:32:13.240Z] [ERROR] Failed to load command file | {"file":"hangman.js","filePath":"C:\\Users\\9700X-5070\\Downloads\\DCB-1\\src\\commands\\hangman.js","error":"Unexpected token '}'","stack":"SyntaxError: Unexpected token '}'\n    at compileSourceTextModule (node:internal/modules/esm/utils:346:16)\n    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:107:18)\n    at #translate (node:internal/modules/esm/loader:546:20)\n    at afterLoad (node:internal/modules/esm/loader:596:29)\n    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:601:12)\n    at #createModuleJob (node:internal/modules/esm/loader:624:36)\n    at #getJobFromResolveResult (node:internal/modules/esm/loader:343:34)\n    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:311:41)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:664:25)"}
+[2025-10-31T16:32:13.257Z] [SUCCESS] Commands loaded successfully | {"loadedCount":35}
+[2025-10-31T16:32:13.258Z] [INFO] Attempting to login to Discord...
+[2025-10-31T16:32:14.341Z] [SUCCESS] Login successful
+[2025-10-31T16:32:14.358Z] [SUCCESS] Bot started successfully as HNH#0111 | {"guilds":1,"users":3}
+[2025-10-31T16:32:30.876Z] [INFO] Received SIGINT, shutting down gracefully...
