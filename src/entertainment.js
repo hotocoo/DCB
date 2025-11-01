@@ -10,6 +10,8 @@ class EntertainmentManager {
     this.loadEntertainment();
     this.jokeCache = new Map();
     this.funStats = new Map();
+    this.contentCache = new Map(); // Cache for recently generated content
+    this.MAX_CACHE_SIZE = 1000;
   }
 
   ensureStorage() {
@@ -174,13 +176,21 @@ class EntertainmentManager {
     ];
 
     const continuation = continuations[Math.floor(Math.random() * continuations.length)];
+    const story = `${baseStory} ${continuation}`;
 
-    return {
-      story: `${baseStory} ${continuation}`,
+    const content = {
+      story,
       genre,
       prompt,
-      length: 'medium'
+      length: 'medium',
+      type: 'story',
+      id: `story_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     };
+
+    // Store for sharing
+    this.storeContentForSharing(content);
+
+    return content;
   }
 
   // Riddle and Puzzle System
@@ -253,11 +263,17 @@ class EntertainmentManager {
     const categoryFacts = facts[category] || facts.science;
     const fact = categoryFacts[Math.floor(Math.random() * categoryFacts.length)];
 
-    return {
+    const content = {
       fact,
       category,
+      type: 'fact',
       id: `fact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     };
+
+    // Store for sharing
+    this.storeContentForSharing(content);
+
+    return content;
   }
 
   // Quote System
@@ -292,11 +308,17 @@ class EntertainmentManager {
     const categoryQuotes = quotes[category] || quotes.inspirational;
     const quote = categoryQuotes[Math.floor(Math.random() * categoryQuotes.length)];
 
-    return {
+    const content = {
       ...quote,
       category,
+      type: 'quote',
       id: `quote_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     };
+
+    // Store for sharing
+    this.storeContentForSharing(content);
+
+    return content;
   }
 
   // Tongue Twister Generator
@@ -393,6 +415,32 @@ class EntertainmentManager {
     ];
 
     return questions[Math.floor(Math.random() * questions.length)];
+  }
+
+  // Content retrieval for sharing
+  getContentForSharing(contentId) {
+    // Check cache first
+    if (this.contentCache.has(contentId)) {
+      return this.contentCache.get(contentId);
+    }
+
+    // For now, content is generated on-demand and not persistently stored
+    // In a real implementation, you might store recent content in the JSON file
+    return null;
+  }
+
+  // Store content for potential sharing (recently generated content)
+  storeContentForSharing(content) {
+    if (this.contentCache.size >= this.MAX_CACHE_SIZE) {
+      // Remove oldest entry
+      const firstKey = this.contentCache.keys().next().value;
+      this.contentCache.delete(firstKey);
+    }
+
+    this.contentCache.set(content.id, {
+      ...content,
+      timestamp: Date.now()
+    });
   }
 
   // Fun Statistics
@@ -552,6 +600,10 @@ export function createFunChallenge(type = 'daily') {
 
 export function getFunLeaderboard(category = 'jokes', limit = 10) {
   return entertainmentManager.getFunLeaderboard(category, limit);
+}
+
+export function getContentForSharing(contentId) {
+  return entertainmentManager.getContentForSharing(contentId);
 }
 
 // Auto-cleanup every hour

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { updateUserStats } from '../achievements.js';
+import { tttGames } from '../game-states.js';
 
 export const data = new SlashCommandBuilder()
   .setName('tictactoe')
@@ -57,6 +58,9 @@ export async function execute(interaction) {
       isAI: !opponent,
       created: Date.now()
     };
+
+    // Store game state
+    tttGames.set(gameId, gameState);
 
     await sendTicTacToeBoard(interaction, gameState);
   } catch (error) {
@@ -148,6 +152,46 @@ async function sendTicTacToeBoard(interaction, gameState) {
       if (aiMove !== null) {
         gameState.board[aiMove] = 'O';
         gameState.currentPlayer = 'X';
+        // Check for AI win after move
+        const aiWinner = checkWinner(gameState.board);
+        if (aiWinner) {
+          gameState.status = 'completed';
+
+          if (aiWinner !== 'tie') {
+            const winnerPlayer = gameState.players[aiWinner];
+            if (winnerPlayer.id !== 'ai') {
+              await updateUserStats(winnerPlayer.id, { games: { tictactoe_wins: 1 } });
+            }
+          }
+
+          // Update statistics for both players
+          if (gameState.players.X.id !== 'ai') {
+            await updateUserStats(gameState.players.X.id, { games: { tictactoe_games: 1 } });
+          }
+          if (gameState.players.O.id !== 'ai') {
+            await updateUserStats(gameState.players.O.id, { games: { tictactoe_games: 1 } });
+          }
+
+          const resultEmbed = new EmbedBuilder()
+            .setTitle('⭕ Tic-Tac-Toe - Game Over!')
+            .setColor(aiWinner === 'tie' ? 0xFFA500 : 0x00FF00)
+            .setDescription(aiWinner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${gameState.players[aiWinner].name} wins!**`)
+            .addFields({
+              name: 'Final Board',
+              value: formatBoard(gameState.board),
+              inline: false
+            });
+
+          // Clean up game state
+          tttGames.delete(gameState.id);
+
+          if (interaction.replied || interaction.deferred) {
+            await interaction.editReply({ embeds: [resultEmbed], components: [] });
+          } else {
+            await interaction.reply({ embeds: [resultEmbed] });
+          }
+          return;
+        }
         await sendTicTacToeBoard(interaction, gameState);
       }
     }, 1000);

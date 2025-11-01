@@ -12,13 +12,13 @@ import { inputValidator, sanitizeInput, validateUserId, validateNumber, validate
 
 // Feature modules
 import { isOnCooldown, setCooldown, getFormattedCooldown, getButtonCooldownType } from './cooldowns.js';
-import { wordleGames, hangmanGames, guessGames, combatGames, explorationGames, connect4Games } from './game-states.js';
+import { wordleGames, hangmanGames, guessGames, combatGames, explorationGames, connect4Games, triviaGames, tttGames, pollGames, memoryGames } from './game-states.js';
 import { getCharacter, resetCharacter, spendSkillPoints, encounterMonster, fightTurn, applyXp, narrate, saveCharacter, addItemToInventory, removeItemFromInventory, getItemInfo, getItemRarityInfo, generateRandomItem } from './rpg.js';
 import { addBalance, getBalance, transferBalance, getMarketPrice, buyFromMarket, sellToMarket } from './economy.js';
 import { getUserGuild, contributeToGuild } from './guilds.js';
 import { warnUser, muteUser, unmuteUser, unbanUser } from './moderation.js';
 import { pause, resume, skip, stop, shuffleQueue, clearQueue, getQueue, getMusicStats, searchSongs, play, back } from './music.js';
-import { getRandomJoke, generateStory, getRiddle, getFunFact, getRandomQuote, magic8Ball, generateFunName, createFunChallenge } from './entertainment.js';
+import { getRandomJoke, generateStory, getRiddle, getFunFact, getRandomQuote, magic8Ball, generateFunName, createFunChallenge, rateJoke } from './entertainment.js';
 import { getLocations } from './locations.js';
 import { getActiveAuctions, createAuction } from './trading.js';
 import { updateProfile } from './profiles.js';
@@ -1082,6 +1082,176 @@ async function handleButtonInteraction(interaction, client) {
       return;
     }
 
+    // Explore unlock button handler
+    if (action === 'explore_unlock') {
+      const [, targetUserId] = interaction.customId.split(':');
+
+      if (targetUserId && targetUserId !== interaction.user.id) {
+        logCommandExecution(interaction, false, new Error('Wrong user'));
+        return safeInteractionReply(interaction, { content: 'You cannot unlock locations for another user.', flags: MessageFlags.Ephemeral });
+      }
+
+      const char = getCharacter(interaction.user.id);
+      if (!char) {
+        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
+      }
+
+      // Import discoverLocation function
+      const { discoverLocation, unlockLocation, getLocations } = await import('./locations.js');
+
+      const locations = getLocations();
+      const locationOrder = ['whispering_woods', 'crystal_caverns', 'volcano_summit', 'forgotten_temple', 'shadow_realm', 'celestial_spire'];
+
+      // Find the next unlockable location
+      let nextLocationId = null;
+      for (const locId of locationOrder) {
+        const location = locations[locId];
+        if (!location || location.unlocked) continue;
+
+        const discoverResult = await discoverLocation(interaction.user.id, locId);
+        if (discoverResult.success && discoverResult.canUnlock) {
+          nextLocationId = locId;
+          break;
+        }
+      }
+
+      if (!nextLocationId) {
+        // No unlockable locations - update embed to show this
+        const currentEmbed = interaction.message.embeds[0];
+        const updatedEmbed = EmbedBuilder.from(currentEmbed)
+          .setDescription('🏕️ **No new locations available!**\n\nYou\'ve discovered all currently available locations. Check back later for new content!');
+
+        // Remove the unlock button
+        const updatedComponents = interaction.message.components.map(row => ({
+          ...row,
+          components: row.components.filter(btn => btn.customId !== `explore_unlock:${interaction.user.id}`)
+        }));
+
+        await safeInteractionUpdate(interaction, {
+          embeds: [updatedEmbed],
+          components: updatedComponents.length > 0 ? updatedComponents : []
+        });
+        return;
+      }
+
+      // Attempt to unlock the location
+      const unlockResult = unlockLocation(interaction.user.id, nextLocationId);
+
+      if (unlockResult.success) {
+        const unlockedLocation = unlockResult.location;
+
+        // Create success embed
+        const successEmbed = new EmbedBuilder()
+          .setTitle('🎉 New Location Discovered!')
+          .setColor(unlockedLocation.color)
+          .setDescription(unlockResult.message)
+          .addFields(
+            { name: '📍 Location', value: unlockedLocation.name, inline: true },
+            { name: '🏆 Level', value: unlockedLocation.level, inline: true },
+            { name: '🎯 Type', value: unlockedLocation.type, inline: true },
+            { name: '💎 Rewards', value: `${unlockedLocation.rewards.xp} XP, ${unlockedLocation.rewards.gold} gold`, inline: false }
+          );
+
+        // Update the original message with the new location added
+        const currentEmbed = interaction.message.embeds[0];
+        const currentDescription = currentEmbed.description || '';
+
+        // Add the new location to the embed fields
+        const newFields = [...(currentEmbed.fields || [])];
+        newFields.push({
+          name: `${unlockedLocation.emoji} ${unlockedLocation.name} (Level ${unlockedLocation.level})`,
+          value: `**Type:** ${unlockedLocation.type}\n**Description:** ${unlockedLocation.description}\n**Rewards:** ${unlockedLocation.rewards.xp} XP, ${unlockedLocation.rewards.gold} gold`,
+          inline: false
+        });
+
+        const updatedEmbed = EmbedBuilder.from(currentEmbed)
+          .setFields(newFields);
+
+        await safeInteractionUpdate(interaction, { embeds: [updatedEmbed] });
+
+        // Send success message
+        await safeInteractionReply(interaction, { embeds: [successEmbed], flags: MessageFlags.Ephemeral });
+      } else {
+        // Unlock failed
+        const errorEmbed = new EmbedBuilder()
+          .setTitle('❌ Location Unlock Failed')
+          .setColor(0xFF0000)
+          .setDescription(`Failed to unlock location: ${unlockResult.reason || 'Unknown error'}`);
+
+        await safeInteractionReply(interaction, { embeds: [errorEmbed], flags: MessageFlags.Ephemeral });
+      }
+      return;
+    }
+
+    // Explore map button handler
+    if (action === 'explore_map') {
+      const [, targetUserId] = interaction.customId.split(':');
+
+      if (targetUserId && targetUserId !== interaction.user.id) {
+        logCommandExecution(interaction, false, new Error('Wrong user'));
+        return safeInteractionReply(interaction, { content: 'You cannot view map for another user.', flags: MessageFlags.Ephemeral });
+      }
+
+      const char = getCharacter(interaction.user.id);
+      if (!char) {
+        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
+      }
+
+      const locations = getLocations();
+      const availableLocations = Object.values(locations).filter(loc => loc.unlocked);
+
+      if (availableLocations.length === 0) {
+        return safeInteractionReply(interaction, { content: '🏕️ No locations available yet. Start your adventure by exploring the Whispering Woods!\nUse `/explore discover location:whispering_woods`', flags: MessageFlags.Ephemeral });
+      }
+
+      // Create map representation using text-based layout
+      const locationOrder = ['whispering_woods', 'crystal_caverns', 'volcano_summit', 'forgotten_temple', 'shadow_realm', 'celestial_spire'];
+      let mapText = '**🌍 World Map**\n\n';
+
+      // Create a simple path representation
+      const pathSegments = [];
+      for (let i = 0; i < locationOrder.length; i++) {
+        const locId = locationOrder[i];
+        const location = locations[locId];
+
+        if (location && location.unlocked) {
+          // Unlocked location
+          pathSegments.push(`${location.emoji} **[${location.name}]**`);
+        } else if (location) {
+          // Locked location (not discovered yet)
+          pathSegments.push(`🔒 *[???]*`);
+        }
+
+        // Add connector arrow if not the last location
+        if (i < locationOrder.length - 1) {
+          pathSegments.push(' → ');
+        }
+      }
+
+      mapText += pathSegments.join('') + '\n\n';
+
+      // Add location details
+      mapText += '**📍 Discovered Locations:**\n';
+      availableLocations.forEach(location => {
+        mapText += `${location.emoji} **${location.name}** (Level ${location.level}) - ${location.type}\n`;
+      });
+
+      const mapEmbed = new EmbedBuilder()
+        .setTitle('🗺️ World Map')
+        .setColor(0x0099FF)
+        .setDescription(mapText)
+        .setFooter({ text: 'Use /explore locations to view details and rewards for each location' });
+
+      // Keep the original buttons
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`explore_unlock:${interaction.user.id}`).setLabel('🔓 Discover More').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`explore_map:${interaction.user.id}`).setLabel('🗺️ View Map').setStyle(ButtonStyle.Secondary)
+      );
+
+      await safeInteractionUpdate(interaction, { embeds: [mapEmbed], components: [row] });
+      return;
+    }
+
     // RPG/Explore button handlers
     if (action === 'rpg_leaderboard') {
       const [, offset, targetUserId] = interaction.customId.split(':');
@@ -1678,20 +1848,119 @@ async function handleButtonInteraction(interaction, client) {
       return;
     }
 
-    if (action === 'memory_reset') {
-      const [, targetUserId] = interaction.customId.split(':');
+    // Memory game button handlers
+    if (action.startsWith('memory_')) {
+      const parts = interaction.customId.split('_');
+      const cardIndexStr = parts[1];
+      const messageId = interaction.message.id;
 
-      if (targetUserId && targetUserId !== interaction.user.id) {
-        logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot reset memory for another user.', flags: MessageFlags.Ephemeral });
+      // Handle memory reset (existing implementation)
+      if (cardIndexStr === 'reset') {
+        const [, , targetUserId] = interaction.customId.split(':');
+
+        if (targetUserId && targetUserId !== interaction.user.id) {
+          logCommandExecution(interaction, false, new Error('Wrong user'));
+          return safeInteractionReply(interaction, { content: 'You cannot reset memory for another user.', flags: MessageFlags.Ephemeral });
+        }
+
+        const gameState = memoryGames.get(messageId);
+        if (!gameState) {
+          return safeInteractionReply(interaction, { content: '❌ **Memory game not found!**', flags: MessageFlags.Ephemeral });
+        }
+
+        // Reset flipped cards
+        gameState.flippedCards = [];
+        gameState.moves++;
+
+        // Update the board display
+        const { sendMemoryBoard } = await import('./commands/memory.js');
+        await sendMemoryBoard(interaction, gameState);
+        return;
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle('🔄 Memory Game Reset')
-        .setColor(0x4CAF50)
-        .setDescription('Memory game has been reset!');
+      // Handle card flip
+      const cardIndex = parseInt(cardIndexStr);
+      if (isNaN(cardIndex) || cardIndex < 0 || cardIndex >= 12) {
+        return safeInteractionReply(interaction, { content: '❌ **Invalid card!**', flags: MessageFlags.Ephemeral });
+      }
 
-      await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+      const gameState = memoryGames.get(messageId);
+      if (!gameState) {
+        return safeInteractionReply(interaction, { content: '❌ **Memory game not found!**', flags: MessageFlags.Ephemeral });
+      }
+
+      // Validate game state
+      if (!gameState.gameActive) {
+        return safeInteractionReply(interaction, { content: '❌ **Game is already completed!**', flags: MessageFlags.Ephemeral });
+      }
+
+      const card = gameState.cards[cardIndex];
+
+      // Check if card is already matched or flipped
+      if (card.isMatched) {
+        return safeInteractionReply(interaction, { content: '❌ **Card is already matched!**', flags: MessageFlags.Ephemeral });
+      }
+
+      if (gameState.flippedCards.includes(cardIndex)) {
+        return safeInteractionReply(interaction, { content: '❌ **Card is already flipped!**', flags: MessageFlags.Ephemeral });
+      }
+
+      // Flip the card
+      gameState.flippedCards.push(cardIndex);
+      gameState.moves++;
+
+      // Check for matches (if 2 cards are flipped)
+      if (gameState.flippedCards.length === 2) {
+        const [firstIndex, secondIndex] = gameState.flippedCards;
+        const firstCard = gameState.cards[firstIndex];
+        const secondCard = gameState.cards[secondIndex];
+
+        if (firstCard.emoji === secondCard.emoji) {
+          // Match found!
+          firstCard.isMatched = true;
+          secondCard.isMatched = true;
+          gameState.matchedPairs++;
+
+          // Clear flipped cards immediately for matches
+          gameState.flippedCards = [];
+
+          // Check for win condition
+          if (gameState.matchedPairs === gameState.totalPairs) {
+            gameState.gameActive = false;
+            const timeElapsed = Math.round((Date.now() - gameState.startTime) / 1000);
+
+            const winEmbed = new EmbedBuilder()
+              .setTitle('🎉 Memory Master!')
+              .setDescription(`Congratulations! You matched all ${gameState.totalPairs} pairs in ${gameState.moves} moves and ${timeElapsed} seconds! 🏆`)
+              .setColor(0x00FF00)
+              .addFields(
+                {
+                  name: '📊 Stats',
+                  value: `**Moves:** ${gameState.moves}\n**Time:** ${timeElapsed}s\n**Efficiency:** ${((gameState.totalPairs / gameState.moves) * 100).toFixed(1)}%`,
+                  inline: true
+                },
+                {
+                  name: '🏆 Rating',
+                  value: getPerformanceRating(gameState.moves, gameState.totalPairs, timeElapsed),
+                  inline: true
+                }
+              );
+
+            // Clean up game state
+            memoryGames.delete(messageId);
+
+            await safeInteractionUpdate(interaction, { embeds: [winEmbed], components: [] });
+            return;
+          }
+        } else {
+          // No match - cards will stay flipped temporarily, reset button will be shown
+          // The reset button handler above will clear the flipped cards
+        }
+      }
+
+      // Update the board display
+      const { sendMemoryBoard } = await import('./commands/memory.js');
+      await sendMemoryBoard(interaction, gameState);
       return;
     }
 
@@ -1902,19 +2171,51 @@ async function handleButtonInteraction(interaction, client) {
     }
 
     if (action === 'fun_rate') {
-      const [, jokeId, rating, targetUserId] = interaction.customId.split(':');
+      const [, jokeId, ratingStr, targetUserId] = interaction.customId.split(':');
 
+      // Validate user ID
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
         return safeInteractionReply(interaction, { content: 'You cannot rate jokes for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle('⭐ Rating Submitted')
-        .setColor(0x4CAF50)
-        .setDescription(`You rated joke ${jokeId} with ${rating} stars!`);
+      // Validate rating
+      const rating = parseInt(ratingStr);
+      if (isNaN(rating) || rating < 1 || rating > 5) {
+        return safeInteractionReply(interaction, { content: '❌ Invalid rating. Rating must be between 1 and 5 stars.', flags: MessageFlags.Ephemeral });
+      }
 
-      await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+      // Validate joke ID format (basic check)
+      if (!jokeId || jokeId.length < 10) {
+        return safeInteractionReply(interaction, { content: '❌ Invalid joke reference.', flags: MessageFlags.Ephemeral });
+      }
+
+      try {
+        // Attempt to rate the joke
+        const ratingResult = rateJoke(jokeId, rating);
+
+        if (!ratingResult) {
+          return safeInteractionReply(interaction, { content: '❌ Failed to record your rating. Please try again.', flags: MessageFlags.Ephemeral });
+        }
+
+        // Create success response embed
+        const embed = new EmbedBuilder()
+          .setTitle('⭐ Thanks for your rating!')
+          .setColor(0x4CAF50)
+          .setDescription(`You rated this joke with **${rating} star${rating !== 1 ? 's' : ''}!** ⭐\n\nYour feedback helps improve our joke collection!`)
+          .setFooter({ text: 'Rating recorded successfully' });
+
+        await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+
+      } catch (error) {
+        logger.error('Error rating joke', error, {
+          userId: interaction.user.id,
+          jokeId,
+          rating
+        });
+        return safeInteractionReply(interaction, { content: '❌ An error occurred while recording your rating. Please try again.', flags: MessageFlags.Ephemeral });
+      }
+
       return;
     }
 
@@ -1948,12 +2249,109 @@ async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot share for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle('📤 Content Shared')
-        .setColor(0x2196F3)
-        .setDescription(`Content ${contentId} has been shared!`);
+      // Validate user ID matches
+      if (targetUserId !== interaction.user.id) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Sharing failed!** User ID mismatch.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
 
-      await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+      // Import content retrieval function
+      const { getContentForSharing } = await import('./entertainment.js');
+      const content = getContentForSharing(contentId);
+
+      if (!content) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Content not found!** This content may have expired or is no longer available for sharing.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Create shareable message based on content type
+      let shareEmbed;
+      let shareContent = '';
+
+      try {
+        switch (content.type) {
+          case 'story':
+            shareEmbed = new EmbedBuilder()
+              .setTitle(`📖 ${content.genre.charAt(0).toUpperCase() + content.genre.slice(1)} Story`)
+              .setColor(0x9932CC)
+              .setDescription(content.story)
+              .addFields({
+                name: '🎯 Prompt',
+                value: content.prompt,
+                inline: false
+              })
+              .setFooter({
+                text: `Shared by ${interaction.user.username} • Originally generated from /fun story`,
+                iconURL: interaction.user.displayAvatarURL({ dynamic: true })
+              });
+            break;
+
+          case 'fact':
+            shareEmbed = new EmbedBuilder()
+              .setTitle(`🧠 ${content.category === 'random' ? 'Random' : content.category.charAt(0).toUpperCase() + content.category.slice(1)} Fun Fact`)
+              .setColor(0x4CAF50)
+              .setDescription(content.fact)
+              .setFooter({
+                text: `Shared by ${interaction.user.username} • Originally generated from /fun fact`,
+                iconURL: interaction.user.displayAvatarURL({ dynamic: true })
+              });
+            break;
+
+          case 'quote':
+            shareEmbed = new EmbedBuilder()
+              .setTitle(`💬 ${content.category.charAt(0).toUpperCase() + content.category.slice(1)} Quote`)
+              .setColor(0xE91E63)
+              .addFields(
+                { name: 'Quote', value: `"${content.quote}"`, inline: false },
+                { name: 'Author', value: content.author, inline: true },
+                { name: 'Category', value: content.category, inline: true }
+              )
+              .setFooter({
+                text: `Shared by ${interaction.user.username} • Originally generated from /fun quote`,
+                iconURL: interaction.user.displayAvatarURL({ dynamic: true })
+              });
+            break;
+
+          default:
+            throw new Error(`Unknown content type: ${content.type}`);
+        }
+
+        // Send the shared content to the channel
+        await interaction.channel.send({
+          content: `📤 **${interaction.user.username} shared some fun content!**`,
+          embeds: [shareEmbed]
+        });
+
+        // Update the original interaction
+        const successEmbed = new EmbedBuilder()
+          .setTitle('✅ Content Shared Successfully!')
+          .setColor(0x4CAF50)
+          .setDescription('Your content has been shared with the channel!')
+          .setFooter({ text: 'Thanks for spreading the fun!' });
+
+        await safeInteractionUpdate(interaction, { embeds: [successEmbed], components: [] });
+
+      } catch (error) {
+        logger.error('Error sharing fun content', error, {
+          userId: interaction.user.id,
+          contentId,
+          contentType: content.type
+        });
+
+        // Handle sharing failure
+        const errorEmbed = new EmbedBuilder()
+          .setTitle('❌ Sharing Failed')
+          .setColor(0xFF0000)
+          .setDescription('Sorry, there was an error sharing your content. Please try again.')
+          .setFooter({ text: 'If this persists, contact the bot administrator' });
+
+        await safeInteractionUpdate(interaction, { embeds: [errorEmbed], components: [] });
+      }
+
       return;
     }
 
@@ -2349,6 +2747,381 @@ async function handleButtonInteraction(interaction, client) {
       }
 
       await sendConnect4Board(interaction, gameState);
+      return;
+    }
+
+    // Tic-Tac-Toe button handler
+    if (action === 'ttt') {
+      const [, positionStr, gameId] = interaction.customId.split('_');
+
+      const gameState = tttGames.get(gameId);
+      if (!gameState) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Game not found!** The game may have expired or been completed.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Validate user turn
+      const currentPlayerId = gameState.players[gameState.currentPlayer]?.id;
+      if (interaction.user.id !== currentPlayerId) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Not your turn!** Please wait for the other player.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      const position = parseInt(positionStr);
+      if (isNaN(position) || position < 0 || position > 8) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Invalid position!** Please select a valid board position.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Check if position is empty
+      if (gameState.board[position] !== null) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Position already taken!** Please choose an empty square.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Make the move
+      gameState.board[position] = gameState.currentPlayer;
+
+      // Check for winner
+      const winner = checkWinner(gameState.board);
+      if (winner) {
+        gameState.status = 'completed';
+
+        if (winner !== 'tie') {
+          const winnerPlayer = gameState.players[winner];
+          if (winnerPlayer.id !== 'ai') {
+            await updateUserStats(winnerPlayer.id, { games: { tictactoe_wins: 1 } });
+          }
+        }
+
+        // Update statistics for both players
+        if (gameState.players.X.id !== 'ai') {
+          await updateUserStats(gameState.players.X.id, { games: { tictactoe_games: 1 } });
+        }
+        if (gameState.players.O.id !== 'ai') {
+          await updateUserStats(gameState.players.O.id, { games: { tictactoe_games: 1 } });
+        }
+
+        const resultEmbed = new EmbedBuilder()
+          .setTitle('⭕ Tic-Tac-Toe - Game Over!')
+          .setColor(winner === 'tie' ? 0xFFA500 : 0x00FF00)
+          .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${gameState.players[winner].name} wins!**`)
+          .addFields({
+            name: 'Final Board',
+            value: formatBoard(gameState.board),
+            inline: false
+          });
+
+        // Clean up game state
+        tttGames.delete(gameId);
+
+        await safeInteractionUpdate(interaction, { embeds: [resultEmbed], components: [] });
+        return;
+      }
+
+      // Switch turns if game continues
+      gameState.currentPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
+
+      // Handle AI move if playing against AI
+      if (gameState.isAI && gameState.currentPlayer === 'O' && gameState.status === 'active') {
+        // Import AI move function
+        const { getAIMove } = await import('./commands/tictactoe.js');
+        const aiMove = getAIMove(gameState.board, gameState.difficulty);
+        if (aiMove !== null) {
+          gameState.board[aiMove] = 'O';
+          gameState.currentPlayer = 'X';
+
+          // Check for AI win
+          const aiWinner = checkWinner(gameState.board);
+          if (aiWinner) {
+            gameState.status = 'completed';
+
+            if (aiWinner !== 'tie') {
+              const winnerPlayer = gameState.players[aiWinner];
+              if (winnerPlayer.id !== 'ai') {
+                await updateUserStats(winnerPlayer.id, { games: { tictactoe_wins: 1 } });
+              }
+            }
+
+            // Update statistics for both players
+            if (gameState.players.X.id !== 'ai') {
+              await updateUserStats(gameState.players.X.id, { games: { tictactoe_games: 1 } });
+            }
+            if (gameState.players.O.id !== 'ai') {
+              await updateUserStats(gameState.players.O.id, { games: { tictactoe_games: 1 } });
+            }
+
+            const resultEmbed = new EmbedBuilder()
+              .setTitle('⭕ Tic-Tac-Toe - Game Over!')
+              .setColor(aiWinner === 'tie' ? 0xFFA500 : 0x00FF00)
+              .setDescription(aiWinner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${gameState.players[aiWinner].name} wins!**`)
+              .addFields({
+                name: 'Final Board',
+                value: formatBoard(gameState.board),
+                inline: false
+              });
+
+            // Clean up game state
+            tttGames.delete(gameId);
+
+            await safeInteractionUpdate(interaction, { embeds: [resultEmbed], components: [] });
+            return;
+          }
+
+          gameState.currentPlayer = 'X';
+        }
+      }
+
+      // Update the board display
+      const { sendTicTacToeBoard } = await import('./commands/tictactoe.js');
+      await sendTicTacToeBoard(interaction, gameState);
+
+      return;
+    }
+
+    // Poll button handler
+    if (action === 'poll') {
+      const [, optionIndexStr] = interaction.customId.split('_');
+      const optionIndex = parseInt(optionIndexStr);
+
+      // Get message ID to find the poll data
+      const messageId = interaction.message.id;
+      const pollData = pollGames.get(messageId);
+
+      if (!pollData) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Poll not found!** This poll may have expired or been completed.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Check if poll has expired
+      if (Date.now() > pollData.endTime) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Poll has expired!** You can no longer vote on this poll.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Validate option index
+      if (isNaN(optionIndex) || optionIndex < 0 || optionIndex >= pollData.options.length) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Invalid poll option!**',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      const userId = interaction.user.id;
+      const previousVote = pollData.votes.get(userId);
+
+      // Handle vote based on poll type (currently only single choice)
+      if (pollData.pollType === 'single') {
+        // Remove previous vote if exists
+        if (previousVote !== undefined) {
+          pollData.totalVotes--;
+        }
+
+        // Add new vote
+        pollData.votes.set(userId, optionIndex);
+        pollData.totalVotes++;
+      }
+
+      // Update embed with current results
+      const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+      const updatedEmbed = new EmbedBuilder()
+        .setTitle(`📊 ${pollData.question}`)
+        .setColor(0x0099FF)
+        .setDescription(
+          pollData.options.map((option, index) => {
+            const voteCount = Array.from(pollData.votes.values()).filter(v => v === index).length;
+            const percentage = pollData.totalVotes > 0 ? Math.round((voteCount / pollData.totalVotes) * 100) : 0;
+            return `${emojis[index]} ${option}\n${'█'.repeat(Math.max(1, percentage / 5))}${voteCount > 0 ? ` **${voteCount}** (${percentage}%)` : ''}`;
+          }).join('\n\n')
+        )
+        .setFooter({ text: `Total votes: ${pollData.totalVotes} • Poll ends` })
+        .setTimestamp(pollData.endTime);
+
+      // Create updated button rows
+      const buttons = pollData.options.map((option, index) =>
+        new ButtonBuilder()
+          .setCustomId(`poll_${index}`)
+          .setLabel(`${emojis[index]} ${option.length > 15 ? option.substring(0, 15) + '...' : option}`)
+          .setStyle(ButtonStyle.Primary)
+      );
+
+      const rows = [];
+      for (let i = 0; i < buttons.length; i += 2) {
+        const row = new ActionRowBuilder().addComponents(buttons.slice(i, i + 2));
+        rows.push(row);
+      }
+
+      await safeInteractionUpdate(interaction, { embeds: [updatedEmbed], components: rows });
+      return;
+    }
+
+    // Trivia button handler
+    if (action === 'trivia') {
+      const [, indexStr] = interaction.customId.split('_');
+      const selectedAnswer = parseInt(indexStr);
+
+      // Find the active trivia game for this user
+      let gameState = null;
+      let gameId = null;
+      for (const [id, state] of triviaGames.entries()) {
+        if (state.userId === interaction.user.id && state.gameActive) {
+          gameState = state;
+          gameId = id;
+          break;
+        }
+      }
+
+      if (!gameState) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **No active trivia game found!** Please start a new game with `/trivia`.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Validate answer index
+      if (isNaN(selectedAnswer) || selectedAnswer < 0 || selectedAnswer >= 4) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Invalid answer selection!**',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      const currentQuestion = gameState.questions[gameState.currentQuestion];
+
+      if (!currentQuestion) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Game error!** No current question available.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      const isCorrect = selectedAnswer === currentQuestion.correct;
+
+      if (isCorrect) {
+        gameState.score++;
+      }
+
+      // Record the answer
+      gameState.answers.push({
+        question: currentQuestion.question,
+        selectedAnswer: selectedAnswer,
+        correctAnswer: currentQuestion.correct,
+        isCorrect: isCorrect,
+        userChoice: currentQuestion.options[selectedAnswer],
+        correctChoice: currentQuestion.options[currentQuestion.correct]
+      });
+
+      gameState.currentQuestion++;
+
+      // Send feedback
+      const feedbackEmbed = new EmbedBuilder()
+        .setTitle(isCorrect ? '✅ Correct!' : '❌ Incorrect!')
+        .setDescription(`**${currentQuestion.question}**\n\nYour answer: **${currentQuestion.options[selectedAnswer]}**\nCorrect answer: **${currentQuestion.options[currentQuestion.correct]}**`)
+        .setColor(isCorrect ? 0x00FF00 : 0xFF0000)
+        .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` });
+
+      await safeInteractionReply(interaction, { embeds: [feedbackEmbed], flags: MessageFlags.Ephemeral });
+
+      // Check if quiz is complete
+      if (gameState.currentQuestion >= gameState.questions.length) {
+        // Send final results
+        const totalTime = Math.round((Date.now() - gameState.startTime) / 1000);
+        const percentage = Math.round((gameState.score / gameState.questions.length) * 100);
+
+        let resultMessage = '';
+        if (percentage >= 90) resultMessage = '🏆 Outstanding! You\'re a trivia master!';
+        else if (percentage >= 70) resultMessage = '🥇 Great job! You know your stuff!';
+        else if (percentage >= 50) resultMessage = '🥈 Not bad! Keep practicing!';
+        else resultMessage = '📚 Keep learning and try again!';
+
+        // Update achievements
+        try {
+          const { updateUserStats } = await import('./achievements.js');
+          const correctAnswers = gameState.answers.filter(a => a.isCorrect).length;
+          updateUserStats(interaction.user.id, {
+            trivia_correct: correctAnswers,
+            features_tried: 1
+          });
+        } catch (error) {
+          console.warn('Failed to update trivia achievements:', error.message);
+        }
+
+        const resultEmbed = new EmbedBuilder()
+          .setTitle('🎯 Trivia Quiz Complete!')
+          .setDescription(`${resultMessage}\n\n**Final Score: ${gameState.score}/${gameState.questions.length} (${percentage}%)**\n⏱️ Time: ${totalTime}s`)
+          .setColor(percentage >= 70 ? 0x00FF00 : percentage >= 50 ? 0xFFA500 : 0xFF0000)
+          .setTimestamp();
+
+        // Add detailed results
+        gameState.answers.forEach((answer, index) => {
+          const emoji = answer.isCorrect ? '✅' : '❌';
+          const status = answer.isCorrect ? 'Correct' : 'Incorrect';
+          resultEmbed.addFields({
+            name: `Q${index + 1}: ${status}`,
+            value: `${emoji} **${answer.question}**\n${answer.isCorrect ? 'Your answer: ' + answer.userChoice : `Your answer: ${answer.userChoice}\nCorrect: ${answer.correctChoice}`}`,
+            inline: false
+          });
+        });
+
+        // Clean up game state
+        triviaGames.delete(gameId);
+
+        setTimeout(async () => {
+          await safeInteractionReply(interaction, { embeds: [resultEmbed], flags: MessageFlags.Ephemeral });
+        }, 2000);
+      } else {
+        // Send next question after delay
+        setTimeout(async () => {
+          const nextQuestion = gameState.questions[gameState.currentQuestion];
+
+          if (!nextQuestion) {
+            return safeInteractionReply(interaction, {
+              content: '❌ **Game error!** No next question available.',
+              flags: MessageFlags.Ephemeral
+            });
+          }
+
+          const embed = new EmbedBuilder()
+            .setTitle(`🧠 Trivia Quiz - Question ${gameState.currentQuestion + 1}/${gameState.questions.length}`)
+            .setDescription(`**${nextQuestion.question}**`)
+            .setColor(0x0099FF)
+            .addFields({
+              name: 'Category',
+              value: nextQuestion.category,
+              inline: true
+            })
+            .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` })
+            .setTimestamp();
+
+          const buttons = nextQuestion.options.map((option, index) =>
+            new ButtonBuilder()
+              .setCustomId(`trivia_${index}`)
+              .setLabel(`${String.fromCharCode(65 + index)}) ${option}`)
+              .setStyle(ButtonStyle.Primary)
+          );
+
+          const rows = [];
+          for (let i = 0; i < buttons.length; i += 2) {
+            const row = new ActionRowBuilder().addComponents(buttons.slice(i, i + 2));
+            rows.push(row);
+          }
+
+          await safeInteractionReply(interaction, { embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
+        }, 2000);
+      }
+
       return;
     }
 

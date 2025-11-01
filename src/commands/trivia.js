@@ -122,13 +122,24 @@ export async function execute(interaction) {
     throw new CommandError(`Failed to prepare trivia questions: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
   }
 
+  // Import trivia games map
+  const { triviaGames } = await import('../game-states.js');
+
+  // Generate unique game ID
+  const gameId = `trivia_${interaction.user.id}_${Date.now()}`;
+
   const gameState = {
+    userId: interaction.user.id,
     questions: selectedQuestions,
     currentQuestion: 0,
     score: 0,
     answers: [],
-    startTime: Date.now()
+    startTime: Date.now(),
+    gameActive: true
   };
+
+  // Store game state
+  triviaGames.set(gameId, gameState);
 
   await sendQuestion(interaction, gameState);
 }

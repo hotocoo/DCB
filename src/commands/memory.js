@@ -79,6 +79,11 @@ async function sendMemoryBoard(interaction, gameState) {
     } else {
       await interaction.reply({ embeds: [winEmbed] });
     }
+  
+    // Clean up game state
+    const { memoryGames } = await import('../game-states.js');
+    memoryGames.delete(interaction.message?.id || interaction.id);
+  
     return;
   }
 
@@ -136,6 +141,14 @@ async function sendMemoryBoard(interaction, gameState) {
     await interaction.editReply({ embeds: [embed], components: buttons });
   } else {
     await interaction.reply({ embeds: [embed], components: buttons });
+  }
+
+  // Store game state after reply (if not already stored)
+  const messageId = interaction.message?.id || interaction.id;
+  const { memoryGames } = await import('../game-states.js');
+
+  if (!memoryGames.has(messageId)) {
+    memoryGames.set(messageId, gameState);
   }
 }
 

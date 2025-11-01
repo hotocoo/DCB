@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType , MessageFlags} from 'discord.js';
 import { CommandError, handleCommandError } from '../errorHandler.js';
+import { pollGames } from '../game-states.js';
 
 export const data = new SlashCommandBuilder()
   .setName('poll')
@@ -120,15 +121,19 @@ export async function execute(interaction) {
 
   const message = await interaction.reply({ embeds: [embed], components: rows });
 
-  // Store poll data for tracking votes
+  // Store poll data for tracking votes globally
   const pollData = {
     question,
     options: validOptions,
     votes: new Map(), // userId -> optionIndex
     totalVotes: 0,
     endTime: Date.now() + durationMinutes * 60000,
-    messageId: message.id
+    messageId: message.id,
+    pollType: 'single' // Currently single choice, can be extended later
   };
+
+  // Store in global poll games map
+  pollGames.set(message.id, pollData);
 
   // Set up collector for button interactions
   const filter = (i) => i.customId.startsWith('poll_') && i.message.id === message.id;
@@ -166,6 +171,9 @@ export async function execute(interaction) {
   });
 
   collector.on('end', async () => {
+    // Clean up poll data from global map
+    pollGames.delete(message.id);
+
     // Final update when poll ends
     const finalEmbed = new EmbedBuilder()
       .setTitle(`📊 ${question} [ENDED]`)

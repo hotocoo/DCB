@@ -20,4 +20,17 @@ export const explorationGames = new Map();
 export const connect4Games = new Map();
 
 // Typing game attempts for minigame
+// Trivia game states: gameId -> gameState
+export const triviaGames = new Map();
+
+// Tic-Tac-Toe game states: gameId -> gameState
+export const tttGames = new Map();
+
+// Poll game states: messageId -> pollData
+export const pollGames = new Map();
+
+// Memory game states: messageId -> gameState
+export const memoryGames = new Map();
+
+// Typing game attempts for minigame
 export const typingAttempts = new Map();
