@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const PROFILES_FILE = path.join(process.cwd(), 'data', 'profiles.json');
+const PROFILES_DIR = path.join(process.cwd(), 'data', 'players');
 
 // Advanced User Profile and Statistics System
 class ProfileManager {
@@ -12,35 +12,67 @@ class ProfileManager {
   }
 
   ensureStorage() {
-    const dir = path.dirname(PROFILES_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(PROFILES_FILE)) {
-      fs.writeFileSync(PROFILES_FILE, JSON.stringify({}));
+    if (!fs.existsSync(PROFILES_DIR)) {
+      fs.mkdirSync(PROFILES_DIR, { recursive: true });
     }
   }
 
   loadProfiles() {
+    this.profiles = {};
+    if (!fs.existsSync(PROFILES_DIR)) return;
+
+    const files = fs.readdirSync(PROFILES_DIR).filter(f => f.endsWith('.json'));
+    for (const file of files) {
+      const userId = path.basename(file, '.json');
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(PROFILES_DIR, file), 'utf8'));
+        if (data.profile) {
+          this.profiles[userId] = data.profile;
+        }
+      } catch (error) {
+        console.error(`Failed to load profile for ${userId}:`, error);
+      }
+    }
+  }
+
+  saveProfile(userId, profile) {
+    this.ensureStorage();
+    const filePath = path.join(PROFILES_DIR, `${userId}.json`);
+    const data = {
+      profile,
+      exported: Date.now(),
+      version: '1.0'
+    };
     try {
-      const data = JSON.parse(fs.readFileSync(PROFILES_FILE, 'utf8'));
-      this.profiles = data;
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
     } catch (error) {
-      console.error('Failed to load profiles:', error);
-      this.profiles = {};
+      console.error(`Failed to save profile for ${userId}:`, error);
     }
   }
 
   saveProfiles() {
-    try {
-      fs.writeFileSync(PROFILES_FILE, JSON.stringify(this.profiles, null, 2));
-    } catch (error) {
-      console.error('Failed to save profiles:', error);
-    }
+    // Profiles are now saved individually by saveProfile
+    // This method can be kept for compatibility but doesn't need to do anything
   }
 
   // Advanced Profile Creation and Management
   getOrCreateProfile(userId, username) {
+    if (!this.profiles[userId]) {
+      // Try to load from file first
+      this.ensureStorage();
+      const filePath = path.join(PROFILES_DIR, `${userId}.json`);
+      if (fs.existsSync(filePath)) {
+        try {
+          const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          if (data.profile) {
+            this.profiles[userId] = data.profile;
+          }
+        } catch (error) {
+          console.error(`Failed to load profile for ${userId}:`, error);
+        }
+      }
+    }
+
     if (!this.profiles[userId]) {
       this.profiles[userId] = {
         userId,
@@ -123,6 +155,7 @@ class ProfileManager {
     if (this.profiles[userId].username !== username) {
       this.profiles[userId].username = username;
       this.profiles[userId].updated = Date.now();
+      this.saveProfile(userId, this.profiles[userId]);
     }
 
     return this.profiles[userId];
@@ -146,7 +179,7 @@ class ProfileManager {
     }
 
     profile.updated = Date.now();
-    this.saveProfiles();
+    this.saveProfile(userId, profile);
     return profile;
   }
 
@@ -164,7 +197,7 @@ class ProfileManager {
     }
 
     profile.updated = Date.now();
-    this.saveProfiles();
+    this.saveProfile(userId, profile);
     return profile;
   }
 
@@ -207,7 +240,7 @@ class ProfileManager {
         awarded: Date.now()
       });
 
-      this.saveProfiles();
+      this.saveProfile(userId, profile);
       return true;
     }
 
@@ -220,7 +253,7 @@ class ProfileManager {
 
     if (badgeIndex !== -1) {
       profile.badges.splice(badgeIndex, 1);
-      this.saveProfiles();
+      this.saveProfile(userId, profile);
       return true;
     }
 
@@ -402,7 +435,7 @@ class ProfileManager {
     }
 
     this.profiles[userId] = profileData.profile;
-    this.saveProfiles();
+    this.saveProfile(userId, profileData.profile);
 
     return { success: true };
   }
@@ -424,7 +457,7 @@ class ProfileManager {
     }
 
     profile.updated = Date.now();
-    this.saveProfiles();
+    this.saveProfile(userId, profile);
     return profile;
   }
 
@@ -495,7 +528,7 @@ class ProfileManager {
 
     if (newMilestones.length > 0) {
       profile.updated = Date.now();
-      this.saveProfiles();
+      this.saveProfile(userId, profile);
     }
 
     return newMilestones;

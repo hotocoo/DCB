@@ -5,7 +5,7 @@ import { logger } from './logger.js';
 import { inputValidator, sanitizeInput, validateString, validateNumber } from './validation.js';
 import { CommandError } from './errorHandler.js';
 
-const FILE = path.join(process.cwd(), 'data', 'rpg.json');
+const PLAYERS_DIR = path.join(process.cwd(), 'data', 'players');
 
 // in-memory cache to reduce fs reads/writes
 let cache = null;
@@ -49,56 +49,110 @@ const CHARACTER_CLASSES = {
 };
 
 function ensureDir() {
-  const dir = path.dirname(FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(PLAYERS_DIR)) fs.mkdirSync(PLAYERS_DIR, { recursive: true });
 }
 
 function readAll() {
   ensureDir();
-  if (!fs.existsSync(FILE)) return {};
-  try {
-    const raw = JSON.parse(fs.readFileSync(FILE, 'utf8')) || {};
-    // migrate / ensure defaults for older characters
-    for (const k of Object.keys(raw)) {
-      const c = raw[k] || {};
-      if (typeof c.xp === 'undefined') c.xp = 0;
-      if (typeof c.lvl === 'undefined') c.lvl = levelFromXp(c.xp);
-      if (typeof c.skillPoints === 'undefined') c.skillPoints = 0;
-      if (typeof c.hp === 'undefined') c.hp = 20;
-      if (typeof c.maxHp === 'undefined') c.maxHp = 20;
-      if (typeof c.mp === 'undefined') c.mp = 10;
-      if (typeof c.maxMp === 'undefined') c.maxMp = 10;
-      if (typeof c.atk === 'undefined') c.atk = 5;
-      if (typeof c.def === 'undefined') c.def = 2;
-      if (typeof c.spd === 'undefined') c.spd = 2;
-      if (typeof c.class === 'undefined') c.class = 'warrior';
-      if (typeof c.abilities === 'undefined') c.abilities = CHARACTER_CLASSES[c.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
-      if (typeof c.color === 'undefined') c.color = CHARACTER_CLASSES[c.class]?.color || CHARACTER_CLASSES.warrior.color;
-      if (typeof c.inventory === 'undefined') c.inventory = {};
-      if (typeof c.equipped_weapon === 'undefined') c.equipped_weapon = null;
-      if (typeof c.equipped_armor === 'undefined') c.equipped_armor = null;
-      if (typeof c.gold === 'undefined') c.gold = 0;
-      if (typeof c.dailyExplorations === 'undefined') c.dailyExplorations = 0;
-      if (typeof c.lastDailyReset === 'undefined') c.lastDailyReset = Date.now();
-      if (typeof c.sessionXpGained === 'undefined') c.sessionXpGained = 0;
-      if (typeof c.lastSessionReset === 'undefined') c.lastSessionReset = Date.now();
-      raw[k] = c;
+  const all = {};
+
+  // Migrate from old data/rpg.json if it exists
+  const oldFile = path.join(process.cwd(), 'data', 'rpg.json');
+  if (fs.existsSync(oldFile)) {
+    try {
+      const oldData = JSON.parse(fs.readFileSync(oldFile, 'utf8')) || {};
+      console.log(`[RPG DEBUG] Migrating ${Object.keys(oldData).length} characters from old rpg.json`);
+      for (const [userId, char] of Object.entries(oldData)) {
+        // Ensure defaults
+        if (typeof char.xp === 'undefined') char.xp = 0;
+        if (typeof char.lvl === 'undefined') char.lvl = levelFromXp(char.xp);
+        if (typeof char.skillPoints === 'undefined') char.skillPoints = 0;
+        if (typeof char.hp === 'undefined') char.hp = 20;
+        if (typeof char.maxHp === 'undefined') char.maxHp = 20;
+        if (typeof char.mp === 'undefined') char.mp = 10;
+        if (typeof char.maxMp === 'undefined') char.maxMp = 10;
+        if (typeof char.atk === 'undefined') char.atk = 5;
+        if (typeof char.def === 'undefined') char.def = 2;
+        if (typeof char.spd === 'undefined') char.spd = 2;
+        if (typeof char.class === 'undefined') char.class = 'warrior';
+        if (typeof char.abilities === 'undefined') char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
+        if (typeof char.color === 'undefined') char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+        if (typeof char.inventory === 'undefined') char.inventory = {};
+        if (typeof char.equipped_weapon === 'undefined') char.equipped_weapon = null;
+        if (typeof char.equipped_armor === 'undefined') char.equipped_armor = null;
+        if (typeof char.gold === 'undefined') char.gold = 0;
+        if (typeof char.dailyExplorations === 'undefined') char.dailyExplorations = 0;
+        if (typeof char.lastDailyReset === 'undefined') char.lastDailyReset = Date.now();
+        if (typeof char.sessionXpGained === 'undefined') char.sessionXpGained = 0;
+        if (typeof char.lastSessionReset === 'undefined') char.lastSessionReset = Date.now();
+        if (typeof char.createdAt === 'undefined') char.createdAt = Date.now();
+        all[userId] = char;
+        // Save to individual file
+        const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
+        const tmp = `${filePath}.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify(char, null, 2), 'utf8');
+        fs.renameSync(tmp, filePath);
+      }
+      // Backup and remove old file
+      fs.copyFileSync(oldFile, `${oldFile}.bak`);
+      fs.unlinkSync(oldFile);
+      console.log(`[RPG DEBUG] Migration completed, old file backed up`);
+    } catch (err) {
+      console.error('Failed to migrate old RPG data:', err);
     }
-    cache = raw;
-    return raw;
-  } catch (err) {
-    console.error('Failed to read rpg storage', err);
-    return {};
   }
+
+  // Read all player files from data/players/
+  if (fs.existsSync(PLAYERS_DIR)) {
+    const files = fs.readdirSync(PLAYERS_DIR).filter(f => f.endsWith('.json'));
+    for (const file of files) {
+      const userId = path.basename(file, '.json');
+      try {
+        const char = JSON.parse(fs.readFileSync(path.join(PLAYERS_DIR, file), 'utf8')) || {};
+        // migrate / ensure defaults for older characters
+        if (typeof char.xp === 'undefined') char.xp = 0;
+        if (typeof char.lvl === 'undefined') char.lvl = levelFromXp(char.xp);
+        if (typeof char.skillPoints === 'undefined') char.skillPoints = 0;
+        if (typeof char.hp === 'undefined') char.hp = 20;
+        if (typeof char.maxHp === 'undefined') char.maxHp = 20;
+        if (typeof char.mp === 'undefined') char.mp = 10;
+        if (typeof char.maxMp === 'undefined') char.maxMp = 10;
+        if (typeof char.atk === 'undefined') char.atk = 5;
+        if (typeof char.def === 'undefined') char.def = 2;
+        if (typeof char.spd === 'undefined') char.spd = 2;
+        if (typeof char.class === 'undefined') char.class = 'warrior';
+        if (typeof char.abilities === 'undefined') char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
+        if (typeof char.color === 'undefined') char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+        if (typeof char.inventory === 'undefined') char.inventory = {};
+        if (typeof char.equipped_weapon === 'undefined') char.equipped_weapon = null;
+        if (typeof char.equipped_armor === 'undefined') char.equipped_armor = null;
+        if (typeof char.gold === 'undefined') char.gold = 0;
+        if (typeof char.dailyExplorations === 'undefined') char.dailyExplorations = 0;
+        if (typeof char.lastDailyReset === 'undefined') char.lastDailyReset = Date.now();
+        if (typeof char.sessionXpGained === 'undefined') char.sessionXpGained = 0;
+        if (typeof char.lastSessionReset === 'undefined') char.lastSessionReset = Date.now();
+        all[userId] = char;
+      } catch (err) {
+        console.error(`Failed to read player data for ${userId}`, err);
+      }
+    }
+  }
+
+  cache = all;
+  return all;
 }
 
 function writeAll(obj) {
   ensureDir();
   try {
-    // atomic write: write to temp file then rename
-    const tmp = `${FILE}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8');
-    fs.renameSync(tmp, FILE);
+    // Save each user's data to individual files
+    for (const [userId, char] of Object.entries(obj)) {
+      const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
+      const tmp = `${filePath}.tmp`;
+      console.log(`[RPG DEBUG] Writing player data: ${filePath}`);
+      fs.writeFileSync(tmp, JSON.stringify(char, null, 2), 'utf8');
+      fs.renameSync(tmp, filePath);
+    }
     cache = obj;
   } catch (err) {
     console.error('Failed to write RPG data:', err);
@@ -202,8 +256,53 @@ export function applyXp(userId, char, amount = 0) {
 }
 
 export function getCharacter(userId) {
-  const all = cache || readAll();
-  return all[userId] || null;
+  // Try cache first
+  if (cache && cache[userId]) {
+    return cache[userId];
+  }
+
+  // Otherwise read from file
+  ensureDir();
+  const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
+  if (!fs.existsSync(filePath)) return null;
+
+  try {
+    const char = JSON.parse(fs.readFileSync(filePath, 'utf8')) || {};
+    // migrate / ensure defaults for older characters
+    if (typeof char.xp === 'undefined') char.xp = 0;
+    if (typeof char.lvl === 'undefined') char.lvl = levelFromXp(char.xp);
+    if (typeof char.skillPoints === 'undefined') char.skillPoints = 0;
+    if (typeof char.hp === 'undefined') char.hp = 20;
+    if (typeof char.maxHp === 'undefined') char.maxHp = 20;
+    if (typeof char.mp === 'undefined') char.mp = 10;
+    if (typeof char.maxMp === 'undefined') char.maxMp = 10;
+    if (typeof char.atk === 'undefined') char.atk = 5;
+    if (typeof char.def === 'undefined') char.def = 2;
+    if (typeof char.spd === 'undefined') char.spd = 2;
+    if (typeof char.class === 'undefined') char.class = 'warrior';
+    if (typeof char.abilities === 'undefined') char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
+    if (typeof char.color === 'undefined') char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+    if (typeof char.inventory === 'undefined') char.inventory = {};
+    if (typeof char.equipped_weapon === 'undefined') char.equipped_weapon = null;
+    if (typeof char.equipped_armor === 'undefined') char.equipped_armor = null;
+    if (typeof char.gold === 'undefined') char.gold = 0;
+    if (typeof char.dailyExplorations === 'undefined') char.dailyExplorations = 0;
+    if (typeof char.lastDailyReset === 'undefined') char.lastDailyReset = Date.now();
+    if (typeof char.sessionXpGained === 'undefined') char.sessionXpGained = 0;
+    if (typeof char.lastSessionReset === 'undefined') char.lastSessionReset = Date.now();
+
+    // Update cache
+    if (cache) {
+      cache[userId] = char;
+    } else {
+      cache = { [userId]: char };
+    }
+
+    return char;
+  } catch (err) {
+    console.error(`Failed to read character data for ${userId}`, err);
+    return null;
+  }
 }
 
 export function saveCharacter(userId, char) {
@@ -213,9 +312,18 @@ export function saveCharacter(userId, char) {
   }
   locks.add(userId);
   try {
-    const all = cache || readAll();
-    all[userId] = char;
-    writeAll(all);
+    // Save directly to individual file
+    ensureDir();
+    const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
+    const tmp = `${filePath}.tmp`;
+    console.log(`[RPG DEBUG] Writing character data: ${filePath}`);
+    fs.writeFileSync(tmp, JSON.stringify(char, null, 2), 'utf8');
+    fs.renameSync(tmp, filePath);
+
+    // Update cache if it exists
+    if (cache) {
+      cache[userId] = char;
+    }
     return true;
   } finally {
     locks.delete(userId);
