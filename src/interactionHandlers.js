@@ -18,7 +18,7 @@ import { addBalance, getBalance, transferBalance, getMarketPrice, buyFromMarket,
 import { getUserGuild, contributeToGuild } from './guilds.js';
 import { warnUser, muteUser, unmuteUser, unbanUser } from './moderation.js';
 import { pause, resume, skip, stop, shuffleQueue, clearQueue, getQueue, getMusicStats, searchSongs, play, back } from './music.js';
-import { getRandomJoke, generateStory, getRiddle, getFunFact, getRandomQuote, magic8Ball, generateFunName, createFunChallenge, rateJoke } from './entertainment.js';
+import { getRandomJoke, generateStory, getRiddle, getFunFact, getRandomQuote, magic8Ball, generateFunName, createFunChallenge } from './entertainment.js';
 import { getLocations } from './locations.js';
 import { getActiveAuctions, createAuction } from './trading.js';
 import { updateProfile } from './profiles.js';
@@ -614,8 +614,8 @@ async function handleModalSubmit(interaction, client) {
    }
 }
 
-// Function to handle button interactions
-async function handleButtonInteraction(interaction, client) {
+// Export the handleButtonInteraction function
+export async function handleButtonInteraction(interaction, client) {
   const userId = interaction.user.id;
   const buttonCooldownType = getButtonCooldownType(interaction.customId);
   const cooldownCheck = isOnCooldown(userId, buttonCooldownType);
