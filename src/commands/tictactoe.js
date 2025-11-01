@@ -74,7 +74,7 @@ export async function execute(interaction) {
  */
 async function sendTicTacToeBoard(interaction, gameState) {
   try {
-    const { board, players, currentPlayer, status, isAI } = gameState;
+    const { board, players, currentPlayer, status, isAI, difficulty } = gameState;
 
     // Check for winner
     const winner = checkWinner(board);
@@ -151,6 +151,9 @@ async function sendTicTacToeBoard(interaction, gameState) {
         await sendTicTacToeBoard(interaction, gameState);
       }
     }, 1000);
+  }
+  } catch (error) {
+    console.error('Error in sendTicTacToeBoard:', error);
   }
 }
 

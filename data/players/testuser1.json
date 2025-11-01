@@ -1,0 +1,24 @@
+{
+  "name": "Playertest",
+  "class": "warrior",
+  "hp": 25,
+  "maxHp": 25,
+  "mp": 10,
+  "maxMp": 10,
+  "atk": 7,
+  "def": 3,
+  "spd": 1,
+  "lvl": 1,
+  "xp": 0,
+  "skillPoints": 0,
+  "abilities": [
+    "Power Strike",
+    "Shield Block",
+    "Battle Cry"
+  ],
+  "color": 16711680,
+  "inventory": {},
+  "equipped_weapon": null,
+  "equipped_armor": null,
+  "gold": 0
+}

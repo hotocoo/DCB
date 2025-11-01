@@ -273,5 +273,3 @@ export async function execute(interaction) {
 export async function safeExecute(interaction) {
   return safeExecuteCommand(interaction, execute);
 }
-  }
-}

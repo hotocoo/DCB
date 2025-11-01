@@ -292,6 +292,8 @@ async function sendResults(interaction, gameState) {
   if (interaction.replied || interaction.deferred) {
     await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
   } else {
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  }
 }
 
 export async function safeExecute(interaction) {

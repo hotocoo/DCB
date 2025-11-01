@@ -159,6 +159,7 @@ export function writeAll(data) {
 
     // Write to temporary file first, then rename for atomicity
     const tempPath = filePath + '.tmp';
+    console.log(`[STORAGE DEBUG] Writing to storage file: ${filePath}`);
     fs.writeFileSync(tempPath, jsonString, DEFAULT_ENCODING);
     fs.renameSync(tempPath, filePath);
 
