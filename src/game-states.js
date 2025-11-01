@@ -16,5 +16,8 @@ export const combatGames = new Map();
 // Exploration game states: userId -> gameState
 export const explorationGames = new Map();
 
+// Connect4 game states: gameId -> gameState
+export const connect4Games = new Map();
+
 // Typing game attempts for minigame
 export const typingAttempts = new Map();

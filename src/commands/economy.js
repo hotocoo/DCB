@@ -14,6 +14,7 @@ import {
   getUserBusinesses,
   claimDailyReward
 } from '../economy.js';
+import { safeExecuteCommand, CommandError, validateRange, validateNotEmpty, validateUser } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('economy')
@@ -34,11 +35,12 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('daily').setDescription('Claim your daily reward'));
 
 export async function execute(interaction) {
-  const sub = interaction.options.getSubcommand();
+  return safeExecuteCommand(interaction, async () => {
+    const sub = interaction.options.getSubcommand();
 
-  if (sub === 'balance') {
-    const targetUser = interaction.options.getUser('user') || interaction.user;
-    const balance = getBalance(targetUser.id);
+    if (sub === 'balance') {
+      const targetUser = interaction.options.getUser('user') || interaction.user;
+      const balance = getBalance(targetUser.id);
 
     const embed = new EmbedBuilder()
       .setTitle('💰 Balance Check')
@@ -60,17 +62,17 @@ export async function execute(interaction) {
     const targetUser = interaction.options.getUser('user');
     const amount = interaction.options.getInteger('amount');
 
-    if (targetUser.id === interaction.user.id) {
-      return interaction.reply({ content: '❌ You cannot transfer gold to yourself!', flags: MessageFlags.Ephemeral });
-    }
+    // Validate user input
+    validateNotEmpty(targetUser, 'target user');
+    validateRange(amount, 1, Number.MAX_SAFE_INTEGER, 'transfer amount');
 
-    if (amount <= 0) {
-      return interaction.reply({ content: '❌ Transfer amount must be positive!', flags: MessageFlags.Ephemeral });
+    if (targetUser.id === interaction.user.id) {
+      throw new CommandError('You cannot transfer gold to yourself!', 'INVALID_ARGUMENT');
     }
 
     const balance = getBalance(interaction.user.id);
     if (balance < amount) {
-      return interaction.reply({ content: `❌ Insufficient funds! You have ${balance} gold but need ${amount} gold.`, flags: MessageFlags.Ephemeral });
+      throw new CommandError(`Insufficient funds! You have ${balance} gold but need ${amount} gold.`, 'INSUFFICIENT_FUNDS');
     }
 
     const result = transferBalance(interaction.user.id, targetUser.id, amount);
@@ -88,7 +90,7 @@ export async function execute(interaction) {
 
       await interaction.reply({ embeds: [embed] });
     } else {
-      await interaction.reply({ content: `❌ Transfer failed: ${result.reason}`, flags: MessageFlags.Ephemeral });
+      throw new CommandError(`Transfer failed: ${result.reason}`, 'COMMAND_ERROR');
     }
 
   } else if (sub === 'business') {
@@ -98,13 +100,13 @@ export async function execute(interaction) {
       const businessType = interaction.options.getString('type');
       const investment = interaction.options.getInteger('investment') || 100;
 
-      const validTypes = ['shop', 'farm', 'mine', 'factory', 'bank', 'casino'];
-      if (!validTypes.includes(businessType)) {
-        return interaction.reply({ content: '❌ Invalid business type. Use: shop, farm, mine, factory, bank, casino', flags: MessageFlags.Ephemeral });
-      }
+      // Validate inputs
+      validateNotEmpty(businessType, 'business type');
+      validateRange(investment, 50, Number.MAX_SAFE_INTEGER, 'investment amount');
 
-      if (investment < 50) {
-        return interaction.reply({ content: '❌ Minimum investment is 50 gold.', flags: MessageFlags.Ephemeral });
+      const validTypes = ['shop', 'farm', 'mine', 'factory', 'bank', 'casino', 'restaurant', 'tech', 'trading'];
+      if (!validTypes.includes(businessType)) {
+        throw new CommandError(`Invalid business type. Use: ${validTypes.join(', ')}`, 'INVALID_ARGUMENT');
       }
 
       const result = createBusiness(interaction.user.id, businessType, investment);
@@ -122,7 +124,7 @@ export async function execute(interaction) {
 
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: `❌ Failed to create business: ${result.reason}`, flags: MessageFlags.Ephemeral });
+        throw new CommandError(`Failed to create business: ${result.reason}`, 'COMMAND_ERROR');
       }
 
     } else if (action === 'collect') {
@@ -137,10 +139,15 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } else {
-          await interaction.reply({ content: '💤 No income available to collect yet. Check back later!', flags: MessageFlags.Ephemeral });
+          const embed = new EmbedBuilder()
+            .setTitle('💤 No Income Available')
+            .setColor(0xFFA500)
+            .setDescription('No income available to collect yet. Check back later!');
+
+          await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         }
       } else {
-        await interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
+        throw new CommandError(result.reason, 'COMMAND_ERROR');
       }
 
     } else if (action === 'list') {
@@ -177,9 +184,7 @@ export async function execute(interaction) {
     } else if (action === 'upgrade') {
       const businessId = interaction.options.getString('business_id');
 
-      if (!businessId) {
-        return interaction.reply({ content: '❌ Please specify a business ID to upgrade. Use `/economy business action:list` to see your businesses.', flags: MessageFlags.Ephemeral });
-      }
+      validateNotEmpty(businessId, 'business ID');
 
       const { upgradeBusiness } = await import('../economy.js');
       const result = upgradeBusiness(interaction.user.id, businessId);
@@ -197,7 +202,7 @@ export async function execute(interaction) {
 
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: `❌ Upgrade failed: ${result.reason}`, flags: MessageFlags.Ephemeral });
+        throw new CommandError(`Upgrade failed: ${result.reason}`, 'COMMAND_ERROR');
       }
     }
 
@@ -229,12 +234,19 @@ export async function execute(interaction) {
       await interaction.reply({ embeds: [embed], components: [row] });
 
     } else if (action === 'buy') {
-      if (!item) {
-        return interaction.reply({ content: '❌ Please specify an item to buy!', flags: MessageFlags.Ephemeral });
-      }
+      validateNotEmpty(item, 'item to buy');
+      validateRange(quantity, 1, 1000, 'quantity'); // Reasonable limit
 
       const price = getMarketPrice(item);
+      if (price === 0) {
+        throw new CommandError(`Item '${item}' is not available in the market.`, 'NOT_FOUND');
+      }
+
       const totalCost = price * quantity;
+      const balance = getBalance(interaction.user.id);
+      if (balance < totalCost) {
+        throw new CommandError(`Insufficient funds! You need ${totalCost} gold but only have ${balance} gold.`, 'INSUFFICIENT_FUNDS');
+      }
 
       const result = buyFromMarket(interaction.user.id, item, quantity);
 
@@ -251,15 +263,19 @@ export async function execute(interaction) {
 
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: `❌ Purchase failed: ${result.reason}`, flags: MessageFlags.Ephemeral });
+        throw new CommandError(`Purchase failed: ${result.reason}`, 'COMMAND_ERROR');
       }
 
     } else if (action === 'sell') {
-      if (!item) {
-        return interaction.reply({ content: '❌ Please specify an item to sell!', flags: MessageFlags.Ephemeral });
+      validateNotEmpty(item, 'item to sell');
+      validateRange(quantity, 1, 1000, 'quantity'); // Reasonable limit
+
+      const marketPrice = getMarketPrice(item);
+      if (marketPrice === 0) {
+        throw new CommandError(`Item '${item}' is not available in the market.`, 'NOT_FOUND');
       }
 
-      const sellPrice = Math.floor(getMarketPrice(item) * 0.8);
+      const sellPrice = Math.floor(marketPrice * 0.8);
       const totalEarnings = sellPrice * quantity;
 
       const result = sellToMarket(interaction.user.id, item, quantity);
@@ -277,20 +293,18 @@ export async function execute(interaction) {
 
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: `❌ Sale failed: ${result.reason}`, flags: MessageFlags.Ephemeral });
+        throw new CommandError(`Sale failed: ${result.reason}`, 'COMMAND_ERROR');
       }
     }
 
   } else if (sub === 'lottery') {
     const ticketPrice = interaction.options.getInteger('ticket_price');
 
-    if (ticketPrice <= 0) {
-      return interaction.reply({ content: '❌ Ticket price must be positive!', flags: MessageFlags.Ephemeral });
-    }
+    validateRange(ticketPrice, 1, 10000, 'ticket price'); // Reasonable limits
 
     const currentBalance = getBalance(interaction.user.id);
     if (currentBalance < ticketPrice) {
-      return interaction.reply({ content: `❌ Insufficient funds! You need ${ticketPrice} gold but only have ${currentBalance}.`, flags: MessageFlags.Ephemeral });
+      throw new CommandError(`Insufficient funds! You need ${ticketPrice} gold but only have ${currentBalance}.`, 'INSUFFICIENT_FUNDS');
     }
 
     // Simple lottery with 1/1000 chance of winning
@@ -311,16 +325,30 @@ export async function execute(interaction) {
 
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: `🎫 **Lottery Ticket Purchased!**\nYour number: **${result.lotteryNumber}**\n💰 Cost: ${ticketPrice} gold\n🏆 Jackpot: ${prizePool} gold\n\n*Better luck next time!*`, flags: MessageFlags.Ephemeral });
+        const embed = new EmbedBuilder()
+          .setTitle('🎫 Lottery Ticket Purchased')
+          .setColor(0xFFA500)
+          .setDescription(`Your number: **${result.lotteryNumber}**\n💰 Cost: ${ticketPrice} gold\n🏆 Jackpot: ${prizePool} gold\n\n*Better luck next time!*`);
+
+        await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
       }
+    } else {
+      throw new CommandError('Failed to create lottery ticket.', 'COMMAND_ERROR');
     }
 
   } else if (sub === 'history') {
     const limit = interaction.options.getInteger('limit') || 10;
+    validateRange(limit, 1, 50, 'transaction limit'); // Reasonable limit
+
     const transactions = getTransactionHistory(interaction.user.id, limit);
 
     if (transactions.length === 0) {
-      return interaction.reply({ content: '📋 No transaction history found.', flags: MessageFlags.Ephemeral });
+      const embed = new EmbedBuilder()
+        .setTitle('📋 Transaction History')
+        .setColor(0xFFA500)
+        .setDescription('No transaction history found.');
+
+      return await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -388,4 +416,7 @@ export async function execute(interaction) {
       await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
   }
+ }, {
+   command: 'economy'
+ });
 }

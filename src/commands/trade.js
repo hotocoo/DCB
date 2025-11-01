@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle , MessageFlags} from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import {
   createTradeRequest,
   acceptTrade,
@@ -13,6 +13,7 @@ import {
   getActiveAuctions,
   getMarketPrices
 } from '../trading.js';
+import { safeExecuteCommand, CommandError, validateUser, validateRange, validateNotEmpty } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('trade')
@@ -39,26 +40,38 @@ export async function execute(interaction) {
 
   if (sub === 'offer') {
     const targetUser = interaction.options.getUser('user');
+
+    validateUser(interaction, targetUser.id);
+
     const offerItems = interaction.options.getString('offer_items')?.split(',').map(s => s.trim()) || [];
     const offerGold = interaction.options.getInteger('offer_gold') || 0;
     const requestItems = interaction.options.getString('request_items')?.split(',').map(s => s.trim()) || [];
     const requestGold = interaction.options.getInteger('request_gold') || 0;
 
     if (targetUser.id === userId) {
-      return interaction.reply({ content: '❌ You cannot trade with yourself!', flags: MessageFlags.Ephemeral });
+      throw new CommandError('You cannot trade with yourself!', 'INVALID_ARGUMENT');
     }
 
     if (offerItems.length === 0 && offerGold === 0) {
-      return interaction.reply({ content: '❌ You must offer at least some items or gold!', flags: MessageFlags.Ephemeral });
+      throw new CommandError('You must offer at least some items or gold!', 'INVALID_ARGUMENT');
     }
 
     if (requestItems.length === 0 && requestGold === 0) {
-      return interaction.reply({ content: '❌ You must request at least some items or gold!', flags: MessageFlags.Ephemeral });
+      throw new CommandError('You must request at least some items or gold!', 'INVALID_ARGUMENT');
     }
 
-    const result = createTradeRequest(userId, targetUser.id, offerItems, requestItems, offerGold, requestGold);
-    if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
+    validateRange(offerGold, 0, 1000000, 'offer gold'); // Max 1M gold
+    validateRange(requestGold, 0, 1000000, 'request gold');
+    validateRange(offerItems.length, 0, 10, 'offer items count');
+    validateRange(requestItems.length, 0, 10, 'request items count');
+
+    try {
+      const result = createTradeRequest(userId, targetUser.id, offerItems, requestItems, offerGold, requestGold);
+      if (!result.success) {
+        throw new CommandError(result.reason || 'Failed to create trade request.', 'COMMAND_ERROR');
+      }
+    } catch (error) {
+      throw new CommandError(`Failed to create trade offer: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
     }
 
     const embed = new EmbedBuilder()
@@ -158,17 +171,26 @@ export async function execute(interaction) {
   } else if (sub === 'auction') {
     const action = interaction.options.getString('action');
 
+    validateNotEmpty(action, 'auction action');
+    const validActions = ['create', 'bid', 'buyout'];
+    if (!validActions.includes(action)) {
+      throw new CommandError('Invalid auction action. Use: create, bid, buyout', 'INVALID_ARGUMENT');
+    }
+
     if (action === 'create') {
       const item = interaction.options.getString('item');
       const price = interaction.options.getInteger('price');
 
-      if (!item || !price || price <= 0) {
-        return interaction.reply({ content: '❌ Please specify an item and valid starting price!', flags: MessageFlags.Ephemeral });
-      }
+      validateNotEmpty(item, 'auction item');
+      validateRange(price, 1, 100000, 'auction starting price'); // Max 100k gold
 
-      const result = createAuction(item, price, 24, userId);
-      if (!result.success) {
-        return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
+      try {
+        const result = createAuction(item, price, 24, userId);
+        if (!result.success) {
+          throw new CommandError(result.reason || 'Failed to create auction.', 'COMMAND_ERROR');
+        }
+      } catch (error) {
+        throw new CommandError(`Failed to create auction: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
       }
 
       const embed = new EmbedBuilder()
@@ -187,33 +209,42 @@ export async function execute(interaction) {
       const auctionId = interaction.options.getString('auction_id');
       const price = interaction.options.getInteger('price');
 
-      if (!auctionId || !price || price <= 0) {
-        return interaction.reply({ content: '❌ Please specify auction ID and valid bid amount!', flags: MessageFlags.Ephemeral });
-      }
+      validateNotEmpty(auctionId, 'auction ID');
+      validateRange(price, 1, 1000000, 'bid amount'); // Max 1M gold
 
-      const result = placeBid(auctionId, userId, price);
-      if (!result.success) {
-        return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
-      }
+      try {
+        const result = placeBid(auctionId, userId, price);
+        if (!result.success) {
+          throw new CommandError(result.reason || 'Failed to place bid.', 'COMMAND_ERROR');
+        }
 
-      await interaction.reply({ content: `💰 **Bid Placed!**\nYou bid ${price} gold on auction ${auctionId}!`, flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: `💰 **Bid Placed!**\nYou bid ${price} gold on auction ${auctionId}!`, flags: MessageFlags.Ephemeral });
+      } catch (error) {
+        throw new CommandError(`Failed to place bid: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
+      }
 
     } else if (action === 'buyout') {
       const auctionId = interaction.options.getString('auction_id');
 
-      if (!auctionId) {
-        return interaction.reply({ content: '❌ Please specify auction ID!', flags: MessageFlags.Ephemeral });
-      }
+      validateNotEmpty(auctionId, 'auction ID');
 
-      const result = buyoutAuction(auctionId, userId);
-      if (!result.success) {
-        return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
-      }
+      try {
+        const result = buyoutAuction(auctionId, userId);
+        if (!result.success) {
+          throw new CommandError(result.reason || 'Failed to buyout auction.', 'COMMAND_ERROR');
+        }
 
-      await interaction.reply({ content: `💎 **Auction Won!**\nYou purchased the item via buyout!`, flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: `💎 **Auction Won!**\nYou purchased the item via buyout!`, flags: MessageFlags.Ephemeral });
+      } catch (error) {
+        throw new CommandError(`Failed to buyout auction: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
+      }
     }
   } else if (sub === 'pending') {
     // Show pending trade requests - would be implemented with proper notification system
     await interaction.reply({ content: '📨 **Pending Trades:**\nNo pending trade requests. Use `/trade offer` to start trading!', flags: MessageFlags.Ephemeral });
   }
+}
+
+export async function safeExecute(interaction) {
+  return safeExecuteCommand(interaction, execute);
 }

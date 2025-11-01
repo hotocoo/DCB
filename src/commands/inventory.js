@@ -13,6 +13,7 @@ import {
   saveCharacter,
   removeItemFromInventory
 } from '../rpg.js';
+import { CommandError, handleCommandError } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('inventory')
@@ -23,16 +24,22 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('unequip').setDescription('Unequip weapon or armor').addStringOption(opt => opt.setName('slot').setDescription('weapon|armor').setRequired(true)));
 
 export async function execute(interaction) {
-  const sub = interaction.options.getSubcommand();
-  const userId = interaction.user.id;
+  try {
+    const sub = interaction.options.getSubcommand();
+    const userId = interaction.user.id;
 
-  if (sub === 'view') {
-    const inventory = getInventory(userId);
-    const inventoryValue = getInventoryValue(userId);
-
-    if (Object.keys(inventory).length === 0) {
-      return interaction.reply({ content: '🛄 Your inventory is empty. Go explore to find items!', flags: MessageFlags.Ephemeral });
+    // Input validation
+    if (!userId) {
+      throw new CommandError('Invalid user ID', 'VALIDATION_ERROR');
     }
+
+    if (sub === 'view') {
+      const inventory = getInventory(userId);
+      const inventoryValue = getInventoryValue(userId);
+
+      if (!inventory || Object.keys(inventory).length === 0) {
+        return interaction.reply({ content: '🛄 Your inventory is empty. Go explore to find items!', flags: MessageFlags.Ephemeral });
+      }
 
     // Group items by type
     const itemsByType = {};
@@ -98,6 +105,12 @@ export async function execute(interaction) {
       return interaction.reply({ content: `❌ You don't have "${itemName}" in your inventory.`, flags: MessageFlags.Ephemeral });
     }
 
+    // Validate item is consumable
+    const item = getItemInfo(targetItemId);
+    if (!item || item.type !== 'consumable') {
+      return interaction.reply({ content: `❌ "${itemName}" is not a consumable item.`, flags: MessageFlags.Ephemeral });
+    }
+
     const result = useConsumableItem(userId, targetItemId);
     if (!result.success) {
       return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
@@ -137,15 +150,23 @@ export async function execute(interaction) {
 
     const character = getCharacter(userId);
     if (!character) {
-      return interaction.reply({ content: '❌ You need a character first. Use /rpg start', flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: '❌ You need a character first. Use `/rpg start` to create one.', flags: MessageFlags.Ephemeral });
     }
 
     const slot = item.type === 'weapon' ? 'weapon' : 'armor';
 
+    // Check if item is already equipped
+    if (character.equipped && character.equipped[slot] === targetItemId) {
+      return interaction.reply({ content: `❌ **${item.name}** is already equipped in the ${slot} slot.`, flags: MessageFlags.Ephemeral });
+    }
+
     // Unequip current item in that slot if any
     if (character.equipped && character.equipped[slot]) {
-      const currentItem = getItemInfo(character.equipped[slot]);
-      addItemToInventory(userId, character.equipped[slot], 1);
+      const currentItemId = character.equipped[slot];
+      const currentItem = getItemInfo(currentItemId);
+      if (currentItem) {
+        addItemToInventory(userId, currentItemId, 1);
+      }
     }
 
     // Equip new item
@@ -164,7 +185,7 @@ export async function execute(interaction) {
 
     const character = getCharacter(userId);
     if (!character) {
-      return interaction.reply({ content: '❌ You need a character first. Use /rpg start', flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: '❌ You need a character first. Use `/rpg start` to create one.', flags: MessageFlags.Ephemeral });
     }
 
     if (!character.equipped || !character.equipped[slot]) {
@@ -182,6 +203,9 @@ export async function execute(interaction) {
     saveCharacter(userId, character);
 
     await interaction.reply({ content: `✅ Unequipped **${item.name}** from ${slot} slot!` });
+  }
+  } catch (error) {
+    return handleCommandError(interaction, error);
   }
 }
 

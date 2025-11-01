@@ -1,5 +1,6 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType , MessageFlags} from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
 import { updateUserStats } from '../achievements.js';
+import { safeExecuteCommand, CommandError, validateRange } from '../errorHandler.js';
 
 const triviaQuestions = [
   {
@@ -80,29 +81,45 @@ export async function execute(interaction) {
   const questionCount = interaction.options.getInteger('questions') || 5;
   const category = interaction.options.getString('category') || 'all';
 
+  // Validate question count
+  validateRange(questionCount, 1, 10, 'question count');
+
   // Filter questions by category if specified
   let availableQuestions = triviaQuestions;
   if (category !== 'all') {
+    const validCategories = ['Geography', 'Science', 'Math', 'Art', 'Nature', 'History', 'Technology'];
+    if (!validCategories.includes(category)) {
+      throw new CommandError('Invalid category specified.', 'INVALID_ARGUMENT');
+    }
     availableQuestions = triviaQuestions.filter(q => q.category === category);
   }
 
   if (availableQuestions.length < questionCount) {
-    return interaction.reply({
-      content: `❌ Not enough questions available in ${category === 'all' ? 'all categories' : category} category. Available: ${availableQuestions.length}, Requested: ${questionCount}`,
-      flags: MessageFlags.Ephemeral
-    });
+    throw new CommandError(`Not enough questions available in ${category === 'all' ? 'all categories' : category} category. Available: ${availableQuestions.length}, Requested: ${questionCount}`, 'INVALID_ARGUMENT');
+  }
+
+  if (availableQuestions.length === 0) {
+    throw new CommandError('No questions available in the selected category.', 'NOT_FOUND');
   }
 
   // Select random questions
   const selectedQuestions = [];
   const usedIndices = new Set();
 
-  while (selectedQuestions.length < questionCount && usedIndices.size < availableQuestions.length) {
-    const randomIndex = Math.floor(Math.random() * availableQuestions.length);
-    if (!usedIndices.has(randomIndex)) {
-      usedIndices.add(randomIndex);
-      selectedQuestions.push(availableQuestions[randomIndex]);
+  try {
+    while (selectedQuestions.length < questionCount && usedIndices.size < availableQuestions.length) {
+      const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+      if (!usedIndices.has(randomIndex)) {
+        usedIndices.add(randomIndex);
+        selectedQuestions.push(availableQuestions[randomIndex]);
+      }
     }
+
+    if (selectedQuestions.length < questionCount) {
+      throw new CommandError('Failed to select sufficient unique questions.', 'COMMAND_ERROR');
+    }
+  } catch (error) {
+    throw new CommandError(`Failed to prepare trivia questions: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
   }
 
   const gameState = {
@@ -158,37 +175,48 @@ async function sendQuestion(interaction, gameState) {
   });
 
   collector.on('collect', async (i) => {
-    const selectedAnswer = parseInt(i.customId.split('_')[1]);
-    const isCorrect = selectedAnswer === question.correct;
+    try {
+      const selectedAnswer = parseInt(i.customId.split('_')[1]);
 
-    if (isCorrect) {
-      gameState.score++;
+      if (isNaN(selectedAnswer) || selectedAnswer < 0 || selectedAnswer >= question.options.length) {
+        await i.reply({ content: 'Invalid answer selection.', flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      const isCorrect = selectedAnswer === question.correct;
+
+      if (isCorrect) {
+        gameState.score++;
+      }
+
+      gameState.answers.push({
+        question: question.question,
+        selectedAnswer: selectedAnswer,
+        correctAnswer: question.correct,
+        isCorrect: isCorrect,
+        userChoice: question.options[selectedAnswer],
+        correctChoice: question.options[question.correct]
+      });
+
+      gameState.currentQuestion++;
+
+      // Send feedback and next question
+      const feedbackEmbed = new EmbedBuilder()
+        .setTitle(isCorrect ? '✅ Correct!' : '❌ Incorrect!')
+        .setDescription(`**${question.question}**\n\nYour answer: **${question.options[selectedAnswer]}**\nCorrect answer: **${question.options[question.correct]}**`)
+        .setColor(isCorrect ? 0x00FF00 : 0xFF0000)
+        .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` });
+
+      await i.reply({ embeds: [feedbackEmbed], flags: MessageFlags.Ephemeral });
+
+      // Wait a moment before sending next question
+      setTimeout(() => {
+        sendQuestion(interaction, gameState);
+      }, 2000);
+    } catch (error) {
+      console.error('Error in trivia collector:', error);
+      await i.reply({ content: 'An error occurred while processing your answer.', flags: MessageFlags.Ephemeral });
     }
-
-    gameState.answers.push({
-      question: question.question,
-      selectedAnswer: selectedAnswer,
-      correctAnswer: question.correct,
-      isCorrect: isCorrect,
-      userChoice: question.options[selectedAnswer],
-      correctChoice: question.options[question.correct]
-    });
-
-    gameState.currentQuestion++;
-
-    // Send feedback and next question
-    const feedbackEmbed = new EmbedBuilder()
-      .setTitle(isCorrect ? '✅ Correct!' : '❌ Incorrect!')
-      .setDescription(`**${question.question}**\n\nYour answer: **${question.options[selectedAnswer]}**\nCorrect answer: **${question.options[question.correct]}**`)
-      .setColor(isCorrect ? 0x00FF00 : 0xFF0000)
-      .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` });
-
-    await i.reply({ embeds: [feedbackEmbed], flags: MessageFlags.Ephemeral });
-
-    // Wait a moment before sending next question
-    setTimeout(() => {
-      sendQuestion(interaction, gameState);
-    }, 2000);
   });
 
   collector.on('end', async (collected) => {
@@ -234,11 +262,15 @@ async function sendResults(interaction, gameState) {
   else resultMessage = '📚 Keep learning and try again!';
 
   // Track trivia achievements
-  const correctAnswers = gameState.answers.filter(a => a.isCorrect).length;
-  updateUserStats(interaction.user.id, {
-    trivia_correct: correctAnswers,
-    features_tried: 1
-  });
+  try {
+    const correctAnswers = gameState.answers.filter(a => a.isCorrect).length;
+    updateUserStats(interaction.user.id, {
+      trivia_correct: correctAnswers,
+      features_tried: 1
+    });
+  } catch (error) {
+    console.warn('Failed to update trivia achievements:', error.message);
+  }
 
   const embed = new EmbedBuilder()
     .setTitle('🎯 Trivia Quiz Complete!')
@@ -260,6 +292,8 @@ async function sendResults(interaction, gameState) {
   if (interaction.replied || interaction.deferred) {
     await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
   } else {
-    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-  }
+}
+
+export async function safeExecute(interaction) {
+  return safeExecuteCommand(interaction, execute);
 }

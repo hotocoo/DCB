@@ -15,6 +15,12 @@ const MAX_GUILD_NAME_LENGTH = 20;
 const MAX_LOCATION_LENGTH = 50;
 const MAX_QUESTION_LENGTH = 200;
 const MAX_OPTION_LENGTH = 50;
+const SANITIZATION_PATTERNS = [
+  /[<>]/g, // Remove potential HTML tags
+  /javascript:/gi, // Remove javascript: protocol
+  /on\w+=/gi, // Remove event handlers
+  /[^\x20-\x7E]/g // Remove non-printable characters
+];
 
 class InputValidator {
 
@@ -25,41 +31,50 @@ class InputValidator {
    * @returns {object} Validation result with valid boolean and reason
    */
   validateString(input, options = {}) {
-    const {
-      minLength = 0,
-      maxLength = MAX_STRING_LENGTH,
-      allowedChars = null,
-      blockedWords = [],
-      required = false
-    } = options;
+    try {
+      const {
+        minLength = 0,
+        maxLength = MAX_STRING_LENGTH,
+        allowedChars = null,
+        blockedWords = [],
+        required = false
+      } = options;
 
-    if (required && (!input || input.trim() === '')) {
-      return { valid: false, reason: 'This field is required' };
-    }
+      if (required && (!input || input.trim() === '')) {
+        return { valid: false, reason: 'This field is required' };
+      }
 
-    if (input && input.length < minLength) {
-      return { valid: false, reason: `Must be at least ${minLength} characters` };
-    }
+      if (input && typeof input !== 'string') {
+        return { valid: false, reason: 'Input must be a string' };
+      }
 
-    if (input && input.length > maxLength) {
-      return { valid: false, reason: `Must be no more than ${maxLength} characters` };
-    }
+      if (input && input.length < minLength) {
+        return { valid: false, reason: `Must be at least ${minLength} characters` };
+      }
 
-    if (input && allowedChars && !new RegExp(`^[${allowedChars}]+$`).test(input)) {
-      return { valid: false, reason: `Contains invalid characters. Allowed: ${allowedChars}` };
-    }
+      if (input && input.length > maxLength) {
+        return { valid: false, reason: `Must be no more than ${maxLength} characters` };
+      }
 
-    if (input && blockedWords.length > 0) {
-      const lowerInput = input.toLowerCase();
-      for (const word of blockedWords) {
-        if (lowerInput.includes(word.toLowerCase())) {
-          logger.warn('Blocked word detected in input', { word: word.toLowerCase() });
-          return { valid: false, reason: 'Contains inappropriate content' };
+      if (input && allowedChars && !new RegExp(`^[${allowedChars}]+$`).test(input)) {
+        return { valid: false, reason: `Contains invalid characters. Allowed: ${allowedChars}` };
+      }
+
+      if (input && blockedWords.length > 0) {
+        const lowerInput = input.toLowerCase();
+        for (const word of blockedWords) {
+          if (lowerInput.includes(word.toLowerCase())) {
+            logger.warn('Blocked word detected in input', { word: word.toLowerCase() });
+            return { valid: false, reason: 'Contains inappropriate content' };
+          }
         }
       }
-    }
 
-    return { valid: true };
+      return { valid: true };
+    } catch (error) {
+      logger.error('Error in validateString', error, { input: typeof input, options });
+      return { valid: false, reason: 'Validation error occurred' };
+    }
   }
 
   /**
@@ -421,13 +436,20 @@ class InputValidator {
   sanitizeInput(input) {
     if (typeof input !== 'string') return input;
 
-    return input
-      .trim()
-      .replace(/[<>]/g, '') // Remove potential HTML tags
-      .replace(/javascript:/gi, '') // Remove javascript: protocol
-      .replace(/on\w+=/gi, '') // Remove event handlers
-      .replace(/[^\x20-\x7E]/g, '') // Remove non-printable characters
-      .slice(0, MAX_STRING_LENGTH); // Limit length
+    try {
+      let sanitized = input.trim();
+
+      // Apply all sanitization patterns
+      for (const pattern of SANITIZATION_PATTERNS) {
+        sanitized = sanitized.replace(pattern, '');
+      }
+
+      // Limit length
+      return sanitized.slice(0, MAX_STRING_LENGTH);
+    } catch (error) {
+      logger.error('Error in sanitizeInput', error, { inputType: typeof input });
+      return ''; // Return empty string on error
+    }
   }
 
   /**
@@ -480,31 +502,53 @@ class InputValidator {
 
   // Bulk validation for complex objects
   validateObject(obj, schema) {
-    const errors = [];
-
-    for (const [key, rules] of Object.entries(schema)) {
-      const value = obj[key];
-
-      if (rules.required && (value === null || value === undefined)) {
-        errors.push(`${key} is required`);
-        continue;
+    try {
+      if (!obj || typeof obj !== 'object') {
+        return { valid: false, errors: ['Input must be an object'] };
       }
 
-      if (value !== null && value !== undefined) {
-        if (rules.type === 'string') {
-          const stringValidation = this.validateString(value, rules);
-          if (!stringValidation.valid) errors.push(`${key}: ${stringValidation.reason}`);
-        } else if (rules.type === 'number') {
-          const numberValidation = this.validateNumber(value, rules);
-          if (!numberValidation.valid) errors.push(`${key}: ${numberValidation.reason}`);
+      if (!schema || typeof schema !== 'object') {
+        return { valid: false, errors: ['Schema must be an object'] };
+      }
+
+      const errors = [];
+
+      for (const [key, rules] of Object.entries(schema)) {
+        const value = obj[key];
+
+        if (rules.required && (value === null || value === undefined)) {
+          errors.push(`${key} is required`);
+          continue;
+        }
+
+        if (value !== null && value !== undefined) {
+          if (rules.type === 'string') {
+            const stringValidation = this.validateString(value, rules);
+            if (!stringValidation.valid) errors.push(`${key}: ${stringValidation.reason}`);
+          } else if (rules.type === 'number') {
+            const numberValidation = this.validateNumber(value, rules);
+            if (!numberValidation.valid) errors.push(`${key}: ${numberValidation.reason}`);
+          } else if (rules.type === 'userId') {
+            const userIdValidation = this.validateUserId(value);
+            if (!userIdValidation.valid) errors.push(`${key}: ${userIdValidation.reason}`);
+          } else if (rules.type === 'channelId') {
+            const channelIdValidation = this.validateChannelId(value);
+            if (!channelIdValidation.valid) errors.push(`${key}: ${channelIdValidation.reason}`);
+          } else if (rules.type === 'roleId') {
+            const roleIdValidation = this.validateRoleId(value);
+            if (!roleIdValidation.valid) errors.push(`${key}: ${roleIdValidation.reason}`);
+          }
         }
       }
-    }
 
-    return {
-      valid: errors.length === 0,
-      errors
-    };
+      return {
+        valid: errors.length === 0,
+        errors
+      };
+    } catch (error) {
+      logger.error('Error in validateObject', error, { objKeys: Object.keys(obj || {}), schemaKeys: Object.keys(schema || {}) });
+      return { valid: false, errors: ['Validation error occurred'] };
+    }
   }
 }
 

@@ -12,7 +12,7 @@ import { inputValidator, sanitizeInput, validateUserId, validateNumber, validate
 
 // Feature modules
 import { isOnCooldown, setCooldown, getFormattedCooldown, getButtonCooldownType } from './cooldowns.js';
-import { wordleGames, hangmanGames, guessGames, combatGames, explorationGames } from './game-states.js';
+import { wordleGames, hangmanGames, guessGames, combatGames, explorationGames, connect4Games } from './game-states.js';
 import { getCharacter, resetCharacter, spendSkillPoints, encounterMonster, fightTurn, applyXp, narrate, saveCharacter, addItemToInventory, removeItemFromInventory, getItemInfo, getItemRarityInfo, generateRandomItem } from './rpg.js';
 import { addBalance, getBalance, transferBalance, getMarketPrice, buyFromMarket, sellToMarket } from './economy.js';
 import { getUserGuild, contributeToGuild } from './guilds.js';
@@ -28,21 +28,23 @@ import { getRadioStations } from './music.js';
 // Constants for rate limiting and configuration
 const INTERACTION_RATE_LIMIT = 5;
 const INTERACTION_RATE_WINDOW = 10000; // 10 seconds
+const PROCESSED_INTERACTION_CLEANUP_TIME = 5 * 60 * 1000; // 5 minutes
+const CIRCUIT_BREAKER_MAX_ATTEMPTS = 3;
+const CIRCUIT_BREAKER_CLEANUP_TIME = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Rate limiter for interactions to prevent abuse.
  */
 const interactionRateLimiter = createRateLimiter(INTERACTION_RATE_LIMIT, INTERACTION_RATE_WINDOW, (key) => key);
 
-// Circuit breaker constants
-const CIRCUIT_BREAKER_MAX_ATTEMPTS = 3;
-const CIRCUIT_BREAKER_CLEANUP_TIME = 5 * 60 * 1000; // 5 minutes
-
 /**
  * Circuit breaker to prevent infinite error loops.
  * Tracks error attempts per interaction to avoid recursive failures.
  */
 const circuitBreaker = new Map();
+
+// Processed interactions map to prevent duplicate responses
+const processedInteractions = new Map();
 
 /**
  * Sends a Wordle guess modal to the user.
@@ -67,15 +69,40 @@ export async function sendWordleGuessModal(interaction, gameId) {
   await interaction.showModal(modal);
 }
 
-// Constants for interaction processing
-const PROCESSED_INTERACTION_CLEANUP_TIME = 5 * 60 * 1000; // 5 minutes
+// Helper function to update inventory embed
+export async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
+  const { getItemInfo, getItemRarityInfo } = await import('./rpg.js');
 
-/**
- * Safely handles interactions and prevents duplicate responses.
- * @param {object} interaction - Discord interaction object
- * @param {object} options - Reply options
- * @returns {Promise<boolean>} True if reply was successful, false otherwise
- */
+  const embed = interaction.message.embeds[0];
+  const newEmbed = {
+    title: embed.title,
+    color: embed.color,
+    description: `💰 Total Value: ${inventoryValue} gold`,
+    fields: []
+  };
+
+  for (const [type, items] of Object.entries(itemsByType)) {
+    const typeEmoji = {
+      weapon: '⚔️',
+      armor: '🛡️',
+      consumable: '🧪',
+      material: '🔩'
+    }[type] || '📦';
+
+    const itemList = items.map(item => {
+      return `${typeEmoji} **${item.name}** (${item.quantity}x)`;
+    }).join('\n');
+
+    newEmbed.fields.push({
+      name: `${typeEmoji} ${type.charAt(0).toUpperCase() + type.slice(1)}s`,
+      value: itemList || 'None',
+      inline: true
+    });
+  }
+
+  await interaction.editReply({ embeds: [newEmbed] });
+}
+
 /**
  * Checks if the circuit breaker allows the operation to proceed.
  * @param {string} interactionId - The interaction identifier
@@ -202,22 +229,14 @@ export async function safeInteractionReply(interaction, options) {
      // Record error attempt in circuit breaker
      recordErrorAttempt(interactionId);
 
-     console.error(`[SAFE_INTERACTION_REPLY] Failed to reply to interaction ${interactionId}`, error.message);
-     console.error(`[SAFE_INTERACTION_REPLY] Error details:`, {
-       error: error.message,
-       stack: error.stack,
-       userId: interaction.user.id,
-       interactionType: interaction.type,
+     logger.error(`Failed to reply to interaction ${interactionId}`, error, {
+       userId: interaction.user?.id,
+       interactionType: interaction?.type,
        interactionId,
        interactionState: {
-         replied: interaction.replied,
-         deferred: interaction.deferred
+         replied: interaction?.replied,
+         deferred: interaction?.deferred
        }
-     });
-     logger.error(`Failed to reply to interaction ${interactionId}`, error, {
-       userId: interaction.user.id,
-       interactionType: interaction.type,
-       interactionId
      });
      return false;
    }
@@ -313,43 +332,8 @@ export async function safeInteractionUpdate(interaction, options) {
    }
  }
 
-// Helper function to update inventory embed
-export async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
-  const { getItemInfo, getItemRarityInfo } = await import('./rpg.js');
-
-  const embed = interaction.message.embeds[0];
-  const newEmbed = {
-    title: embed.title,
-    color: embed.color,
-    description: `💰 Total Value: ${inventoryValue} gold`,
-    fields: []
-  };
-
-  for (const [type, items] of Object.entries(itemsByType)) {
-    const typeEmoji = {
-      weapon: '⚔️',
-      armor: '🛡️',
-      consumable: '🧪',
-      material: '🔩'
-    }[type] || '📦';
-
-    const itemList = items.map(item => {
-      return `${typeEmoji} **${item.name}** (${item.quantity}x)`;
-    }).join('\n');
-
-    newEmbed.fields.push({
-      name: `${typeEmoji} ${type.charAt(0).toUpperCase() + type.slice(1)}s`,
-      value: itemList || 'None',
-      inline: true
-    });
-  }
-
-  await interaction.editReply({ embeds: [newEmbed] });
-}
-
 // Maps for cooldowns and processed interactions
 export const spendCooldowns = new Map();
-export const processedInteractions = new Map();
 
 // Export circuit breaker for use in errorHandler.js
 export const circuitBreakerMap = circuitBreaker;
@@ -1872,8 +1856,23 @@ async function handleButtonInteraction(interaction, client) {
     if (action === 'guess_modal') {
       const [, gameId, min, max] = interaction.customId.split(':');
 
+      const gameState = guessGames.get(gameId);
+      if (!gameState) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Game not found!** The game may have expired.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      if (!gameState.gameActive) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Game is no longer active!**',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
       const modal = new ModalBuilder().setCustomId(`guess_submit:${gameId}`).setTitle('Make Your Guess');
-      const guessInput = new TextInputBuilder().setCustomId('guess').setLabel(`Guess a number between ${min} and ${max}`).setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder(`${min}-${max}`);
+      const guessInput = new TextInputBuilder().setCustomId('guess_number').setLabel(`Guess a number between ${min} and ${max}`).setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder(`${min}-${max}`);
 
       modal.addComponents({ type: 1, components: [guessInput] });
       await interaction.showModal(modal);
@@ -2309,6 +2308,47 @@ async function handleButtonInteraction(interaction, client) {
       }
 
       sendWordleGuessModal(interaction, interaction.user.id);
+      return;
+    }
+
+    // Connect4 button handler
+    if (action === 'c4') {
+      const [, colStr, gameId] = interaction.customId.split('_');
+
+      const gameState = connect4Games.get(gameId);
+      if (!gameState) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Game not found!** The game may have expired or been completed.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Validate user turn
+      if (interaction.user.id !== gameState.players[gameState.currentPlayer]?.id) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Not your turn!** Please wait for the other player.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      const column = parseInt(colStr);
+      if (isNaN(column) || column < 0 || column > 6) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Invalid column!** Please select a valid column (1-7).',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Make the move
+      const moveResult = await makeConnect4Move(gameState, column);
+      if (!moveResult) {
+        return safeInteractionReply(interaction, {
+          content: '❌ **Invalid move!** That column is full.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      await sendConnect4Board(interaction, gameState);
       return;
     }
 

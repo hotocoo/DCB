@@ -3,6 +3,7 @@ import { exploreLocation, unlockLocation, enterDungeon, discoverLocation, getLoc
 import { narrate } from '../rpg.js';
 import fs from 'fs';
 import path from 'path';
+import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler.js';
 
 // RPG data file path
 const FILE = path.join(process.cwd(), 'data', 'rpg.json');
@@ -142,8 +143,9 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('enter').setDescription('Enter a location for adventure').addStringOption(opt => opt.setName('location').setDescription('Location to explore').setRequired(true)));
 
 export async function execute(interaction) {
-  const sub = interaction.options.getSubcommand();
-  const userId = interaction.user.id;
+  return safeExecuteCommand(interaction, async () => {
+    const sub = interaction.options.getSubcommand();
+    const userId = interaction.user.id;
 
   if (sub === 'locations') {
     const locations = getLocations();
@@ -194,10 +196,13 @@ export async function execute(interaction) {
 
   } else if (sub === 'discover') {
     const locationName = interaction.options.getString('location');
+
+    validateNotEmpty(locationName, 'location name');
+
     const result = discoverLocation(userId, locationName);
 
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
+      throw new CommandError(result.reason, 'COMMAND_ERROR');
     }
 
     const { location, requirements, canUnlock } = result;
@@ -216,6 +221,8 @@ export async function execute(interaction) {
           );
 
         await interaction.reply({ embeds: [embed] });
+      } else {
+        throw new CommandError(unlockResult.reason || 'Failed to unlock location', 'COMMAND_ERROR');
       }
     } else {
       const embed = new EmbedBuilder()
@@ -234,41 +241,48 @@ export async function execute(interaction) {
   } else if (sub === 'enter') {
     const locationName = interaction.options.getString('location');
 
+    validateNotEmpty(locationName, 'location name');
+
     // Check daily limit
     const dailyCheck = checkDailyLimit(userId);
     if (!dailyCheck.allowed) {
-      return interaction.reply({
-        content: `❌ **Daily exploration limit reached!** You have used ${dailyCheck.used}/${dailyCheck.max} explorations today. Reset in ${Math.ceil((24 - (Date.now() - (dailyCheck.resetTime || Date.now())) / 3600000))} hours.`,
-        flags: MessageFlags.Ephemeral
-      });
+      const resetHours = Math.ceil((24 - (Date.now() - (dailyCheck.resetTime || Date.now())) / 3600000));
+      throw new CommandError(`Daily exploration limit reached! You have used ${dailyCheck.used}/${dailyCheck.max} explorations today. Reset in ${resetHours} hours.`, 'COMMAND_ERROR');
     }
 
     // Check session XP cap
     const sessionCheck = checkSessionXpCap(userId);
     if (!sessionCheck.allowed) {
-      return interaction.reply({
-        content: `❌ **Session XP cap reached!** You have gained ${sessionCheck.used}/${sessionCheck.max} XP this session. Reset in ${Math.ceil((24 - (Date.now() - (sessionCheck.resetTime || Date.now())) / 3600000))} hours.`,
-        flags: MessageFlags.Ephemeral
-      });
+      const resetHours = Math.ceil((24 - (Date.now() - (sessionCheck.resetTime || Date.now())) / 3600000));
+      throw new CommandError(`Session XP cap reached! You have gained ${sessionCheck.used}/${sessionCheck.max} XP this session. Reset in ${resetHours} hours.`, 'COMMAND_ERROR');
     }
 
     const result = exploreLocation(userId, locationName);
 
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
+      throw new CommandError(result.reason, 'COMMAND_ERROR');
     }
 
     // Increment daily exploration count
-    incrementDailyExploration(userId);
+    const incrementResult = incrementDailyExploration(userId);
+    if (!incrementResult.success) {
+      throw new CommandError(incrementResult.reason || 'Failed to update exploration count', 'COMMAND_ERROR');
+    }
 
     const { location, encounter, narrative } = result;
 
     // Generate AI narrative for the location entry
-    const locationNarrative = await narrate(
-      interaction.guildId,
-      `${location.ai_prompt} An adventurer enters this mystical place.`,
-      `You enter ${location.name}. ${narrative.entry}`
-    );
+    let locationNarrative;
+    try {
+      locationNarrative = await narrate(
+        interaction.guildId,
+        `${location.ai_prompt} An adventurer enters this mystical place.`,
+        `You enter ${location.name}. ${narrative.entry}`
+      );
+    } catch (narrativeError) {
+      console.warn('[EXPLORE] AI narrative generation failed, using fallback:', narrativeError.message);
+      locationNarrative = `You enter ${location.name}. ${narrative.entry}`;
+    }
 
     const embed = new EmbedBuilder()
       .setTitle(`${location.emoji} ${location.name}`)
@@ -289,5 +303,7 @@ export async function execute(interaction) {
     );
 
     await interaction.reply({ embeds: [embed], components: [row] });
-  }
+  }, {
+    command: 'explore'
+  });
 }

@@ -54,3 +54,17 @@
 [2025-11-01T12:15:06.686Z] [INFO] YouTube search successful | {"query":"test song","results":3}
 [2025-11-01T12:15:38.594Z] [INFO] MusicManager initialization diagnostics | {"originalFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegExists":true,"nodeVersion":"v22.21.0","platform":"win32"}
 [2025-11-01T12:15:38.595Z] [INFO] MusicManager initialized | {"initializationTime":"2025-11-01T12:15:38.595Z","hasSpotifyCredentials":true,"hasYouTubeAccess":true,"hasDeezzerAccess":true,"ffmpegStaticAvailable":true,"resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegPathExists":true}
+[2025-11-01T12:32:20.221Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T12:32:20.226Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T12:37:58.364Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T12:37:58.365Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T12:38:20.098Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T12:38:20.102Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T12:39:21.897Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T12:39:21.899Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T12:44:36.613Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T12:44:36.616Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T12:45:38.612Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T12:45:38.618Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T13:02:20.223Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T13:02:20.224Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}

@@ -11,6 +11,7 @@ import {
   getGuildLeaderboard,
   contributeToGuild
 } from '../guilds.js';
+import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('guild')
@@ -23,45 +24,47 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('party').setDescription('Party management').addStringOption(opt => opt.setName('action').setDescription('create|join|leave').setRequired(true)).addStringOption(opt => opt.setName('party_id').setDescription('Party ID (for join)')));
 
 export async function execute(interaction) {
-  const sub = interaction.options.getSubcommand();
-  const userId = interaction.user.id;
-  const userName = interaction.user.username;
+  return safeExecuteCommand(interaction, async () => {
+    const sub = interaction.options.getSubcommand();
+    const userId = interaction.user.id;
+    const userName = interaction.user.username;
 
-  if (sub === 'create') {
-    const guildName = interaction.options.getString('name');
+    if (sub === 'create') {
+      const guildName = interaction.options.getString('name');
 
-    // Validate guild name
-    if (guildName.length < 3 || guildName.length > 20) {
-      return interaction.reply({ content: '❌ Guild name must be between 3 and 20 characters.', flags: MessageFlags.Ephemeral });
-    }
+      // Validate guild name
+      validateNotEmpty(guildName, 'guild name');
+      validateRange(guildName.length, 3, 20, 'guild name length');
 
-    if (!/^[a-zA-Z0-9\s]+$/.test(guildName)) {
-      return interaction.reply({ content: '❌ Guild name can only contain letters, numbers, and spaces.', flags: MessageFlags.Ephemeral });
-    }
+      if (!/^[a-zA-Z0-9\s]+$/.test(guildName)) {
+        throw new CommandError('Guild name can only contain letters, numbers, and spaces.', 'INVALID_ARGUMENT');
+      }
 
-    const result = createGuild(guildName, userId, userName);
-    if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
-    }
+      const result = createGuild(guildName, userId, userName);
+      if (!result.success) {
+        throw new CommandError(result.reason, 'COMMAND_ERROR');
+      }
 
-    const embed = new EmbedBuilder()
-      .setTitle('🏛️ Guild Created!')
-      .setColor(0xFFD700)
-      .setDescription(`**${guildName}** has been founded!`)
-      .addFields(
-        { name: '👑 Leader', value: userName, inline: true },
-        { name: '🏆 Level', value: '1', inline: true },
-        { name: '👥 Members', value: '1', inline: true }
-      );
+      const embed = new EmbedBuilder()
+        .setTitle('🏛️ Guild Created!')
+        .setColor(0xFFD700)
+        .setDescription(`**${guildName}** has been founded!`)
+        .addFields(
+          { name: '👑 Leader', value: userName, inline: true },
+          { name: '🏆 Level', value: '1', inline: true },
+          { name: '👥 Members', value: '1', inline: true }
+        );
 
-    await interaction.reply({ embeds: [embed] });
+      await interaction.reply({ embeds: [embed] });
 
   } else if (sub === 'join') {
     const guildName = interaction.options.getString('name');
 
+    validateNotEmpty(guildName, 'guild name');
+
     const result = joinGuild(guildName, userId, userName);
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
+      throw new CommandError(result.reason, 'COMMAND_ERROR');
     }
 
     const embed = new EmbedBuilder()
@@ -216,5 +219,7 @@ export async function execute(interaction) {
 
       await interaction.reply({ content: '👋 You have left the party.', flags: MessageFlags.Ephemeral });
     }
-  }
+  }, {
+    command: 'guild'
+  });
 }

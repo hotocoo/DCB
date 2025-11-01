@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 import { readFileSync } from 'fs';
 import path from 'path';
+import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
     .setName('hangman')
@@ -20,9 +21,10 @@ export const data = new SlashCommandBuilder()
                     .setRequired(true)));
 
 export async function execute(interaction) {
-    const subcommand = interaction.options.getSubcommand();
+    return safeExecuteCommand(interaction, async () => {
+        const subcommand = interaction.options.getSubcommand();
 
-    if (subcommand === 'start') {
+        if (subcommand === 'start') {
         const words = readFileSync(path.join(__dirname, '../../data/words.txt'), 'utf8')
             .split('\n')
             .filter(word => word.trim().length > 0);
@@ -75,17 +77,20 @@ export async function execute(interaction) {
     } else if (subcommand === 'guess') {
         const guess = interaction.options.getString('letter').toLowerCase();
 
-        if (!guess || guess.length !== 1 || !/^[a-z]$/.test(guess)) {
-            return await interaction.reply({ content: 'Please guess a single letter (a-z).', flags: MessageFlags.Ephemeral });
+        // Validate input
+        validateNotEmpty(guess, 'letter');
+        validateRange(guess.length, 1, 1, 'letter length');
+        if (!/^[a-z]$/.test(guess)) {
+            throw new CommandError('Please guess a single letter (a-z).', 'INVALID_ARGUMENT');
         }
 
         const gameState = interaction.client.games.get(interaction.user.id);
         if (!gameState || gameState.isGameOver) {
-            return await interaction.reply({ content: 'No active game found. Start a new game with /hangman start.', flags: MessageFlags.Ephemeral });
+            throw new CommandError('No active game found. Start a new game with /hangman start.', 'NOT_FOUND');
         }
 
         if (gameState.guessedLetters.has(guess)) {
-            return await interaction.reply({ content: 'You have already guessed that letter.', flags: MessageFlags.Ephemeral });
+            throw new CommandError('You have already guessed that letter.', 'INVALID_ARGUMENT');
         }
 
         gameState.guessedLetters.add(guess);
@@ -114,5 +119,7 @@ export async function execute(interaction) {
         if (gameState.isGameOver) {
             interaction.client.games.delete(interaction.user.id);
         }
-    }
+    }, {
+        command: 'hangman'
+    });
 }

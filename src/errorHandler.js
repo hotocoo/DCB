@@ -6,6 +6,18 @@
 import { logError } from './logger.js';
 
 /**
+ * Circuit breaker configuration constants.
+ */
+const CIRCUIT_BREAKER_MAX_ATTEMPTS = 3;
+const CIRCUIT_BREAKER_CLEANUP_TIME = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Retry configuration defaults.
+ */
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_RETRY_DELAY = 1000;
+
+/**
  * Error codes and their corresponding user-friendly messages.
  */
 const ERROR_MESSAGES = {
@@ -79,14 +91,12 @@ function checkCircuitBreaker(interactionId) {
 
     const { attempts, lastAttempt } = circuitData;
     const now = Date.now();
-    const CIRCUIT_BREAKER_CLEANUP_TIME = 5 * 60 * 1000; // 5 minutes
 
     if (now - lastAttempt > CIRCUIT_BREAKER_CLEANUP_TIME) {
       circuitBreakerMap.delete(interactionId);
       return true;
     }
 
-    const CIRCUIT_BREAKER_MAX_ATTEMPTS = 3;
     return attempts < CIRCUIT_BREAKER_MAX_ATTEMPTS;
   } catch (error) {
     // If import fails, allow operation to proceed
@@ -447,12 +457,24 @@ export function createRateLimiter(points, duration, keyGenerator) {
 /**
  * Retry helper for async operations with exponential backoff.
  * @param {Function} operation - Async function to retry
- * @param {number} maxRetries - Maximum number of retry attempts
- * @param {number} delay - Base delay between retries in milliseconds
+ * @param {number} [maxRetries=DEFAULT_MAX_RETRIES] - Maximum number of retry attempts
+ * @param {number} [delay=DEFAULT_RETRY_DELAY] - Base delay between retries in milliseconds
  * @returns {Promise} Promise resolving to operation result
  * @throws {CommandError} If all retries are exhausted
  */
-export async function retryAsync(operation, maxRetries = 3, delay = 1000) {
+export async function retryAsync(operation, maxRetries = DEFAULT_MAX_RETRIES, delay = DEFAULT_RETRY_DELAY) {
+  if (typeof operation !== 'function') {
+    throw new CommandError('Operation must be a function.', 'INVALID_ARGUMENT');
+  }
+
+  if (!Number.isInteger(maxRetries) || maxRetries < 0) {
+    throw new CommandError('maxRetries must be a non-negative integer.', 'INVALID_ARGUMENT');
+  }
+
+  if (!Number.isFinite(delay) || delay < 0) {
+    throw new CommandError('delay must be a non-negative number.', 'INVALID_ARGUMENT');
+  }
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await operation();
@@ -465,8 +487,12 @@ export async function retryAsync(operation, maxRetries = 3, delay = 1000) {
         );
       }
 
-      // Log retry attempt (using console.log for simplicity, could use logger)
-      console.log(`Attempt ${attempt} failed, retrying in ${delay * attempt}ms: ${error.message}`);
+      // Log retry attempt using logger instead of console.log
+      logError(`Retry attempt ${attempt} failed, retrying in ${delay * attempt}ms`, error, {
+        attempt,
+        maxRetries,
+        delay: delay * attempt
+      });
       await new Promise(resolve => setTimeout(resolve, delay * attempt));
     }
   }

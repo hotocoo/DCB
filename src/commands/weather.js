@@ -1,12 +1,57 @@
-import { SlashCommandBuilder, EmbedBuilder , MessageFlags} from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 
-// Rate limiter for weather API (60 requests per minute)
+// Rate limiter for weather API (60 requests per minute per user)
 const weatherRateLimiter = new RateLimiterMemory({
   keyPrefix: 'weather_api',
   points: 60,
   duration: 60,
 });
+
+/**
+ * Validates if the location input is safe and reasonable.
+ * @param {string} location - The location string to validate.
+ * @returns {boolean} True if valid, false otherwise.
+ */
+function isValidLocation(location) {
+  if (!location || typeof location !== 'string') return false;
+  if (location.length < 2 || location.length > 100) return false;
+  // Basic check for potentially malicious input
+  if (/[<>\"';&]/.test(location)) return false;
+  return true;
+}
+
+/**
+ * Gets the weather emoji based on the weather condition.
+ * @param {string} condition - The weather condition.
+ * @returns {string} The corresponding emoji.
+ */
+function getWeatherEmoji(condition) {
+  const emojis = {
+    'Clear': '☀️',
+    'Clouds': '☁️',
+    'Rain': '🌧️',
+    'Drizzle': '🌦️',
+    'Thunderstorm': '⛈️',
+    'Snow': '❄️',
+    'Mist': '🌫️',
+    'Fog': '🌫️',
+    'Haze': '🌫️'
+  };
+  return emojis[condition] || '🌤️';
+}
+
+/**
+ * Gets the wind direction from degrees.
+ * @param {number} degrees - Wind direction in degrees.
+ * @returns {string} Wind direction abbreviation.
+ */
+function getWindDirection(degrees) {
+  if (degrees == null) return '';
+  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const index = Math.round(degrees / 22.5) % 16;
+  return directions[index];
+}
 
 export const data = new SlashCommandBuilder()
   .setName('weather')
@@ -16,34 +61,57 @@ export const data = new SlashCommandBuilder()
       .setDescription('City name or location')
       .setRequired(true));
 
+/**
+ * Executes the weather command.
+ * @param {import('discord.js').CommandInteraction} interaction - The interaction object.
+ */
 export async function execute(interaction) {
-  const location = interaction.options.getString('location');
-
   try {
+    const location = interaction.options.getString('location');
+
+    // Validate location input
+    if (!isValidLocation(location)) {
+      return await interaction.reply({ content: '❌ Invalid location. Please provide a valid city name or location.', flags: MessageFlags.Ephemeral });
+    }
+
+    // Check if API key is configured
+    if (!process.env.OPENWEATHER_API_KEY) {
+      return await interaction.reply({ content: '❌ Weather API key not configured. Please contact an administrator.', flags: MessageFlags.Ephemeral });
+    }
+
     // Rate limiting for weather API
     try {
-      await weatherRateLimiter.consume('weather_api');
+      await weatherRateLimiter.consume(interaction.user.id);
     } catch (rejRes) {
-      return interaction.reply({
+      return await interaction.reply({
         content: `⏰ **Rate limit exceeded!** Please wait ${Math.round(rejRes.msBeforeNext / 1000)} seconds before trying again.`,
         flags: MessageFlags.Ephemeral
       });
     }
 
     // Using a free weather API (you may want to replace with a paid one for production)
-    const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`);
+    const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`, {
+      timeout: 10000 // 10 second timeout
+    });
 
     if (!response.ok) {
       if (response.status === 401) {
-        return interaction.reply({ content: '❌ Weather API key not configured. Please contact an administrator.', flags: MessageFlags.Ephemeral });
+        return await interaction.reply({ content: '❌ Weather API key not configured. Please contact an administrator.', flags: MessageFlags.Ephemeral });
       } else if (response.status === 404) {
-        return interaction.reply({ content: `❌ Location "${location}" not found. Please check the spelling and try again.`, flags: MessageFlags.Ephemeral });
+        return await interaction.reply({ content: `❌ Location "${location}" not found. Please check the spelling and try again.`, flags: MessageFlags.Ephemeral });
+      } else if (response.status === 429) {
+        return await interaction.reply({ content: '❌ Weather API rate limit exceeded. Please try again later.', flags: MessageFlags.Ephemeral });
       } else {
-        return interaction.reply({ content: `❌ Unable to fetch weather data. Please try again later.`, flags: MessageFlags.Ephemeral });
+        return await interaction.reply({ content: `❌ Unable to fetch weather data. Please try again later.`, flags: MessageFlags.Ephemeral });
       }
     }
 
     const data = await response.json();
+
+    // Validate API response structure
+    if (!data || !data.main || !data.weather || !data.weather[0] || !data.sys || !data.wind) {
+      return await interaction.reply({ content: '❌ Invalid weather data received. Please try again later.', flags: MessageFlags.Ephemeral });
+    }
 
     const embed = new EmbedBuilder()
       .setTitle(`🌤️ Weather in ${data.name}, ${data.sys.country}`)
@@ -87,27 +155,12 @@ export async function execute(interaction) {
 
   } catch (error) {
     console.error('Weather command error:', error);
-    await interaction.reply({ content: '❌ An error occurred while fetching weather data. Please try again later.', flags: MessageFlags.Ephemeral });
+    if (error.name === 'AbortError') {
+      await interaction.reply({ content: '❌ Request timed out. Please try again later.', flags: MessageFlags.Ephemeral });
+    } else if (error.message.includes('fetch')) {
+      await interaction.reply({ content: '❌ Network error. Please check your connection and try again.', flags: MessageFlags.Ephemeral });
+    } else {
+      await interaction.reply({ content: '❌ An error occurred while fetching weather data. Please try again later.', flags: MessageFlags.Ephemeral });
+    }
   }
-}
-
-function getWeatherEmoji(condition) {
-  const emojis = {
-    'Clear': '☀️',
-    'Clouds': '☁️',
-    'Rain': '🌧️',
-    'Drizzle': '🌦️',
-    'Thunderstorm': '⛈️',
-    'Snow': '❄️',
-    'Mist': '🌫️',
-    'Fog': '🌫️',
-    'Haze': '🌫️'
-  };
-  return emojis[condition] || '🌤️';
-}
-
-function getWindDirection(degrees) {
-  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-  const index = Math.round(degrees / 22.5) % 16;
-  return directions[index];
 }

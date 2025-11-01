@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { searchSongs, play, pause, resume, skip, stop, getQueue, getMusicStats, getLyrics, getRadioStations, setVolume, shuffleQueue, clearQueue, back, setLoop, getLoop } from '../music.js';
+import { CommandError, handleCommandError } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('music')
@@ -30,8 +31,21 @@ export const data = new SlashCommandBuilder()
   ).setRequired(true)));
 
 export async function execute(interaction) {
-  console.log(`[MUSIC] Command executed: ${interaction.options.getSubcommand()} by ${interaction.user.username} in ${interaction.guild.name}`);
-  const sub = interaction.options.getSubcommand();
+  try {
+    console.log(`[MUSIC] Command executed: ${interaction.options.getSubcommand()} by ${interaction.user.username} in ${interaction.guild?.name || 'DM'}`);
+    const sub = interaction.options.getSubcommand();
+
+    // Input validation
+    if (!interaction.user?.id) {
+      throw new CommandError('Invalid user', 'VALIDATION_ERROR');
+    }
+
+    if (!interaction.guild?.id && sub !== 'lyrics') {
+      return interaction.reply({
+        content: '❌ Music commands can only be used in servers.',
+        flags: MessageFlags.Ephemeral
+      });
+    }
 
   if (sub === 'play') {
     const query = interaction.options.getString('query');
@@ -442,12 +456,23 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
   } else if (sub === 'volume') {
     const volume = interaction.options.getInteger('level');
 
-    if (volume < 0 || volume > 200) {
-      return interaction.reply({ content: '❌ Volume must be between 0 and 200.', flags: MessageFlags.Ephemeral });
+    // Input validation
+    if (typeof volume !== 'number' || volume < 0 || volume > 200) {
+      return interaction.reply({
+        content: '❌ Volume must be a number between 0 and 200.',
+        flags: MessageFlags.Ephemeral
+      });
     }
 
     try {
-      setVolume(interaction.guild.id, volume);
+      const success = setVolume(interaction.guild.id, volume);
+      if (!success) {
+        return interaction.reply({
+          content: '❌ No active music session to adjust volume.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
       const embed = new EmbedBuilder()
         .setTitle('🔊 Volume Changed')
         .setColor(0x0099FF)
@@ -559,5 +584,8 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
       console.error('Radio command error:', error);
       await interaction.reply({ content: '❌ Failed to play radio.', flags: MessageFlags.Ephemeral });
     }
+  }
+  } catch (error) {
+    return handleCommandError(interaction, error);
   }
 }

@@ -1,5 +1,6 @@
-import { SlashCommandBuilder , MessageFlags} from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { getGuild, setGuild } from '../storage.js';
+import { safeExecuteCommand, CommandError, validateGuild, validatePermissions } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('togglechat')
@@ -7,13 +8,30 @@ export const data = new SlashCommandBuilder()
   .addBooleanOption(opt => opt.setName('enabled').setDescription('Enable chat responder').setRequired(true));
 
 export async function execute(interaction) {
-  if (!interaction.memberPermissions?.has || !interaction.memberPermissions.has('ManageGuild')) {
-    await interaction.reply({ content: 'You need Manage Server permission to run this command.', flags: MessageFlags.Ephemeral });
-    return;
-  }
+  validateGuild(interaction);
+  validatePermissions(interaction, ['ManageGuild']);
 
   const enabled = interaction.options.getBoolean('enabled');
-  const cfg = getGuild(interaction.guildId) || {};
-  setGuild(interaction.guildId, { ...cfg, chatEnabled: enabled });
-  await interaction.reply({ content: `Chat responder is now ${enabled ? 'enabled' : 'disabled'} for this guild.`, flags: MessageFlags.Ephemeral });
+
+  if (typeof enabled !== 'boolean') {
+    throw new CommandError('Invalid enabled value provided.', 'INVALID_ARGUMENT');
+  }
+
+  try {
+    const cfg = getGuild(interaction.guildId) || {};
+    const updatedCfg = { ...cfg, chatEnabled: enabled };
+
+    setGuild(interaction.guildId, updatedCfg);
+
+    await interaction.reply({
+      content: `✅ Chat responder is now **${enabled ? 'enabled' : 'disabled'}** for this guild.`,
+      flags: MessageFlags.Ephemeral
+    });
+  } catch (error) {
+    throw new CommandError(`Failed to toggle chat responder: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
+  }
+}
+
+export async function safeExecute(interaction) {
+  return safeExecuteCommand(interaction, execute);
 }

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle , MessageFlags} from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import {
   getOrCreateProfile,
   updateProfile,
@@ -9,6 +9,7 @@ import {
   generateProfileInsights,
   checkMilestones
 } from '../profiles.js';
+import { safeExecuteCommand, CommandError, validateUser, validateRange, validateNotEmpty } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('profile')
@@ -23,13 +24,23 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
   const userId = interaction.user.id;
-  const targetUser = interaction.options.getUser('user');
 
   if (sub === 'view') {
+    const targetUser = interaction.options.getUser('user');
     const viewUserId = targetUser?.id || userId;
+
+    // Validate target user if specified
+    if (targetUser) {
+      validateUser(interaction, targetUser.id);
+    }
+
     const viewUsername = targetUser?.username || interaction.user.username;
 
-    const profile = getOrCreateProfile(viewUserId, viewUsername);
+    try {
+      const profile = getOrCreateProfile(viewUserId, viewUsername);
+      if (!profile) {
+        throw new CommandError('Failed to retrieve profile data.', 'NOT_FOUND');
+      }
     const analytics = getProfileAnalytics(viewUserId);
     const insights = generateProfileInsights(viewUserId);
 
@@ -96,7 +107,10 @@ export async function execute(interaction) {
       new ButtonBuilder().setCustomId(`profile_compare:${viewUserId}:${userId}`).setLabel('⚖️ Compare').setStyle(ButtonStyle.Secondary)
     );
 
-    await interaction.reply({ embeds: [embed], components: [row] });
+      await interaction.reply({ embeds: [embed], components: [row] });
+    } catch (error) {
+      throw new CommandError(`Failed to display profile: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
+    }
 
   } else if (sub === 'edit') {
     // Show profile editing interface
@@ -115,11 +129,21 @@ export async function execute(interaction) {
   } else if (sub === 'compare') {
     const otherUser = interaction.options.getUser('user');
 
+    if (!otherUser) {
+      throw new CommandError('You must specify a user to compare with.', 'INVALID_ARGUMENT');
+    }
+
+    validateUser(interaction, otherUser.id);
+
     if (otherUser.id === userId) {
       return interaction.reply({ content: '❌ You cannot compare your profile with yourself!', flags: MessageFlags.Ephemeral });
     }
 
-    const comparison = compareProfiles(userId, otherUser.id);
+    try {
+      const comparison = compareProfiles(userId, otherUser.id);
+      if (!comparison) {
+        throw new CommandError('Failed to compare profiles.', 'COMMAND_ERROR');
+      }
 
     const embed = new EmbedBuilder()
       .setTitle('⚖️ Profile Comparison')
@@ -155,20 +179,23 @@ export async function execute(interaction) {
       inline: false
     });
 
+    } catch (error) {
+      throw new CommandError(`Failed to compare profiles: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
+    }
+
     await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
   } else if (sub === 'search') {
     const query = interaction.options.getString('query');
 
-    if (query.length < 2) {
-      return interaction.reply({ content: '❌ Search query must be at least 2 characters.', flags: MessageFlags.Ephemeral });
-    }
+    validateNotEmpty(query, 'search query');
+    validateRange(query.length, 2, 100, 'query length');
 
-    const results = searchProfiles(query, 5);
-
-    if (results.length === 0) {
-      return interaction.reply({ content: `🔍 No profiles found matching "${query}".`, flags: MessageFlags.Ephemeral });
-    }
+    try {
+      const results = searchProfiles(query, 5);
+      if (!Array.isArray(results)) {
+        throw new CommandError('Failed to search profiles.', 'COMMAND_ERROR');
+      }
 
     const embed = new EmbedBuilder()
       .setTitle(`🔍 Search Results for "${query}"`)
@@ -182,11 +209,18 @@ export async function execute(interaction) {
       });
     });
 
+    } catch (error) {
+      throw new CommandError(`Failed to search profiles: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
+    }
+
     await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
   } else if (sub === 'leaderboard') {
     const category = interaction.options.getString('category');
     const stat = interaction.options.getString('stat');
+
+    validateNotEmpty(category, 'category');
+    validateNotEmpty(stat, 'stat');
 
     const validCategories = ['rpg', 'games', 'social', 'activity'];
     const validStats = {
@@ -197,18 +231,22 @@ export async function execute(interaction) {
     };
 
     if (!validCategories.includes(category)) {
-      return interaction.reply({ content: '❌ Invalid category. Use: rpg, games, social, activity', flags: MessageFlags.Ephemeral });
+      throw new CommandError('Invalid category. Use: rpg, games, social, activity', 'INVALID_ARGUMENT');
     }
 
     if (!validStats[category]?.includes(stat)) {
-      return interaction.reply({ content: `❌ Invalid stat for ${category}. Available: ${validStats[category].join(', ')}`, flags: MessageFlags.Ephemeral });
+      throw new CommandError(`Invalid stat for ${category}. Available: ${validStats[category].join(', ')}`, 'INVALID_ARGUMENT');
     }
 
-    const leaderboard = getLeaderboard(category, stat, 10);
+    try {
+      const leaderboard = getLeaderboard(category, stat, 10);
+      if (!Array.isArray(leaderboard)) {
+        throw new CommandError('Failed to retrieve leaderboard data.', 'COMMAND_ERROR');
+      }
 
-    if (leaderboard.length === 0) {
-      return interaction.reply({ content: '📊 No data available for this leaderboard yet.', flags: MessageFlags.Ephemeral });
-    }
+      if (leaderboard.length === 0) {
+        return interaction.reply({ content: '📊 No data available for this leaderboard yet.', flags: MessageFlags.Ephemeral });
+      }
 
     const embed = new EmbedBuilder()
       .setTitle(`🏆 ${category.toUpperCase()} Leaderboard - ${stat.replace('_', ' ').toUpperCase()}`)
@@ -224,38 +262,58 @@ export async function execute(interaction) {
       });
     });
 
+    } catch (error) {
+      throw new CommandError(`Failed to retrieve leaderboard: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
+    }
+
     await interaction.reply({ embeds: [embed] });
 
   } else if (sub === 'insights') {
-    const insights = generateProfileInsights(userId);
+    try {
+      const insights = generateProfileInsights(userId);
+      if (!Array.isArray(insights)) {
+        throw new CommandError('Failed to generate profile insights.', 'COMMAND_ERROR');
+      }
 
-    if (insights.length === 0) {
-      return interaction.reply({ content: '💡 Start using more bot features to get personalized insights!', flags: MessageFlags.Ephemeral });
-    }
+      if (insights.length === 0) {
+        return interaction.reply({ content: '💡 Start using more bot features to get personalized insights!', flags: MessageFlags.Ephemeral });
+      }
 
-    const embed = new EmbedBuilder()
-      .setTitle('💡 Profile Insights')
-      .setColor(0x9932CC)
-      .setDescription('AI-powered analysis of your bot usage patterns:');
+      const embed = new EmbedBuilder()
+        .setTitle('💡 Profile Insights')
+        .setColor(0x9932CC)
+        .setDescription('AI-powered analysis of your bot usage patterns:');
 
-    insights.forEach((insight, index) => {
-      embed.addFields({
-        name: `Insight #${index + 1}`,
-        value: insight,
-        inline: false
+      insights.forEach((insight, index) => {
+        embed.addFields({
+          name: `Insight #${index + 1}`,
+          value: insight,
+          inline: false
+        });
       });
-    });
 
-    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    } catch (error) {
+      throw new CommandError(`Failed to generate insights: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
+    }
   }
+}
+
+export async function safeExecute(interaction) {
+  return safeExecuteCommand(interaction, execute);
 }
 
 // Helper function for user level calculation
 function getUserLevel(profile) {
-  const totalPoints = profile.achievements.length * 10 +
-                     profile.statistics.rpg.total_level +
-                     profile.statistics.games.trivia_correct +
-                     profile.statistics.social.reputation;
+  if (!profile || !profile.achievements || !profile.statistics) {
+    return 1;
+  }
 
-  return Math.floor(totalPoints / 100) + 1;
+  const achievementsPoints = (profile.achievements.length || 0) * 10;
+  const rpgPoints = profile.statistics.rpg?.total_level || 0;
+  const triviaPoints = profile.statistics.games?.trivia_correct || 0;
+  const reputationPoints = profile.statistics.social?.reputation || 0;
+
+  const totalPoints = achievementsPoints + rpgPoints + triviaPoints + reputationPoints;
+  return Math.max(1, Math.floor(totalPoints / 100) + 1);
 }

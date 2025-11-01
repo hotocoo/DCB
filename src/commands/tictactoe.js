@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle , MessageFlags} from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { updateUserStats } from '../achievements.js';
 
 export const data = new SlashCommandBuilder()
@@ -19,68 +19,92 @@ export const data = new SlashCommandBuilder()
       )
       .setRequired(false));
 
+/**
+ * Executes the Tic-Tac-Toe command.
+ * @param {import('discord.js').CommandInteraction} interaction - The interaction object.
+ */
 export async function execute(interaction) {
-  const opponent = interaction.options.getUser('opponent');
-  const difficulty = interaction.options.getString('difficulty') || 'medium';
+  try {
+    const opponent = interaction.options.getUser('opponent');
+    const difficulty = interaction.options.getString('difficulty') || 'medium';
 
-  if (opponent && opponent.id === interaction.user.id) {
-    return interaction.reply({ content: '❌ You cannot play against yourself!', flags: MessageFlags.Ephemeral });
-  }
-
-  if (opponent && opponent.bot) {
-    return interaction.reply({ content: '❌ You cannot challenge bot accounts to Tic-Tac-Toe.', flags: MessageFlags.Ephemeral });
-  }
-
-  const gameId = `ttt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const gameState = {
-    id: gameId,
-    board: Array(9).fill(null),
-    players: {
-      X: { id: interaction.user.id, name: interaction.user.username },
-      O: opponent ? { id: opponent.id, name: opponent.username } : { id: 'ai', name: `${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} AI` }
-    },
-    currentPlayer: 'X',
-    status: 'active',
-    difficulty,
-    isAI: !opponent,
-    created: Date.now()
-  };
-
-  await sendTicTacToeBoard(interaction, gameState);
-}
-
-async function sendTicTacToeBoard(interaction, gameState) {
-  const { board, players, currentPlayer, status, isAI } = gameState;
-
-  // Check for winner
-  const winner = checkWinner(board);
-  if (winner) {
-    gameState.status = 'completed';
-
-    if (winner !== 'tie') {
-      const winnerPlayer = players[winner];
-      if (winnerPlayer.id !== 'ai') {
-        updateUserStats(winnerPlayer.id, { games: { tictactoe_wins: 1 } });
+    // Validate opponent input
+    if (opponent) {
+      if (opponent.id === interaction.user.id) {
+        return await interaction.reply({ content: '❌ You cannot play against yourself!', flags: MessageFlags.Ephemeral });
+      }
+      if (opponent.bot) {
+        return await interaction.reply({ content: '❌ You cannot challenge bot accounts to Tic-Tac-Toe.', flags: MessageFlags.Ephemeral });
       }
     }
 
-    const resultEmbed = new EmbedBuilder()
-      .setTitle('⭕ Tic-Tac-Toe - Game Over!')
-      .setColor(winner === 'tie' ? 0xFFA500 : 0x00FF00)
-      .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${players[winner].name} wins!**`)
-      .addFields({
-        name: 'Final Board',
-        value: formatBoard(board),
-        inline: false
-      });
-
-    if (interaction.replied || interaction.deferred) {
-      await interaction.editReply({ embeds: [resultEmbed], components: [] });
-    } else {
-      await interaction.reply({ embeds: [resultEmbed] });
+    // Validate difficulty only for AI games
+    if (!opponent && !['easy', 'medium', 'hard', 'impossible'].includes(difficulty)) {
+      return await interaction.reply({ content: '❌ Invalid difficulty level.', flags: MessageFlags.Ephemeral });
     }
-    return;
+
+    const gameId = `ttt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const gameState = {
+      id: gameId,
+      board: Array(9).fill(null),
+      players: {
+        X: { id: interaction.user.id, name: interaction.user.username },
+        O: opponent ? { id: opponent.id, name: opponent.username } : { id: 'ai', name: `${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} AI` }
+      },
+      currentPlayer: 'X',
+      status: 'active',
+      difficulty,
+      isAI: !opponent,
+      created: Date.now()
+    };
+
+    await sendTicTacToeBoard(interaction, gameState);
+  } catch (error) {
+    console.error('Error in tictactoe execute:', error);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: '❌ An error occurred while starting the game.', flags: MessageFlags.Ephemeral });
+    }
   }
+}
+
+/**
+ * Sends the Tic-Tac-Toe board and handles game logic.
+ * @param {import('discord.js').CommandInteraction} interaction - The interaction object.
+ * @param {Object} gameState - The current game state.
+ */
+async function sendTicTacToeBoard(interaction, gameState) {
+  try {
+    const { board, players, currentPlayer, status, isAI } = gameState;
+
+    // Check for winner
+    const winner = checkWinner(board);
+    if (winner) {
+      gameState.status = 'completed';
+
+      if (winner !== 'tie') {
+        const winnerPlayer = players[winner];
+        if (winnerPlayer.id !== 'ai') {
+          await updateUserStats(winnerPlayer.id, { games: { tictactoe_wins: 1 } });
+        }
+      }
+
+      const resultEmbed = new EmbedBuilder()
+        .setTitle('⭕ Tic-Tac-Toe - Game Over!')
+        .setColor(winner === 'tie' ? 0xFFA500 : 0x00FF00)
+        .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${players[winner].name} wins!**`)
+        .addFields({
+          name: 'Final Board',
+          value: formatBoard(board),
+          inline: false
+        });
+
+      if (interaction.replied || interaction.deferred) {
+        await interaction.editReply({ embeds: [resultEmbed], components: [] });
+      } else {
+        await interaction.reply({ embeds: [resultEmbed] });
+      }
+      return;
+    }
 
   const embed = new EmbedBuilder()
     .setTitle('⭕ Tic-Tac-Toe')
@@ -130,6 +154,11 @@ async function sendTicTacToeBoard(interaction, gameState) {
   }
 }
 
+/**
+ * Formats the board into a string representation.
+ * @param {Array} board - The game board array.
+ * @returns {string} Formatted board string.
+ */
 function formatBoard(board) {
   const symbols = {
     null: '⬜',
@@ -144,6 +173,11 @@ function formatBoard(board) {
   return formatted;
 }
 
+/**
+ * Checks for a winner or tie on the board.
+ * @param {Array} board - The game board array.
+ * @returns {string|null} Winner ('X', 'O'), 'tie', or null.
+ */
 function checkWinner(board) {
   const lines = [
     [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
@@ -164,6 +198,12 @@ function checkWinner(board) {
   return null;
 }
 
+/**
+ * Determines the AI's move based on difficulty.
+ * @param {Array} board - The game board array.
+ * @param {string} difficulty - AI difficulty level.
+ * @returns {number|null} The move index or null if no moves available.
+ */
 function getAIMove(board, difficulty) {
   const availableMoves = board.map((cell, index) => cell === null ? index : null).filter(val => val !== null);
 
@@ -198,6 +238,12 @@ function getAIMove(board, difficulty) {
   return availableMoves[Math.floor(Math.random() * availableMoves.length)];
 }
 
+/**
+ * Finds a winning move for the given player.
+ * @param {Array} board - The game board array.
+ * @param {string} player - The player ('X' or 'O').
+ * @returns {number|null} The winning move index or null.
+ */
 function findWinningMove(board, player) {
   for (let i = 0; i < 9; i++) {
     if (board[i] === null) {
@@ -211,10 +257,22 @@ function findWinningMove(board, player) {
   return null;
 }
 
+/**
+ * Finds a blocking move against the opponent.
+ * @param {Array} board - The game board array.
+ * @param {string} opponent - The opponent player.
+ * @returns {number|null} The blocking move index or null.
+ */
 function findBlockingMove(board, opponent) {
   return findWinningMove(board, opponent);
 }
 
+/**
+ * Gets the best move using minimax algorithm.
+ * @param {Array} board - The game board array.
+ * @param {string} player - The AI player.
+ * @returns {number|null} The best move index.
+ */
 function getBestMove(board, player) {
   let bestScore = -Infinity;
   let bestMove = null;
@@ -235,6 +293,14 @@ function getBestMove(board, player) {
   return bestMove;
 }
 
+/**
+ * Minimax algorithm for evaluating board positions.
+ * @param {Array} board - The game board array.
+ * @param {number} depth - Current depth in recursion.
+ * @param {boolean} isMaximizing - Whether maximizing or minimizing.
+ * @param {string} aiPlayer - The AI player symbol.
+ * @returns {number} The evaluated score.
+ */
 function minimax(board, depth, isMaximizing, aiPlayer) {
   const humanPlayer = aiPlayer === 'O' ? 'X' : 'O';
   const result = checkWinner(board);

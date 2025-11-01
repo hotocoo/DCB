@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType , MessageFlags} from 'discord.js';
+import { CommandError, handleCommandError } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('poll')
@@ -31,24 +32,70 @@ export const data = new SlashCommandBuilder()
       .setRequired(false));
 
 export async function execute(interaction) {
-  const question = interaction.options.getString('question');
-  const option1 = interaction.options.getString('option1');
-  const option2 = interaction.options.getString('option2');
-  const option3 = interaction.options.getString('option3');
-  const option4 = interaction.options.getString('option4');
-  const durationMinutes = interaction.options.getInteger('duration') || 10;
+  try {
+    const question = interaction.options.getString('question');
+    const option1 = interaction.options.getString('option1');
+    const option2 = interaction.options.getString('option2');
+    const option3 = interaction.options.getString('option3');
+    const option4 = interaction.options.getString('option4');
+    const durationMinutes = interaction.options.getInteger('duration') || 10;
 
-  const options = [option1, option2, option3, option4].filter(Boolean);
-  const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+    // Input validation
+    if (!question || question.trim().length === 0) {
+      return interaction.reply({
+        content: '❌ Question cannot be empty.',
+        flags: MessageFlags.Ephemeral
+      });
+    }
 
-  if (options.length < 2) {
-    return interaction.reply({ content: '❌ You need at least 2 options for a poll.', flags: MessageFlags.Ephemeral });
-  }
+    if (question.length > 256) {
+      return interaction.reply({
+        content: '❌ Question must be 256 characters or less.',
+        flags: MessageFlags.Ephemeral
+      });
+    }
+
+    const options = [option1, option2, option3, option4].filter(Boolean);
+
+    // Validate options
+    if (options.length < 2) {
+      return interaction.reply({
+        content: '❌ You need at least 2 options for a poll.',
+        flags: MessageFlags.Ephemeral
+      });
+    }
+
+    // Check for empty or duplicate options
+    const trimmedOptions = options.map(opt => opt.trim());
+    if (trimmedOptions.some(opt => opt.length === 0)) {
+      return interaction.reply({
+        content: '❌ Options cannot be empty.',
+        flags: MessageFlags.Ephemeral
+      });
+    }
+
+    if (trimmedOptions.some(opt => opt.length > 80)) {
+      return interaction.reply({
+        content: '❌ Each option must be 80 characters or less.',
+        flags: MessageFlags.Ephemeral
+      });
+    }
+
+    const uniqueOptions = new Set(trimmedOptions);
+    if (uniqueOptions.size !== trimmedOptions.length) {
+      return interaction.reply({
+        content: '❌ All options must be unique.',
+        flags: MessageFlags.Ephemeral
+      });
+    }
+
+    const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+    const validOptions = trimmedOptions;
 
   const embed = new EmbedBuilder()
     .setTitle(`📊 ${question}`)
     .setColor(0x0099FF)
-    .setDescription(options.map((option, index) => `${emojis[index]} ${option}`).join('\n\n'))
+    .setDescription(validOptions.map((option, index) => `${emojis[index]} ${option}`).join('\n\n'))
     .addFields({
       name: 'Instructions',
       value: 'Click the buttons below to vote! You can change your vote at any time.',
@@ -58,7 +105,7 @@ export async function execute(interaction) {
     .setTimestamp(Date.now() + durationMinutes * 60000);
 
   // Create buttons for each option
-  const buttons = options.map((option, index) =>
+  const buttons = validOptions.map((option, index) =>
     new ButtonBuilder()
       .setCustomId(`poll_${index}`)
       .setLabel(`${emojis[index]} ${option.length > 15 ? option.substring(0, 15) + '...' : option}`)
@@ -76,7 +123,7 @@ export async function execute(interaction) {
   // Store poll data for tracking votes
   const pollData = {
     question,
-    options,
+    options: validOptions,
     votes: new Map(), // userId -> optionIndex
     totalVotes: 0,
     endTime: Date.now() + durationMinutes * 60000,
@@ -146,4 +193,7 @@ export async function execute(interaction) {
 
     await interaction.editReply({ embeds: [finalEmbed], components: disabledRows });
   });
+  } catch (error) {
+    return handleCommandError(interaction, error);
+  }
 }
