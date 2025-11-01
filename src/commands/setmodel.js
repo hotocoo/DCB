@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder , MessageFlags} from 'discord.js';
 import { setGuild } from '../storage.js';
 
 export const data = new SlashCommandBuilder()
@@ -9,12 +9,12 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   if (!interaction.memberPermissions?.has || !interaction.memberPermissions.has('ManageGuild')) {
-    await interaction.reply({ content: 'You need Manage Server permission to run this command.', ephemeral: true });
+    await interaction.reply({ content: 'You need Manage Server permission to run this command.', flags: MessageFlags.Ephemeral });
     return;
   }
 
   const url = interaction.options.getString('url');
   const api = interaction.options.getString('api') || 'openai-compatible';
   setGuild(interaction.guildId, { modelUrl: url, modelApi: api });
-  await interaction.reply({ content: `Saved model URL for this guild: ${url} (api=${api})`, ephemeral: true });
+  await interaction.reply({ content: `Saved model URL for this guild: ${url} (api=${api})`, flags: MessageFlags.Ephemeral });
 }

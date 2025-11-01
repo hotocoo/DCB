@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle , MessageFlags} from 'discord.js';
 import { createReminder, createEvent, parseTime, getUserReminders, getUserEvents, cancelReminder, cancelEvent, getUpcomingEvents } from '../scheduler.js';
 
 export const data = new SlashCommandBuilder()
@@ -33,11 +33,11 @@ export async function execute(interaction) {
       const scheduledTime = parseTime(when);
 
       if (!scheduledTime) {
-        return interaction.reply({ content: '❌ Invalid time format. Use formats like "in 30 minutes", "tomorrow 3pm", "next friday 2pm".', ephemeral: true });
+        return interaction.reply({ content: '❌ Invalid time format. Use formats like "in 30 minutes", "tomorrow 3pm", "next friday 2pm".', flags: MessageFlags.Ephemeral });
       }
 
       if (scheduledTime <= Date.now()) {
-        return interaction.reply({ content: '❌ Cannot schedule reminders in the past!', ephemeral: true });
+        return interaction.reply({ content: '❌ Cannot schedule reminders in the past!', flags: MessageFlags.Ephemeral });
       }
 
       const reminderData = {
@@ -66,7 +66,7 @@ export async function execute(interaction) {
 
     } catch (error) {
       console.error('Reminder creation error:', error);
-      await interaction.reply({ content: '❌ Failed to create reminder. Please try again.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to create reminder. Please try again.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'event') {
@@ -80,11 +80,11 @@ export async function execute(interaction) {
       const startTime = parseTime(when);
 
       if (!startTime) {
-        return interaction.reply({ content: '❌ Invalid time format. Use formats like "in 30 minutes", "tomorrow 3pm", "next friday 2pm".', ephemeral: true });
+        return interaction.reply({ content: '❌ Invalid time format. Use formats like "in 30 minutes", "tomorrow 3pm", "next friday 2pm".', flags: MessageFlags.Ephemeral });
       }
 
       if (startTime <= Date.now()) {
-        return interaction.reply({ content: '❌ Cannot schedule events in the past!', ephemeral: true });
+        return interaction.reply({ content: '❌ Cannot schedule events in the past!', flags: MessageFlags.Ephemeral });
       }
 
       const eventData = {
@@ -118,7 +118,7 @@ export async function execute(interaction) {
 
     } catch (error) {
       console.error('Event creation error:', error);
-      await interaction.reply({ content: '❌ Failed to create event. Please try again.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to create event. Please try again.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'list') {
@@ -126,7 +126,7 @@ export async function execute(interaction) {
     const userEvents = interaction.guild ? getUserEvents(interaction.guild.id, 10) : [];
 
     if (userReminders.length === 0 && userEvents.length === 0) {
-      return interaction.reply({ content: '📅 No upcoming reminders or events. Use `/remind me` or `/remind event` to create some!', ephemeral: true });
+      return interaction.reply({ content: '📅 No upcoming reminders or events. Use `/remind me` or `/remind event` to create some!', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -171,7 +171,7 @@ export async function execute(interaction) {
     const upcoming = getUpcomingEvents(interaction.user.id, interaction.guild?.id, days);
 
     if (upcoming.length === 0) {
-      return interaction.reply({ content: `📅 No upcoming events or reminders in the next ${days} days.`, ephemeral: true });
+      return interaction.reply({ content: `📅 No upcoming events or reminders in the next ${days} days.`, flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -190,7 +190,7 @@ export async function execute(interaction) {
       });
     });
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
   } else if (sub === 'cancel') {
     const type = interaction.options.getString('type');
@@ -200,22 +200,22 @@ export async function execute(interaction) {
       const result = cancelReminder(interaction.user.id, id);
 
       if (result) {
-        await interaction.reply({ content: '✅ **Reminder cancelled successfully!**', ephemeral: true });
+        await interaction.reply({ content: '✅ **Reminder cancelled successfully!**', flags: MessageFlags.Ephemeral });
       } else {
-        await interaction.reply({ content: '❌ Reminder not found or already executed.', ephemeral: true });
+        await interaction.reply({ content: '❌ Reminder not found or already executed.', flags: MessageFlags.Ephemeral });
       }
 
     } else if (type === 'event') {
       const result = cancelEvent(interaction.guild.id, id, interaction.user.id);
 
       if (result) {
-        await interaction.reply({ content: '✅ **Event cancelled successfully!**', ephemeral: true });
+        await interaction.reply({ content: '✅ **Event cancelled successfully!**', flags: MessageFlags.Ephemeral });
       } else {
-        await interaction.reply({ content: '❌ Event not found or you are not the creator.', ephemeral: true });
+        await interaction.reply({ content: '❌ Event not found or you are not the creator.', flags: MessageFlags.Ephemeral });
       }
 
     } else {
-      await interaction.reply({ content: '❌ Invalid type. Use "reminder" or "event".', ephemeral: true });
+      await interaction.reply({ content: '❌ Invalid type. Use "reminder" or "event".', flags: MessageFlags.Ephemeral });
     }
   }
 }

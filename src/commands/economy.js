@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import {
   getBalance,
   addBalance,
@@ -61,16 +61,16 @@ export async function execute(interaction) {
     const amount = interaction.options.getInteger('amount');
 
     if (targetUser.id === interaction.user.id) {
-      return interaction.reply({ content: '❌ You cannot transfer gold to yourself!', ephemeral: true });
+      return interaction.reply({ content: '❌ You cannot transfer gold to yourself!', flags: MessageFlags.Ephemeral });
     }
 
     if (amount <= 0) {
-      return interaction.reply({ content: '❌ Transfer amount must be positive!', ephemeral: true });
+      return interaction.reply({ content: '❌ Transfer amount must be positive!', flags: MessageFlags.Ephemeral });
     }
 
     const balance = getBalance(interaction.user.id);
     if (balance < amount) {
-      return interaction.reply({ content: `❌ Insufficient funds! You have ${balance} gold but need ${amount} gold.`, ephemeral: true });
+      return interaction.reply({ content: `❌ Insufficient funds! You have ${balance} gold but need ${amount} gold.`, flags: MessageFlags.Ephemeral });
     }
 
     const result = transferBalance(interaction.user.id, targetUser.id, amount);
@@ -88,7 +88,7 @@ export async function execute(interaction) {
 
       await interaction.reply({ embeds: [embed] });
     } else {
-      await interaction.reply({ content: `❌ Transfer failed: ${result.reason}`, ephemeral: true });
+      await interaction.reply({ content: `❌ Transfer failed: ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'business') {
@@ -100,11 +100,11 @@ export async function execute(interaction) {
 
       const validTypes = ['shop', 'farm', 'mine', 'factory', 'bank', 'casino'];
       if (!validTypes.includes(businessType)) {
-        return interaction.reply({ content: '❌ Invalid business type. Use: shop, farm, mine, factory, bank, casino', ephemeral: true });
+        return interaction.reply({ content: '❌ Invalid business type. Use: shop, farm, mine, factory, bank, casino', flags: MessageFlags.Ephemeral });
       }
 
       if (investment < 50) {
-        return interaction.reply({ content: '❌ Minimum investment is 50 gold.', ephemeral: true });
+        return interaction.reply({ content: '❌ Minimum investment is 50 gold.', flags: MessageFlags.Ephemeral });
       }
 
       const result = createBusiness(interaction.user.id, businessType, investment);
@@ -122,7 +122,7 @@ export async function execute(interaction) {
 
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: `❌ Failed to create business: ${result.reason}`, ephemeral: true });
+        await interaction.reply({ content: `❌ Failed to create business: ${result.reason}`, flags: MessageFlags.Ephemeral });
       }
 
     } else if (action === 'collect') {
@@ -137,17 +137,17 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } else {
-          await interaction.reply({ content: '💤 No income available to collect yet. Check back later!', ephemeral: true });
+          await interaction.reply({ content: '💤 No income available to collect yet. Check back later!', flags: MessageFlags.Ephemeral });
         }
       } else {
-        await interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+        await interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
       }
 
     } else if (action === 'list') {
       const businesses = getUserBusinesses(interaction.user.id);
 
       if (businesses.length === 0) {
-        return interaction.reply({ content: '🏢 You have no businesses yet. Use `/economy business action:create` to start one!', ephemeral: true });
+        return interaction.reply({ content: '🏢 You have no businesses yet. Use `/economy business action:create` to start one!', flags: MessageFlags.Ephemeral });
       }
 
       const embed = new EmbedBuilder()
@@ -173,12 +173,12 @@ export async function execute(interaction) {
         new ButtonBuilder().setCustomId(`economy_invest:${interaction.user.id}`).setLabel('📈 Investments').setStyle(ButtonStyle.Secondary)
       );
 
-      await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+      await interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral });
     } else if (action === 'upgrade') {
       const businessId = interaction.options.getString('business_id');
 
       if (!businessId) {
-        return interaction.reply({ content: '❌ Please specify a business ID to upgrade. Use `/economy business action:list` to see your businesses.', ephemeral: true });
+        return interaction.reply({ content: '❌ Please specify a business ID to upgrade. Use `/economy business action:list` to see your businesses.', flags: MessageFlags.Ephemeral });
       }
 
       const { upgradeBusiness } = await import('../economy.js');
@@ -197,7 +197,7 @@ export async function execute(interaction) {
 
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: `❌ Upgrade failed: ${result.reason}`, ephemeral: true });
+        await interaction.reply({ content: `❌ Upgrade failed: ${result.reason}`, flags: MessageFlags.Ephemeral });
       }
     }
 
@@ -230,7 +230,7 @@ export async function execute(interaction) {
 
     } else if (action === 'buy') {
       if (!item) {
-        return interaction.reply({ content: '❌ Please specify an item to buy!', ephemeral: true });
+        return interaction.reply({ content: '❌ Please specify an item to buy!', flags: MessageFlags.Ephemeral });
       }
 
       const price = getMarketPrice(item);
@@ -251,12 +251,12 @@ export async function execute(interaction) {
 
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: `❌ Purchase failed: ${result.reason}`, ephemeral: true });
+        await interaction.reply({ content: `❌ Purchase failed: ${result.reason}`, flags: MessageFlags.Ephemeral });
       }
 
     } else if (action === 'sell') {
       if (!item) {
-        return interaction.reply({ content: '❌ Please specify an item to sell!', ephemeral: true });
+        return interaction.reply({ content: '❌ Please specify an item to sell!', flags: MessageFlags.Ephemeral });
       }
 
       const sellPrice = Math.floor(getMarketPrice(item) * 0.8);
@@ -277,7 +277,7 @@ export async function execute(interaction) {
 
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: `❌ Sale failed: ${result.reason}`, ephemeral: true });
+        await interaction.reply({ content: `❌ Sale failed: ${result.reason}`, flags: MessageFlags.Ephemeral });
       }
     }
 
@@ -285,12 +285,12 @@ export async function execute(interaction) {
     const ticketPrice = interaction.options.getInteger('ticket_price');
 
     if (ticketPrice <= 0) {
-      return interaction.reply({ content: '❌ Ticket price must be positive!', ephemeral: true });
+      return interaction.reply({ content: '❌ Ticket price must be positive!', flags: MessageFlags.Ephemeral });
     }
 
     const currentBalance = getBalance(interaction.user.id);
     if (currentBalance < ticketPrice) {
-      return interaction.reply({ content: `❌ Insufficient funds! You need ${ticketPrice} gold but only have ${currentBalance}.`, ephemeral: true });
+      return interaction.reply({ content: `❌ Insufficient funds! You need ${ticketPrice} gold but only have ${currentBalance}.`, flags: MessageFlags.Ephemeral });
     }
 
     // Simple lottery with 1/1000 chance of winning
@@ -311,7 +311,7 @@ export async function execute(interaction) {
 
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: `🎫 **Lottery Ticket Purchased!**\nYour number: **${result.lotteryNumber}**\n💰 Cost: ${ticketPrice} gold\n🏆 Jackpot: ${prizePool} gold\n\n*Better luck next time!*`, ephemeral: true });
+        await interaction.reply({ content: `🎫 **Lottery Ticket Purchased!**\nYour number: **${result.lotteryNumber}**\n💰 Cost: ${ticketPrice} gold\n🏆 Jackpot: ${prizePool} gold\n\n*Better luck next time!*`, flags: MessageFlags.Ephemeral });
       }
     }
 
@@ -320,7 +320,7 @@ export async function execute(interaction) {
     const transactions = getTransactionHistory(interaction.user.id, limit);
 
     if (transactions.length === 0) {
-      return interaction.reply({ content: '📋 No transaction history found.', ephemeral: true });
+      return interaction.reply({ content: '📋 No transaction history found.', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -339,7 +339,7 @@ export async function execute(interaction) {
       });
     });
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
   } else if (sub === 'stats') {
     const stats = getUserEconomyStats(interaction.user.id);
@@ -364,7 +364,7 @@ export async function execute(interaction) {
       new ButtonBuilder().setCustomId(`economy_invest:${interaction.user.id}`).setLabel('📈 Investments').setStyle(ButtonStyle.Secondary)
     );
 
-    await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+    await interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral });
   } else if (sub === 'daily') {
     const result = claimDailyReward(interaction.user.id);
 
@@ -385,7 +385,7 @@ export async function execute(interaction) {
         .setColor(0xFFA500)
         .setDescription(`Your daily reward will be available in ${result.hoursLeft} hours.`);
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
   }
 }

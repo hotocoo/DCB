@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 import {
   getNews,
   getRandomJoke,
@@ -34,7 +34,7 @@ export async function execute(interaction) {
 
     const result = await getNews(query, 5);
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -54,7 +54,7 @@ export async function execute(interaction) {
   } else if (sub === 'joke') {
     const result = await getRandomJoke();
     if (!result.success) {
-      return interaction.reply({ content: '❌ Failed to get joke. Please try again later.', ephemeral: true });
+      return interaction.reply({ content: '❌ Failed to get joke. Please try again later.', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -68,7 +68,7 @@ export async function execute(interaction) {
   } else if (sub === 'catfact') {
     const result = await getCatFact();
     if (!result.success) {
-      return interaction.reply({ content: '❌ Failed to get cat fact. Please try again later.', ephemeral: true });
+      return interaction.reply({ content: '❌ Failed to get cat fact. Please try again later.', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -84,7 +84,7 @@ export async function execute(interaction) {
 
     const result = await getNumberFact(number);
     if (!result.success) {
-      return interaction.reply({ content: '❌ Failed to get number fact. Please try again later.', ephemeral: true });
+      return interaction.reply({ content: '❌ Failed to get number fact. Please try again later.', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -98,7 +98,7 @@ export async function execute(interaction) {
   } else if (sub === 'dadjoke') {
     const result = await getDadJoke();
     if (!result.success) {
-      return interaction.reply({ content: '❌ Failed to get dad joke. Please try again later.', ephemeral: true });
+      return interaction.reply({ content: '❌ Failed to get dad joke. Please try again later.', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -112,7 +112,7 @@ export async function execute(interaction) {
   } else if (sub === 'programquote') {
     const result = await getProgrammingQuote();
     if (!result.success) {
-      return interaction.reply({ content: '❌ Failed to get programming quote. Please try again later.', ephemeral: true });
+      return interaction.reply({ content: '❌ Failed to get programming quote. Please try again later.', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -132,7 +132,7 @@ export async function execute(interaction) {
 
     const result = await getGitHubStats(username);
     if (!result.success) {
-      return interaction.reply({ content: `❌ Failed to get GitHub stats for ${username}. User may not exist.`, ephemeral: true });
+      return interaction.reply({ content: `❌ Failed to get GitHub stats for ${username}. User may not exist.`, flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -154,7 +154,7 @@ export async function execute(interaction) {
 
     const result = await getWeather(location);
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
 
     const data = result.data;
@@ -197,7 +197,7 @@ export async function execute(interaction) {
       });
     }
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   }
 }
 

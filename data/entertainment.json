@@ -1,5 +1,13 @@
 {
-  "funStats": {},
+  "funStats": {
+    "333133024520568833": {
+      "jokesHeard": 0,
+      "riddlesSolved": 0,
+      "storiesGenerated": 0,
+      "factsLearned": 1,
+      "gamesPlayed": 0
+    }
+  },
   "jokeRatings": {},
   "gameScores": {},
   "entertainmentHistory": []

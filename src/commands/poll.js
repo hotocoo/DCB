@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType , MessageFlags} from 'discord.js';
 
 export const data = new SlashCommandBuilder()
   .setName('poll')
@@ -42,7 +42,7 @@ export async function execute(interaction) {
   const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
 
   if (options.length < 2) {
-    return interaction.reply({ content: '❌ You need at least 2 options for a poll.', ephemeral: true });
+    return interaction.reply({ content: '❌ You need at least 2 options for a poll.', flags: MessageFlags.Ephemeral });
   }
 
   const embed = new EmbedBuilder()

@@ -225,9 +225,11 @@ ultra-discord-bot/
 │   ├── minigames/       # Mini-game logic
 │   ├── *.js             # Core modules and managers
 ├── data/                # JSON data storage
+│   ├── players/         # Individual player script files
 ├── logs/                # Application logs
 ├── scripts/             # Utility scripts
-└── tests/               # Test suites
+├── tests/               # Test suites and results
+└── root-level-files/    # Main project files (package.json, README, etc.)
 ```
 
 ### Key Modules

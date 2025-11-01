@@ -1,5 +1,5 @@
 // Module file for Connect4 command
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { updateUserStats } from '../achievements.js';
 
 export const data = new SlashCommandBuilder()
@@ -24,11 +24,11 @@ export async function execute(interaction) {
   const difficulty = interaction.options.getString('difficulty') || 'medium';
 
   if (opponent.id === interaction.user.id) {
-    return interaction.reply({ content: '❌ You cannot play against yourself!', ephemeral: true });
+    return interaction.reply({ content: '❌ You cannot play against yourself!', flags: MessageFlags.Ephemeral });
   }
 
   if (opponent.bot && !difficulty) {
-    return interaction.reply({ content: '❌ Please specify difficulty when playing against AI.', ephemeral: true });
+    return interaction.reply({ content: '❌ Please specify difficulty when playing against AI.', flags: MessageFlags.Ephemeral });
   }
 
   const gameId = `c4_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

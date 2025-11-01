@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { startTypingGame, checkTypingAttempt } from '../minigames/typing.js';
 
 const sessions = new Map();
@@ -16,16 +16,16 @@ export async function execute(interaction) {
     const guess = interaction.options.getInteger('number');
     if (!sessions.has(user) || typeof sessions.get(user) === 'object') {
       sessions.set(user, Math.floor(Math.random() * 100) + 1);
-      return interaction.reply({ content: 'I have picked a number between 1 and 100. Try /minigame guess <number> to guess!', ephemeral: true });
+      return interaction.reply({ content: 'I have picked a number between 1 and 100. Try /minigame guess <number> to guess!', flags: MessageFlags.Ephemeral });
     }
     const target = sessions.get(user);
-    if (!guess) return interaction.reply({ content: 'You need to provide a number to guess.', ephemeral: true });
+    if (!guess) return interaction.reply({ content: 'You need to provide a number to guess.', flags: MessageFlags.Ephemeral });
     if (guess === target) {
       sessions.delete(user);
       return interaction.reply(`${interaction.user.username}, correct! You guessed ${target}.`);
     }
     const hint = guess < target ? 'higher' : 'lower';
-    return interaction.reply({ content: `Nope — try ${hint}.`, ephemeral: true });
+    return interaction.reply({ content: `Nope — try ${hint}.`, flags: MessageFlags.Ephemeral });
   }
 
   if (sub === 'type') {

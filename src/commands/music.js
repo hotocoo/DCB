@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { searchSongs, play, pause, resume, skip, stop, getQueue, getMusicStats, getLyrics, getRadioStations, setVolume, shuffleQueue, clearQueue, back, setLoop, getLoop } from '../music.js';
 
 export const data = new SlashCommandBuilder()
@@ -41,7 +41,7 @@ export async function execute(interaction) {
     if (!voiceChannel) {
       return interaction.reply({
         content: '🎵 **You must be in a voice channel to play music!**',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -50,7 +50,7 @@ export async function execute(interaction) {
     if (!botPermissions.has('Connect') || !botPermissions.has('Speak')) {
       return interaction.reply({
         content: '❌ **I need "Connect" and "Speak" permissions in your voice channel.**',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -73,7 +73,7 @@ export async function execute(interaction) {
 
         return interaction.reply({
           content: noResultsMessage,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -123,7 +123,7 @@ export async function execute(interaction) {
 
         return interaction.reply({
           content: errorMessage,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -160,7 +160,7 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
       console.error('Play command error:', error);
       await interaction.reply({
         content: '❌ **An error occurred while playing music.**',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -183,7 +183,7 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
           noResultsMessage = '❌ **No search results found**\n\n🔍 No tracks found for your search query.\n💡 Try different keywords or check the spelling.';
         }
 
-        return interaction.reply({ content: noResultsMessage, ephemeral: true });
+        return interaction.reply({ content: noResultsMessage, flags: MessageFlags.Ephemeral });
       }
 
       const embed = new EmbedBuilder()
@@ -217,7 +217,7 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
       await interaction.reply({ embeds: [embed], components: rows });
     } catch (error) {
       console.error('Search command error:', error);
-      await interaction.reply({ content: '❌ Failed to search songs.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to search songs.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'back') {
@@ -244,11 +244,11 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
 
         await interaction.reply({ embeds: [embed], components: [row] });
       } else {
-        await interaction.reply({ content: '❌ No previous song in history.', ephemeral: true });
+        await interaction.reply({ content: '❌ No previous song in history.', flags: MessageFlags.Ephemeral });
       }
     } catch (error) {
       console.error('Back command error:', error);
-      await interaction.reply({ content: '❌ Failed to go back.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to go back.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'loop') {
@@ -263,7 +263,7 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
       await interaction.reply({ embeds: [embed] });
     } catch (error) {
       console.error('Loop command error:', error);
-      await interaction.reply({ content: '❌ Failed to set loop mode.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to set loop mode.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'skip') {
@@ -289,11 +289,11 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
 
         await interaction.reply({ embeds: [embed], components: [row] });
       } else {
-        await interaction.reply({ content: '❌ No songs in queue to skip.', ephemeral: true });
+        await interaction.reply({ content: '❌ No songs in queue to skip.', flags: MessageFlags.Ephemeral });
       }
     } catch (error) {
       console.error('Skip command error:', error);
-      await interaction.reply({ content: '❌ Failed to skip song.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to skip song.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'pause') {
@@ -306,11 +306,11 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
           .setDescription('Music has been paused. Use `/music resume` to continue.');
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: '❌ No music is currently playing.', ephemeral: true });
+        await interaction.reply({ content: '❌ No music is currently playing.', flags: MessageFlags.Ephemeral });
       }
     } catch (error) {
       console.error('Pause command error:', error);
-      await interaction.reply({ content: '❌ Failed to pause music.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to pause music.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'resume') {
@@ -323,11 +323,11 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
           .setDescription('Music is now playing!');
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: '❌ No paused music to resume.', ephemeral: true });
+        await interaction.reply({ content: '❌ No paused music to resume.', flags: MessageFlags.Ephemeral });
       }
     } catch (error) {
       console.error('Resume command error:', error);
-      await interaction.reply({ content: '❌ Failed to resume music.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to resume music.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'stop') {
@@ -340,11 +340,11 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
           .setDescription('Music stopped and left voice channel.');
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: '❌ No music is currently playing.', ephemeral: true });
+        await interaction.reply({ content: '❌ No music is currently playing.', flags: MessageFlags.Ephemeral });
       }
     } catch (error) {
       console.error('Stop command error:', error);
-      await interaction.reply({ content: '❌ Failed to stop music.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to stop music.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'queue') {
@@ -387,14 +387,14 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
       await interaction.reply({ embeds: [embed], components: [row] });
     } catch (error) {
       console.error('Queue command error:', error);
-      await interaction.reply({ content: '❌ Failed to get queue.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to get queue.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'nowplaying') {
     try {
       const stats = getMusicStats(interaction.guild.id);
       if (!stats.currentlyPlaying) {
-        return interaction.reply({ content: '❌ No music is currently playing.', ephemeral: true });
+        return interaction.reply({ content: '❌ No music is currently playing.', flags: MessageFlags.Ephemeral });
       }
 
       const current = stats.currentlyPlaying;
@@ -419,7 +419,7 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
       await interaction.reply({ embeds: [embed], components: [row] });
     } catch (error) {
       console.error('Nowplaying command error:', error);
-      await interaction.reply({ content: '❌ Failed to get now playing info.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to get now playing info.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'shuffle') {
@@ -432,18 +432,18 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
           .setDescription('Music queue has been shuffled!');
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: '❌ Queue is empty or too small to shuffle.', ephemeral: true });
+        await interaction.reply({ content: '❌ Queue is empty or too small to shuffle.', flags: MessageFlags.Ephemeral });
       }
     } catch (error) {
       console.error('Shuffle command error:', error);
-      await interaction.reply({ content: '❌ Failed to shuffle queue.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to shuffle queue.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'volume') {
     const volume = interaction.options.getInteger('level');
 
     if (volume < 0 || volume > 200) {
-      return interaction.reply({ content: '❌ Volume must be between 0 and 200.', ephemeral: true });
+      return interaction.reply({ content: '❌ Volume must be between 0 and 200.', flags: MessageFlags.Ephemeral });
     }
 
     try {
@@ -455,7 +455,7 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
       await interaction.reply({ embeds: [embed] });
     } catch (error) {
       console.error('Volume command error:', error);
-      await interaction.reply({ content: '❌ Failed to set volume.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to set volume.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'lyrics') {
@@ -476,11 +476,11 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
           .setFooter({ text: `Powered by ${lyrics.source}` });
         await interaction.reply({ embeds: [embed] });
       } else {
-        await interaction.reply({ content: '❌ Lyrics not found for that song.', ephemeral: true });
+        await interaction.reply({ content: '❌ Lyrics not found for that song.', flags: MessageFlags.Ephemeral });
       }
     } catch (error) {
       console.error('Lyrics command error:', error);
-      await interaction.reply({ content: '❌ Failed to get lyrics.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to get lyrics.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'radio') {
@@ -491,13 +491,13 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
       const station = stations[stationKey];
 
       if (!station) {
-        return interaction.reply({ content: '❌ Invalid radio station.', ephemeral: true });
+        return interaction.reply({ content: '❌ Invalid radio station.', flags: MessageFlags.Ephemeral });
       }
 
       // Voice channel check
       const voiceChannel = interaction.member.voice?.channel;
       if (!voiceChannel) {
-        return interaction.reply({ content: '🎵 You must be in a voice channel to play radio!', ephemeral: true });
+        return interaction.reply({ content: '🎵 You must be in a voice channel to play radio!', flags: MessageFlags.Ephemeral });
       }
 
       // Create song object for radio
@@ -536,7 +536,7 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
             errorMessage += `: ${result.error}`;
         }
 
-        return interaction.reply({ content: errorMessage, ephemeral: true });
+        return interaction.reply({ content: errorMessage, flags: MessageFlags.Ephemeral });
       }
 
       const embed = new EmbedBuilder()
@@ -557,7 +557,7 @@ console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
       await interaction.reply({ embeds: [embed], components: [row] });
     } catch (error) {
       console.error('Radio command error:', error);
-      await interaction.reply({ content: '❌ Failed to play radio.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to play radio.', flags: MessageFlags.Ephemeral });
     }
   }
 }

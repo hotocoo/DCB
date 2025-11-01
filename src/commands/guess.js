@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags } from 'discord.js';
 import { updateUserStats } from '../achievements.js';
 
 export const data = new SlashCommandBuilder()
@@ -55,10 +55,10 @@ export async function execute(interaction) {
 
   if (customMin !== null && customMax !== null) {
     if (customMin >= customMax) {
-      return interaction.reply({ content: '❌ Minimum must be less than maximum!', ephemeral: true });
+      return interaction.reply({ content: '❌ Minimum must be less than maximum!', flags: MessageFlags.Ephemeral });
     }
     if (customMax - customMin > 10000) {
-      return interaction.reply({ content: '❌ Range too large! Maximum range is 10,000.', ephemeral: true });
+      return interaction.reply({ content: '❌ Range too large! Maximum range is 10,000.', flags: MessageFlags.Ephemeral });
     }
     min = customMin;
     max = customMax;
@@ -150,13 +150,13 @@ async function processGuess(interaction, gameState, guess) {
   const guessNum = parseInt(guess);
 
   if (isNaN(guessNum)) {
-    return interaction.reply({ content: '❌ Please enter a valid number!', ephemeral: true });
+    return interaction.reply({ content: '❌ Please enter a valid number!', flags: MessageFlags.Ephemeral });
   }
 
   if (guessNum < gameState.min || guessNum > gameState.max) {
     return interaction.reply({
       content: `❌ Number must be between ${gameState.min} and ${gameState.max}!`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -226,6 +226,6 @@ async function processGuess(interaction, gameState, guess) {
   } else {
     // Continue game
     await sendGuessPrompt(interaction, gameState);
-    await interaction.reply({ content: `**${guessNum}** - ${feedback}`, ephemeral: true });
+    await interaction.reply({ content: `**${guessNum}** - ${feedback}`, flags: MessageFlags.Ephemeral });
   }
 }

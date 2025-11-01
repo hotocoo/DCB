@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle , MessageFlags} from 'discord.js';
 import { updateUserStats } from '../achievements.js';
 
 export const data = new SlashCommandBuilder()
@@ -24,11 +24,11 @@ export async function execute(interaction) {
   const difficulty = interaction.options.getString('difficulty') || 'medium';
 
   if (opponent && opponent.id === interaction.user.id) {
-    return interaction.reply({ content: '❌ You cannot play against yourself!', ephemeral: true });
+    return interaction.reply({ content: '❌ You cannot play against yourself!', flags: MessageFlags.Ephemeral });
   }
 
   if (opponent && opponent.bot) {
-    return interaction.reply({ content: '❌ You cannot challenge bot accounts to Tic-Tac-Toe.', ephemeral: true });
+    return interaction.reply({ content: '❌ You cannot challenge bot accounts to Tic-Tac-Toe.', flags: MessageFlags.Ephemeral });
   }
 
   const gameId = `ttt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

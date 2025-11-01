@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder , MessageFlags} from 'discord.js';
 import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, resetCharacter, getCharacterClasses, getClassInfo, bossEncounter, getCraftingRecipes, canCraftItem, craftItem, createQuest, listQuests, completeQuest } from '../rpg.js';
 import { updateUserStats } from '../achievements.js';
 import { exploreLocation } from '../locations.js';
@@ -39,7 +39,7 @@ export async function execute(interaction) {
     const name = interaction.options.getString('name');
     const charClass = interaction.options.getString('class') || 'warrior';
     const char = createCharacter(userId, name, charClass);
-    if (!char) return interaction.reply({ content: 'You already have a character.', ephemeral: true });
+    if (!char) return interaction.reply({ content: 'You already have a character.', flags: MessageFlags.Ephemeral });
 
     // Track achievements
     const achievementResult = updateUserStats(userId, {
@@ -72,11 +72,11 @@ export async function execute(interaction) {
 
   if (sub === 'inventory') {
     // Redirect to inventory command for now
-    return interaction.reply({ content: 'Use `/inventory view` to manage your inventory!', ephemeral: true });
+    return interaction.reply({ content: 'Use `/inventory view` to manage your inventory!', flags: MessageFlags.Ephemeral });
   }
 
   const char = getCharacter(userId);
-  if (!char) return interaction.reply({ content: 'You have no character. Run /rpg start', ephemeral: true });
+  if (!char) return interaction.reply({ content: 'You have no character. Run /rpg start', flags: MessageFlags.Ephemeral });
 
   if (sub === 'stats') {
     const classInfo = getClassInfo(char.class);
@@ -142,7 +142,7 @@ export async function execute(interaction) {
     const result = exploreLocation(userId, 'whispering_woods'); // Default to starting location
 
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
 
     const { location, encounter, narrative } = result;
@@ -204,8 +204,8 @@ export async function execute(interaction) {
     const stat = interaction.options.getString('stat');
     const amount = interaction.options.getInteger('amount');
     const pts = char.skillPoints || 0;
-    if (amount <= 0) return interaction.reply({ content: 'Amount must be > 0', ephemeral: true });
-    if (amount > pts) return interaction.reply({ content: `You only have ${pts} skill points.`, ephemeral: true });
+    if (amount <= 0) return interaction.reply({ content: 'Amount must be > 0', flags: MessageFlags.Ephemeral });
+    if (amount > pts) return interaction.reply({ content: `You only have ${pts} skill points.`, flags: MessageFlags.Ephemeral });
 
     // apply points
     if (stat === 'hp') {
@@ -225,12 +225,12 @@ export async function execute(interaction) {
     } else if (stat === 'spd') {
       char.spd += amount;
     } else {
-      return interaction.reply({ content: 'Unknown stat. Use hp|mp|maxhp|maxmp|atk|def|spd', ephemeral: true });
+      return interaction.reply({ content: 'Unknown stat. Use hp|mp|maxhp|maxmp|atk|def|spd', flags: MessageFlags.Ephemeral });
     }
 
     char.skillPoints = pts - amount;
     saveCharacter(userId, char);
-    return interaction.reply({ content: `Leveled up: +${amount} ${stat}. Remaining points: ${char.skillPoints}`, ephemeral: true });
+    return interaction.reply({ content: `Leveled up: +${amount} ${stat}. Remaining points: ${char.skillPoints}`, flags: MessageFlags.Ephemeral });
   }
 
   if (sub === 'leaderboard') {
@@ -238,7 +238,7 @@ export async function execute(interaction) {
     const offset = 0;
     const list = getLeaderboard(limit, offset);
     const total = getLeaderboardCount();
-    if (!list.length) return interaction.reply({ content: 'No players yet.', ephemeral: true });
+    if (!list.length) return interaction.reply({ content: 'No players yet.', flags: MessageFlags.Ephemeral });
     const page = Math.floor(offset / limit) + 1;
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const row = new ActionRowBuilder();
@@ -282,21 +282,21 @@ export async function execute(interaction) {
       const title = interaction.options.getString('title') || 'A simple quest';
       const desc = interaction.options.getString('desc') || 'Do something heroic.';
       const q = createQuest(userId, title, desc);
-      return interaction.reply({ content: `Quest created: ${q.title} (id=${q.id})`, ephemeral: true });
+      return interaction.reply({ content: `Quest created: ${q.title} (id=${q.id})`, flags: MessageFlags.Ephemeral });
     }
     if (action === 'list') {
       const qs = listQuests(userId);
-      if (!qs.length) return interaction.reply({ content: 'No quests.', ephemeral: true });
+      if (!qs.length) return interaction.reply({ content: 'No quests.', flags: MessageFlags.Ephemeral });
       return interaction.reply(qs.map(q => `${q.id} - ${q.title} [${q.status}]`).join('\n'));
     }
     if (action === 'complete') {
       const id = interaction.options.getString('id');
       const q = completeQuest(userId, id);
-      if (!q) return interaction.reply({ content: 'Quest not found.', ephemeral: true });
+      if (!q) return interaction.reply({ content: 'Quest not found.', flags: MessageFlags.Ephemeral });
       const rewardText = q.xpReward && q.goldReward ? `\n🎉 **Rewards:** ${q.xpReward} XP, ${q.goldReward} gold!` : '';
-      return interaction.reply({ content: `Quest completed: ${q.title}${rewardText}`, ephemeral: true });
+      return interaction.reply({ content: `Quest completed: ${q.title}${rewardText}`, flags: MessageFlags.Ephemeral });
     }
-    return interaction.reply({ content: 'Unknown quest action. Use create|list|complete', ephemeral: true });
+    return interaction.reply({ content: 'Unknown quest action. Use create|list|complete', flags: MessageFlags.Ephemeral });
   }
 
   if (sub === 'craft') {
@@ -304,18 +304,18 @@ export async function execute(interaction) {
     const recipes = getCraftingRecipes();
 
     if (!recipes[itemId]) {
-      return interaction.reply({ content: `❌ "${itemId}" is not a craftable item.`, ephemeral: true });
+      return interaction.reply({ content: `❌ "${itemId}" is not a craftable item.`, flags: MessageFlags.Ephemeral });
     }
 
     const canCraft = canCraftItem(userId, itemId);
 
     if (!canCraft.success) {
       if (canCraft.reason === 'level_too_low') {
-        return interaction.reply({ content: `❌ You need to be level ${canCraft.required} to craft this item.`, ephemeral: true });
+        return interaction.reply({ content: `❌ You need to be level ${canCraft.required} to craft this item.`, flags: MessageFlags.Ephemeral });
       } else if (canCraft.reason === 'missing_materials') {
-        return interaction.reply({ content: `❌ You're missing materials. You need: ${canCraft.missing}`, ephemeral: true });
+        return interaction.reply({ content: `❌ You're missing materials. You need: ${canCraft.missing}`, flags: MessageFlags.Ephemeral });
       }
-      return interaction.reply({ content: `❌ Cannot craft this item: ${canCraft.reason}`, ephemeral: true });
+      return interaction.reply({ content: `❌ Cannot craft this item: ${canCraft.reason}`, flags: MessageFlags.Ephemeral });
     }
 
     const result = craftItem(userId, itemId);
@@ -337,7 +337,7 @@ export async function execute(interaction) {
 
       await interaction.reply({ embeds: [embed] });
     } else {
-      await interaction.reply({ content: `❌ Failed to craft item: ${result.reason}`, ephemeral: true });
+      await interaction.reply({ content: `❌ Failed to craft item: ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
   }
 }

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { createNovel, listNovels, getNovel, generateChapter } from '../novel.js';
 
 export const data = new SlashCommandBuilder()
@@ -16,20 +16,20 @@ export async function execute(interaction) {
     const title = interaction.options.getString('title');
     const prompt = interaction.options.getString('prompt');
     const novel = createNovel(userId, title, prompt);
-    return interaction.reply({ content: `Created novel ${novel.title} (id=${novel.id})`, ephemeral: true });
+    return interaction.reply({ content: `Created novel ${novel.title} (id=${novel.id})`, flags: MessageFlags.Ephemeral });
   }
   if (sub === 'list') {
     const ns = listNovels();
-    if (!ns.length) return interaction.reply({ content: 'No novels yet.', ephemeral: true });
+    if (!ns.length) return interaction.reply({ content: 'No novels yet.', flags: MessageFlags.Ephemeral });
     return interaction.reply(ns.join('\n'));
   }
   if (sub === 'read') {
     const id = interaction.options.getString('id');
     const chapter = interaction.options.getInteger('chapter') || 1;
     const novel = getNovel(id);
-    if (!novel) return interaction.reply({ content: 'Novel not found.', ephemeral: true });
+    if (!novel) return interaction.reply({ content: 'Novel not found.', flags: MessageFlags.Ephemeral });
     const chap = novel.chapters[chapter - 1];
-    if (!chap) return interaction.reply({ content: 'Chapter not found. You can run /novel next to generate.', ephemeral: true });
+    if (!chap) return interaction.reply({ content: 'Chapter not found. You can run /novel next to generate.', flags: MessageFlags.Ephemeral });
     return interaction.reply({ content: `Chapter ${chap.index} - ${novel.title}\n\n${chap.text}` });
   }
   if (sub === 'next') {

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, MessageFlags } from 'discord.js';
 import {
   warnUser,
   muteUser,
@@ -49,7 +49,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction) {
   // Check if user has administrator permissions
   if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-    return interaction.reply({ content: '❌ You need Administrator permissions to use this command.', ephemeral: true });
+    return interaction.reply({ content: '❌ You need Administrator permissions to use this command.', flags: MessageFlags.Ephemeral });
   }
 
   const sub = interaction.options.getSubcommand();
@@ -61,7 +61,7 @@ export async function execute(interaction) {
     const severity = interaction.options.getString('severity') || 'medium';
 
     if (targetUser.id === interaction.user.id) {
-      return interaction.reply({ content: '❌ You cannot warn yourself!', ephemeral: true });
+      return interaction.reply({ content: '❌ You cannot warn yourself!', flags: MessageFlags.Ephemeral });
     }
 
     const warning = warnUser(guildId, targetUser.id, interaction.user.id, reason, severity);
@@ -96,7 +96,7 @@ export async function execute(interaction) {
     const durationMs = durationMinutes * 60 * 1000;
 
     if (targetUser.id === interaction.user.id) {
-      return interaction.reply({ content: '❌ You cannot mute yourself!', ephemeral: true });
+      return interaction.reply({ content: '❌ You cannot mute yourself!', flags: MessageFlags.Ephemeral });
     }
 
     const mute = muteUser(guildId, targetUser.id, interaction.user.id, reason, durationMs);
@@ -122,7 +122,7 @@ export async function execute(interaction) {
     const result = unmuteUser(guildId, targetUser.id, interaction.user.id, reason);
 
     if (!result) {
-      return interaction.reply({ content: '❌ User is not currently muted.', ephemeral: true });
+      return interaction.reply({ content: '❌ User is not currently muted.', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -144,7 +144,7 @@ export async function execute(interaction) {
     const durationMs = durationHours ? durationHours * 60 * 60 * 1000 : null;
 
     if (targetUser.id === interaction.user.id) {
-      return interaction.reply({ content: '❌ You cannot ban yourself!', ephemeral: true });
+      return interaction.reply({ content: '❌ You cannot ban yourself!', flags: MessageFlags.Ephemeral });
     }
 
     const ban = banUser(guildId, targetUser.id, interaction.user.id, reason, durationMs);
@@ -170,7 +170,7 @@ export async function execute(interaction) {
     const result = unbanUser(guildId, targetUser.id, interaction.user.id, reason);
 
     if (!result) {
-      return interaction.reply({ content: '❌ User is not currently banned.', ephemeral: true });
+      return interaction.reply({ content: '❌ User is not currently banned.', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -190,7 +190,7 @@ export async function execute(interaction) {
     const reason = interaction.options.getString('reason');
 
     if (targetUser.id === interaction.user.id) {
-      return interaction.reply({ content: '❌ You cannot kick yourself!', ephemeral: true });
+      return interaction.reply({ content: '❌ You cannot kick yourself!', flags: MessageFlags.Ephemeral });
     }
 
     const kick = kickUser(guildId, targetUser.id, interaction.user.id, reason);
@@ -263,7 +263,7 @@ export async function execute(interaction) {
     const modActions = getModActions(guildId, limit);
 
     if (modActions.length === 0) {
-      return interaction.reply({ content: '📋 No moderation actions found.', ephemeral: true });
+      return interaction.reply({ content: '📋 No moderation actions found.', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()

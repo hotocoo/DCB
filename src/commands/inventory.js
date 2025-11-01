@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import {
   getInventory,
   getItemInfo,
@@ -31,7 +31,7 @@ export async function execute(interaction) {
     const inventoryValue = getInventoryValue(userId);
 
     if (Object.keys(inventory).length === 0) {
-      return interaction.reply({ content: '🛄 Your inventory is empty. Go explore to find items!', ephemeral: true });
+      return interaction.reply({ content: '🛄 Your inventory is empty. Go explore to find items!', flags: MessageFlags.Ephemeral });
     }
 
     // Group items by type
@@ -95,12 +95,12 @@ export async function execute(interaction) {
     }
 
     if (!targetItemId) {
-      return interaction.reply({ content: `❌ You don't have "${itemName}" in your inventory.`, ephemeral: true });
+      return interaction.reply({ content: `❌ You don't have "${itemName}" in your inventory.`, flags: MessageFlags.Ephemeral });
     }
 
     const result = useConsumableItem(userId, targetItemId);
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
 
     let response = `✅ Used ${getItemInfo(targetItemId).name}!`;
@@ -127,17 +127,17 @@ export async function execute(interaction) {
     }
 
     if (!targetItemId) {
-      return interaction.reply({ content: `❌ You don't have "${itemName}" in your inventory.`, ephemeral: true });
+      return interaction.reply({ content: `❌ You don't have "${itemName}" in your inventory.`, flags: MessageFlags.Ephemeral });
     }
 
     const item = getItemInfo(targetItemId);
     if (item.type !== 'weapon' && item.type !== 'armor') {
-      return interaction.reply({ content: `❌ You can only equip weapons and armor, not ${item.type}s.`, ephemeral: true });
+      return interaction.reply({ content: `❌ You can only equip weapons and armor, not ${item.type}s.`, flags: MessageFlags.Ephemeral });
     }
 
     const character = getCharacter(userId);
     if (!character) {
-      return interaction.reply({ content: '❌ You need a character first. Use /rpg start', ephemeral: true });
+      return interaction.reply({ content: '❌ You need a character first. Use /rpg start', flags: MessageFlags.Ephemeral });
     }
 
     const slot = item.type === 'weapon' ? 'weapon' : 'armor';
@@ -159,16 +159,16 @@ export async function execute(interaction) {
     const slot = interaction.options.getString('slot');
 
     if (slot !== 'weapon' && slot !== 'armor') {
-      return interaction.reply({ content: '❌ Invalid slot. Use weapon or armor.', ephemeral: true });
+      return interaction.reply({ content: '❌ Invalid slot. Use weapon or armor.', flags: MessageFlags.Ephemeral });
     }
 
     const character = getCharacter(userId);
     if (!character) {
-      return interaction.reply({ content: '❌ You need a character first. Use /rpg start', ephemeral: true });
+      return interaction.reply({ content: '❌ You need a character first. Use /rpg start', flags: MessageFlags.Ephemeral });
     }
 
     if (!character.equipped || !character.equipped[slot]) {
-      return interaction.reply({ content: `❌ You don't have anything equipped in the ${slot} slot.`, ephemeral: true });
+      return interaction.reply({ content: `❌ You don't have anything equipped in the ${slot} slot.`, flags: MessageFlags.Ephemeral });
     }
 
     const itemId = character.equipped[slot];

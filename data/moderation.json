@@ -2,8 +2,30 @@
   "warnings": {},
   "bans": {},
   "mutes": {},
-  "kicks": {},
-  "mod_actions": [],
+  "kicks": {
+    "941715588269625444": {
+      "941664598082355220": [
+        {
+          "id": "kick_1761930154609_u8kryz061",
+          "userId": "941664598082355220",
+          "moderatorId": "333133024520568833",
+          "reason": "nihha",
+          "timestamp": 1761930154609
+        }
+      ]
+    }
+  },
+  "mod_actions": [
+    {
+      "id": "mod_1761930154609_ojoy4od5z",
+      "guildId": "941715588269625444",
+      "action": "kick",
+      "targetUserId": "941664598082355220",
+      "moderatorId": "333133024520568833",
+      "reason": "nihha",
+      "timestamp": 1761930154609
+    }
+  ],
   "auto_mod": {
     "enabled": true,
     "spam_detection": true,

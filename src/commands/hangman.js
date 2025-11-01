@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 import { readFileSync } from 'fs';
 import path from 'path';
 
@@ -28,7 +28,7 @@ export async function execute(interaction) {
             .filter(word => word.trim().length > 0);
 
         if (words.length === 0) {
-            return await interaction.reply({ content: 'No words available for Hangman.', ephemeral: true });
+            return await interaction.reply({ content: 'No words available for Hangman.', flags: MessageFlags.Ephemeral });
         }
 
         const randomWord = words[Math.floor(Math.random() * words.length)];
@@ -76,16 +76,16 @@ export async function execute(interaction) {
         const guess = interaction.options.getString('letter').toLowerCase();
 
         if (!guess || guess.length !== 1 || !/^[a-z]$/.test(guess)) {
-            return await interaction.reply({ content: 'Please guess a single letter (a-z).', ephemeral: true });
+            return await interaction.reply({ content: 'Please guess a single letter (a-z).', flags: MessageFlags.Ephemeral });
         }
 
         const gameState = interaction.client.games.get(interaction.user.id);
         if (!gameState || gameState.isGameOver) {
-            return await interaction.reply({ content: 'No active game found. Start a new game with /hangman start.', ephemeral: true });
+            return await interaction.reply({ content: 'No active game found. Start a new game with /hangman start.', flags: MessageFlags.Ephemeral });
         }
 
         if (gameState.guessedLetters.has(guess)) {
-            return await interaction.reply({ content: 'You have already guessed that letter.', ephemeral: true });
+            return await interaction.reply({ content: 'You have already guessed that letter.', flags: MessageFlags.Ephemeral });
         }
 
         gameState.guessedLetters.add(guess);

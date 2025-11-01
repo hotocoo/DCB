@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { exploreLocation, unlockLocation, enterDungeon, discoverLocation, getLocations } from '../locations.js';
 import { narrate, checkDailyLimit, incrementDailyExploration, checkSessionXpCap } from '../rpg.js';
 
@@ -20,7 +20,7 @@ export async function execute(interaction) {
     if (availableLocations.length === 0) {
       return interaction.reply({
         content: '🏕️ No locations available yet. Start your adventure by exploring the Whispering Woods!\nUse `/explore discover location:whispering_woods`',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -65,7 +65,7 @@ export async function execute(interaction) {
     const result = discoverLocation(userId, locationName);
 
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
 
     const { location, requirements, canUnlock } = result;
@@ -96,7 +96,7 @@ export async function execute(interaction) {
           inline: false
         });
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'enter') {
@@ -107,7 +107,7 @@ export async function execute(interaction) {
     if (!dailyCheck.allowed) {
       return interaction.reply({
         content: `❌ **Daily exploration limit reached!** You have used ${dailyCheck.used}/${dailyCheck.max} explorations today. Reset in ${Math.ceil((24 - (Date.now() - (dailyCheck.resetTime || Date.now())) / 3600000))} hours.`,
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -116,14 +116,14 @@ export async function execute(interaction) {
     if (!sessionCheck.allowed) {
       return interaction.reply({
         content: `❌ **Session XP cap reached!** You have gained ${sessionCheck.used}/${sessionCheck.max} XP this session. Reset in ${Math.ceil((24 - (Date.now() - (sessionCheck.resetTime || Date.now())) / 3600000))} hours.`,
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
     const result = exploreLocation(userId, locationName);
 
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
 
     // Increment daily exploration count

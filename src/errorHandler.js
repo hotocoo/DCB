@@ -99,11 +99,80 @@ export async function handleCommandError(interaction, error, context = {}) {
     responseOptions.content += hints[error.code];
   }
 
-  // Send appropriate response based on interaction state
-  if (interaction.replied || interaction.deferred) {
-    return interaction.followUp(responseOptions);
-  } else {
-    return interaction.reply(responseOptions);
+  // Send appropriate response based on interaction state with enhanced error handling
+  try {
+    console.error('[HANDLE_COMMAND_ERROR] Attempting to send error response');
+    console.error('[HANDLE_COMMAND_ERROR] Interaction state before response:', {
+      id: interaction?.id,
+      replied: interaction?.replied,
+      deferred: interaction?.deferred,
+      type: interaction?.type,
+      commandName: interaction?.commandName
+    });
+
+    // Check for DiscordAPIError[10062]: Unknown interaction specifically
+    if (interaction && !interaction.replied && !interaction.deferred) {
+      try {
+        console.error('[HANDLE_COMMAND_ERROR] Using reply');
+        await interaction.reply(responseOptions);
+        return;
+      } catch (replyError) {
+        if (replyError.code === 10062) {
+          console.error('[HANDLE_COMMAND_ERROR] Interaction already expired/replied, cannot send error response');
+          logError('Cannot send error response - interaction expired', replyError, {
+            originalCommand: interaction?.commandName,
+            originalError: error.message,
+            interactionId: interaction?.id
+          });
+          return;
+        }
+        throw replyError; // Re-throw other errors
+      }
+    } else if (interaction && (interaction.replied || interaction.deferred)) {
+      try {
+        console.error('[HANDLE_COMMAND_ERROR] Using followUp');
+        await interaction.followUp(responseOptions);
+        return;
+      } catch (followUpError) {
+        if (followUpError.code === 10062) {
+          console.error('[HANDLE_COMMAND_ERROR] Interaction already expired, cannot send followUp error response');
+          logError('Cannot send followUp error response - interaction expired', followUpError, {
+            originalCommand: interaction?.commandName,
+            originalError: error.message,
+            interactionId: interaction?.id
+          });
+          return;
+        }
+        throw followUpError; // Re-throw other errors
+      }
+    } else {
+      console.error('[HANDLE_COMMAND_ERROR] Interaction object invalid or already handled');
+      logError('Invalid interaction state for error response', new Error('Invalid interaction object'), {
+        originalCommand: interaction?.commandName,
+        originalError: error.message,
+        interactionId: interaction?.id,
+        interactionExists: !!interaction
+      });
+      return;
+    }
+  } catch (responseError) {
+    console.error('[HANDLE_COMMAND_ERROR] Failed to send error response:', responseError.message);
+    console.error('[HANDLE_COMMAND_ERROR] Response error details:', {
+      responseError: responseError.message,
+      stack: responseError.stack,
+      interactionId: interaction?.id,
+      originalError: error.message,
+      errorCode: responseError.code
+    });
+
+    // If we can't send a response, log it and continue
+    logError('Failed to send error response to user', responseError, {
+      originalCommand: interaction?.commandName,
+      originalError: error.message,
+      interactionReplied: interaction?.replied,
+      interactionDeferred: interaction?.deferred,
+      errorCode: responseError.code
+    });
   }
 }
 
@@ -118,6 +187,17 @@ export async function safeExecuteCommand(interaction, commandFunction, context =
   try {
     return await commandFunction(interaction);
   } catch (error) {
+    // Log immediately before any interaction attempts
+    console.error('[SAFE_EXECUTE_COMMAND] Error occurred:', error.message);
+    console.error('[SAFE_EXECUTE_COMMAND] Error stack:', error.stack);
+    console.error('[SAFE_EXECUTE_COMMAND] Interaction state:', {
+      id: interaction?.id,
+      replied: interaction?.replied,
+      deferred: interaction?.deferred,
+      type: interaction?.type,
+      commandName: interaction?.commandName
+    });
+
     if (error instanceof CommandError) {
       await handleCommandError(interaction, error, context);
     } else {

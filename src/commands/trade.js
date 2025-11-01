@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle , MessageFlags} from 'discord.js';
 import {
   createTradeRequest,
   acceptTrade,
@@ -45,20 +45,20 @@ export async function execute(interaction) {
     const requestGold = interaction.options.getInteger('request_gold') || 0;
 
     if (targetUser.id === userId) {
-      return interaction.reply({ content: '❌ You cannot trade with yourself!', ephemeral: true });
+      return interaction.reply({ content: '❌ You cannot trade with yourself!', flags: MessageFlags.Ephemeral });
     }
 
     if (offerItems.length === 0 && offerGold === 0) {
-      return interaction.reply({ content: '❌ You must offer at least some items or gold!', ephemeral: true });
+      return interaction.reply({ content: '❌ You must offer at least some items or gold!', flags: MessageFlags.Ephemeral });
     }
 
     if (requestItems.length === 0 && requestGold === 0) {
-      return interaction.reply({ content: '❌ You must request at least some items or gold!', ephemeral: true });
+      return interaction.reply({ content: '❌ You must request at least some items or gold!', flags: MessageFlags.Ephemeral });
     }
 
     const result = createTradeRequest(userId, targetUser.id, offerItems, requestItems, offerGold, requestGold);
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -78,7 +78,7 @@ export async function execute(interaction) {
     const tradeHistory = getUserTradeHistory(userId, 10);
 
     if (tradeHistory.length === 0) {
-      return interaction.reply({ content: '📋 No trade history found. Start trading to build your history!', ephemeral: true });
+      return interaction.reply({ content: '📋 No trade history found. Start trading to build your history!', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -97,7 +97,7 @@ export async function execute(interaction) {
       });
     });
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
   } else if (sub === 'stats') {
     const stats = getTradeStats(userId);
@@ -119,7 +119,7 @@ export async function execute(interaction) {
       });
     }
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
   } else if (sub === 'market') {
     const auctions = getActiveAuctions(5);
@@ -163,12 +163,12 @@ export async function execute(interaction) {
       const price = interaction.options.getInteger('price');
 
       if (!item || !price || price <= 0) {
-        return interaction.reply({ content: '❌ Please specify an item and valid starting price!', ephemeral: true });
+        return interaction.reply({ content: '❌ Please specify an item and valid starting price!', flags: MessageFlags.Ephemeral });
       }
 
       const result = createAuction(item, price, 24, userId);
       if (!result.success) {
-        return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+        return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
       }
 
       const embed = new EmbedBuilder()
@@ -188,32 +188,32 @@ export async function execute(interaction) {
       const price = interaction.options.getInteger('price');
 
       if (!auctionId || !price || price <= 0) {
-        return interaction.reply({ content: '❌ Please specify auction ID and valid bid amount!', ephemeral: true });
+        return interaction.reply({ content: '❌ Please specify auction ID and valid bid amount!', flags: MessageFlags.Ephemeral });
       }
 
       const result = placeBid(auctionId, userId, price);
       if (!result.success) {
-        return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+        return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
       }
 
-      await interaction.reply({ content: `💰 **Bid Placed!**\nYou bid ${price} gold on auction ${auctionId}!`, ephemeral: true });
+      await interaction.reply({ content: `💰 **Bid Placed!**\nYou bid ${price} gold on auction ${auctionId}!`, flags: MessageFlags.Ephemeral });
 
     } else if (action === 'buyout') {
       const auctionId = interaction.options.getString('auction_id');
 
       if (!auctionId) {
-        return interaction.reply({ content: '❌ Please specify auction ID!', ephemeral: true });
+        return interaction.reply({ content: '❌ Please specify auction ID!', flags: MessageFlags.Ephemeral });
       }
 
       const result = buyoutAuction(auctionId, userId);
       if (!result.success) {
-        return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+        return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
       }
 
-      await interaction.reply({ content: `💎 **Auction Won!**\nYou purchased the item via buyout!`, ephemeral: true });
+      await interaction.reply({ content: `💎 **Auction Won!**\nYou purchased the item via buyout!`, flags: MessageFlags.Ephemeral });
     }
   } else if (sub === 'pending') {
     // Show pending trade requests - would be implemented with proper notification system
-    await interaction.reply({ content: '📨 **Pending Trades:**\nNo pending trade requests. Use `/trade offer` to start trading!', ephemeral: true });
+    await interaction.reply({ content: '📨 **Pending Trades:**\nNo pending trade requests. Use `/trade offer` to start trading!', flags: MessageFlags.Ephemeral });
   }
 }

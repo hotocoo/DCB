@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import {
   createGuild,
   joinGuild,
@@ -32,16 +32,16 @@ export async function execute(interaction) {
 
     // Validate guild name
     if (guildName.length < 3 || guildName.length > 20) {
-      return interaction.reply({ content: '❌ Guild name must be between 3 and 20 characters.', ephemeral: true });
+      return interaction.reply({ content: '❌ Guild name must be between 3 and 20 characters.', flags: MessageFlags.Ephemeral });
     }
 
     if (!/^[a-zA-Z0-9\s]+$/.test(guildName)) {
-      return interaction.reply({ content: '❌ Guild name can only contain letters, numbers, and spaces.', ephemeral: true });
+      return interaction.reply({ content: '❌ Guild name can only contain letters, numbers, and spaces.', flags: MessageFlags.Ephemeral });
     }
 
     const result = createGuild(guildName, userId, userName);
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -61,7 +61,7 @@ export async function execute(interaction) {
 
     const result = joinGuild(guildName, userId, userName);
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -79,20 +79,20 @@ export async function execute(interaction) {
   } else if (sub === 'leave') {
     const userGuild = getUserGuild(userId);
     if (!userGuild) {
-      return interaction.reply({ content: '❌ You are not in a guild.', ephemeral: true });
+      return interaction.reply({ content: '❌ You are not in a guild.', flags: MessageFlags.Ephemeral });
     }
 
     const result = leaveGuild(userGuild.name, userId);
     if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
 
-    await interaction.reply({ content: `👋 You have left **${userGuild.name}**.`, ephemeral: true });
+    await interaction.reply({ content: `👋 You have left **${userGuild.name}**.`, flags: MessageFlags.Ephemeral });
 
   } else if (sub === 'info') {
     const userGuild = getUserGuild(userId);
     if (!userGuild) {
-      return interaction.reply({ content: '❌ You are not in a guild. Use `/guild create` or `/guild join`!', ephemeral: true });
+      return interaction.reply({ content: '❌ You are not in a guild. Use `/guild create` or `/guild join`!', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -130,7 +130,7 @@ export async function execute(interaction) {
     const leaderboard = getGuildLeaderboard(10);
 
     if (leaderboard.length === 0) {
-      return interaction.reply({ content: '🏆 No guilds yet. Be the first to create one!', ephemeral: true });
+      return interaction.reply({ content: '🏆 No guilds yet. Be the first to create one!', flags: MessageFlags.Ephemeral });
     }
 
     const userGuild = getUserGuild(userId);
@@ -161,7 +161,7 @@ export async function execute(interaction) {
     if (action === 'create') {
       const result = createParty(userId, userName);
       if (!result.success) {
-        return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+        return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
       }
 
       const embed = new EmbedBuilder()
@@ -184,12 +184,12 @@ export async function execute(interaction) {
       const partyId = interaction.options.getString('party_id');
 
       if (!partyId.startsWith('party_')) {
-        return interaction.reply({ content: '❌ Invalid party ID format.', ephemeral: true });
+        return interaction.reply({ content: '❌ Invalid party ID format.', flags: MessageFlags.Ephemeral });
       }
 
       const result = joinParty(partyId, userId, userName);
       if (!result.success) {
-        return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+        return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
       }
 
       const embed = new EmbedBuilder()
@@ -206,15 +206,15 @@ export async function execute(interaction) {
     } else if (action === 'leave') {
       const userParty = getUserParty(userId);
       if (!userParty) {
-        return interaction.reply({ content: '❌ You are not in a party.', ephemeral: true });
+        return interaction.reply({ content: '❌ You are not in a party.', flags: MessageFlags.Ephemeral });
       }
 
       const result = leaveParty(userParty.id, userId);
       if (!result.success) {
-        return interaction.reply({ content: `❌ ${result.reason}`, ephemeral: true });
+        return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
       }
 
-      await interaction.reply({ content: '👋 You have left the party.', ephemeral: true });
+      await interaction.reply({ content: '👋 You have left the party.', flags: MessageFlags.Ephemeral });
     }
   }
 }

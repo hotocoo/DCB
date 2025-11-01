@@ -3,7 +3,7 @@
  * Handles chat input commands, button clicks, modal submissions, and game interactions.
  */
 
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder, PermissionFlagsBits, MessageFlags } from 'discord.js';
 
 // Core modules
 import { logCommandExecution, logError, logger } from './logger.js';
@@ -97,6 +97,12 @@ export async function safeInteractionReply(interaction, options) {
 
     // Check if interaction is still valid (not expired)
     if (interaction.replied || interaction.deferred) {
+      console.error(`[SAFE_INTERACTION_REPLY] Interaction ${interactionId} already replied/deferred`, {
+        userId: interaction.user.id,
+        interactionId,
+        replied: interaction.replied,
+        deferred: interaction.deferred
+      });
       logger.warn(`Interaction ${interactionId} already replied/deferred`, {
         userId: interaction.user.id,
         interactionId,
@@ -122,9 +128,23 @@ export async function safeInteractionReply(interaction, options) {
       options.content = sanitizeInput(options.content);
     }
 
+    console.error(`[SAFE_INTERACTION_REPLY] Attempting to reply to interaction ${interactionId}`);
     await interaction.reply(options);
+    console.error(`[SAFE_INTERACTION_REPLY] Successfully replied to interaction ${interactionId}`);
     return true;
   } catch (error) {
+    console.error(`[SAFE_INTERACTION_REPLY] Failed to reply to interaction ${interactionId}`, error.message);
+    console.error(`[SAFE_INTERACTION_REPLY] Error details:`, {
+      error: error.message,
+      stack: error.stack,
+      userId: interaction.user.id,
+      interactionType: interaction.type,
+      interactionId,
+      interactionState: {
+        replied: interaction.replied,
+        deferred: interaction.deferred
+      }
+    });
     logger.error(`Failed to reply to interaction ${interactionId}`, error, {
       userId: interaction.user.id,
       interactionType: interaction.type,
@@ -171,7 +191,7 @@ export async function safeInteractionUpdate(interaction, options) {
     hasEmbeds: !!options.embeds,
     hasComponents: !!options.components,
     hasContent: !!options.content,
-    isEphemeral: options.ephemeral || false
+    isEphemeral: options.flags?.has(MessageFlags.Ephemeral) || false
   });
 
   try {
@@ -273,7 +293,7 @@ export async function handleInteraction(interaction, client) {
          });
          return await safeInteractionReply(interaction, {
            content: `⏰ **Rate Limited!** Please slow down and try again in a moment.`,
-           ephemeral: true
+           flags: MessageFlags.Ephemeral
          });
        }
      }
@@ -283,7 +303,7 @@ export async function handleInteraction(interaction, client) {
      if (globalCooldown.onCooldown) {
        return await safeInteractionReply(interaction, {
          content: `⏰ **Cooldown Active!** Please wait ${getFormattedCooldown(globalCooldown.remaining)} before using another command.`,
-         ephemeral: true
+         flags: MessageFlags.Ephemeral
        });
      }
 
@@ -295,7 +315,7 @@ export async function handleInteraction(interaction, client) {
      if (commandCooldown.onCooldown) {
        return await safeInteractionReply(interaction, {
          content: `⏰ **${interaction.commandName} is on cooldown!** Please wait ${getFormattedCooldown(commandCooldown.remaining)}.`,
-         ephemeral: true
+         flags: MessageFlags.Ephemeral
        });
      }
 
@@ -348,33 +368,45 @@ export async function handleInteraction(interaction, client) {
        });
 
        // Set command-specific cooldown after successful execution
-       setCooldown(interaction.user.id, interaction.commandName);
-     }
-
-     // Log successful completion with timing
-     const executionTime = Date.now() - startTime;
-     logCommandExecution(interaction, true, null, { executionTime });
-
-   } catch (err) {
-     const executionTime = Date.now() - startTime;
-
-     // Use standardized error handling
-     await handleCommandError(interaction, err instanceof CommandError ? err :
-       new CommandError(err.message || 'Unknown error occurred', 'UNKNOWN_ERROR', {
-         originalError: err.message,
-         stack: err.stack,
+         setCooldown(interaction.user.id, interaction.commandName);
+       }
+ 
+       // Log successful completion with timing
+       const executionTime = Date.now() - startTime;
+       logCommandExecution(interaction, true, null, { executionTime });
+ 
+     } catch (err) {
+       const executionTime = Date.now() - startTime;
+ 
+       // Log error details before handling
+       console.error('[HANDLE_INTERACTION] Error in handleInteraction:', err.message);
+       console.error('[HANDLE_INTERACTION] Error stack:', err.stack);
+       console.error('[HANDLE_INTERACTION] Interaction state at error:', {
+         id: interaction?.id,
+         replied: interaction?.replied,
+         deferred: interaction?.deferred,
+         type: interaction?.type,
+         commandName: interaction?.commandName,
+         userId: interaction?.user?.id
+       });
+ 
+       // Use standardized error handling
+       await handleCommandError(interaction, err instanceof CommandError ? err :
+         new CommandError(err.message || 'Unknown error occurred', 'UNKNOWN_ERROR', {
+           originalError: err.message,
+           stack: err.stack,
+           executionTime
+         }), {
+         command: interaction.commandName,
+         userId: interaction.user.id,
+         guild: interaction.guild?.name || 'DM',
+         channel: interaction.channel?.name || 'Unknown',
          executionTime
-       }), {
-       command: interaction.commandName,
-       userId: interaction.user.id,
-       guild: interaction.guild?.name || 'DM',
-       channel: interaction.channel?.name || 'Unknown',
-       executionTime
-     });
-
-     // Log command failure
-     logCommandExecution(interaction, false, err);
-   }
+       });
+ 
+       // Log command failure
+       logCommandExecution(interaction, false, err);
+     }
 }
 
 // Function to handle modal submits with comprehensive validation and error handling
@@ -410,7 +442,7 @@ async function handleModalSubmit(interaction, client) {
        const def = resetCharacter(interaction.user.id, className);
        return await safeInteractionReply(interaction, {
          content: `Character reset to defaults: HP ${def.hp}/${def.maxHp} MP ${def.mp}/${def.maxMp} ATK ${def.atk} DEF ${def.def} SPD ${def.spd} Level ${def.lvl}`,
-         ephemeral: true
+         flags: MessageFlags.Ephemeral
        });
      }
 
@@ -447,7 +479,7 @@ async function handleModalSubmit(interaction, client) {
 
        return await safeInteractionReply(interaction, {
          content: `Successfully contributed ${amount.value} gold to ${guildName}!`,
-         ephemeral: true
+         flags: MessageFlags.Ephemeral
        });
      }
 
@@ -488,7 +520,7 @@ async function handleModalSubmit(interaction, client) {
 
        return await safeInteractionReply(interaction, {
          content: `Successfully transferred ${amount.value} gold to ${recipient.user.username}!`,
-         ephemeral: true
+         flags: MessageFlags.Ephemeral
        });
      }
 
@@ -529,7 +561,7 @@ async function handleButtonInteraction(interaction, client) {
     });
     return interaction.reply({
       content: `⏰ **Button on cooldown!** Please wait ${getFormattedCooldown(cooldownCheck.remaining)} before pressing this button again.`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -569,7 +601,7 @@ async function handleButtonInteraction(interaction, client) {
       const [, targetGuild] = interaction.customId.split(':');
       if (targetGuild && targetGuild !== interaction.guild.id) {
         logCommandExecution(interaction, false, new Error('Wrong guild'));
-        return interaction.reply({ content: 'You cannot pause music in another server.', ephemeral: true });
+        return interaction.reply({ content: 'You cannot pause music in another server.', flags: MessageFlags.Ephemeral });
       }
 
       const result = pause(interaction.guild.id);
@@ -598,10 +630,10 @@ async function handleButtonInteraction(interaction, client) {
             components: [new ActionRowBuilder().addComponents(newRow)]
           });
         } else {
-          await safeInteractionReply(interaction, { content: '⏸️ **Music paused!**', ephemeral: true });
+          await safeInteractionReply(interaction, { content: '⏸️ **Music paused!**', flags: MessageFlags.Ephemeral });
         }
       } else {
-        await safeInteractionReply(interaction, { content: '❌ No music currently playing.', ephemeral: true });
+        await safeInteractionReply(interaction, { content: '❌ No music currently playing.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -610,7 +642,7 @@ async function handleButtonInteraction(interaction, client) {
       const [, targetGuild] = interaction.customId.split(':');
       if (targetGuild && targetGuild !== interaction.guild.id) {
         logCommandExecution(interaction, false, new Error('Wrong guild'));
-        return interaction.reply({ content: 'You cannot resume music in another server.', ephemeral: true });
+        return interaction.reply({ content: 'You cannot resume music in another server.', flags: MessageFlags.Ephemeral });
       }
 
       const result = resume(interaction.guild.id);
@@ -634,10 +666,10 @@ async function handleButtonInteraction(interaction, client) {
             components: [new ActionRowBuilder().addComponents(newRow)]
           });
         } else {
-          await safeInteractionReply(interaction, { content: '▶️ **Music resumed!**', ephemeral: true });
+          await safeInteractionReply(interaction, { content: '▶️ **Music resumed!**', flags: MessageFlags.Ephemeral });
         }
       } else {
-        await safeInteractionReply(interaction, { content: '❌ No paused music to resume.', ephemeral: true });
+        await safeInteractionReply(interaction, { content: '❌ No paused music to resume.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -646,7 +678,7 @@ async function handleButtonInteraction(interaction, client) {
       const [, targetGuild] = interaction.customId.split(':');
       if (targetGuild && targetGuild !== interaction.guild.id) {
         logCommandExecution(interaction, false, new Error('Wrong guild'));
-        return interaction.reply({ content: 'You cannot skip music in another server.', ephemeral: true });
+        return interaction.reply({ content: 'You cannot skip music in another server.', flags: MessageFlags.Ephemeral });
       }
 
       const nextSong = skip(interaction.guild.id);
@@ -661,7 +693,7 @@ async function handleButtonInteraction(interaction, client) {
           components: interaction.message.components
         });
       } else {
-        await safeInteractionReply(interaction, { content: '❌ No songs in queue to skip.', ephemeral: true });
+        await safeInteractionReply(interaction, { content: '❌ No songs in queue to skip.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -670,7 +702,7 @@ async function handleButtonInteraction(interaction, client) {
       const [, targetGuild] = interaction.customId.split(':');
       if (targetGuild && targetGuild !== interaction.guild.id) {
         logCommandExecution(interaction, false, new Error('Wrong guild'));
-        return interaction.reply({ content: 'You cannot stop music in another server.', ephemeral: true });
+        return interaction.reply({ content: 'You cannot stop music in another server.', flags: MessageFlags.Ephemeral });
       }
 
       const success = stop(interaction.guild.id);
@@ -685,7 +717,7 @@ async function handleButtonInteraction(interaction, client) {
           components: []
         });
       } else {
-        await safeInteractionReply(interaction, { content: '❌ No music is currently playing.', ephemeral: true });
+        await safeInteractionReply(interaction, { content: '❌ No music is currently playing.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -694,7 +726,7 @@ async function handleButtonInteraction(interaction, client) {
       const [, targetGuild] = interaction.customId.split(':');
       if (targetGuild && targetGuild !== interaction.guild.id) {
         logCommandExecution(interaction, false, new Error('Wrong guild'));
-        return interaction.reply({ content: 'You cannot view queue in another server.', ephemeral: true });
+        return interaction.reply({ content: 'You cannot view queue in another server.', flags: MessageFlags.Ephemeral });
       }
 
       const queue = getQueue(interaction.guild.id);
@@ -740,7 +772,7 @@ async function handleButtonInteraction(interaction, client) {
       const [, targetGuild] = interaction.customId.split(':');
       if (targetGuild && targetGuild !== interaction.guild.id) {
         logCommandExecution(interaction, false, new Error('Wrong guild'));
-        return interaction.reply({ content: 'You cannot shuffle queue in another server.', ephemeral: true });
+        return interaction.reply({ content: 'You cannot shuffle queue in another server.', flags: MessageFlags.Ephemeral });
       }
 
       const success = shuffleQueue(interaction.guild.id);
@@ -752,7 +784,7 @@ async function handleButtonInteraction(interaction, client) {
 
         await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
       } else {
-        await safeInteractionReply(interaction, { content: '❌ Queue is empty or too small to shuffle.', ephemeral: true });
+        await safeInteractionReply(interaction, { content: '❌ Queue is empty or too small to shuffle.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -761,7 +793,7 @@ async function handleButtonInteraction(interaction, client) {
       const [, targetGuild] = interaction.customId.split(':');
       if (targetGuild && targetGuild !== interaction.guild.id) {
         logCommandExecution(interaction, false, new Error('Wrong guild'));
-        return interaction.reply({ content: 'You cannot clear queue in another server.', ephemeral: true });
+        return interaction.reply({ content: 'You cannot clear queue in another server.', flags: MessageFlags.Ephemeral });
       }
 
       const success = clearQueue(interaction.guild.id);
@@ -773,7 +805,7 @@ async function handleButtonInteraction(interaction, client) {
 
         await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
       } else {
-        await safeInteractionReply(interaction, { content: '❌ Queue is already empty.', ephemeral: true });
+        await safeInteractionReply(interaction, { content: '❌ Queue is already empty.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -782,7 +814,7 @@ async function handleButtonInteraction(interaction, client) {
       const [, targetGuild] = interaction.customId.split(':');
       if (targetGuild && targetGuild !== interaction.guild.id) {
         logCommandExecution(interaction, false, new Error('Wrong guild'));
-        return interaction.reply({ content: 'You cannot go back in another server.', ephemeral: true });
+        return interaction.reply({ content: 'You cannot go back in another server.', flags: MessageFlags.Ephemeral });
       }
 
       const previousSong = back(interaction.guild.id);
@@ -798,7 +830,7 @@ async function handleButtonInteraction(interaction, client) {
           components: interaction.message.components
         });
       } else {
-        await safeInteractionReply(interaction, { content: '❌ No previous song in history.', ephemeral: true });
+        await safeInteractionReply(interaction, { content: '❌ No previous song in history.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -813,7 +845,7 @@ async function handleButtonInteraction(interaction, client) {
         logCommandExecution(interaction, false, new Error('No voice channel'));
         return interaction.reply({
           content: '🎵 **You must be in a voice channel to play music!**',
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -823,7 +855,7 @@ async function handleButtonInteraction(interaction, client) {
         logCommandExecution(interaction, false, new Error('Missing permissions'));
         return interaction.reply({
           content: '❌ **I need "Connect" and "Speak" permissions in your voice channel.**',
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -850,7 +882,7 @@ async function handleButtonInteraction(interaction, client) {
               default:
                 errorMessage += `: ${result.error}`;
             }
-            await safeInteractionReply(interaction, { content: errorMessage, ephemeral: true });
+            await safeInteractionReply(interaction, { content: errorMessage, flags: MessageFlags.Ephemeral });
           } else {
             // Create success embed
             const embed = new EmbedBuilder()
@@ -880,7 +912,16 @@ async function handleButtonInteraction(interaction, client) {
             await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
           }
         } else {
-          await safeInteractionReply(interaction, { content: '❌ **Song no longer available**', ephemeral: true });
+          // Check interaction state before attempting to reply
+          if (interaction.replied || interaction.deferred) {
+            console.error(`[MUSIC_PLAY_BUTTON] Interaction already handled, cannot reply`, {
+              interactionId: interaction.id,
+              replied: interaction.replied,
+              deferred: interaction.deferred
+            });
+            return; // Don't attempt to reply if already handled
+          }
+          await safeInteractionReply(interaction, { content: '❌ **Song no longer available**', flags: MessageFlags.Ephemeral });
         }
       } catch (error) {
         logger.error('[MUSIC] Play button error', error, {
@@ -888,7 +929,16 @@ async function handleButtonInteraction(interaction, client) {
           query,
           songIndex
         });
-        await safeInteractionReply(interaction, { content: '❌ **Failed to play song**', ephemeral: true });
+        // Check interaction state before attempting to reply
+        if (interaction.replied || interaction.deferred) {
+          console.error(`[MUSIC_PLAY_BUTTON_ERROR] Interaction already handled, cannot reply`, {
+            interactionId: interaction.id,
+            replied: interaction.replied,
+            deferred: interaction.deferred
+          });
+          return; // Don't attempt to reply if already handled
+        }
+        await safeInteractionReply(interaction, { content: '❌ **Failed to play song**', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -901,7 +951,7 @@ async function handleButtonInteraction(interaction, client) {
         const station = stations[stationKey];
 
         if (!station) {
-          await safeInteractionReply(interaction, { content: '❌ Invalid radio station.', ephemeral: true });
+          await safeInteractionReply(interaction, { content: '❌ Invalid radio station.', flags: MessageFlags.Ephemeral });
           return;
         }
 
@@ -909,7 +959,7 @@ async function handleButtonInteraction(interaction, client) {
         const voiceChannel = interaction.member.voice?.channel;
         if (!voiceChannel) {
           logCommandExecution(interaction, false, new Error('No voice channel'));
-          return interaction.reply({ content: '🎵 You must be in a voice channel to change radio!', ephemeral: true });
+          return interaction.reply({ content: '🎵 You must be in a voice channel to change radio!', flags: MessageFlags.Ephemeral });
         }
 
         // Create song object for radio
@@ -939,7 +989,7 @@ async function handleButtonInteraction(interaction, client) {
             default:
               errorMessage += `: ${result.error}`;
           }
-          await safeInteractionReply(interaction, { content: errorMessage, ephemeral: true });
+          await safeInteractionReply(interaction, { content: errorMessage, flags: MessageFlags.Ephemeral });
         } else {
           const embed = new EmbedBuilder()
             .setTitle(`📻 Changed Station: ${station.name}`)
@@ -958,7 +1008,7 @@ async function handleButtonInteraction(interaction, client) {
           userId: interaction.user.id,
           stationKey
         });
-        await safeInteractionReply(interaction, { content: '❌ Failed to change radio station.', ephemeral: true });
+        await safeInteractionReply(interaction, { content: '❌ Failed to change radio station.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -969,7 +1019,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot view another user\'s leaderboard.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot view another user\'s leaderboard.', flags: MessageFlags.Ephemeral });
       }
 
       const limit = 10;
@@ -1005,7 +1055,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot reset another user\'s character.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot reset another user\'s character.', flags: MessageFlags.Ephemeral });
       }
 
       const modal = new ModalBuilder().setCustomId(`rpg_reset_confirm:btn:${interaction.user.id}:${arg3 || 'warrior'}`).setTitle('Confirm Reset');
@@ -1021,18 +1071,18 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot explore for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot explore for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const char = getCharacter(interaction.user.id);
       if (!char) {
-        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
       }
 
       const locations = getLocations();
       const location = locations.find(l => l.id === locationId);
       if (!location) {
-        return safeInteractionReply(interaction, { content: '❌ Location not found.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ Location not found.', flags: MessageFlags.Ephemeral });
       }
 
       // Simulate investigation
@@ -1083,18 +1133,18 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot explore for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot explore for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const char = getCharacter(interaction.user.id);
       if (!char) {
-        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
       }
 
       const locations = getLocations();
       const location = locations.find(l => l.id === locationId);
       if (!location) {
-        return safeInteractionReply(interaction, { content: '❌ Location not found.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ Location not found.', flags: MessageFlags.Ephemeral });
       }
 
       // Higher risk, higher reward search
@@ -1150,12 +1200,12 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot rest for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot rest for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const char = getCharacter(interaction.user.id);
       if (!char) {
-        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
       }
 
       // Rest to recover HP and MP
@@ -1183,12 +1233,12 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot continue adventure for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot continue adventure for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const char = getCharacter(interaction.user.id);
       if (!char) {
-        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
       }
 
       // Simulate continuing adventure
@@ -1244,7 +1294,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot leave for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot leave for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const embed = new EmbedBuilder()
@@ -1262,7 +1312,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot transfer for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot transfer for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const modal = new ModalBuilder().setCustomId(`economy_transfer_modal:${interaction.user.id}`).setTitle('Transfer Gold');
@@ -1283,7 +1333,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot access market for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot access market for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const marketPrices = getMarketPrice();
@@ -1314,7 +1364,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot manage business for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot manage business for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const income = Math.floor(Math.random() * 50) + 10;
@@ -1334,12 +1384,12 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot invest for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot invest for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const currentBalance = getBalance(interaction.user.id);
       if (currentBalance < 100) {
-        return safeInteractionReply(interaction, { content: '❌ You need at least 100 gold to invest.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ You need at least 100 gold to invest.', flags: MessageFlags.Ephemeral });
       }
 
       const investment = 100;
@@ -1366,7 +1416,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot buy for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot buy for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const marketPrices = getMarketPrice();
@@ -1401,17 +1451,17 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot sell for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot sell for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const char = getCharacter(interaction.user.id);
       if (!char) {
-        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
       }
 
       const inventory = getInventory(interaction.user.id);
       if (Object.keys(inventory).length === 0) {
-        return safeInteractionReply(interaction, { content: '❌ Your inventory is empty!', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ Your inventory is empty!', flags: MessageFlags.Ephemeral });
       }
 
       const embed = new EmbedBuilder()
@@ -1450,7 +1500,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot create auctions for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot create auctions for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const modal = new ModalBuilder().setCustomId(`trade_create_auction_modal:${interaction.user.id}`).setTitle('Create Auction');
@@ -1473,7 +1523,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot view auctions for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot view auctions for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const auctions = getActiveAuctions();
@@ -1494,7 +1544,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot edit another user\'s profile.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot edit another user\'s profile.', flags: MessageFlags.Ephemeral });
       }
 
       const modal = new ModalBuilder().setCustomId(`profile_edit_modal:${interaction.user.id}`).setTitle('Edit Profile');
@@ -1510,7 +1560,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot refresh another user\'s profile.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot refresh another user\'s profile.', flags: MessageFlags.Ephemeral });
       }
 
       // Profile refresh logic would go here
@@ -1528,7 +1578,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot compare profiles for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot compare profiles for another user.', flags: MessageFlags.Ephemeral });
       }
 
       // Profile comparison logic would go here
@@ -1546,7 +1596,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot view reminders for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot view reminders for another user.', flags: MessageFlags.Ephemeral });
       }
 
       // Reminder logic would go here
@@ -1564,7 +1614,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot reset memory for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot reset memory for another user.', flags: MessageFlags.Ephemeral });
       }
 
       // Memory game reset logic would go here
@@ -1582,12 +1632,12 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot refresh inventory for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot refresh inventory for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const char = getCharacter(interaction.user.id);
       if (!char) {
-        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
       }
 
       const inventory = getInventory(interaction.user.id);
@@ -1623,12 +1673,12 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot get random items for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot get random items for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const char = getCharacter(interaction.user.id);
       if (!char) {
-        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
       }
 
       const randomItem = generateRandomItem(char.lvl);
@@ -1651,12 +1701,12 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot sell items for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot sell items for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const char = getCharacter(interaction.user.id);
       if (!char) {
-        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', ephemeral: true });
+        return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
       }
 
       const inventory = getInventory(interaction.user.id);
@@ -1690,7 +1740,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot contribute to guild for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot contribute to guild for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const modal = new ModalBuilder().setCustomId(`guild_contribute_modal:${guildName}:${interaction.user.id}`).setTitle('Contribute to Guild');
@@ -1706,7 +1756,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot refresh guild for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot refresh guild for another user.', flags: MessageFlags.Ephemeral });
       }
 
       // Guild refresh logic would go here
@@ -1724,7 +1774,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot generate invites for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot generate invites for another user.', flags: MessageFlags.Ephemeral });
       }
 
       // Party invite logic would go here
@@ -1753,7 +1803,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot get jokes for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot get jokes for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const joke = getRandomJoke(category);
@@ -1775,7 +1825,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot rate jokes for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot rate jokes for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const embed = new EmbedBuilder()
@@ -1792,7 +1842,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot get stories for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot get stories for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const story = generateStory(genre);
@@ -1814,7 +1864,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot share for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot share for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const embed = new EmbedBuilder()
@@ -1831,7 +1881,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot view riddles for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot view riddles for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const riddle = getRiddle(difficulty);
@@ -1854,7 +1904,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot get new riddles for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot get new riddles for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const riddle = getRiddle(difficulty);
@@ -1877,7 +1927,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot get facts for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot get facts for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const fact = getFunFact(category);
@@ -1899,7 +1949,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot get quotes for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot get quotes for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const quote = getRandomQuote(category);
@@ -1921,7 +1971,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot use 8ball for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot use 8ball for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const answer = magic8Ball();
@@ -1943,7 +1993,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot generate names for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot generate names for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const name = generateFunName(type);
@@ -1966,7 +2016,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot generate names for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot generate names for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const types = ['hero', 'villain', 'animal', 'object'];
@@ -1992,7 +2042,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot get challenges for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot get challenges for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const challenge = createFunChallenge(type);
@@ -2015,7 +2065,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot get challenges for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot get challenges for another user.', flags: MessageFlags.Ephemeral });
       }
 
       const challenge = createFunChallenge(type);
@@ -2038,7 +2088,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot continue chat for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot continue chat for another user.', flags: MessageFlags.Ephemeral });
       }
 
       // AI chat continuation logic would go here
@@ -2056,7 +2106,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot clear history for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot clear history for another user.', flags: MessageFlags.Ephemeral });
       }
 
       // AI history clear logic would go here
@@ -2095,7 +2145,7 @@ async function handleButtonInteraction(interaction, client) {
 
         await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
       } catch (error) {
-        await safeInteractionReply(interaction, { content: '❌ Failed to mute user.', ephemeral: true });
+        await safeInteractionReply(interaction, { content: '❌ Failed to mute user.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -2113,7 +2163,7 @@ async function handleButtonInteraction(interaction, client) {
 
         await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
       } catch (error) {
-        await safeInteractionReply(interaction, { content: '❌ Failed to unmute user.', ephemeral: true });
+        await safeInteractionReply(interaction, { content: '❌ Failed to unmute user.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -2131,7 +2181,7 @@ async function handleButtonInteraction(interaction, client) {
 
         await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
       } catch (error) {
-        await safeInteractionReply(interaction, { content: '❌ Failed to unban user.', ephemeral: true });
+        await safeInteractionReply(interaction, { content: '❌ Failed to unban user.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
@@ -2141,7 +2191,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot refresh achievements for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot refresh achievements for another user.', flags: MessageFlags.Ephemeral });
       }
 
       // Achievement refresh logic would go here
@@ -2159,7 +2209,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot view leaderboard for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot view leaderboard for another user.', flags: MessageFlags.Ephemeral });
       }
 
       // Achievement leaderboard logic would go here
@@ -2177,7 +2227,7 @@ async function handleButtonInteraction(interaction, client) {
 
       if (targetUserId && targetUserId !== interaction.user.id) {
         logCommandExecution(interaction, false, new Error('Wrong user'));
-        return safeInteractionReply(interaction, { content: 'You cannot guess for another user.', ephemeral: true });
+        return safeInteractionReply(interaction, { content: 'You cannot guess for another user.', flags: MessageFlags.Ephemeral });
       }
 
       sendWordleGuessModal(interaction, interaction.user.id);
@@ -2195,7 +2245,7 @@ async function handleButtonInteraction(interaction, client) {
     logCommandExecution(interaction, false, new Error(`Unrecognized button action: ${action}`));
     await safeInteractionReply(interaction, {
       content: `❌ **Unknown button action: ${action}**\n\nThis button is not implemented yet. Please contact the bot administrator if this is unexpected.`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
 
   } catch (error) {
@@ -2207,7 +2257,7 @@ async function handleButtonInteraction(interaction, client) {
     logCommandExecution(interaction, false, error);
     await safeInteractionReply(interaction, {
       content: '❌ **An error occurred while processing the button.**\n\nPlease try again later.',
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 }

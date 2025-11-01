@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 // import { getUserAchievements, getAllAchievements, getAchievementLeaderboard, updateUserStats, ACHIEVEMENT_RARITIES } from '../achievements.js';
 
 export const data = new SlashCommandBuilder()
@@ -88,7 +88,7 @@ export async function execute(interaction) {
     const leaderboard = [];
 
     if (leaderboard.length === 0) {
-      return interaction.reply({ content: '📊 No achievement data available yet. Be the first to earn achievements!', ephemeral: true });
+      return interaction.reply({ content: '📊 No achievement data available yet. Be the first to earn achievements!', flags: MessageFlags.Ephemeral });
     }
 
     const userRank = leaderboard.findIndex(entry => entry.userId === userId) + 1;
@@ -131,6 +131,6 @@ export async function execute(interaction) {
         { name: '🏅 Level', value: '1 (temporarily disabled)', inline: true }
       );
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   }
 }

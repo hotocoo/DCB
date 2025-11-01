@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder , MessageFlags} from 'discord.js';
 import { getGuild, setGuild } from '../storage.js';
 
 export const data = new SlashCommandBuilder()
@@ -8,12 +8,12 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   if (!interaction.memberPermissions?.has || !interaction.memberPermissions.has('ManageGuild')) {
-    await interaction.reply({ content: 'You need Manage Server permission to run this command.', ephemeral: true });
+    await interaction.reply({ content: 'You need Manage Server permission to run this command.', flags: MessageFlags.Ephemeral });
     return;
   }
 
   const enabled = interaction.options.getBoolean('enabled');
   const cfg = getGuild(interaction.guildId) || {};
   setGuild(interaction.guildId, { ...cfg, playEnabled: enabled });
-  await interaction.reply({ content: `Playful interactions are now ${enabled ? 'enabled' : 'disabled'} for this guild.`, ephemeral: true });
+  await interaction.reply({ content: `Playful interactions are now ${enabled ? 'enabled' : 'disabled'} for this guild.`, flags: MessageFlags.Ephemeral });
 }

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType , MessageFlags} from 'discord.js';
 import { updateUserStats } from '../achievements.js';
 
 const triviaQuestions = [
@@ -89,7 +89,7 @@ export async function execute(interaction) {
   if (availableQuestions.length < questionCount) {
     return interaction.reply({
       content: `❌ Not enough questions available in ${category === 'all' ? 'all categories' : category} category. Available: ${availableQuestions.length}, Requested: ${questionCount}`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -183,7 +183,7 @@ async function sendQuestion(interaction, gameState) {
       .setColor(isCorrect ? 0x00FF00 : 0xFF0000)
       .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` });
 
-    await i.reply({ embeds: [feedbackEmbed], ephemeral: true });
+    await i.reply({ embeds: [feedbackEmbed], flags: MessageFlags.Ephemeral });
 
     // Wait a moment before sending next question
     setTimeout(() => {
@@ -198,7 +198,7 @@ async function sendQuestion(interaction, gameState) {
         .setDescription(`You didn't answer in time. Moving to next question...`)
         .setColor(0xFFA500);
 
-      await interaction.followUp({ embeds: [timeoutEmbed], ephemeral: true });
+      await interaction.followUp({ embeds: [timeoutEmbed], flags: MessageFlags.Ephemeral });
 
       gameState.answers.push({
         question: question.question,
@@ -217,9 +217,9 @@ async function sendQuestion(interaction, gameState) {
   });
 
   if (interaction.replied || interaction.deferred) {
-    await interaction.followUp({ embeds: [embed], components: rows, ephemeral: true });
+    await interaction.followUp({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
   } else {
-    await interaction.reply({ embeds: [embed], components: rows, ephemeral: true });
+    await interaction.reply({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
   }
 }
 
@@ -258,8 +258,8 @@ async function sendResults(interaction, gameState) {
   });
 
   if (interaction.replied || interaction.deferred) {
-    await interaction.followUp({ embeds: [embed], ephemeral: true });
+    await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
   } else {
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   }
 }

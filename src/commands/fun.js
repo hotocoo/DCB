@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import {
   getRandomJoke,
   generateStory,
@@ -238,7 +238,7 @@ export async function execute(interaction) {
     const leaderboard = getFunLeaderboard(category, 10);
 
     if (leaderboard.length === 0) {
-      return interaction.reply({ content: '🏆 No data available for this leaderboard yet. Be the first to participate!', ephemeral: true });
+      return interaction.reply({ content: '🏆 No data available for this leaderboard yet. Be the first to participate!', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()

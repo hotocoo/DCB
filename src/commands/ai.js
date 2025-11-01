@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import {
   generateResponse,
   analyzeSentiment,
@@ -70,7 +70,7 @@ export async function execute(interaction) {
 
     } catch (error) {
       console.error('AI chat error:', error);
-      await interaction.reply({ content: '❌ Failed to generate AI response. Please try again.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to generate AI response. Please try again.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'analyze') {
@@ -93,7 +93,7 @@ export async function execute(interaction) {
 
     } catch (error) {
       console.error('Sentiment analysis error:', error);
-      await interaction.reply({ content: '❌ Failed to analyze sentiment.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to analyze sentiment.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'summarize') {
@@ -121,7 +121,7 @@ export async function execute(interaction) {
 
     } catch (error) {
       console.error('Summarization error:', error);
-      await interaction.reply({ content: '❌ Failed to summarize text.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to summarize text.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'translate') {
@@ -143,7 +143,7 @@ export async function execute(interaction) {
 
     } catch (error) {
       console.error('Translation error:', error);
-      await interaction.reply({ content: '❌ Failed to translate text.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to translate text.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'ideas') {
@@ -162,7 +162,7 @@ export async function execute(interaction) {
 
     } catch (error) {
       console.error('Idea generation error:', error);
-      await interaction.reply({ content: '❌ Failed to generate ideas.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to generate ideas.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'code') {
@@ -186,7 +186,7 @@ export async function execute(interaction) {
 
     } catch (error) {
       console.error('Code generation error:', error);
-      await interaction.reply({ content: '❌ Failed to generate code.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to generate code.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'models') {
@@ -232,16 +232,16 @@ export async function execute(interaction) {
         .setColor(0xFFC107)
         .setDescription(recommendations.map((rec, index) => `${index + 1}. ${rec}`).join('\n'));
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
     } catch (error) {
       console.error('Recommendation error:', error);
-      await interaction.reply({ content: '❌ Failed to generate recommendations.', ephemeral: true });
+      await interaction.reply({ content: '❌ Failed to generate recommendations.', flags: MessageFlags.Ephemeral });
     }
 
   } else if (sub === 'clear') {
     clearUserHistory(interaction.user.id);
 
-    await interaction.reply({ content: '🧹 **AI conversation history cleared!** Starting fresh.', ephemeral: true });
+    await interaction.reply({ content: '🧹 **AI conversation history cleared!** Starting fresh.', flags: MessageFlags.Ephemeral });
   }
 }

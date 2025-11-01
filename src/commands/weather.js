@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder , MessageFlags} from 'discord.js';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 
 // Rate limiter for weather API (60 requests per minute)
@@ -26,7 +26,7 @@ export async function execute(interaction) {
     } catch (rejRes) {
       return interaction.reply({
         content: `⏰ **Rate limit exceeded!** Please wait ${Math.round(rejRes.msBeforeNext / 1000)} seconds before trying again.`,
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -35,11 +35,11 @@ export async function execute(interaction) {
 
     if (!response.ok) {
       if (response.status === 401) {
-        return interaction.reply({ content: '❌ Weather API key not configured. Please contact an administrator.', ephemeral: true });
+        return interaction.reply({ content: '❌ Weather API key not configured. Please contact an administrator.', flags: MessageFlags.Ephemeral });
       } else if (response.status === 404) {
-        return interaction.reply({ content: `❌ Location "${location}" not found. Please check the spelling and try again.`, ephemeral: true });
+        return interaction.reply({ content: `❌ Location "${location}" not found. Please check the spelling and try again.`, flags: MessageFlags.Ephemeral });
       } else {
-        return interaction.reply({ content: `❌ Unable to fetch weather data. Please try again later.`, ephemeral: true });
+        return interaction.reply({ content: `❌ Unable to fetch weather data. Please try again later.`, flags: MessageFlags.Ephemeral });
       }
     }
 
@@ -87,7 +87,7 @@ export async function execute(interaction) {
 
   } catch (error) {
     console.error('Weather command error:', error);
-    await interaction.reply({ content: '❌ An error occurred while fetching weather data. Please try again later.', ephemeral: true });
+    await interaction.reply({ content: '❌ An error occurred while fetching weather data. Please try again later.', flags: MessageFlags.Ephemeral });
   }
 }
 

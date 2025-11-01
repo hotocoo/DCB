@@ -7,6 +7,9 @@ import axios from 'axios';
 import yts from 'yt-search';
 import ffmpeg from 'ffmpeg-static';
 import { spawn } from 'child_process';
+import { existsSync } from 'fs';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import SpotifyWebApi from 'spotify-web-api-node';
 import pkg from 'libsodium-wrappers';
@@ -365,23 +368,24 @@ class MusicManager {
           await this.youtubeRateLimiter.consume('youtube_api');
 
           // Add retry logic for YouTube API issues
-          let info;
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-              info = await ytdl.getInfo(query, {
-                requestOptions: {
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            let info;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                info = await ytdl.getInfo(query, {
+                  requestOptions: {
+                    headers: {
+                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                      'Accept-Language': 'en-US,en;q=0.9'
+                    }
                   }
-                }
-              });
-              break; // Success, exit retry loop
-            } catch (retryError) {
-              console.log(`[MUSIC] YouTube attempt ${attempt} failed for ${query}: ${retryError.message}`);
-              if (attempt === 3) throw retryError;
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Wait before retry
+                });
+                break; // Success, exit retry loop
+              } catch (retryError) {
+                console.log(`[MUSIC] YouTube attempt ${attempt} failed for ${query}: ${retryError.message}`);
+                if (attempt === 3) throw retryError;
+                await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Wait longer before retry
+              }
             }
-          }
 
           const video = info.videoDetails;
 
@@ -708,7 +712,8 @@ class MusicManager {
               info = await ytdl.getInfo(url, {
                 requestOptions: {
                   headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept-Language': 'en-US,en;q=0.9'
                   }
                 }
               });
@@ -720,7 +725,7 @@ class MusicManager {
                 error: retryError.message
               });
               if (attempt === 3) throw retryError;
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Wait before retry
+              await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Wait longer before retry
             }
           }
 
@@ -1038,12 +1043,17 @@ class MusicManager {
           }
         });
         const ytdlStream = ytdl(song.url, {
-          filter: 'audioonly',
-          highWaterMark: 1 << 62,
-          dlChunkSize: 0,
-          bitrate: 128,
-          quality: 'lowestaudio'
-        });
+           filter: 'audioonly',
+           highWaterMark: 1 << 62,
+           dlChunkSize: 0,
+           bitrate: 128,
+           quality: 'lowestaudio',
+           requestOptions: {
+             headers: {
+               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+             }
+           }
+         });
 
         // Set up comprehensive error handling for ytdl stream
         let streamError = null;
@@ -1137,7 +1147,7 @@ class MusicManager {
             error: error.message,
             stack: error.stack,
             ffmpegPath: ffmpeg,
-            ffmpegExists: require('fs').existsSync(ffmpeg),
+            ffmpegExists: existsSync(ffmpeg),
             errorCode: error.code
           });
           streamError = error;
@@ -1228,7 +1238,7 @@ class MusicManager {
           error: streamError.message,
           stack: streamError.stack,
           ffmpegPath: ffmpeg,
-          ffmpegAccessible: require('fs').existsSync(ffmpeg)
+          ffmpegAccessible: existsSync(ffmpeg)
         });
 
         // Check if it's an FFmpeg issue

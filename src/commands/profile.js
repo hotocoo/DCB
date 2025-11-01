@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle , MessageFlags} from 'discord.js';
 import {
   getOrCreateProfile,
   updateProfile,
@@ -116,7 +116,7 @@ export async function execute(interaction) {
     const otherUser = interaction.options.getUser('user');
 
     if (otherUser.id === userId) {
-      return interaction.reply({ content: '❌ You cannot compare your profile with yourself!', ephemeral: true });
+      return interaction.reply({ content: '❌ You cannot compare your profile with yourself!', flags: MessageFlags.Ephemeral });
     }
 
     const comparison = compareProfiles(userId, otherUser.id);
@@ -155,19 +155,19 @@ export async function execute(interaction) {
       inline: false
     });
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
   } else if (sub === 'search') {
     const query = interaction.options.getString('query');
 
     if (query.length < 2) {
-      return interaction.reply({ content: '❌ Search query must be at least 2 characters.', ephemeral: true });
+      return interaction.reply({ content: '❌ Search query must be at least 2 characters.', flags: MessageFlags.Ephemeral });
     }
 
     const results = searchProfiles(query, 5);
 
     if (results.length === 0) {
-      return interaction.reply({ content: `🔍 No profiles found matching "${query}".`, ephemeral: true });
+      return interaction.reply({ content: `🔍 No profiles found matching "${query}".`, flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -182,7 +182,7 @@ export async function execute(interaction) {
       });
     });
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
   } else if (sub === 'leaderboard') {
     const category = interaction.options.getString('category');
@@ -197,17 +197,17 @@ export async function execute(interaction) {
     };
 
     if (!validCategories.includes(category)) {
-      return interaction.reply({ content: '❌ Invalid category. Use: rpg, games, social, activity', ephemeral: true });
+      return interaction.reply({ content: '❌ Invalid category. Use: rpg, games, social, activity', flags: MessageFlags.Ephemeral });
     }
 
     if (!validStats[category]?.includes(stat)) {
-      return interaction.reply({ content: `❌ Invalid stat for ${category}. Available: ${validStats[category].join(', ')}`, ephemeral: true });
+      return interaction.reply({ content: `❌ Invalid stat for ${category}. Available: ${validStats[category].join(', ')}`, flags: MessageFlags.Ephemeral });
     }
 
     const leaderboard = getLeaderboard(category, stat, 10);
 
     if (leaderboard.length === 0) {
-      return interaction.reply({ content: '📊 No data available for this leaderboard yet.', ephemeral: true });
+      return interaction.reply({ content: '📊 No data available for this leaderboard yet.', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -230,7 +230,7 @@ export async function execute(interaction) {
     const insights = generateProfileInsights(userId);
 
     if (insights.length === 0) {
-      return interaction.reply({ content: '💡 Start using more bot features to get personalized insights!', ephemeral: true });
+      return interaction.reply({ content: '💡 Start using more bot features to get personalized insights!', flags: MessageFlags.Ephemeral });
     }
 
     const embed = new EmbedBuilder()
@@ -246,7 +246,7 @@ export async function execute(interaction) {
       });
     });
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   }
 }
 
