@@ -1,0 +1,56 @@
+[2025-11-01T10:37:58.457Z] [INFO] MusicManager initialized | {"initializationTime":"2025-11-01T10:37:58.457Z","hasSpotifyCredentials":true,"hasYouTubeAccess":true,"hasDeezzerAccess":true,"ffmpegStaticAvailable":true}
+[2025-11-01T10:37:58.519Z] [INFO] Loading commands | {"path":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\src\\commands"}
+[2025-11-01T10:37:58.519Z] [INFO] Found command files | {"count":34,"files":["8ball.js","achievements.js","admin.js","ai.js","api.js","coinflip.js","connect4.js","echo.js","economy.js","explore.js","fun.js","guess.js","guild.js","hangman.js","inventory.js","memory.js","minigame.js","music.js","novel.js","ping.js","poll.js","profile.js","remind.js","roll.js","rpg.js","rps.js","setmodel.js","tictactoe.js","togglechat.js","toggleplay.js","trade.js","trivia.js","weather.js","wordle.js"]}
+[2025-11-01T10:37:58.528Z] [INFO] Initializing AI models and personality profiles
+[2025-11-01T10:37:58.528Z] [INFO] AI initialization completed | {"modelsCount":5,"personalitiesCount":4}
+[2025-11-01T10:37:58.565Z] [SUCCESS] Commands loaded successfully | {"loadedCount":34}
+[2025-11-01T10:37:58.565Z] [INFO] Attempting to login to Discord...
+[2025-11-01T10:37:59.753Z] [SUCCESS] Bot started successfully as HNH#0111 | {"guilds":1,"users":3}
+[2025-11-01T10:37:59.754Z] [SUCCESS] Login successful
+[2025-11-01T10:45:45.959Z] [INFO] MusicManager initialization diagnostics | {"originalFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegExists":true,"nodeVersion":"v22.21.0","platform":"win32"}
+[2025-11-01T10:45:45.961Z] [INFO] MusicManager initialized | {"initializationTime":"2025-11-01T10:45:45.960Z","hasSpotifyCredentials":true,"hasYouTubeAccess":true,"hasDeezzerAccess":true,"ffmpegStaticAvailable":true,"resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegPathExists":true}
+[2025-11-01T10:45:47.192Z] [INFO] YouTube search successful | {"query":"test song","results":3}
+[2025-11-01T10:50:05.274Z] [INFO] Character created | {"userId":"testuser1","name":"Tester","class":"warrior"}
+[2025-11-01T10:50:05.276Z] [INFO] Skill points spent | {"userId":"testuser1","stat":"atk","amount":1,"newValue":8}
+[2025-11-01T11:07:03.774Z] [INFO] MusicManager initialization diagnostics | {"originalFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegExists":true,"nodeVersion":"v22.21.0","platform":"win32"}
+[2025-11-01T11:07:03.776Z] [INFO] MusicManager initialized | {"initializationTime":"2025-11-01T11:07:03.776Z","hasSpotifyCredentials":true,"hasYouTubeAccess":true,"hasDeezzerAccess":true,"ffmpegStaticAvailable":true,"resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegPathExists":true}
+[2025-11-01T11:07:04.708Z] [INFO] YouTube search successful | {"query":"test song","results":3}
+[2025-11-01T11:07:58.457Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T11:07:58.457Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T11:09:21.999Z] [INFO] MusicManager initialization diagnostics | {"originalFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegExists":true,"nodeVersion":"v22.21.0","platform":"win32"}
+[2025-11-01T11:09:22.000Z] [INFO] MusicManager initialized | {"initializationTime":"2025-11-01T11:09:22.000Z","hasSpotifyCredentials":true,"hasYouTubeAccess":true,"hasDeezzerAccess":true,"ffmpegStaticAvailable":true,"resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegPathExists":true}
+[2025-11-01T11:37:58.347Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T11:37:58.348Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T11:39:21.887Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T11:39:21.888Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T11:44:36.601Z] [INFO] MusicManager initialization diagnostics | {"originalFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegExists":true,"nodeVersion":"v22.21.0","platform":"win32"}
+[2025-11-01T11:44:36.602Z] [INFO] MusicManager initialized | {"initializationTime":"2025-11-01T11:44:36.602Z","hasSpotifyCredentials":true,"hasYouTubeAccess":true,"hasDeezzerAccess":true,"ffmpegStaticAvailable":true,"resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegPathExists":true}
+[2025-11-01T11:49:47.975Z] [INFO] Character created | {"userId":"testuser1","name":"Tester","class":"warrior"}
+[2025-11-01T11:49:47.977Z] [INFO] Level up | {"userId":"testuser1","oldLvl":1,"newLvl":3,"gained":2,"xp":45}
+[2025-11-01T11:49:47.978Z] [INFO] Skill points spent | {"userId":"testuser1","stat":"atk","amount":1,"newValue":8}
+[2025-11-01T11:56:10.947Z] [INFO] Level up | {"userId":"testuser1234","oldLvl":13,"newLvl":14,"gained":1,"xp":275}
+[2025-11-01T11:57:35.599Z] [INFO] Character created | {"userId":"testuser1","name":"Tester","class":"warrior"}
+[2025-11-01T11:57:35.601Z] [INFO] Level up | {"userId":"testuser1","oldLvl":1,"newLvl":3,"gained":2,"xp":45}
+[2025-11-01T11:57:35.602Z] [INFO] Skill points spent | {"userId":"testuser1","stat":"atk","amount":1,"newValue":8}
+[2025-11-01T12:02:20.216Z] [INFO] MusicManager initialization diagnostics | {"originalFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegExists":true,"nodeVersion":"v22.21.0","platform":"win32"}
+[2025-11-01T12:02:20.217Z] [INFO] MusicManager initialized | {"initializationTime":"2025-11-01T12:02:20.217Z","hasSpotifyCredentials":true,"hasYouTubeAccess":true,"hasDeezzerAccess":true,"ffmpegStaticAvailable":true,"resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegPathExists":true}
+[2025-11-01T12:07:58.356Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T12:07:58.357Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T12:08:20.094Z] [INFO] MusicManager initialization diagnostics | {"originalFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegExists":true,"nodeVersion":"v22.21.0","platform":"win32"}
+[2025-11-01T12:08:20.095Z] [INFO] MusicManager initialized | {"initializationTime":"2025-11-01T12:08:20.095Z","hasSpotifyCredentials":true,"hasYouTubeAccess":true,"hasDeezzerAccess":true,"ffmpegStaticAvailable":true,"resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegPathExists":true}
+[2025-11-01T12:09:21.888Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T12:09:21.888Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T12:12:15.806Z] [INFO] Character created | {"userId":"testuser1","name":"Tester","class":"warrior"}
+[2025-11-01T12:12:15.807Z] [INFO] Level up | {"userId":"testuser1","oldLvl":1,"newLvl":3,"gained":2,"xp":45}
+[2025-11-01T12:12:15.809Z] [INFO] Skill points spent | {"userId":"testuser1","stat":"atk","amount":1,"newValue":8}
+[2025-11-01T12:14:30.587Z] [INFO] Character created | {"userId":"testuser1","name":"Tester","class":"warrior"}
+[2025-11-01T12:14:30.592Z] [INFO] Level up | {"userId":"testuser1","oldLvl":1,"newLvl":3,"gained":2,"xp":45}
+[2025-11-01T12:14:30.594Z] [INFO] Skill points spent | {"userId":"testuser1","stat":"atk","amount":1,"newValue":8}
+[2025-11-01T12:14:36.604Z] [INFO] Starting periodic cleanup of Maps and caches
+[2025-11-01T12:14:36.614Z] [INFO] Periodic cleanup completed | {"itemsCleaned":0}
+[2025-11-01T12:14:38.668Z] [INFO] Level up | {"userId":"testuser1234","oldLvl":14,"newLvl":16,"gained":2,"xp":300}
+[2025-11-01T12:15:05.358Z] [INFO] MusicManager initialization diagnostics | {"originalFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegExists":true,"nodeVersion":"v22.21.0","platform":"win32"}
+[2025-11-01T12:15:05.359Z] [INFO] MusicManager initialized | {"initializationTime":"2025-11-01T12:15:05.359Z","hasSpotifyCredentials":true,"hasYouTubeAccess":true,"hasDeezzerAccess":true,"ffmpegStaticAvailable":true,"resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegPathExists":true}
+[2025-11-01T12:15:06.686Z] [INFO] YouTube search successful | {"query":"test song","results":3}
+[2025-11-01T12:15:38.594Z] [INFO] MusicManager initialization diagnostics | {"originalFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegExists":true,"nodeVersion":"v22.21.0","platform":"win32"}
+[2025-11-01T12:15:38.595Z] [INFO] MusicManager initialized | {"initializationTime":"2025-11-01T12:15:38.595Z","hasSpotifyCredentials":true,"hasYouTubeAccess":true,"hasDeezzerAccess":true,"ffmpegStaticAvailable":true,"resolvedFfmpegPath":"c:\\Users\\9700X-5070\\Downloads\\DCB-1\\node_modules\\ffmpeg-static\\ffmpeg.exe","ffmpegPathExists":true}

@@ -1,5 +1,5 @@
-import { searchSongs } from './src/music.js';
-import { logger } from './src/logger.js';
+import { searchSongs } from '../src/music.js';
+import { logger } from '../src/logger.js';
 
 // Test music search and basic functionality without requiring Discord interaction
 async function testMusicPlayback() {

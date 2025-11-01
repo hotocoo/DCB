@@ -1,4 +1,4 @@
-import { searchSongs, play, pause, resume, skip, stop, getQueue, getMusicStats, setVolume, getVolume } from './src/music.js';
+import { searchSongs, play, pause, resume, skip, stop, getQueue, getMusicStats, setVolume, getVolume } from '../src/music.js';
 import axios from 'axios';
 
 class MusicTestSuite {
@@ -189,7 +189,7 @@ class MusicTestSuite {
       await this.log(`Stop command executed: ${stopResult === true}`);
 
       // Test loop operations
-      const { setLoop, getLoop } = await import('./src/music.js');
+      const { setLoop, getLoop } = await import('../src/music.js');
       const loopResult = setLoop(this.guildId, 'single');
       await this.log(`Loop set to single: ${loopResult === true}`);
 

@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder , MessageFlags} from 'discord.js';
-import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, resetCharacter, getCharacterClasses, getClassInfo, bossEncounter, getCraftingRecipes, canCraftItem, craftItem, createQuest, listQuests, completeQuest } from '../rpg.js';
+import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, resetCharacter, getCharacterClasses, getClassInfo, bossEncounter, getCraftingRecipes, canCraftItem, craftItem, createQuest, listQuests, completeQuest, spendSkillPoints } from '../rpg.js';
 import { updateUserStats } from '../achievements.js';
 import { exploreLocation } from '../locations.js';
 
@@ -203,34 +203,13 @@ export async function execute(interaction) {
   if (sub === 'levelup') {
     const stat = interaction.options.getString('stat');
     const amount = interaction.options.getInteger('amount');
-    const pts = char.skillPoints || 0;
-    if (amount <= 0) return interaction.reply({ content: 'Amount must be > 0', flags: MessageFlags.Ephemeral });
-    if (amount > pts) return interaction.reply({ content: `You only have ${pts} skill points.`, flags: MessageFlags.Ephemeral });
 
-    // apply points
-    if (stat === 'hp') {
-      char.hp = Math.min(char.hp + amount * 2, char.maxHp);
-    } else if (stat === 'maxhp') {
-      char.maxHp += amount * 5; // each point increases maxHp
-      char.hp = Math.min(char.hp + amount * 2, char.maxHp);
-    } else if (stat === 'mp') {
-      char.mp = Math.min(char.mp + amount * 3, char.maxMp);
-    } else if (stat === 'maxmp') {
-      char.maxMp += amount * 5; // each point increases maxMp
-      char.mp = Math.min(char.mp + amount * 3, char.maxMp);
-    } else if (stat === 'atk') {
-      char.atk += amount;
-    } else if (stat === 'def') {
-      char.def += amount;
-    } else if (stat === 'spd') {
-      char.spd += amount;
-    } else {
-      return interaction.reply({ content: 'Unknown stat. Use hp|mp|maxhp|maxmp|atk|def|spd', flags: MessageFlags.Ephemeral });
+    const result = spendSkillPoints(userId, stat, amount);
+    if (!result.success) {
+      return interaction.reply({ content: result.message || 'Failed to spend skill points.', flags: MessageFlags.Ephemeral });
     }
 
-    char.skillPoints = pts - amount;
-    saveCharacter(userId, char);
-    return interaction.reply({ content: `Leveled up: +${amount} ${stat}. Remaining points: ${char.skillPoints}`, flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: `Leveled up: +${amount} ${stat}. Remaining points: ${result.char.skillPoints}`, flags: MessageFlags.Ephemeral });
   }
 
   if (sub === 'leaderboard') {

@@ -1,9 +1,9 @@
-import { getBalance, addBalance, transferBalance, buyFromMarket, sellToMarket, createInvestment, getUserInvestments, getMarketPrice } from './src/economy.js';
-import { warnUser, muteUser, isUserMuted, checkAutoMod, getUserModStats } from './src/moderation.js';
-import { createCharacter, getCharacter, applyXp, addItemToInventory, getInventory, deleteCharacter } from './src/rpg.js';
-import { searchSongs, play, pause, stop, getQueue } from './src/music.js';
-import { CommandError, validateUser, validateGuild, validatePermissions, validateRange, validateNotEmpty, createRateLimiter } from './src/errorHandler.js';
-import { inputValidator, sanitizeInput, validateUserId, validateNumber, validateString } from './src/validation.js';
+import { getBalance, addBalance, transferBalance, buyFromMarket, sellToMarket, createInvestment, getUserInvestments, getMarketPrice } from '../src/economy.js';
+import { warnUser, muteUser, isUserMuted, checkAutoMod, getUserModStats } from '../src/moderation.js';
+import { createCharacter, getCharacter, applyXp, addItemToInventory, getInventory, deleteCharacter } from '../src/rpg.js';
+import { searchSongs, play, pause, stop, getQueue } from '../src/music.js';
+import { CommandError, validateUser, validateGuild, validatePermissions, validateRange, validateNotEmpty, createRateLimiter } from '../src/errorHandler.js';
+import { inputValidator, sanitizeInput, validateUserId, validateNumber, validateString } from '../src/validation.js';
 import assert from 'assert';
 import fs from 'fs';
 
@@ -81,7 +81,7 @@ class ComprehensiveTestSuite {
       this.log(`Sell successful: ${sellResult.success}`, sellResult.success);
 
       // Test investment
-      const investmentTypes = await import('./src/economy.js').then(m => m.getInvestmentTypes());
+      const investmentTypes = await import('../src/economy.js').then(m => m.getInvestmentTypes());
       const invResult = createInvestment(this.testUsers[0], investmentTypes.bank, 100);
       this.log(`Investment created: ${invResult.success}`, invResult.success);
 

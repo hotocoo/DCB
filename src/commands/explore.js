@@ -1,6 +1,138 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { exploreLocation, unlockLocation, enterDungeon, discoverLocation, getLocations } from '../locations.js';
-import { narrate, checkDailyLimit, incrementDailyExploration, checkSessionXpCap } from '../rpg.js';
+import { narrate } from '../rpg.js';
+import fs from 'fs';
+import path from 'path';
+
+// RPG data file path
+const FILE = path.join(process.cwd(), 'data', 'rpg.json');
+
+// in-memory cache to reduce fs reads/writes
+let cache = null;
+// simple per-user locks to avoid concurrent writes
+const locks = new Set();
+
+function ensureDir() {
+  const dir = path.dirname(FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function readAll() {
+  ensureDir();
+  if (!fs.existsSync(FILE)) return {};
+  try {
+    const raw = JSON.parse(fs.readFileSync(FILE, 'utf8')) || {};
+    // migrate / ensure defaults for older characters
+    for (const k of Object.keys(raw)) {
+      const c = raw[k] || {};
+      if (typeof c.dailyExplorations === 'undefined') c.dailyExplorations = 0;
+      if (typeof c.lastDailyReset === 'undefined') c.lastDailyReset = Date.now();
+      if (typeof c.sessionXpGained === 'undefined') c.sessionXpGained = 0;
+      if (typeof c.lastSessionReset === 'undefined') c.lastSessionReset = Date.now();
+      raw[k] = c;
+    }
+    cache = raw;
+    return raw;
+  } catch (err) {
+    console.error('Failed to read rpg storage', err);
+    return {};
+  }
+}
+
+function writeAll(obj) {
+  ensureDir();
+  try {
+    // atomic write: write to temp file then rename
+    const tmp = `${FILE}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8');
+    fs.renameSync(tmp, FILE);
+    cache = obj;
+  } catch (err) {
+    console.error('Failed to write RPG data:', err);
+    // Attempt to restore from cache if available
+    if (cache) {
+      console.log('Restoring from cache after write failure');
+    } else {
+      throw new Error(`Failed to save RPG data: ${err.message}`);
+    }
+  }
+}
+
+// Function to check daily exploration limit
+function checkDailyLimit(userId) {
+  const all = cache || readAll();
+  const char = all[userId];
+  if (!char) return { allowed: false, reason: 'no_character' };
+
+  const now = Date.now();
+  const dayInMs = 24 * 60 * 60 * 1000;
+
+  // Check if we need to reset daily count
+  if (now - (char.lastDailyReset || 0) >= dayInMs) {
+    char.dailyExplorations = 0;
+    char.lastDailyReset = now;
+    writeAll(all);
+  }
+
+  const maxDaily = 10; // 10 explorations per day
+  const used = char.dailyExplorations || 0;
+  const allowed = used < maxDaily;
+
+  return {
+    allowed,
+    used,
+    max: maxDaily,
+    remaining: maxDaily - used,
+    resetTime: char.lastDailyReset
+  };
+}
+
+// Function to increment daily exploration count
+function incrementDailyExploration(userId) {
+  const all = cache || readAll();
+  const char = all[userId];
+  if (!char) return { success: false, reason: 'no_character' };
+
+  // Check daily limit first
+  const check = checkDailyLimit(userId);
+  if (!check.allowed) {
+    return { success: false, reason: 'daily_limit_reached' };
+  }
+
+  char.dailyExplorations = (char.dailyExplorations || 0) + 1;
+  writeAll(all);
+
+  return { success: true, newCount: char.dailyExplorations };
+}
+
+// Function to check session XP cap
+function checkSessionXpCap(userId) {
+  const all = cache || readAll();
+  const char = all[userId];
+  if (!char) return { allowed: false, reason: 'no_character' };
+
+  const now = Date.now();
+  const sessionDurationMs = 24 * 60 * 60 * 1000; // 24 hours
+
+  // Check if we need to reset session XP
+  if (now - (char.lastSessionReset || 0) >= sessionDurationMs) {
+    char.sessionXpGained = 0;
+    char.lastSessionReset = now;
+    writeAll(all);
+  }
+
+  const maxSessionXp = 1000; // 1000 XP per session
+  const used = char.sessionXpGained || 0;
+  const allowed = used < maxSessionXp;
+
+  return {
+    allowed,
+    used,
+    max: maxSessionXp,
+    remaining: maxSessionXp - used,
+    resetTime: char.lastSessionReset
+  };
+}
 
 export const data = new SlashCommandBuilder()
   .setName('explore')

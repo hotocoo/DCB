@@ -64,117 +64,161 @@ export class CommandError extends Error {
  * @param {object} context - Additional context for logging
  * @returns {Promise} Promise resolving to the interaction response
  */
-export async function handleCommandError(interaction, error, context = {}) {
-  // Log the error with structured information
-  logError('Command error occurred', error, {
-    command: interaction?.commandName,
-    user: interaction?.user?.id,
-    guild: interaction?.guild?.id,
-    code: error.code,
-    details: error.details,
-    ...context
-  });
-
-  // Determine user message based on environment
-  let userMessage = error.userMessage || error.message;
-
-  if (process.env.NODE_ENV === 'development') {
-    userMessage = `❌ **Error:** ${error.message}\n\n**Code:** ${error.code}\n**Details:** ${JSON.stringify(error.details, null, 2)}`;
-  }
-
-  const responseOptions = {
-    content: userMessage,
-    ephemeral: true
-  };
-
-  // Add helpful hints for common errors
-  const hints = {
-    PERMISSION_DENIED: '\n\n💡 *Make sure you have the required permissions or roles.*',
-    COOLDOWN_ACTIVE: '\n\n💡 *You can use other commands while waiting.*',
-    INVALID_ARGUMENT: '\n\n💡 *Use `/help` for command usage information.*',
-    INSUFFICIENT_FUNDS: '\n\n💡 *Earn more gold through work, businesses, or trading.*'
-  };
-
-  if (hints[error.code]) {
-    responseOptions.content += hints[error.code];
-  }
-
-  // Send appropriate response based on interaction state with enhanced error handling
+/**
+ * Circuit breaker check imported from interactionHandlers.js
+ * This prevents recursive error handling loops.
+ * @param {string} interactionId - The interaction identifier
+ * @returns {boolean} True if operation can proceed, false if circuit is broken
+ */
+function checkCircuitBreaker(interactionId) {
   try {
-    console.error('[HANDLE_COMMAND_ERROR] Attempting to send error response');
-    console.error('[HANDLE_COMMAND_ERROR] Interaction state before response:', {
-      id: interaction?.id,
-      replied: interaction?.replied,
-      deferred: interaction?.deferred,
-      type: interaction?.type,
-      commandName: interaction?.commandName
-    });
+    // Dynamic import to avoid circular dependencies
+    const { circuitBreakerMap } = require('./interactionHandlers.js');
+    const circuitData = circuitBreakerMap.get(interactionId);
+    if (!circuitData) return true;
 
-    // Check for DiscordAPIError[10062]: Unknown interaction specifically
-    if (interaction && !interaction.replied && !interaction.deferred) {
-      try {
-        console.error('[HANDLE_COMMAND_ERROR] Using reply');
-        await interaction.reply(responseOptions);
-        return;
-      } catch (replyError) {
-        if (replyError.code === 10062) {
-          console.error('[HANDLE_COMMAND_ERROR] Interaction already expired/replied, cannot send error response');
-          logError('Cannot send error response - interaction expired', replyError, {
-            originalCommand: interaction?.commandName,
-            originalError: error.message,
-            interactionId: interaction?.id
-          });
-          return;
-        }
-        throw replyError; // Re-throw other errors
-      }
-    } else if (interaction && (interaction.replied || interaction.deferred)) {
-      try {
-        console.error('[HANDLE_COMMAND_ERROR] Using followUp');
-        await interaction.followUp(responseOptions);
-        return;
-      } catch (followUpError) {
-        if (followUpError.code === 10062) {
-          console.error('[HANDLE_COMMAND_ERROR] Interaction already expired, cannot send followUp error response');
-          logError('Cannot send followUp error response - interaction expired', followUpError, {
-            originalCommand: interaction?.commandName,
-            originalError: error.message,
-            interactionId: interaction?.id
-          });
-          return;
-        }
-        throw followUpError; // Re-throw other errors
-      }
-    } else {
-      console.error('[HANDLE_COMMAND_ERROR] Interaction object invalid or already handled');
-      logError('Invalid interaction state for error response', new Error('Invalid interaction object'), {
-        originalCommand: interaction?.commandName,
-        originalError: error.message,
-        interactionId: interaction?.id,
-        interactionExists: !!interaction
-      });
-      return;
+    const { attempts, lastAttempt } = circuitData;
+    const now = Date.now();
+    const CIRCUIT_BREAKER_CLEANUP_TIME = 5 * 60 * 1000; // 5 minutes
+
+    if (now - lastAttempt > CIRCUIT_BREAKER_CLEANUP_TIME) {
+      circuitBreakerMap.delete(interactionId);
+      return true;
     }
-  } catch (responseError) {
-    console.error('[HANDLE_COMMAND_ERROR] Failed to send error response:', responseError.message);
-    console.error('[HANDLE_COMMAND_ERROR] Response error details:', {
-      responseError: responseError.message,
-      stack: responseError.stack,
-      interactionId: interaction?.id,
-      originalError: error.message,
-      errorCode: responseError.code
-    });
 
-    // If we can't send a response, log it and continue
-    logError('Failed to send error response to user', responseError, {
-      originalCommand: interaction?.commandName,
-      originalError: error.message,
-      interactionReplied: interaction?.replied,
-      interactionDeferred: interaction?.deferred,
-      errorCode: responseError.code
-    });
+    const CIRCUIT_BREAKER_MAX_ATTEMPTS = 3;
+    return attempts < CIRCUIT_BREAKER_MAX_ATTEMPTS;
+  } catch (error) {
+    // If import fails, allow operation to proceed
+    console.warn('[CIRCUIT_BREAKER] Failed to access circuit breaker, allowing operation:', error.message);
+    return true;
   }
 }
+
+export async function handleCommandError(interaction, error, context = {}) {
+   const interactionId = interaction?.id;
+
+   // Check circuit breaker before attempting error response
+   if (interactionId && !checkCircuitBreaker(interactionId)) {
+     console.error('[HANDLE_COMMAND_ERROR] Circuit breaker tripped for interaction, skipping error response');
+     logError('Circuit breaker tripped - cannot send error response', new Error('Circuit breaker activated'), {
+       originalCommand: interaction?.commandName,
+       originalError: error.message,
+       interactionId
+     });
+     return;
+   }
+
+   // Log the error with structured information
+   logError('Command error occurred', error, {
+     command: interaction?.commandName,
+     user: interaction?.user?.id,
+     guild: interaction?.guild?.id,
+     code: error.code,
+     details: error.details,
+     ...context
+   });
+
+   // Determine user message based on environment
+   let userMessage = error.userMessage || error.message;
+
+   if (process.env.NODE_ENV === 'development') {
+     userMessage = `❌ **Error:** ${error.message}\n\n**Code:** ${error.code}\n**Details:** ${JSON.stringify(error.details, null, 2)}`;
+   }
+
+   const responseOptions = {
+     content: userMessage,
+     ephemeral: true
+   };
+
+   // Add helpful hints for common errors
+   const hints = {
+     PERMISSION_DENIED: '\n\n💡 *Make sure you have the required permissions or roles.*',
+     COOLDOWN_ACTIVE: '\n\n💡 *You can use other commands while waiting.*',
+     INVALID_ARGUMENT: '\n\n💡 *Use `/help` for command usage information.*',
+     INSUFFICIENT_FUNDS: '\n\n💡 *Earn more gold through work, businesses, or trading.*'
+   };
+
+   if (hints[error.code]) {
+     responseOptions.content += hints[error.code];
+   }
+
+   // Send appropriate response based on interaction state with enhanced error handling
+   try {
+     console.error('[HANDLE_COMMAND_ERROR] Attempting to send error response');
+     console.error('[HANDLE_COMMAND_ERROR] Interaction state before response:', {
+       id: interaction?.id,
+       replied: interaction?.replied,
+       deferred: interaction?.deferred,
+       type: interaction?.type,
+       commandName: interaction?.commandName
+     });
+
+     // Check for DiscordAPIError[10062]: Unknown interaction specifically
+     if (interaction && !interaction.replied && !interaction.deferred) {
+       try {
+         console.error('[HANDLE_COMMAND_ERROR] Using reply');
+         await interaction.reply(responseOptions);
+         return;
+       } catch (replyError) {
+         if (replyError.code === 10062) {
+           console.error('[HANDLE_COMMAND_ERROR] Interaction already expired/replied, cannot send error response');
+           logError('Cannot send error response - interaction expired', replyError, {
+             originalCommand: interaction?.commandName,
+             originalError: error.message,
+             interactionId: interaction?.id
+           });
+           return;
+         }
+         throw replyError; // Re-throw other errors
+       }
+     } else if (interaction && (interaction.replied || interaction.deferred)) {
+       try {
+         console.error('[HANDLE_COMMAND_ERROR] Using followUp');
+         await interaction.followUp(responseOptions);
+         return;
+       } catch (followUpError) {
+         if (followUpError.code === 10062) {
+           console.error('[HANDLE_COMMAND_ERROR] Interaction already expired, cannot send followUp error response');
+           logError('Cannot send followUp error response - interaction expired', followUpError, {
+             originalCommand: interaction?.commandName,
+             originalError: error.message,
+             interactionId: interaction?.id
+           });
+           return;
+         }
+         throw followUpError; // Re-throw other errors
+       }
+     } else {
+       console.error('[HANDLE_COMMAND_ERROR] Interaction object invalid or already handled');
+       logError('Invalid interaction state for error response', new Error('Invalid interaction object'), {
+         originalCommand: interaction?.commandName,
+         originalError: error.message,
+         interactionId: interaction?.id,
+         interactionExists: !!interaction
+       });
+       return;
+     }
+   } catch (responseError) {
+     console.error('[HANDLE_COMMAND_ERROR] Failed to send error response:', responseError.message);
+     console.error('[HANDLE_COMMAND_ERROR] Response error details:', {
+       responseError: responseError.message,
+       stack: responseError.stack,
+       interactionId: interaction?.id,
+       originalError: error.message,
+       errorCode: responseError.code
+     });
+
+     // If we can't send a response, log it and continue - don't attempt to log error response failure recursively
+     logError('Failed to send error response to user', responseError, {
+       originalCommand: interaction?.commandName,
+       originalError: error.message,
+       interactionReplied: interaction?.replied,
+       interactionDeferred: interaction?.deferred,
+       errorCode: responseError.code
+     });
+   }
+ }
 
 /**
  * Safely executes a command function with error handling.

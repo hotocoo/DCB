@@ -6,10 +6,42 @@ import ytdl from '@distube/ytdl-core';
 import axios from 'axios';
 import yts from 'yt-search';
 import ffmpeg from 'ffmpeg-static';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { existsSync } from 'fs';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
+import path from 'path';
+
+// FFmpeg binary path resolution and validation
+let ffmpegPath = ffmpeg;
+if (typeof ffmpeg === 'string' && existsSync(ffmpeg)) {
+  ffmpegPath = ffmpeg;
+} else {
+  // Fallback: try to find ffmpeg in system PATH
+  try {
+    ffmpegPath = execSync('where ffmpeg 2>nul || which ffmpeg 2>/dev/null || echo ""', { encoding: 'utf8' }).trim();
+    if (!ffmpegPath || !existsSync(ffmpegPath)) {
+      // Last resort: use the static binary directly
+      ffmpegPath = path.resolve('ffmpeg-static');
+    }
+  } catch (e) {
+    ffmpegPath = path.resolve('ffmpeg-static');
+  }
+}
+
+// Ensure absolute path
+if (ffmpegPath && !path.isAbsolute(ffmpegPath)) {
+  ffmpegPath = path.resolve(ffmpegPath);
+}
+
+// Diagnostic logs for debugging
+console.log('[MUSIC] FFmpeg path resolved:', ffmpegPath);
+console.log('[MUSIC] FFmpeg exists at resolved path:', existsSync(ffmpegPath));
+logger.info('MusicManager initialization diagnostics', {
+  originalFfmpegPath: ffmpeg,
+  resolvedFfmpegPath: ffmpegPath,
+  ffmpegExists: existsSync(ffmpegPath),
+  nodeVersion: process.version,
+  platform: process.platform
+});
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import SpotifyWebApi from 'spotify-web-api-node';
 import pkg from 'libsodium-wrappers';
@@ -368,24 +400,38 @@ class MusicManager {
           await this.youtubeRateLimiter.consume('youtube_api');
 
           // Add retry logic for YouTube API issues
-            let info;
-            for (let attempt = 1; attempt <= 3; attempt++) {
-              try {
-                info = await ytdl.getInfo(query, {
-                  requestOptions: {
-                    headers: {
-                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                      'Accept-Language': 'en-US,en;q=0.9'
-                    }
+                let info;
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                  try {
+                    logger.debug('YouTube getInfo attempt', {
+                      attempt,
+                      query,
+                      headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept-Language': 'en-US,en;q=0.9'
+                      }
+                    });
+                    info = await ytdl.getInfo(query, {
+                      requestOptions: {
+                        headers: {
+                          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                          'Accept-Language': 'en-US,en;q=0.9'
+                        }
+                      }
+                    });
+                    break; // Success, exit retry loop
+                  } catch (retryError) {
+                    console.log(`[MUSIC] YouTube attempt ${attempt} failed for ${query}: ${retryError.message}`);
+                    logger.warn('YouTube getInfo retry failed', {
+                      attempt,
+                      query,
+                      error: retryError.message,
+                      stack: retryError.stack
+                    });
+                    if (attempt === 3) throw retryError;
+                    await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Wait longer before retry
                   }
-                });
-                break; // Success, exit retry loop
-              } catch (retryError) {
-                console.log(`[MUSIC] YouTube attempt ${attempt} failed for ${query}: ${retryError.message}`);
-                if (attempt === 3) throw retryError;
-                await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Wait longer before retry
-              }
-            }
+                }
 
           const video = info.videoDetails;
 
@@ -706,28 +752,38 @@ class MusicManager {
           await this.youtubeRateLimiter.consume('youtube_api');
 
           // Add retry logic for YouTube validation
-          let info;
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-              info = await ytdl.getInfo(url, {
-                requestOptions: {
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept-Language': 'en-US,en;q=0.9'
-                  }
-                }
-              });
-              break; // Success, exit retry loop
-            } catch (retryError) {
-              logger.debug(`YouTube validation attempt ${attempt} failed`, {
-                title,
-                url,
-                error: retryError.message
-              });
-              if (attempt === 3) throw retryError;
-              await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Wait longer before retry
-            }
-          }
+           let info;
+           for (let attempt = 1; attempt <= 3; attempt++) {
+             try {
+               logger.debug('YouTube validation getInfo attempt', {
+                 attempt,
+                 title,
+                 url,
+                 headers: {
+                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                   'Accept-Language': 'en-US,en;q=0.9'
+                 }
+               });
+               info = await ytdl.getInfo(url, {
+                 requestOptions: {
+                   headers: {
+                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                     'Accept-Language': 'en-US,en;q=0.9'
+                   }
+                 }
+               });
+               break; // Success, exit retry loop
+             } catch (retryError) {
+               logger.debug(`YouTube validation attempt ${attempt} failed`, {
+                 title,
+                 url,
+                 error: retryError.message,
+                 errorCode: retryError.code
+               });
+               if (attempt === 3) throw retryError;
+               await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Wait longer before retry
+             }
+           }
 
           const video = info.videoDetails;
 
@@ -819,9 +875,10 @@ class MusicManager {
           logger.debug('Spawning FFmpeg for Spotify preview', {
             guildId,
             songTitle: song.title,
-            previewUrl: song.preview
+            previewUrl: song.preview,
+            ffmpegPath: ffmpegPath
           });
-          const ffmpegProcess = spawn(ffmpeg, [
+          const ffmpegProcess = spawn(ffmpegPath, [
             '-hide_banner',
             '-loglevel', 'error',
             '-reconnect', '1',
@@ -962,7 +1019,7 @@ class MusicManager {
           ffmpegArgs
         });
 
-        const ffmpegProcess = spawn(ffmpeg, ffmpegArgs);
+        const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs);
 
         ffmpegProcess.stderr.on('data', (data) => {
           const errorMsg = data.toString();
@@ -970,7 +1027,8 @@ class MusicManager {
           logger.warn('FFmpeg Deezer stderr', {
             guildId,
             songTitle: song.title,
-            error: errorMsg
+            error: errorMsg,
+            ffmpegPath: ffmpegPath
           });
         });
 
@@ -1002,7 +1060,7 @@ class MusicManager {
           error: streamError.message,
           stack: streamError.stack,
           streamUrl,
-          ffmpegPath: ffmpeg
+          ffmpegPath: ffmpegPath
         });
 
         // If preview URL failed, try fallback to test audio
@@ -1034,6 +1092,8 @@ class MusicManager {
         logger.debug('Creating ytdl stream', {
           guildId,
           songTitle: song.title,
+          ffmpegPath: ffmpegPath,
+          ffmpegExists: existsSync(ffmpegPath),
           options: {
             filter: 'audioonly',
             highWaterMark: 1 << 62,
@@ -1050,7 +1110,12 @@ class MusicManager {
            quality: 'lowestaudio',
            requestOptions: {
              headers: {
-               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+               'Accept-Language': 'en-US,en;q=0.5',
+               'Accept-Encoding': 'gzip, deflate',
+               'Connection': 'keep-alive',
+               'Upgrade-Insecure-Requests': '1'
              }
            }
          });
@@ -1078,30 +1143,32 @@ class MusicManager {
         });
 
         // Transcode to Opus using ffmpeg
-        logger.debug('Spawning FFmpeg for YouTube audio transcoding', {
-          guildId,
-          songTitle: song.title,
-          ffmpegArgs: [
-            '-hide_banner',
-            '-loglevel', 'error',
-            '-analyzeduration', '0',
-            '-i', 'pipe:0',
-            '-f', 's16le',
-            '-ar', '48000',
-            '-ac', '2',
-            'pipe:1'
-          ]
-        });
-        const ffmpegProcess = spawn(ffmpeg, [
-          '-hide_banner',
-          '-loglevel', 'error',
-          '-analyzeduration', '0',
-          '-i', 'pipe:0',
-          '-f', 's16le',
-          '-ar', '48000',
-          '-ac', '2',
-          'pipe:1'
-        ]);
+         logger.debug('Spawning FFmpeg for YouTube audio transcoding', {
+           guildId,
+           songTitle: song.title,
+           ffmpegPath: ffmpegPath,
+           ffmpegExists: existsSync(ffmpegPath),
+           ffmpegArgs: [
+             '-hide_banner',
+             '-loglevel', 'error',
+             '-analyzeduration', '0',
+             '-i', 'pipe:0',
+             '-f', 's16le',
+             '-ar', '48000',
+             '-ac', '2',
+             'pipe:1'
+           ]
+         });
+         const ffmpegProcess = spawn(ffmpegPath, [
+           '-hide_banner',
+           '-loglevel', 'error',
+           '-analyzeduration', '0',
+           '-i', 'pipe:0',
+           '-f', 's16le',
+           '-ar', '48000',
+           '-ac', '2',
+           'pipe:1'
+         ]);
 
         // Handle ffmpeg process errors
         ffmpegProcess.stderr.on('data', (data) => {
@@ -1146,8 +1213,8 @@ class MusicManager {
             songTitle: song.title,
             error: error.message,
             stack: error.stack,
-            ffmpegPath: ffmpeg,
-            ffmpegExists: existsSync(ffmpeg),
+            ffmpegPath: ffmpegPath,
+            ffmpegExists: existsSync(ffmpegPath),
             errorCode: error.code
           });
           streamError = error;
@@ -1189,7 +1256,7 @@ class MusicManager {
             guildId,
             songTitle: song.title,
             error: err.message,
-            ffmpegPath: ffmpeg
+            ffmpegPath: ffmpegPath
           });
         });
 
@@ -1237,8 +1304,8 @@ class MusicManager {
           songTitle: song.title,
           error: streamError.message,
           stack: streamError.stack,
-          ffmpegPath: ffmpeg,
-          ffmpegAccessible: existsSync(ffmpeg)
+          ffmpegPath: ffmpegPath,
+          ffmpegAccessible: existsSync(ffmpegPath)
         });
 
         // Check if it's an FFmpeg issue
@@ -1246,7 +1313,7 @@ class MusicManager {
           logger.error('FFmpeg spawn/access issue detected', {
             guildId,
             songTitle: song.title,
-            ffmpegPath: ffmpeg,
+            ffmpegPath: ffmpegPath,
             errorCode: streamError.code
           });
         }
@@ -1302,7 +1369,7 @@ class MusicManager {
           ffmpegArgs
         });
 
-        const ffmpegProcess = spawn(ffmpeg, ffmpegArgs);
+        const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs);
 
         ffmpegProcess.stderr.on('data', (data) => {
           const errorMsg = data.toString();
@@ -1314,13 +1381,15 @@ class MusicManager {
             logger.error('Direct stream became unavailable', {
               guildId,
               songTitle: song.title,
-              errorMsg
+              errorMsg,
+              ffmpegPath: ffmpegPath
             });
           } else {
             logger.warn('FFmpeg direct stderr', {
               guildId,
               songTitle: song.title,
-              errorMsg
+              errorMsg,
+              ffmpegPath: ffmpegPath
             });
           }
         });
@@ -1358,7 +1427,7 @@ class MusicManager {
           error: streamError.message,
           stack: streamError.stack,
           streamUrl: song.url,
-          ffmpegPath: ffmpeg
+          ffmpegPath: ffmpegPath
         });
 
         // For direct streams, try alternative FFmpeg arguments if the first attempt fails
@@ -1691,7 +1760,7 @@ class MusicManager {
       logger.warn('FFmpeg-related error detected, attempting recovery', {
         guildId,
         errorType,
-        ffmpegPath: ffmpeg
+        ffmpegPath: ffmpegPath
       });
 
       // Try to restart the player and connection
@@ -2312,7 +2381,9 @@ logger.info('MusicManager initialized', {
   hasSpotifyCredentials: !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET),
   hasYouTubeAccess: true, // ytdl-core always available
   hasDeezzerAccess: true, // axios available
-  ffmpegStaticAvailable: !!ffmpeg
+  ffmpegStaticAvailable: !!ffmpeg,
+  resolvedFfmpegPath: ffmpegPath,
+  ffmpegPathExists: existsSync(ffmpegPath)
 });
 
 // Convenience functions for external use

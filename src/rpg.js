@@ -178,7 +178,8 @@ export function levelFromXp(xp) {
 // apply xp to character in-memory and grant skill points for levels gained
 export function applyXp(userId, char, amount = 0) {
   const oldLvl = char.lvl || levelFromXp(char.xp || 0);
-  char.xp = (char.xp || 0) + (amount || 0);
+  const oldXp = char.xp || 0;
+  char.xp = oldXp + (amount || 0);
   const newLvl = levelFromXp(char.xp);
   let gained = 0;
   if (newLvl > oldLvl) {
@@ -188,6 +189,7 @@ export function applyXp(userId, char, amount = 0) {
     // Restore HP and MP on level up
     char.hp = char.maxHp || 20;
     char.mp = char.maxMp || 10;
+    logger.info('Level up', { userId, oldLvl, newLvl, gained, xp: char.xp });
   } else {
     char.lvl = newLvl;
   }
@@ -195,6 +197,7 @@ export function applyXp(userId, char, amount = 0) {
   // Track session XP gained
   char.sessionXpGained = (char.sessionXpGained || 0) + amount;
 
+  logger.debug('XP applied', { userId, oldXp, amount, newXp: char.xp, oldLvl, newLvl, skillPointsGained: gained });
   return { char, oldLvl, newLvl, gained };
 }
 
@@ -298,10 +301,12 @@ export function fightTurn(attacker, defender) {
   const hitRoll = Math.floor(Math.random() * 100);
 
   if (hitRoll >= hitChance) {
+    logger.debug('Attack missed', { speed, hitChance, hitRoll });
     return 0; // Miss
   }
 
   defender.hp -= damage;
+  logger.debug('Attack hit', { damage, attackerHp: attacker.hp, defenderHp: defender.hp });
   return damage;
 }
 
@@ -598,9 +603,14 @@ export function equipItem(userId, itemId) {
   }
 
   // Remove from inventory
-  removeItemFromInventory(userId, itemId, 1);
+  const removeResult = removeItemFromInventory(userId, itemId, 1);
+  if (!removeResult.success) {
+    logger.error('Failed to remove item from inventory during equip', { userId, itemId });
+    return { success: false, reason: 'inventory_error' };
+  }
 
   writeAll(all);
+  logger.info('Item equipped', { userId, itemId, type: item.type });
   return { success: true, char };
 }
 
@@ -628,10 +638,15 @@ export function unequipItem(userId, slot) {
   }
 
   if (itemId) {
-    addItemToInventory(userId, itemId, 1);
+    const addResult = addItemToInventory(userId, itemId, 1);
+    if (!addResult.success) {
+      logger.error('Failed to add item to inventory during unequip', { userId, itemId });
+      return { success: false, reason: 'inventory_error' };
+    }
   }
 
   writeAll(all);
+  logger.info('Item unequipped', { userId, slot, itemId });
   return { success: true, char };
 }
 
@@ -668,20 +683,31 @@ export function craftItem(userId, itemId) {
 
   const recipe = CRAFTING_RECIPES[itemId];
   const character = getCharacter(userId);
+  if (!character) return { success: false, reason: 'no_character' };
+
   const inventory = getInventory(userId);
 
   // Remove materials
   for (const [materialId, requiredQuantity] of Object.entries(recipe.materials)) {
-    removeItemFromInventory(userId, materialId, requiredQuantity);
+    const removeResult = removeItemFromInventory(userId, materialId, requiredQuantity);
+    if (!removeResult.success) {
+      logger.error('Failed to remove material during crafting', { userId, itemId, materialId, required: requiredQuantity });
+      return { success: false, reason: 'material_removal_failed' };
+    }
   }
 
   // Add crafted item
-  const result = addItemToInventory(userId, itemId, 1);
+  const addResult = addItemToInventory(userId, itemId, 1);
+  if (!addResult.success) {
+    logger.error('Failed to add crafted item to inventory', { userId, itemId });
+    return { success: false, reason: 'item_add_failed' };
+  }
 
   // Award XP for crafting
   const xpReward = Math.floor(character.lvl * 2);
-  applyXp(userId, character, xpReward);
+  const xpResult = applyXp(userId, character, xpReward);
 
+  logger.info('Item crafted successfully', { userId, itemId, xpGained: xpReward });
   return {
     success: true,
     char: character,

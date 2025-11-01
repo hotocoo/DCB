@@ -13,15 +13,17 @@ import { inputValidator, sanitizeInput, validateUserId, validateNumber, validate
 // Feature modules
 import { isOnCooldown, setCooldown, getFormattedCooldown, getButtonCooldownType } from './cooldowns.js';
 import { wordleGames, hangmanGames, guessGames, combatGames, explorationGames } from './game-states.js';
-import { getCharacter, resetCharacter, spendSkillPoints, encounterMonster, fightTurn, applyXp, narrate } from './rpg.js';
+import { getCharacter, resetCharacter, spendSkillPoints, encounterMonster, fightTurn, applyXp, narrate, saveCharacter, addItemToInventory, removeItemFromInventory, getItemInfo, getItemRarityInfo, generateRandomItem } from './rpg.js';
 import { addBalance, getBalance, transferBalance, getMarketPrice, buyFromMarket, sellToMarket } from './economy.js';
 import { getUserGuild, contributeToGuild } from './guilds.js';
 import { warnUser, muteUser, unmuteUser, unbanUser } from './moderation.js';
-import { pause, resume, skip, stop, shuffleQueue, clearQueue, getQueue, getMusicStats, searchSongs, play } from './music.js';
+import { pause, resume, skip, stop, shuffleQueue, clearQueue, getQueue, getMusicStats, searchSongs, play, back } from './music.js';
 import { getRandomJoke, generateStory, getRiddle, getFunFact, getRandomQuote, magic8Ball, generateFunName, createFunChallenge } from './entertainment.js';
 import { getLocations } from './locations.js';
 import { getActiveAuctions, createAuction } from './trading.js';
 import { updateProfile } from './profiles.js';
+import { getLeaderboard, getLeaderboardCount, randomEventType, getInventory, getInventoryValue } from './rpg.js';
+import { getRadioStations } from './music.js';
 
 // Constants for rate limiting and configuration
 const INTERACTION_RATE_LIMIT = 5;
@@ -31,6 +33,16 @@ const INTERACTION_RATE_WINDOW = 10000; // 10 seconds
  * Rate limiter for interactions to prevent abuse.
  */
 const interactionRateLimiter = createRateLimiter(INTERACTION_RATE_LIMIT, INTERACTION_RATE_WINDOW, (key) => key);
+
+// Circuit breaker constants
+const CIRCUIT_BREAKER_MAX_ATTEMPTS = 3;
+const CIRCUIT_BREAKER_CLEANUP_TIME = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Circuit breaker to prevent infinite error loops.
+ * Tracks error attempts per interaction to avoid recursive failures.
+ */
+const circuitBreaker = new Map();
 
 /**
  * Sends a Wordle guess modal to the user.
@@ -64,95 +76,152 @@ const PROCESSED_INTERACTION_CLEANUP_TIME = 5 * 60 * 1000; // 5 minutes
  * @param {object} options - Reply options
  * @returns {Promise<boolean>} True if reply was successful, false otherwise
  */
-export async function safeInteractionReply(interaction, options) {
-  const interactionId = interaction.id;
+/**
+ * Checks if the circuit breaker allows the operation to proceed.
+ * @param {string} interactionId - The interaction identifier
+ * @returns {boolean} True if operation can proceed, false if circuit is broken
+ */
+function checkCircuitBreaker(interactionId) {
+  const circuitData = circuitBreaker.get(interactionId);
+  if (!circuitData) return true;
 
-  try {
-    // Rate limiting check
-    await interactionRateLimiter.consume(interaction.user.id);
-  } catch (error) {
-    if (error instanceof CommandError && error.code === 'RATE_LIMITED') {
-      logError('Interaction rate limited', error, {
-        userId: interaction.user.id,
-        interactionId
-      });
-      return false;
-    }
-  }
+  const { attempts, lastAttempt } = circuitData;
+  const now = Date.now();
 
-  // Check if this interaction has already been processed
-  if (processedInteractions.has(interactionId)) {
-    logger.warn(`Interaction ${interactionId} already processed, ignoring`, {
-      userId: interaction.user.id,
-      interactionId
-    });
-    return false;
-  }
-
-  try {
-    // Validate interaction object
-    validateNotEmpty(interaction, 'interaction');
-    validateNotEmpty(interaction.user, 'interaction.user');
-    validateUserId(interaction.user.id);
-
-    // Check if interaction is still valid (not expired)
-    if (interaction.replied || interaction.deferred) {
-      console.error(`[SAFE_INTERACTION_REPLY] Interaction ${interactionId} already replied/deferred`, {
-        userId: interaction.user.id,
-        interactionId,
-        replied: interaction.replied,
-        deferred: interaction.deferred
-      });
-      logger.warn(`Interaction ${interactionId} already replied/deferred`, {
-        userId: interaction.user.id,
-        interactionId,
-        replied: interaction.replied,
-        deferred: interaction.deferred
-      });
-      return false;
-    }
-
-    // Mark as processed
-    processedInteractions.set(interactionId, Date.now());
-
-    // Clean up old processed interactions
-    const cutoffTime = Date.now() - PROCESSED_INTERACTION_CLEANUP_TIME;
-    for (const [id, timestamp] of processedInteractions.entries()) {
-      if (timestamp < cutoffTime) {
-        processedInteractions.delete(id);
-      }
-    }
-
-    // Sanitize content if present
-    if (options.content) {
-      options.content = sanitizeInput(options.content);
-    }
-
-    console.error(`[SAFE_INTERACTION_REPLY] Attempting to reply to interaction ${interactionId}`);
-    await interaction.reply(options);
-    console.error(`[SAFE_INTERACTION_REPLY] Successfully replied to interaction ${interactionId}`);
+  // Clean up old circuit breaker entries
+  if (now - lastAttempt > CIRCUIT_BREAKER_CLEANUP_TIME) {
+    circuitBreaker.delete(interactionId);
     return true;
-  } catch (error) {
-    console.error(`[SAFE_INTERACTION_REPLY] Failed to reply to interaction ${interactionId}`, error.message);
-    console.error(`[SAFE_INTERACTION_REPLY] Error details:`, {
-      error: error.message,
-      stack: error.stack,
-      userId: interaction.user.id,
-      interactionType: interaction.type,
-      interactionId,
-      interactionState: {
-        replied: interaction.replied,
-        deferred: interaction.deferred
+  }
+
+  return attempts < CIRCUIT_BREAKER_MAX_ATTEMPTS;
+}
+
+/**
+ * Records an error attempt in the circuit breaker.
+ * @param {string} interactionId - The interaction identifier
+ */
+function recordErrorAttempt(interactionId) {
+  const now = Date.now();
+  const circuitData = circuitBreaker.get(interactionId) || { attempts: 0, lastAttempt: now };
+
+  circuitData.attempts += 1;
+  circuitData.lastAttempt = now;
+
+  circuitBreaker.set(interactionId, circuitData);
+
+  // Clean up old entries periodically
+  if (circuitBreaker.size > 1000) {
+    for (const [id, data] of circuitBreaker.entries()) {
+      if (now - data.lastAttempt > CIRCUIT_BREAKER_CLEANUP_TIME) {
+        circuitBreaker.delete(id);
       }
-    });
-    logger.error(`Failed to reply to interaction ${interactionId}`, error, {
-      userId: interaction.user.id,
-      interactionType: interaction.type,
-      interactionId
-    });
-    return false;
+    }
   }
 }
+
+export async function safeInteractionReply(interaction, options) {
+   const interactionId = interaction.id;
+
+   // Check circuit breaker before proceeding
+   if (!checkCircuitBreaker(interactionId)) {
+     console.error(`[SAFE_INTERACTION_REPLY] Circuit breaker tripped for interaction ${interactionId}, skipping reply`);
+     logger.error(`Circuit breaker tripped - too many error attempts for interaction ${interactionId}`, new Error('Circuit breaker activated'), {
+       interactionId,
+       userId: interaction.user?.id
+     });
+     return false;
+   }
+
+   try {
+     // Rate limiting check
+     await interactionRateLimiter.consume(interaction.user.id);
+   } catch (error) {
+     if (error instanceof CommandError && error.code === 'RATE_LIMITED') {
+       logError('Interaction rate limited', error, {
+         userId: interaction.user.id,
+         interactionId
+       });
+       return false;
+     }
+   }
+
+   // Check if this interaction has already been processed
+   if (processedInteractions.has(interactionId)) {
+     logger.warn(`Interaction ${interactionId} already processed, ignoring`, {
+       userId: interaction.user.id,
+       interactionId
+     });
+     return false;
+   }
+
+   try {
+     // Validate interaction object
+     validateNotEmpty(interaction, 'interaction');
+     validateNotEmpty(interaction.user, 'interaction.user');
+     validateUserId(interaction.user.id);
+
+     // Check if interaction is still valid (not expired)
+     if (interaction.replied || interaction.deferred) {
+       console.error(`[SAFE_INTERACTION_REPLY] Interaction ${interactionId} already replied/deferred`, {
+         userId: interaction.user.id,
+         interactionId,
+         replied: interaction.replied,
+         deferred: interaction.deferred
+       });
+       logger.warn(`Interaction ${interactionId} already replied/deferred`, {
+         userId: interaction.user.id,
+         interactionId,
+         replied: interaction.replied,
+         deferred: interaction.deferred
+       });
+       return false;
+     }
+
+     // Mark as processed
+     processedInteractions.set(interactionId, Date.now());
+
+     // Clean up old processed interactions
+     const cutoffTime = Date.now() - PROCESSED_INTERACTION_CLEANUP_TIME;
+     for (const [id, timestamp] of processedInteractions.entries()) {
+       if (timestamp < cutoffTime) {
+         processedInteractions.delete(id);
+       }
+     }
+
+     // Sanitize content if present
+     if (options.content) {
+       options.content = sanitizeInput(options.content);
+     }
+
+     console.error(`[SAFE_INTERACTION_REPLY] Attempting to reply to interaction ${interactionId}`);
+     await interaction.reply(options);
+     console.error(`[SAFE_INTERACTION_REPLY] Successfully replied to interaction ${interactionId}`);
+     return true;
+   } catch (error) {
+     // Record error attempt in circuit breaker
+     recordErrorAttempt(interactionId);
+
+     console.error(`[SAFE_INTERACTION_REPLY] Failed to reply to interaction ${interactionId}`, error.message);
+     console.error(`[SAFE_INTERACTION_REPLY] Error details:`, {
+       error: error.message,
+       stack: error.stack,
+       userId: interaction.user.id,
+       interactionType: interaction.type,
+       interactionId,
+       interactionState: {
+         replied: interaction.replied,
+         deferred: interaction.deferred
+       }
+     });
+     logger.error(`Failed to reply to interaction ${interactionId}`, error, {
+       userId: interaction.user.id,
+       interactionType: interaction.type,
+       interactionId
+     });
+     return false;
+   }
+ }
 
 /**
  * Safely updates interactions and prevents duplicate updates.
@@ -161,75 +230,88 @@ export async function safeInteractionReply(interaction, options) {
  * @returns {Promise<boolean>} True if update was successful, false otherwise
  */
 export async function safeInteractionUpdate(interaction, options) {
-  const interactionId = interaction.id;
+   const interactionId = interaction.id;
 
-  try {
-    // Rate limiting check for updates
-    await interactionRateLimiter.consume(interaction.user.id);
-  } catch (error) {
-    if (error instanceof CommandError && error.code === 'RATE_LIMITED') {
-      logError('Interaction update rate limited', error, {
-        userId: interaction.user.id,
-        interactionId
-      });
-      return false;
-    }
-  }
+   // Check circuit breaker before proceeding
+   if (!checkCircuitBreaker(interactionId)) {
+     console.error(`[SAFE_INTERACTION_UPDATE] Circuit breaker tripped for interaction ${interactionId}, skipping update`);
+     logger.error(`Circuit breaker tripped - too many error attempts for interaction ${interactionId}`, new Error('Circuit breaker activated'), {
+       interactionId,
+       userId: interaction.user?.id
+     });
+     return false;
+   }
 
-  // Check if this interaction has already been processed
-  if (processedInteractions.has(interactionId)) {
-    logger.warn(`Interaction ${interactionId} already processed, ignoring`, {
-      userId: interaction.user.id,
-      interactionId
-    });
-    return false;
-  }
+   try {
+     // Rate limiting check for updates
+     await interactionRateLimiter.consume(interaction.user.id);
+   } catch (error) {
+     if (error instanceof CommandError && error.code === 'RATE_LIMITED') {
+       logError('Interaction update rate limited', error, {
+         userId: interaction.user.id,
+         interactionId
+       });
+       return false;
+     }
+   }
 
-  logger.debug('Processing interaction update', {
-    userId: interaction.user.id,
-    interactionId,
-    hasEmbeds: !!options.embeds,
-    hasComponents: !!options.components,
-    hasContent: !!options.content,
-    isEphemeral: options.flags?.has(MessageFlags.Ephemeral) || false
-  });
+   // Check if this interaction has already been processed
+   if (processedInteractions.has(interactionId)) {
+     logger.warn(`Interaction ${interactionId} already processed, ignoring`, {
+       userId: interaction.user.id,
+       interactionId
+     });
+     return false;
+   }
 
-  try {
-    // Validate interaction object
-    validateNotEmpty(interaction, 'interaction');
-    validateNotEmpty(interaction.user, 'interaction.user');
-    validateUserId(interaction.user.id);
+   logger.debug('Processing interaction update', {
+     userId: interaction.user.id,
+     interactionId,
+     hasEmbeds: !!options.embeds,
+     hasComponents: !!options.components,
+     hasContent: !!options.content,
+     isEphemeral: options.flags?.has(MessageFlags.Ephemeral) || false
+   });
 
-    // Check if interaction is still valid
-    if (interaction.replied || interaction.deferred) {
-      logger.warn(`Interaction ${interactionId} already replied/deferred`, {
-        userId: interaction.user.id,
-        interactionId,
-        replied: interaction.replied,
-        deferred: interaction.deferred
-      });
-      return false;
-    }
+   try {
+     // Validate interaction object
+     validateNotEmpty(interaction, 'interaction');
+     validateNotEmpty(interaction.user, 'interaction.user');
+     validateUserId(interaction.user.id);
 
-    // Mark as processed
-    processedInteractions.set(interactionId, Date.now());
+     // Check if interaction is still valid
+     if (interaction.replied || interaction.deferred) {
+       logger.warn(`Interaction ${interactionId} already replied/deferred`, {
+         userId: interaction.user.id,
+         interactionId,
+         replied: interaction.replied,
+         deferred: interaction.deferred
+       });
+       return false;
+     }
 
-    // Sanitize content if present
-    if (options.content) {
-      options.content = sanitizeInput(options.content);
-    }
+     // Mark as processed
+     processedInteractions.set(interactionId, Date.now());
 
-    await interaction.update(options);
-    return true;
-  } catch (error) {
-    logger.error(`Failed to update interaction ${interactionId}`, error, {
-      userId: interaction.user.id,
-      interactionType: interaction.type,
-      interactionId
-    });
-    return false;
-  }
-}
+     // Sanitize content if present
+     if (options.content) {
+       options.content = sanitizeInput(options.content);
+     }
+
+     await interaction.update(options);
+     return true;
+   } catch (error) {
+     // Record error attempt in circuit breaker
+     recordErrorAttempt(interactionId);
+
+     logger.error(`Failed to update interaction ${interactionId}`, error, {
+       userId: interaction.user.id,
+       interactionType: interaction.type,
+       interactionId
+     });
+     return false;
+   }
+ }
 
 // Helper function to update inventory embed
 export async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
@@ -268,6 +350,9 @@ export async function updateInventoryEmbed(interaction, itemsByType, inventoryVa
 // Maps for cooldowns and processed interactions
 export const spendCooldowns = new Map();
 export const processedInteractions = new Map();
+
+// Export circuit breaker for use in errorHandler.js
+export const circuitBreakerMap = circuitBreaker;
 
 // Wordle word list
 export const wordleWords = ['HOUSE', 'PLANE', 'TIGER', 'BREAD', 'CHAIR', 'SNAKE', 'CLOUD', 'LIGHT', 'MUSIC', 'WATER', 'EARTH', 'STORM', 'FLAME', 'SHARP', 'QUIET', 'BRIGHT', 'DANCE', 'FIELD', 'GRASS', 'HEART', 'KNIFE', 'LARGE', 'MOUSE', 'NIGHT', 'OCEAN', 'PIANO', 'QUICK', 'RIVER', 'SHINE', 'TRUCK', 'WHEAT', 'YOUNG', 'ALARM', 'BEACH', 'CLOCK', 'DRIVE', 'ELBOW', 'FLOUR', 'GHOST', 'HAPPY', 'INDEX', 'JOINT', 'KNOCK', 'LUNCH', 'MIGHT', 'NOISE', 'OCCUR', 'PAINT', 'QUILT', 'ROBOT', 'SHORE', 'THICK', 'UNION', 'VOICE', 'WASTE', 'YIELD', 'ABUSE', 'ADULT', 'AGENT', 'AGREE', 'AHEAD', 'ALARM', 'ALBUM', 'ALERT', 'ALIEN', 'ALIGN', 'ALIKE', 'ALIVE', 'ALLOW', 'ALONE', 'ALONG', 'ALTER', 'AMONG', 'ANGER', 'ANGLE', 'ANGRY', 'APART', 'APPLE', 'APPLY', 'ARENA', 'ARGUE', 'ARISE', 'ARMED', 'ARMOR', 'ARRAY', 'ASIDE', 'ASSET', 'AVOID', 'AWAKE', 'AWARD', 'AWARE', 'BADLY', 'BAKER', 'BASES', 'BASIC', 'BEACH', 'BEGAN', 'BEGIN', 'BEING', 'BELOW', 'BENCH', 'BILLY', 'BIRTH', 'BLACK', 'BLAME', 'BLANK', 'BLIND', 'BLOCK', 'BLOOD', 'BOARD', 'BOOST', 'BOOTH', 'BOUND', 'BRAIN', 'BRAND', 'BRASS', 'BRAVE', 'BREAD', 'BREAK', 'BREED', 'BRIEF', 'BRING', 'BROAD', 'BROKE', 'BROWN', 'BUILD', 'BUILT', 'BUYER', 'CABLE', 'CALIF', 'CARRY', 'CATCH', 'CAUSE', 'CHAIN', 'CHAIR', 'CHAOS', 'CHARM', 'CHART', 'CHASE', 'CHEAP', 'CHECK', 'CHEST', 'CHIEF', 'CHILD', 'CHINA', 'CHOSE', 'CIVIL', 'CLAIM', 'CLASS', 'CLEAN', 'CLEAR', 'CLICK', 'CLIMB', 'CLOCK', 'CLOSE', 'CLOUD', 'COACH', 'COAST', 'COULD', 'COUNT', 'COURT', 'COVER', 'CRAFT', 'CRASH', 'CRAZY', 'CREAM', 'CRIME', 'CROSS', 'CROWD', 'CROWN', 'CRUDE', 'CURVE', 'CYCLE', 'DAILY', 'DANCE', 'DATED', 'DEALT', 'DEATH', 'DEBUT', 'DELAY', 'DEPTH', 'DOING', 'DOUBT', 'DOZEN', 'DRAFT', 'DRAMA', 'DRANK', 'DREAM', 'DRESS', 'DRILL', 'DRINK', 'DRIVE', 'DROVE', 'DYING', 'EAGER', 'EARLY', 'EARTH', 'EIGHT', 'ELITE', 'EMPTY', 'ENEMY', 'ENJOY', 'ENTER', 'ENTRY', 'EQUAL', 'ERROR', 'EVENT', 'EVERY', 'EXACT', 'EXIST', 'EXTRA', 'FAITH', 'FALSE', 'FAULT', 'FIBER', 'FIELD', 'FIFTH', 'FIFTY', 'FIGHT', 'FINAL', 'FIRST', 'FIXED', 'FLASH', 'FLEET', 'FLOOR', 'FLUID', 'FOCUS', 'FORCE', 'FORTH', 'FORTY', 'FORUM', 'FOUND', 'FRAME', 'FRANK', 'FRAUD', 'FRESH', 'FRONT', 'FRUIT', 'FULLY', 'FUNNY', 'GIANT', 'GIVEN', 'GLASS', 'GLOBE', 'GOING', 'GRACE', 'GRADE', 'GRAND', 'GRANT', 'GRASS', 'GRAVE', 'GREAT', 'GREEN', 'GROSS', 'GROUP', 'GROWN', 'GUARD', 'GUESS', 'GUEST', 'GUIDE', 'HAPPY', 'HARRY', 'HEART', 'HEAVY', 'HENCE', 'HENRY', 'HORSE', 'HOTEL', 'HOUSE', 'HUMAN', 'HURRY', 'IMAGE', 'INDEX', 'INNER', 'INPUT', 'ISSUE', 'JAPAN', 'JIMMY', 'JOINT', 'JONES', 'JUDGE', 'KNOWN', 'LABEL', 'LARGE', 'LASER', 'LATER', 'LAUGH', 'LAYER', 'LEARN', 'LEASE', 'LEAST', 'LEAVE', 'LEGAL', 'LEVEL', 'LEWIS', 'LIGHT', 'LIMIT', 'LINKS', 'LIVES', 'LOCAL', 'LOOSE', 'LOWER', 'LUCKY', 'LUNCH', 'LYING', 'MAGIC', 'MAJOR', 'MAKER', 'MARCH', 'MARIA', 'MATCH', 'MAYBE', 'MAYOR', 'MEANT', 'MEDAL', 'MEDIA', 'METAL', 'MIGHT', 'MINOR', 'MINUS', 'MIXED', 'MODEL', 'MONEY', 'MONTH', 'MORAL', 'MOTOR', 'MOUNT', 'MOUSE', 'MOUTH', 'MOVED', 'MOVIE', 'MUSIC', 'NEEDS', 'NEVER', 'NEWLY', 'NIGHT', 'NOISE', 'NORTH', 'NOTED', 'NOVEL', 'NURSE', 'OCCUR', 'OCEAN', 'OFFER', 'OFTEN', 'ORDER', 'OTHER', 'OUGHT', 'PAINT', 'PANEL', 'PAPER', 'PARTY', 'PEACE', 'PETER', 'PHASE', 'PHONE', 'PHOTO', 'PIANO', 'PIECE', 'PILOT', 'PITCH', 'PLACE', 'PLAIN', 'PLANE', 'PLANT', 'PLATE', 'PLAYS', 'PLENT', 'PLOTS', 'POEMS', 'POINT', 'POUND', 'POWER', 'PRESS', 'PRICE', 'PRIDE', 'PRIME', 'PRINT', 'PRIOR', 'PRIZE', 'PROOF', 'PROUD', 'PROVE', 'QUEEN', 'QUICK', 'QUIET', 'QUITE', 'RADIO', 'RAISE', 'RANGE', 'RAPID', 'RATIO', 'REACH', 'READY', 'REALM', 'REBEL', 'REFER', 'RELAX', 'REMARK', 'REMIND', 'REMOVE', 'RENDER', 'RENEW', 'RENTAL', 'REPAIR', 'REPEAT', 'REPLACE', 'REPORT', 'RESIST', 'RESOURCE', 'RESPONSE', 'RESULT', 'RETAIN', 'RETIRE', 'RETURN', 'REVEAL', 'REVIEW', 'REWARD', 'RIDER', 'RIDGE', 'RIGHT', 'RIGID', 'RING', 'RISE', 'RISK', 'RIVER', 'ROAD', 'ROBOT', 'ROGER', 'ROMAN', 'ROUGH', 'ROUND', 'ROUTE', 'ROYAL', 'RURAL', 'SCALE', 'SCENE', 'SCOPE', 'SCORE', 'SENSE', 'SERVE', 'SEVEN', 'SHALL', 'SHAPE', 'SHARE', 'SHARP', 'SHEET', 'SHELF', 'SHELL', 'SHIFT', 'SHINE', 'SHIRT', 'SHOCK', 'SHOOT', 'SHORT', 'SHOWN', 'SIDES', 'SIGHT', 'SILVER', 'SIMILAR', 'SIMPLE', 'SIXTH', 'SIXTY', 'SIZED', 'SKILL', 'SLEEP', 'SLIDE', 'SMALL', 'SMART', 'SMILE', 'SMITH', 'SMOKE', 'SNAKE', 'SOLID', 'SOLVE', 'SORRY', 'SOUND', 'SOUTH', 'SPACE', 'SPARE', 'SPEAK', 'SPEED', 'SPEND', 'SPENT', 'SPLIT', 'SPOKE', 'STAGE', 'STAKE', 'STAND', 'START', 'STATE', 'STEAM', 'STEEL', 'STEEP', 'STICK', 'STILL', 'STOCK', 'STONE', 'STOOD', 'STORE', 'STORM', 'STORY', 'STRIP', 'STUCK', 'STUDY', 'STUFF', 'STYLE', 'SUGAR', 'SUITE', 'SUPER', 'SWEET', 'TABLE', 'TAKEN', 'TASTE', 'TAXES', 'TEACH', 'TEETH', 'TERRY', 'TEXAS', 'THANK', 'THEFT', 'THEIR', 'THEME', 'THERE', 'THESE', 'THICK', 'THING', 'THINK', 'THIRD', 'THOSE', 'THREE', 'THREW', 'THROW', 'THUMB', 'TIGER', 'TIGHT', 'TIRED', 'TITLE', 'TODAY', 'TOKEN', 'TOPIC', 'TOTAL', 'TOUCH', 'TOUGH', 'TOWER', 'TRACK', 'TRADE', 'TRAIN', 'TREAT', 'TREND', 'TRIAL', 'TRIBE', 'TRICK', 'TRIED', 'TRIES', 'TRUCK', 'TRULY', 'TRUNK', 'TRUST', 'TRUTH', 'TWICE', 'TWIST', 'TYLER', 'UNION', 'UNITY', 'UNTIL', 'UPPER', 'UPSET', 'URBAN', 'USAGE', 'USUAL', 'VALUE', 'VIDEO', 'VIRUS', 'VISIT', 'VITAL', 'VOCAL', 'VOICE', 'WASTE', 'WATCH', 'WATER', 'WAVE', 'WHEEL', 'WHERE', 'WHICH', 'WHILE', 'WHITE', 'WHOLE', 'WINNER', 'WINTER', 'WOMAN', 'WOMEN', 'WORLD', 'WORRY', 'WORSE', 'WORST', 'WORTH', 'WOULD', 'WRITE', 'WRONG', 'WROTE', 'YOUNG', 'YOURS', 'YOUTH'];
@@ -1563,7 +1648,7 @@ async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot refresh another user\'s profile.', flags: MessageFlags.Ephemeral });
       }
 
-      // Profile refresh logic would go here
+      const profile = updateProfile(interaction.user.id, {});
       const embed = new EmbedBuilder()
         .setTitle('🔄 Profile Refreshed')
         .setColor(0x4CAF50)
@@ -1581,7 +1666,8 @@ async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot compare profiles for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      // Profile comparison logic would go here
+      const targetProfile = updateProfile(interaction.user.id, {});
+      const compareProfile = updateProfile(compareUserId, {});
       const embed = new EmbedBuilder()
         .setTitle('⚖️ Profile Comparison')
         .setColor(0x2196F3)
@@ -1599,7 +1685,6 @@ async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot view reminders for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      // Reminder logic would go here
       const embed = new EmbedBuilder()
         .setTitle('📅 Upcoming Reminders')
         .setColor(0xFF9800)
@@ -1617,7 +1702,6 @@ async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot reset memory for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      // Memory game reset logic would go here
       const embed = new EmbedBuilder()
         .setTitle('🔄 Memory Game Reset')
         .setColor(0x4CAF50)
@@ -1641,7 +1725,6 @@ async function handleButtonInteraction(interaction, client) {
       }
 
       const inventory = getInventory(interaction.user.id);
-      const inventoryValue = getInventoryValue(interaction.user.id);
 
       const embed = new EmbedBuilder()
         .setTitle('🎒 Inventory')
@@ -1759,11 +1842,11 @@ async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot refresh guild for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      // Guild refresh logic would go here
+      const guildInfo = getUserGuild(interaction.user.id);
       const embed = new EmbedBuilder()
         .setTitle('🔄 Guild Refreshed')
         .setColor(0x4CAF50)
-        .setDescription(`${guildName} data has been refreshed!`);
+        .setDescription(`${guildName || guildInfo?.name || 'Guild'} data has been refreshed!`);
 
       await safeInteractionUpdate(interaction, { embeds: [embed], components: interaction.message.components });
       return;
@@ -1777,7 +1860,6 @@ async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot generate invites for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      // Party invite logic would go here
       const embed = new EmbedBuilder()
         .setTitle('🔗 Party Invite Generated')
         .setColor(0x2196F3)
@@ -2091,7 +2173,6 @@ async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot continue chat for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      // AI chat continuation logic would go here
       const embed = new EmbedBuilder()
         .setTitle('💬 AI Chat Continued')
         .setColor(0x00FF00)
@@ -2109,7 +2190,6 @@ async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot clear history for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      // AI history clear logic would go here
       const embed = new EmbedBuilder()
         .setTitle('🗑️ AI History Cleared')
         .setColor(0xFF0000)
@@ -2194,7 +2274,6 @@ async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot refresh achievements for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      // Achievement refresh logic would go here
       const embed = new EmbedBuilder()
         .setTitle('🔄 Achievements Refreshed')
         .setColor(0x4CAF50)
@@ -2212,7 +2291,6 @@ async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot view leaderboard for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      // Achievement leaderboard logic would go here
       const embed = new EmbedBuilder()
         .setTitle('🏅 Achievement Leaderboard')
         .setColor(0xFFD700)

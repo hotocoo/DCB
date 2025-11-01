@@ -3,14 +3,14 @@ import path from 'path';
 import assert from 'assert';
 
 // Stub the missing dependencies to run RPG tests in isolation
-import { logger } from './src/logger.js';
-import { inputValidator, sanitizeInput, validateString, validateNumber } from './src/validation.js';
-import { CommandError } from './src/errorHandler.js';
+import { logger } from '../src/logger.js';
+import { inputValidator, sanitizeInput, validateString, validateNumber } from '../src/validation.js';
+import { CommandError } from '../src/errorHandler.js';
 
 const FILE = path.join(process.cwd(), 'data', 'rpg.json');
 
 // Import RPG functions
-import { createCharacter, getCharacter, applyXp, spendSkillPoints, getLeaderboard, getLeaderboardCount, resetCharacter } from './src/rpg.js';
+import { createCharacter, getCharacter, applyXp, spendSkillPoints, getLeaderboard, getLeaderboardCount, resetCharacter } from '../src/rpg.js';
 
 // Use a temp data dir to avoid clobbering real data during tests
 const DATA_DIR = path.join(process.cwd(), 'data');

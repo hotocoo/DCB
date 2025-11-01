@@ -1,10 +1,10 @@
 import { createCharacter, getCharacter, saveCharacter, applyXp } from '../src/rpg.js';
+import fs from 'fs';
+import path from 'path';
 
 function resetData() {
   // simple: remove data file if exists to start fresh
   try {
-    const fs = require('fs');
-    const path = require('path');
     const p = path.join(process.cwd(), 'data', 'rpg.json');
     if (fs.existsSync(p)) fs.unlinkSync(p);
   } catch (e) { /* ignore */ }

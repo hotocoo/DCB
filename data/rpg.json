@@ -3,10 +3,10 @@
     "name": "Tester",
     "hp": 20,
     "maxHp": 20,
-    "atk": 14,
-    "lvl": 12,
-    "xp": 225,
-    "skillPoints": 2,
+    "atk": 17,
+    "lvl": 16,
+    "xp": 300,
+    "skillPoints": 3,
     "mp": 10,
     "maxMp": 10,
     "def": 2,
@@ -21,7 +21,11 @@
     "inventory": {},
     "equipped_weapon": null,
     "equipped_armor": null,
-    "gold": 0
+    "gold": 0,
+    "dailyExplorations": 0,
+    "lastDailyReset": 1761995183231,
+    "sessionXpGained": 75,
+    "lastSessionReset": 1761995183231
   },
   "333133024520568833": {
     "name": "watchandnotlearn",
@@ -50,7 +54,11 @@
     },
     "equipped_weapon": null,
     "equipped_armor": null,
-    "gold": 0
+    "gold": 0,
+    "dailyExplorations": 0,
+    "lastDailyReset": 1761995183231,
+    "sessionXpGained": 0,
+    "lastSessionReset": 1761995183231
   },
   "testuser1": {
     "name": "TestHero",
@@ -76,6 +84,10 @@
     },
     "equipped_weapon": null,
     "equipped_armor": null,
-    "gold": 0
+    "gold": 0,
+    "dailyExplorations": 0,
+    "lastDailyReset": 1761995183231,
+    "sessionXpGained": 0,
+    "lastSessionReset": 1761995183231
   }
 }
