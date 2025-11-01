@@ -1,7 +1,11 @@
 import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 import { readFileSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const data = new SlashCommandBuilder()
     .setName('hangman')
@@ -25,7 +29,7 @@ export async function execute(interaction) {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'start') {
-        const words = readFileSync(path.join(__dirname, '../../data/words.txt'), 'utf8')
+            const words = readFileSync(path.join(__dirname, '../../data/words.txt'), 'utf8')
             .split('\n')
             .filter(word => word.trim().length > 0);
 
@@ -73,8 +77,9 @@ export async function execute(interaction) {
             interaction.client.games = new Map();
         }
         interaction.client.games.set(interaction.user.id, gameState);
+        }
 
-    } else if (subcommand === 'guess') {
+        else if (subcommand === 'guess') {
         const guess = interaction.options.getString('letter').toLowerCase();
 
         // Validate input
@@ -119,7 +124,9 @@ export async function execute(interaction) {
         if (gameState.isGameOver) {
             interaction.client.games.delete(interaction.user.id);
         }
-    }, {
+        }
+    },
+    {
         command: 'hangman'
     });
 }
