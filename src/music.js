@@ -403,20 +403,31 @@ class MusicManager {
                 let info;
                 for (let attempt = 1; attempt <= 3; attempt++) {
                   try {
-                    logger.debug('YouTube getInfo attempt', {
+                    const modernHeaders = {
+                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                      'Accept-Language': 'en-US,en;q=0.9',
+                      'Accept-Encoding': 'gzip, deflate, br',
+                      'Cache-Control': 'max-age=0',
+                      'Sec-Fetch-Dest': 'document',
+                      'Sec-Fetch-Mode': 'navigate',
+                      'Sec-Fetch-Site': 'none',
+                      'Sec-Fetch-User': '?1',
+                      'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                      'Sec-Ch-Ua-Mobile': '?0',
+                      'Sec-Ch-Ua-Platform': '"Windows"',
+                      'Upgrade-Insecure-Requests': '1'
+                    };
+
+                    logger.debug('YouTube getInfo attempt with modern headers', {
                       attempt,
                       query,
-                      headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept-Language': 'en-US,en;q=0.9'
-                      }
+                      userAgent: modernHeaders['User-Agent']
                     });
+
                     info = await ytdl.getInfo(query, {
                       requestOptions: {
-                        headers: {
-                          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                          'Accept-Language': 'en-US,en;q=0.9'
-                        }
+                        headers: modernHeaders
                       }
                     });
                     break; // Success, exit retry loop
@@ -751,25 +762,36 @@ class MusicManager {
         try {
           await this.youtubeRateLimiter.consume('youtube_api');
 
-          // Add retry logic for YouTube validation
+          // Add retry logic for YouTube validation with modern headers
            let info;
            for (let attempt = 1; attempt <= 3; attempt++) {
              try {
-               logger.debug('YouTube validation getInfo attempt', {
+               const modernHeaders = {
+                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                 'Accept-Language': 'en-US,en;q=0.9',
+                 'Accept-Encoding': 'gzip, deflate, br',
+                 'Cache-Control': 'max-age=0',
+                 'Sec-Fetch-Dest': 'document',
+                 'Sec-Fetch-Mode': 'navigate',
+                 'Sec-Fetch-Site': 'none',
+                 'Sec-Fetch-User': '?1',
+                 'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                 'Sec-Ch-Ua-Mobile': '?0',
+                 'Sec-Ch-Ua-Platform': '"Windows"',
+                 'Upgrade-Insecure-Requests': '1'
+               };
+
+               logger.debug('YouTube validation getInfo attempt with modern headers', {
                  attempt,
                  title,
                  url,
-                 headers: {
-                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                   'Accept-Language': 'en-US,en;q=0.9'
-                 }
+                 userAgent: modernHeaders['User-Agent']
                });
+
                info = await ytdl.getInfo(url, {
                  requestOptions: {
-                   headers: {
-                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                     'Accept-Language': 'en-US,en;q=0.9'
-                   }
+                   headers: modernHeaders
                  }
                });
                break; // Success, exit retry loop
@@ -829,11 +851,14 @@ class MusicManager {
 
   // Enhanced playback with comprehensive error handling
   async playWithErrorHandling(guildId, voiceChannel, song, player, connection) {
+    const startTime = Date.now();
+
     logger.debug('Starting playWithErrorHandling', {
       guildId,
       songTitle: song.title,
       songSource: song.source,
-      songUrl: song.url
+      songUrl: song.url,
+      timestamp: new Date().toISOString()
     });
 
     logger.debug('Checking encryption packages in playWithErrorHandling');
@@ -1085,7 +1110,8 @@ class MusicManager {
       logger.info('Starting YouTube stream creation', {
         guildId,
         songTitle: song.title,
-        songUrl: song.url
+        songUrl: song.url,
+        timestamp: new Date().toISOString()
       });
 
       try {
@@ -1100,8 +1126,26 @@ class MusicManager {
             dlChunkSize: 0,
             bitrate: 128,
             quality: 'lowestaudio'
-          }
+          },
+          timestamp: new Date().toISOString()
         });
+
+        // Check for FFmpeg availability before attempting stream
+        if (!existsSync(ffmpegPath)) {
+          logger.error('FFmpeg binary not found', {
+            guildId,
+            songTitle: song.title,
+            ffmpegPath: ffmpegPath,
+            resolvedPath: path.resolve(ffmpegPath),
+            timestamp: new Date().toISOString()
+          });
+          return {
+            success: false,
+            error: `FFmpeg binary not found at ${ffmpegPath}`,
+            errorType: 'ffmpeg_missing'
+          };
+        }
+
         const ytdlStream = ytdl(song.url, {
            filter: 'audioonly',
            highWaterMark: 1 << 62,
@@ -1110,11 +1154,19 @@ class MusicManager {
            quality: 'lowestaudio',
            requestOptions: {
              headers: {
-               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-               'Accept-Language': 'en-US,en;q=0.5',
-               'Accept-Encoding': 'gzip, deflate',
+               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+               'Accept-Language': 'en-US,en;q=0.9',
+               'Accept-Encoding': 'gzip, deflate, br',
+               'Cache-Control': 'max-age=0',
                'Connection': 'keep-alive',
+               'Sec-Fetch-Dest': 'document',
+               'Sec-Fetch-Mode': 'navigate',
+               'Sec-Fetch-Site': 'none',
+               'Sec-Fetch-User': '?1',
+               'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+               'Sec-Ch-Ua-Mobile': '?0',
+               'Sec-Ch-Ua-Platform': '"Windows"',
                'Upgrade-Insecure-Requests': '1'
              }
            }
@@ -1122,13 +1174,18 @@ class MusicManager {
 
         // Set up comprehensive error handling for ytdl stream
         let streamError = null;
+        let streamStartTime = Date.now();
+
         ytdlStream.on('error', (error) => {
-          console.error(`[MUSIC] YTDL stream error for "${song.title}":`, error);
+          const errorDuration = Date.now() - streamStartTime;
+          console.error(`[MUSIC] YTDL stream error for "${song.title}" after ${errorDuration}ms:`, error);
           logger.error('YTDL stream error', {
             guildId,
             songTitle: song.title,
             error: error.message,
-            stack: error.stack
+            stack: error.stack,
+            errorDuration,
+            timestamp: new Date().toISOString()
           });
           streamError = error;
         });
@@ -1287,25 +1344,73 @@ class MusicManager {
         });
 
         resource.volume.setVolume(currentVolume);
-        logger.debug(`About to play resource for YouTube song: ${song.title}`);
+        logger.debug(`About to play resource for YouTube song: ${song.title}`, {
+          guildId,
+          songTitle: song.title,
+          volume: currentVolume,
+          timestamp: new Date().toISOString()
+        });
         logger.info('Starting YouTube audio playback', {
           guildId,
           songTitle: song.title,
-          volume: currentVolume
+          volume: currentVolume,
+          ffmpegPath: ffmpegPath,
+          timestamp: new Date().toISOString()
         });
+
+        // Add timeout for playback start
+        const playbackTimeout = setTimeout(() => {
+          logger.warn('YouTube playback start timeout', {
+            guildId,
+            songTitle: song.title,
+            timeout: 30000,
+            timestamp: new Date().toISOString()
+          });
+        }, 30000);
+
+        player.once(AudioPlayerStatus.Playing, () => {
+          clearTimeout(playbackTimeout);
+          const playbackStartTime = Date.now() - startTime;
+          logger.info('YouTube playback successfully started', {
+            guildId,
+            songTitle: song.title,
+            startupTime: playbackStartTime,
+            timestamp: new Date().toISOString()
+          });
+        });
+
+        // Add error handler for playback timeout
+        const timeoutId = setTimeout(() => {
+          logger.error('YouTube playback timeout exceeded', {
+            guildId,
+            songTitle: song.title,
+            timeoutDuration: 30000,
+            timestamp: new Date().toISOString()
+          });
+          // Stop the player to prevent hanging
+          player.stop(true);
+        }, 30000);
+
+        player.once(AudioPlayerStatus.Playing, () => {
+          clearTimeout(timeoutId);
+        });
+
         player.play(resource);
 
         return { success: true };
 
       } catch (streamError) {
-        console.error(`[MUSIC] Stream creation error for "${song.title}":`, streamError.message);
+        const errorDuration = Date.now() - startTime;
+        console.error(`[MUSIC] Stream creation error for "${song.title}" after ${errorDuration}ms:`, streamError.message);
         logger.error('YouTube stream creation failed', {
           guildId,
           songTitle: song.title,
           error: streamError.message,
           stack: streamError.stack,
           ffmpegPath: ffmpegPath,
-          ffmpegAccessible: existsSync(ffmpegPath)
+          ffmpegAccessible: existsSync(ffmpegPath),
+          errorDuration,
+          timestamp: new Date().toISOString()
         });
 
         // Check if it's an FFmpeg issue
@@ -1314,7 +1419,10 @@ class MusicManager {
             guildId,
             songTitle: song.title,
             ffmpegPath: ffmpegPath,
-            errorCode: streamError.code
+            resolvedPath: path.resolve(ffmpegPath),
+            ffmpegExists: existsSync(ffmpegPath),
+            errorCode: streamError.code,
+            timestamp: new Date().toISOString()
           });
         }
 

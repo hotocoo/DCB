@@ -68,6 +68,15 @@ export async function execute(interaction) {
       });
     }
 
+    // Defer reply to prevent timeout (fixes "Unknown interaction" errors)
+    await interaction.deferReply();
+    logger.info('Deferred music play interaction', {
+      guildId: interaction.guild.id,
+      userId: interaction.user.id,
+      query: query.substring(0, 100), // Log first 100 chars for privacy
+      timestamp: new Date().toISOString()
+    });
+
     try {
       // Search for the song
       const songs = await searchSongs(query, 1);
@@ -141,7 +150,7 @@ export async function execute(interaction) {
         });
       }
 
-      // Create success embed
+      // Create success embed with detailed info
       const embed = new EmbedBuilder()
         .setTitle('🎵 Now Playing')
         .setColor(0x00FF00)
@@ -167,15 +176,41 @@ export async function execute(interaction) {
         new ButtonBuilder().setCustomId(`music_stop:${interaction.guild.id}`).setLabel('⏹️ Stop').setStyle(ButtonStyle.Danger),
         new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary)
       );
-console.log(`[MUSIC] Replying to interaction: ${interaction.id}`);
 
-      await interaction.reply({ embeds: [embed], components: [row] });
+      console.log(`[MUSIC] Editing deferred reply for interaction: ${interaction.id} with success embed`);
+      logger.info('Music play command successful', {
+        guildId: interaction.guild.id,
+        userId: interaction.user.id,
+        songTitle: song.title,
+        songSource: song.source,
+        timestamp: new Date().toISOString()
+      });
+
+      await interaction.editReply({ embeds: [embed], components: [row] });
     } catch (error) {
       console.error('Play command error:', error);
-      await interaction.reply({
-        content: '❌ **An error occurred while playing music.**',
-        flags: MessageFlags.Ephemeral
+      logger.error('Music play command failed', {
+        guildId: interaction.guild.id,
+        userId: interaction.user.id,
+        query: query.substring(0, 100),
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
       });
+
+      // Check if interaction was already deferred
+      if (interaction.deferred) {
+        await interaction.editReply({
+          content: '❌ **An error occurred while playing music.**',
+          embeds: [],
+          components: []
+        });
+      } else {
+        await interaction.reply({
+          content: '❌ **An error occurred while playing music.**',
+          flags: MessageFlags.Ephemeral
+        });
+      }
     }
 
   } else if (sub === 'search') {
