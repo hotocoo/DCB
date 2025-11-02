@@ -15,18 +15,19 @@ const COMMAND_EXTENSIONS = ['.js', '.mjs', '.cjs'];
 
 /**
  * Loads all command modules from the commands directory.
- * @param {object} client - Discord client instance
- * @returns {Promise<number>} Number of successfully loaded commands
+ * @param {import('discord.js').Client} client - Discord client instance
+ * @returns {Promise<{total: number, loaded: number}>} Object with total command files found and successfully loaded commands
  */
 export async function loadCommands(client) {
   const commandsPath = path.join(process.cwd(), 'src', 'commands');
   let loadedCount = 0;
+  let total = 0;
 
   logger.info('Loading commands', { path: commandsPath });
 
   if (!fs.existsSync(commandsPath)) {
     logger.warn('Commands directory does not exist', { path: commandsPath });
-    return loadedCount;
+    return { total: 0, loaded: 0 };
   }
 
   try {
@@ -34,28 +35,32 @@ export async function loadCommands(client) {
       COMMAND_EXTENSIONS.some(ext => file.endsWith(ext))
     );
 
-    logger.info('Found command files', { count: files.length, files });
+    total = files.length;
+    logger.info('Found command files', { count: total, files });
 
     for (const file of files) {
-      await loadCommandFile(client, commandsPath, file, loadedCount++);
+      if (await loadCommandFile(client, commandsPath, file)) {
+        loadedCount++;
+      }
     }
 
-    logger.success('Commands loaded successfully', { loadedCount });
+    logger.success('Commands loaded successfully', { total, loaded: loadedCount });
   } catch (error) {
-    logger.error('Failed to load commands', error, { path: commandsPath });
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error('Failed to load commands', err, { path: commandsPath });
   }
 
-  return loadedCount;
+  return { total, loaded: loadedCount };
 }
 
 /**
  * Loads a single command file and registers it with the client.
- * @param {object} client - Discord client instance
+ * @param {import('discord.js').Client} client - Discord client instance
  * @param {string} commandsPath - Path to commands directory
  * @param {string} file - Command file name
- * @param {number} index - Index for logging purposes
+ * @returns {Promise<boolean>} Success status of command loading
  */
-async function loadCommandFile(client, commandsPath, file, index) {
+async function loadCommandFile(client, commandsPath, file) {
   const filePath = path.join(commandsPath, file);
 
   try {
@@ -68,7 +73,7 @@ async function loadCommandFile(client, commandsPath, file, index) {
         hasData: !!commandModule.data,
         hasExecute: !!commandModule.execute
       });
-      return;
+      return false;
     }
 
     const commandName = commandModule.data.name;
@@ -77,8 +82,11 @@ async function loadCommandFile(client, commandsPath, file, index) {
       execute: commandModule.execute
     });
 
-    logger.debug('Command loaded', { name: commandName, file, index });
+    logger.debug('Command loaded', { name: commandName, file });
+    return true;
   } catch (error) {
-    logger.error('Failed to load command file', error, { file, filePath });
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error('Failed to load command file', err, { file, filePath });
+    return false;
   }
 }

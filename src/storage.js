@@ -33,6 +33,13 @@ function ensureDataDirectory() {
 }
 
 /**
+ * Initializes the database by ensuring the data directory exists.
+ */
+export function initializeDatabase() {
+  ensureDataDirectory();
+}
+
+/**
  * Gets the full path to a storage file.
  * @param {string} filename - The filename
  * @returns {string} Full path to the file
@@ -207,7 +214,7 @@ export function setGuild(id, data) {
 
   try {
     const all = readAll();
-    all[id] = { ...(all[id] || {}), ...data, lastUpdated: new Date().toISOString() };
+    all[id] = { ...(typeof all[id] === 'object' && all[id] !== null ? all[id] : {}), ...data, lastUpdated: new Date().toISOString() };
     writeAll(all);
 
     logger.debug('Updated guild data', { id, dataKeys: Object.keys(data) });

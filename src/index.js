@@ -19,18 +19,21 @@ import { logger, logError } from './logger.js';
 
 // Feature modules
 import { checkTypingAttempt } from './minigames/typing.js';
-import { getActiveAuctions } from './trading.js';
 import { isOnCooldown, setCooldown } from './cooldowns.js';
-import { wordleGames, hangmanGames, guessGames, combatGames, explorationGames } from './game-states.js';
-import { getCharacter } from './rpg.js';
 import { initializeDatabase } from './storage.js';
-import { initializeScheduler } from './scheduler.js';
+import { schedulerManager } from './scheduler.js';
+
+/**
+ * @typedef {Object} Command
+ * @property {import('discord.js').SlashCommandBuilder} data - The command data structure.
+ * @property {(interaction: import('discord.js').CommandInteraction) => Promise<void>} execute - The command execution function.
+ */
+
 
 /**
  * Constants for bot configuration.
  */
 const LOGIN_TIMEOUT_MS = 15000;
-const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 10000;
 
 /**
  * Validates the Discord token from environment variables.
@@ -65,6 +68,17 @@ try {
   process.exit(1);
 }
 
+// BOT_STATUS validation
+const botStatus = process.env.BOT_STATUS || 'online';
+const validStatuses = ['online', 'idle', 'dnd', 'invisible'];
+let status;
+if (validStatuses.includes(botStatus.toLowerCase())) {
+  status = botStatus.toLowerCase();
+} else {
+  console.warn(`Invalid BOT_STATUS: ${botStatus}. Defaulting to 'online'.`);
+  status = 'online';
+}
+
 // Include necessary intents for bot functionality
 const client = new Client({
   intents: [
@@ -82,35 +96,34 @@ const client = new Client({
       name: process.env.BOT_ACTIVITY || 'Playing RPG Adventures',
       type: ActivityType.Playing
     }],
-    status: (process.env.BOT_STATUS || 'online') as any
+    status: status
   }
 });
 
 // Initialize commands collection with proper typing
-client.commands = new Collection();
+client.commands = /** @type {import('discord.js').Collection<string, Command>} */ (new Collection());
 
-// Initialize database connection
-logger.info('Initializing database connection...');
-try {
-  await initializeDatabase();
-  logger.success('Database initialized successfully');
-} catch (error) {
-  logger.error('Failed to initialize database', error instanceof Error ? error : new Error(String(error)));
-  process.exit(1);
-}
+// Initialize database connection and commands
+let commandStats = { total: 0, loaded: 0 };
+(async () => {
+  try {
+    logger.info('Initializing database connection...');
+    await initializeDatabase();
+    logger.success('Database initialized successfully');
 
-// Load commands using the new module
-logger.info('Loading commands...');
-const commandCount = await loadCommands(client);
-logger.success(`Loaded ${commandCount} commands successfully`);
+    // Load commands using the new module
+    logger.info('Loading commands...');
+    commandStats = await loadCommands(client);
+    logger.success(`Loaded ${commandStats.loaded} out of ${commandStats.total} commands successfully`);
 
-// Initialize scheduler if available
-try {
-  await initializeScheduler(client);
-  logger.success('Scheduler initialized successfully');
-} catch (error) {
-  logger.warn('Scheduler initialization failed, continuing without scheduled tasks', error instanceof Error ? error : new Error(String(error)));
-}
+    // Initialize scheduler if available
+    await schedulerManager.setClient(client);
+    logger.success('Scheduler initialized successfully');
+  } catch (error) {
+    logger.error('Failed to initialize database', error instanceof Error ? error : new Error(String(error)));
+    process.exit(1);
+  }
+})();
 
 // Event listeners
 client.on('error', (error) => {
@@ -127,7 +140,8 @@ client.once('ready', () => {
   const stats = {
     guilds: client.guilds.cache.size,
     users: client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0),
-    commands: client.commands?.size || 0,
+    totalCommands: commandStats.total,
+    loadedCommands: client.commands?.size || 0,
     uptime: process.uptime()
   };
 
@@ -176,7 +190,7 @@ client.on('messageCreate', async message => {
     if (messageCooldown.onCooldown) {
       logger.debug('Message ignored due to cooldown', {
         userId: message.author.id,
-        remainingTime: messageCooldown.remainingTime
+        remainingTime: messageCooldown.remaining
       });
       return;
     }
@@ -218,7 +232,7 @@ client.on('messageCreate', async message => {
       user: `${message.author.username}#${message.author.discriminator}`,
       userId: message.author.id,
       guild: message.guild?.name || 'DM',
-      channel: message.channel instanceof import('discord.js').DMChannel ? 'DM' : message.channel?.name || 'Unknown',
+      channel: message.channel.type === 1 ? 'DM' : message.channel?.name || 'Unknown',
       messageLength: message.content.length,
       processingTime: Date.now() - startTime
     });
