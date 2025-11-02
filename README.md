@@ -3,9 +3,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Discord.js](https://img.shields.io/badge/discord.js-v14-blue.svg)](https://discord.js.org/)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)]()
+[![Database](https://img.shields.io/badge/database-SQLite-lightgrey.svg)]()
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-black.svg)](https://github.com/your-username/ultra-discord-bot)
 
-A comprehensive, feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, and AI-powered interactions.
+A comprehensive, feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, AI-powered interactions, and now powered by SQLite database for enhanced performance and reliability.
 
 ## 🌟 Overview
 
@@ -61,10 +63,14 @@ Whether you're looking to engage your community with games, manage your server e
 
 ## 🚀 Installation
 
+### Database Migration Note (v3.0.0)
+⚠️ **Important**: This version introduces SQLite database migration. Existing JSON data will be automatically migrated on first run. Backup your `data/` folder before upgrading.
+
 ### Prerequisites
 - **Node.js** 18.0.0 or higher
 - **Discord Bot Token** from the [Discord Developer Portal](https://discord.com/developers/applications)
 - **Administrator access** to your Discord server
+- **SQLite** (automatically included, no separate installation needed)
 
 ### Quick Setup
 
@@ -80,27 +86,31 @@ Whether you're looking to engage your community with games, manage your server e
    ```
 
 3. **Configure environment variables:**
-   ```bash
-   cp .env.template .env
-   ```
+    ```bash
+    cp .env.template .env
+    ```
 
-   Edit `.env` with your configuration:
-   ```env
-   # Required Discord Setup
-   DISCORD_TOKEN=your_bot_token_here
-   CLIENT_ID=your_application_client_id
-   GUILD_ID=your_test_server_id
+    Edit `.env` with your configuration:
+    ```env
+    # Required Discord Setup
+    DISCORD_TOKEN=your_bot_token_here
+    CLIENT_ID=your_application_client_id
+    GUILD_ID=your_test_server_id
 
-   # Optional AI Integration
-   OPENAI_API_KEY=your_openai_key_here
-   LOCAL_MODEL_URL=http://localhost:8000
-   LOCAL_MODEL_API=openai-compatible
+    # Database Configuration (Optional - SQLite by default)
+    DATABASE_URL=./data/bot.db
+    DB_MAX_CONNECTIONS=10
 
-   # Optional External APIs
-   OPENWEATHER_API_KEY=your_weather_api_key_here
-   SPOTIFY_CLIENT_ID=your_spotify_client_id
-   SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-   ```
+    # Optional AI Integration
+    OPENAI_API_KEY=your_openai_key_here
+    LOCAL_MODEL_URL=http://localhost:8000
+    LOCAL_MODEL_API=openai-compatible
+
+    # Optional External APIs
+    OPENWEATHER_API_KEY=your_weather_api_key_here
+    SPOTIFY_CLIENT_ID=your_spotify_client_id
+    SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+    ```
 
 4. **Deploy slash commands:**
    ```bash
@@ -197,6 +207,11 @@ Whether you're looking to engage your community with games, manage your server e
 - `SPOTIFY_CLIENT_ID` & `SPOTIFY_CLIENT_SECRET`: Spotify API credentials
 - `YOUTUBE_API_KEY`: YouTube Data API key for enhanced search
 
+#### Database Configuration (Optional)
+- `DATABASE_URL`: Path to SQLite database file (default: ./data/bot.db)
+- `DB_MAX_CONNECTIONS`: Maximum database connections (default: 10)
+- `DB_BACKUP_INTERVAL`: Automatic backup interval in hours (default: 24)
+
 ### Advanced Configuration
 
 The bot supports extensive customization through configuration files and environment variables for:
@@ -205,6 +220,9 @@ The bot supports extensive customization through configuration files and environ
 - Moderation thresholds
 - Economy balancing
 - Feature toggles
+- Database connection pooling
+- Migration settings
+- Backup configurations
 
 ## 🏗️ Architecture
 
@@ -212,10 +230,11 @@ The bot supports extensive customization through configuration files and environ
 - **Runtime**: Node.js 18+
 - **Discord Library**: Discord.js v14
 - **Language**: JavaScript ES6+ (ESM)
-- **Data Storage**: JSON-based persistence with file system
+- **Data Storage**: SQLite database with JSON fallback compatibility
 - **AI Integration**: OpenAI API + Local Model Support
 - **Audio Processing**: FFmpeg integration for music playback
 - **Rate Limiting**: Built-in request throttling
+- **Database**: SQLite 3 with ACID compliance and foreign key constraints
 
 ### Project Structure
 ```
@@ -224,22 +243,25 @@ ultra-discord-bot/
 │   ├── commands/        # Slash command implementations
 │   ├── minigames/       # Mini-game logic
 │   ├── *.js             # Core modules and managers
-├── data/                # JSON data storage
+├── data/                # SQLite database (bot.db) + legacy JSON files
 │   ├── players/         # Individual player script files
+│   ├── bot.db           # SQLite database file
 ├── logs/                # Application logs
 ├── scripts/             # Utility scripts
 ├── tests/               # Test suites and results
+├── migrations/          # Database migration scripts
 └── root-level-files/    # Main project files (package.json, README, etc.)
 ```
 
 ### Key Modules
 - **Command System**: Dynamic command loading and execution
-- **RPG Engine**: Character progression and game mechanics
-- **Music Manager**: Multi-source audio streaming
-- **Economy System**: Transaction processing and market simulation
-- **Moderation Tools**: User management and auto-moderation
-- **AI Assistant**: Multi-model conversational AI
-- **Scheduler**: Event and reminder management
+- **RPG Engine**: Character progression and game mechanics with SQLite persistence
+- **Music Manager**: Multi-source audio streaming with enhanced error handling
+- **Economy System**: Transaction processing and market simulation with database integrity
+- **Moderation Tools**: User management and auto-moderation with audit logging
+- **AI Assistant**: Multi-model conversational AI with memory persistence
+- **Scheduler**: Event and reminder management with database-backed storage
+- **Database Layer**: SQLite connection management with migration support
 
 ## 🤝 Contributing
 
@@ -249,10 +271,11 @@ We welcome contributions from the community! Whether you're fixing bugs, adding 
 
 1. **Code Quality**: Follow ES6+ best practices and maintain consistent code style
 2. **Documentation**: Document all new functions, classes, and features
-3. **Testing**: Add comprehensive tests for new functionality
-4. **Performance**: Optimize for scalability and efficiency
-5. **Security**: Validate inputs and handle errors gracefully
-6. **Compatibility**: Ensure cross-platform compatibility
+3. **Testing**: Add comprehensive tests for new functionality with database integration
+4. **Performance**: Optimize for scalability and efficiency with database query optimization
+5. **Security**: Validate inputs and handle errors gracefully with SQL injection protection
+6. **Compatibility**: Ensure cross-platform compatibility and database migration support
+7. **Database**: Implement proper transaction handling and foreign key relationships
 
 ### Getting Started with Development
 
@@ -265,18 +288,55 @@ We welcome contributions from the community! Whether you're fixing bugs, adding 
 
 - Use GitHub Issues to report bugs or request features
 - Include detailed reproduction steps and environment information
-- Specify Discord.js version, Node.js version, and platform details
+- Specify Discord.js version, Node.js version, platform details, and database status
+- For database-related issues, include migration status and SQLite version
+- Provide log excerpts with error details for faster resolution
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🔄 Recent Updates & Fixes
+
+### Database Migration (v3.0.0)
+- **SQLite Database Integration**: Migrated from JSON-based storage to SQLite for improved performance and reliability
+- **ACID Compliance**: Database transactions ensure data consistency and prevent corruption
+- **Foreign Key Constraints**: Enhanced data integrity across all modules
+- **Migration Scripts**: Automated migration from JSON to SQLite with rollback capability
+- **Backup System**: Automatic database backups and recovery procedures
+
+### Music System Improvements
+- **Enhanced Error Handling**: Improved resilience against API failures and network issues
+- **Multi-Source Support**: Prioritized YouTube with Deezer fallback for better availability
+- **Queue Management**: Robust queue operations with proper state management
+- **Audio Processing**: FFmpeg integration with static binaries for cross-platform compatibility
+
+### Bug Fixes
+- **Command Validation**: Fixed dice format validation in `/roll` command (NdM format support)
+- **RPG Character Creation**: Resolved level scaling and skill point allocation issues
+- **Button Interactions**: Fixed unrecognized button actions in explore and trivia commands
+- **API Error Handling**: Improved error responses for malformed API requests
+- **Memory Management**: Added periodic cleanup of Maps and caches to prevent memory leaks
+
+### Performance Enhancements
+- **Connection Pooling**: Database connection management for concurrent operations
+- **Query Optimization**: Indexed tables for faster data retrieval
+- **Rate Limiting**: Improved rate limiting with adaptive cooldowns
+- **Caching**: Enhanced caching strategies for frequently accessed data
+
+### Development & Testing
+- **Comprehensive Test Suite**: Added extensive testing for music, RPG, and command systems
+- **Error Logging**: Detailed logging with structured error information
+- **Migration Validation**: Automated checks for data integrity during migration
+- **Documentation**: Updated project structure and configuration guides
 
 ## 🙏 Acknowledgments
 
 Built with ❤️ using:
 - **Discord.js** - Official Discord API wrapper
 - **Node.js** - JavaScript runtime environment
-- **FFmpeg** - Audio/video processing
+- **SQLite** - Lightweight, serverless database
+- **FFmpeg** - Audio/video processing with static binaries
 - **OpenAI** - AI integration capabilities
 - **Community** - Ideas, feedback, and contributions
 
