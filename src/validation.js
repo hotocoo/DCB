@@ -245,7 +245,8 @@ class InputValidator {
   }
 
   validateRPGCommand(options) {
-    const subcommand = options.subcommand || options.sub;
+    // For slash commands, subcommand is accessed differently
+    const subcommand = options.subcommand || options.subcommand_group || options.sub;
     const subOptions = options;
 
     switch (subcommand) {
@@ -276,7 +277,22 @@ class InputValidator {
       case 'fight':
       case 'explore':
       case 'boss':
+      case 'stats':
+      case 'leaderboard':
+      case 'reset':
+      case 'class':
+      case 'inventory':
+      case 'craft':
         // No additional validation needed for these
+        break;
+
+      case 'quest':
+        if (subOptions.action) {
+          const validActions = ['create', 'list', 'complete'];
+          if (!validActions.includes(subOptions.action)) {
+            return { valid: false, reason: 'Invalid quest action. Use: create, list, complete' };
+          }
+        }
         break;
 
       default:

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
+import { pathToFileURL } from 'url';
 
 console.log('🔍 Testing command loading...\n');
 
@@ -23,7 +24,8 @@ for (const file of commandFiles) {
 
   try {
     // Test if file can be imported
-    const module = await import(filePath);
+    const moduleUrl = pathToFileURL(filePath).href;
+    const module = await import(moduleUrl);
     loadedCount++;
 
     // Validate command structure

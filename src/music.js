@@ -796,13 +796,24 @@ class MusicManager {
                });
                break; // Success, exit retry loop
              } catch (retryError) {
-               logger.debug(`YouTube validation attempt ${attempt} failed`, {
-                 title,
-                 url,
-                 error: retryError.message,
-                 errorCode: retryError.code
-               });
-               if (attempt === 3) throw retryError;
+           logger.debug(`YouTube validation attempt ${attempt} failed`, {
+             title,
+             url,
+             error: retryError.message,
+             errorCode: retryError.code
+           });
+
+           // Check if it's the specific YouTube parsing error and handle gracefully
+           if (retryError.message && retryError.message.includes('Error when parsing watch.html')) {
+               logger.warn('YouTube parsing error detected - this may be due to YouTube API changes. Attempting fallback.');
+               // Continue to next attempt or throw if this was the last attempt
+               if (attempt === 3) {
+                   // Create a more user-friendly error
+                   const userError = new Error(`YouTube search temporarily unavailable due to API changes. Please try again later or use a direct URL.`);
+                   userError.code = 'YOUTUBE_API_ERROR';
+                   throw userError;
+               }
+           } else if (attempt === 3) throw retryError;
                await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Wait longer before retry
              }
            }

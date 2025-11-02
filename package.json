@@ -6,13 +6,33 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
+    "start:prod": "NODE_ENV=production node src/index.js",
     "dev": "node --watch src/index.js",
+    "dev:debug": "node --inspect --watch src/index.js",
     "deploy": "node src/deploy-commands.js",
-    "test": "node tests/rpg.test.js",
-    "install-deps": "npm install @discordjs/voice @discordjs/opus ytdl-core ffmpeg-static"
+    "deploy:prod": "NODE_ENV=production node src/deploy-commands.js",
+    "test": "node tests/comprehensive-tests.js",
+    "test:rpg": "node tests/rpg.test.js",
+    "test:unit": "node tests/test-token.js",
+    "test:integration": "node tests/test-button-interactions.js",
+    "test:coverage": "npm run test && npx c8 --reporter=lcov --reporter=text node tests/comprehensive-tests.js",
+    "lint": "eslint src/**/*.js tests/**/*.js",
+    "lint:fix": "eslint src/**/*.js tests/**/*.js --fix",
+    "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.js\" \"tests/**/*.js\"",
+    "build": "npm run lint && npm run format:check && npm test",
+    "install-deps": "npm install @discordjs/voice @discordjs/opus ytdl-core ffmpeg-static",
+    "clean": "rm -rf node_modules package-lock.json && npm install",
+    "db:migrate": "node scripts/migrate-db.js",
+    "db:backup": "node scripts/backup-db.js",
+    "db:reset": "node scripts/reset-db.js",
+    "logs:clean": "rm -rf logs/*.log",
+    "docker:build": "docker build -t ultra-discord-bot .",
+    "docker:run": "docker run -d --name ultra-bot --env-file .env ultra-discord-bot"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   },
   "keywords": [
     "discord",
@@ -24,7 +44,9 @@
     "moderation",
     "economy",
     "social",
-    "entertainment"
+    "entertainment",
+    "sqlite",
+    "typescript-support"
   ],
   "author": "ULTRA Bot Development Team",
   "license": "MIT",
@@ -33,12 +55,13 @@
     "@discordjs/voice": "^0.16.1",
     "@distube/ytdl-core": "^4.16.12",
     "axios": "^1.6.0",
+    "better-sqlite3": "^9.4.3",
     "discord.js": "^14.16.0",
-    "dotenv": "^16.0.0",
+    "dotenv": "^16.3.1",
     "ffmpeg-static": "^5.2.0",
     "libsodium-wrappers": "^0.7.15",
     "node-cron": "^3.0.3",
-    "rate-limiter-flexible": "^2.4.1",
+    "rate-limiter-flexible": "^3.0.4",
     "sodium": "^3.0.2",
     "spotify-web-api-node": "^5.0.2",
     "tweetnacl": "^1.0.3",
@@ -46,15 +69,28 @@
     "yt-search": "^2.13.1"
   },
   "devDependencies": {
-    "eslint": "^8.50.0",
-    "nodemon": "^3.0.0"
+    "c8": "^8.0.1",
+    "eslint": "^8.57.0",
+    "nodemon": "^3.0.2",
+    "prettier": "^3.2.5"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/ultra-bot.git"
+    "url": "https://github.com/watchandnotlearn/ultra-discord-bot.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/ultra-bot/issues"
+    "url": "https://github.com/watchandnotlearn/ultra-discord-bot/issues"
   },
-  "homepage": "https://github.com/your-username/ultra-bot#readme"
+  "homepage": "https://github.com/watchandnotlearn/ultra-discord-bot#readme",
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run lint && npm run test",
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+    }
+  }
 }

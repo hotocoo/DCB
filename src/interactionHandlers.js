@@ -593,8 +593,386 @@ async function handleModalSubmit(interaction, client) {
        });
      }
 
+     // Handle economy buy modal
+     if (custom.startsWith('economy_buy_modal:')) {
+       const targetUser = custom.split(':')[1];
+       validateUserId(targetUser);
+       if (targetUser !== interaction.user.id) {
+         throw new CommandError('You cannot buy items for another user.', 'PERMISSION_DENIED');
+       }
+
+       const itemNameStr = interaction.fields.getTextInputValue('item_name');
+       const quantityStr = interaction.fields.getTextInputValue('quantity');
+
+       const itemNameValidation = validateString(itemNameStr, { minLength: 1, maxLength: 50, required: true });
+       if (!itemNameValidation.valid) {
+         throw new CommandError(itemNameValidation.reason, 'INVALID_ARGUMENT');
+       }
+
+       const quantity = validateNumber(quantityStr, { min: 1, max: 1000, integer: true, positive: true });
+       if (!quantity.valid) {
+         throw new CommandError(quantity.reason, 'INVALID_ARGUMENT');
+       }
+
+       const marketPrices = getMarketPrice();
+       const itemKey = itemNameStr.toLowerCase().replace(/\s+/g, '_');
+
+       if (!(itemKey in marketPrices)) {
+         throw new CommandError(`Item "${itemNameStr}" is not available in the market.`, 'INVALID_ARGUMENT');
+       }
+
+       const pricePerUnit = marketPrices[itemKey];
+       const totalCost = pricePerUnit * quantity.value;
+
+       const currentBalance = getBalance(interaction.user.id);
+       if (currentBalance < totalCost) {
+         throw new CommandError(`Insufficient gold balance. You need ${totalCost} gold but only have ${currentBalance}.`, 'INSUFFICIENT_FUNDS');
+       }
+
+       const char = getCharacter(interaction.user.id);
+       if (!char) {
+         throw new CommandError('You need to create a character first to use the market.', 'INVALID_ARGUMENT');
+       }
+
+       // Attempt to buy the item
+       const buyResult = buyFromMarket(interaction.user.id, itemKey, quantity.value);
+
+       if (!buyResult.success) {
+         throw new CommandError(buyResult.reason || 'Failed to complete purchase.', 'UNKNOWN_ERROR');
+       }
+
+       return await safeInteractionReply(interaction, {
+         content: `✅ Successfully purchased ${quantity.value}x ${itemNameStr} for ${totalCost} gold!\n💰 New balance: ${buyResult.newBalance} gold`,
+         flags: MessageFlags.Ephemeral
+       });
+     }
+
+     // Handle economy sell modal
+     if (custom.startsWith('economy_sell_modal:')) {
+       const targetUser = custom.split(':')[1];
+       validateUserId(targetUser);
+       if (targetUser !== interaction.user.id) {
+         throw new CommandError('You cannot sell items for another user.', 'PERMISSION_DENIED');
+       }
+
+       const itemNameStr = interaction.fields.getTextInputValue('item_name');
+       const quantityStr = interaction.fields.getTextInputValue('quantity');
+
+       const itemNameValidation = validateString(itemNameStr, { minLength: 1, maxLength: 50, required: true });
+       if (!itemNameValidation.valid) {
+         throw new CommandError(itemNameValidation.reason, 'INVALID_ARGUMENT');
+       }
+
+       const quantity = validateNumber(quantityStr, { min: 1, max: 1000, integer: true, positive: true });
+       if (!quantity.valid) {
+         throw new CommandError(quantity.reason, 'INVALID_ARGUMENT');
+       }
+
+       const char = getCharacter(interaction.user.id);
+       if (!char) {
+         throw new CommandError('You need to create a character first to sell items.', 'INVALID_ARGUMENT');
+       }
+
+       const inventory = getInventory(interaction.user.id);
+       const itemKey = itemNameStr.toLowerCase().replace(/\s+/g, '_');
+
+       if (!(itemKey in inventory) || inventory[itemKey] < quantity.value) {
+         throw new CommandError(`You don't have enough ${itemNameStr}. Available: ${inventory[itemKey] || 0}`, 'INSUFFICIENT_INVENTORY');
+       }
+
+       const itemInfo = getItemInfo(itemKey);
+       if (!itemInfo) {
+         throw new CommandError(`Unknown item: ${itemNameStr}`, 'INVALID_ARGUMENT');
+       }
+
+       const sellPricePerUnit = Math.floor(itemInfo.value * 0.7); // 70% of buy price
+       const totalEarnings = sellPricePerUnit * quantity.value;
+
+       // Attempt to sell the item
+       const sellResult = sellToMarket(interaction.user.id, itemKey, quantity.value);
+
+       if (!sellResult.success) {
+         throw new CommandError(sellResult.reason || 'Failed to complete sale.', 'UNKNOWN_ERROR');
+       }
+
+       return await safeInteractionReply(interaction, {
+         content: `✅ Successfully sold ${quantity.value}x ${itemNameStr} for ${totalEarnings} gold!\n💰 New balance: ${sellResult.newBalance} gold`,
+         flags: MessageFlags.Ephemeral
+       });
+     }
+
+     // Handle trade create auction modal
+     if (custom.startsWith('trade_create_auction_modal:')) {
+       const targetUser = custom.split(':')[1];
+       validateUserId(targetUser);
+       if (targetUser !== interaction.user.id) {
+         throw new CommandError('You cannot create auctions for another user.', 'PERMISSION_DENIED');
+       }
+
+       const itemNameStr = interaction.fields.getTextInputValue('item_name');
+       const quantityStr = interaction.fields.getTextInputValue('quantity');
+       const priceStr = interaction.fields.getTextInputValue('starting_price');
+
+       const itemNameValidation = validateString(itemNameStr, { minLength: 1, maxLength: 50, required: true });
+       if (!itemNameValidation.valid) {
+         throw new CommandError(itemNameValidation.reason, 'INVALID_ARGUMENT');
+       }
+
+       const quantity = validateNumber(quantityStr, { min: 1, max: 1000, integer: true, positive: true });
+       if (!quantity.valid) {
+         throw new CommandError(quantity.reason, 'INVALID_ARGUMENT');
+       }
+
+       const startingPrice = validateNumber(priceStr, { min: 1, max: 1000000, integer: true, positive: true });
+       if (!startingPrice.valid) {
+         throw new CommandError(startingPrice.reason, 'INVALID_ARGUMENT');
+       }
+
+       const char = getCharacter(interaction.user.id);
+       if (!char) {
+         throw new CommandError('You need to create a character first to create auctions.', 'INVALID_ARGUMENT');
+       }
+
+       const inventory = getInventory(interaction.user.id);
+       const itemKey = itemNameStr.toLowerCase().replace(/\s+/g, '_');
+
+       if (!(itemKey in inventory) || inventory[itemKey] < quantity.value) {
+         throw new CommandError(`You don't have enough ${itemNameStr}. Available: ${inventory[itemKey] || 0}`, 'INSUFFICIENT_INVENTORY');
+       }
+
+       const itemInfo = getItemInfo(itemKey);
+       if (!itemInfo) {
+         throw new CommandError(`Unknown item: ${itemNameStr}`, 'INVALID_ARGUMENT');
+       }
+
+       // Create the auction
+       const auctionResult = createAuction(interaction.user.id, itemKey, quantity.value, startingPrice.value);
+
+       if (!auctionResult.success) {
+         throw new CommandError(auctionResult.reason || 'Failed to create auction.', 'UNKNOWN_ERROR');
+       }
+
+       // Remove items from inventory
+       removeItemFromInventory(interaction.user.id, itemKey, quantity.value);
+
+       return await safeInteractionReply(interaction, {
+         content: `✅ Successfully created auction for ${quantity.value}x ${itemNameStr} starting at ${startingPrice.value} gold!\n📅 Auction ends in 24 hours.`,
+         flags: MessageFlags.Ephemeral
+       });
+     }
+
+     // Handle profile edit modal
+     if (custom.startsWith('profile_edit_modal:')) {
+       const targetUser = custom.split(':')[1];
+       validateUserId(targetUser);
+       if (targetUser !== interaction.user.id) {
+         throw new CommandError('You cannot edit another user\'s profile.', 'PERMISSION_DENIED');
+       }
+
+       const displayName = interaction.fields.getTextInputValue('display_name')?.trim();
+
+       // Validate display name if provided
+       if (displayName) {
+         const displayNameValidation = validateString(displayName, { minLength: 1, maxLength: 32, required: false });
+         if (!displayNameValidation.valid) {
+           throw new CommandError(displayNameValidation.reason, 'INVALID_ARGUMENT');
+         }
+       }
+
+       // Update profile
+       const updateData = {};
+       if (displayName) {
+         updateData.displayName = displayName;
+       }
+
+       const updatedProfile = updateProfile(interaction.user.id, updateData);
+
+       return await safeInteractionReply(interaction, {
+         content: `✅ Profile updated successfully!${displayName ? `\n📝 Display name: ${displayName}` : ''}`,
+         flags: MessageFlags.Ephemeral
+       });
+     }
+
+     // Handle AI chat continue modal
+     if (custom.startsWith('ai_chat_continue_modal:')) {
+       const [, model, personality, targetUserId] = custom.split(':');
+       validateUserId(targetUserId);
+       if (targetUserId !== interaction.user.id) {
+         throw new CommandError('You cannot continue chat for another user.', 'PERMISSION_DENIED');
+       }
+
+       const message = interaction.fields.getTextInputValue('message')?.trim();
+       if (!message) {
+         throw new CommandError('Message cannot be empty.', 'INVALID_ARGUMENT');
+       }
+
+       const messageValidation = validateString(message, { minLength: 1, maxLength: 2000, required: true });
+       if (!messageValidation.valid) {
+         throw new CommandError(messageValidation.reason, 'INVALID_ARGUMENT');
+       }
+
+       // Import AI chat function
+       const { generateChatResponse } = await import('./aiassistant.js');
+       const response = await generateChatResponse(interaction.user.id, message, model, personality);
+
+       const embed = new EmbedBuilder()
+         .setTitle('💬 AI Chat Response')
+         .setColor(0x00FF00)
+         .setDescription(response)
+         .addFields({
+           name: 'Your Message',
+           value: message.length > 1024 ? message.substring(0, 1021) + '...' : message,
+           inline: false
+         });
+
+       const row = new ActionRowBuilder().addComponents(
+         new ButtonBuilder().setCustomId(`ai_chat:${model}:${personality}:${interaction.user.id}`).setLabel('💬 Continue Chat').setStyle(ButtonStyle.Primary),
+         new ButtonBuilder().setCustomId(`ai_clear:${interaction.user.id}`).setLabel('🗑️ Clear History').setStyle(ButtonStyle.Secondary)
+       );
+
+       return await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+     }
+
      // Unknown modal type
      throw new CommandError(`Unknown modal type: ${custom}`, 'INVALID_ARGUMENT');
+
+     // Handle guess modal
+     if (custom.startsWith('guess_submit:')) {
+       const [, gameId] = custom.split(':');
+       const gameState = guessGames.get(gameId);
+
+       if (!gameState) {
+         await safeInteractionReply(interaction, { content: '❌ **Game not found!** The game may have expired.', flags: MessageFlags.Ephemeral });
+         return;
+       }
+
+       if (!gameState.gameActive) {
+         await safeInteractionReply(interaction, { content: '❌ **Game is no longer active!**', flags: MessageFlags.Ephemeral });
+         return;
+       }
+
+       const guess = interaction.fields.getTextInputValue('guess_number');
+
+       // Validate input
+       if (!guess || typeof guess !== 'string') {
+         throw new CommandError('Invalid guess input.', 'INVALID_ARGUMENT');
+       }
+
+       const guessNum = parseInt(guess.trim());
+
+       if (isNaN(guessNum)) {
+         throw new CommandError('Please enter a valid number!', 'INVALID_ARGUMENT');
+       }
+
+       if (guessNum < gameState.min || guessNum > gameState.max) {
+         throw new CommandError(`Number must be between ${gameState.min} and ${gameState.max}!`, 'INVALID_ARGUMENT');
+       }
+
+       gameState.attemptsUsed++;
+
+       let feedback;
+       let isCorrect = false;
+
+       if (guessNum === gameState.secretNumber) {
+         feedback = '🎉 Correct! You win!';
+         isCorrect = true;
+         gameState.gameActive = false;
+       } else if (guessNum < gameState.secretNumber) {
+         feedback = '📈 Too low! Try a higher number.';
+       } else {
+         feedback = '📉 Too high! Try a lower number.';
+       }
+
+       // Store guess with feedback
+       gameState.guesses.push({
+         number: guessNum,
+         feedback,
+         attempt: gameState.attemptsUsed
+       });
+
+       if (isCorrect) {
+         guessGames.delete(gameId); // Clean up completed game
+         const timeElapsed = Math.round((Date.now() - gameState.startTime) / 1000);
+         const attemptsUsed = gameState.attemptsUsed;
+
+         let performanceRating;
+         if (attemptsUsed === 1) performanceRating = '🌟 PERFECT! First try!';
+         else if (attemptsUsed <= 3) performanceRating = '🥇 Excellent!';
+         else if (attemptsUsed <= 5) performanceRating = '🥈 Good job!';
+         else if (attemptsUsed <= 7) performanceRating = '🥉 Not bad!';
+         else performanceRating = '🎯 You got it!';
+
+         const embed = new EmbedBuilder()
+           .setTitle('🎉 Congratulations!')
+           .setColor(0x00FF00)
+           .setDescription(`You guessed **${gameState.secretNumber}** correctly!\n\n${performanceRating}`)
+           .addFields(
+             {
+               name: '📊 Game Stats',
+               value: `**Attempts:** ${attemptsUsed}/${gameState.attempts}\n**Time:** ${timeElapsed}s\n**Difficulty:** ${gameState.difficulty.toUpperCase()}`,
+               inline: true
+             },
+             {
+               name: '🏆 Performance',
+               value: `**Range:** ${gameState.min}-${gameState.max}\n**Efficiency:** ${Math.round((1 - (attemptsUsed - 1) / gameState.attempts) * 100)}%`,
+               inline: true
+             }
+           );
+
+         if (gameState.guesses.length > 0) {
+           embed.addFields({
+             name: '📝 Guess History',
+             value: gameState.guesses.map((g, i) => `${i + 1}. **${g.number}** - ${g.feedback}`).join('\n'),
+             inline: false
+           });
+         }
+
+         await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+       } else {
+         // Continue game
+         const { attempts, attemptsUsed: currentAttemptsUsed, min, max, guesses } = gameState;
+
+         if (currentAttemptsUsed >= attempts) {
+           gameState.gameActive = false;
+           guessGames.delete(gameId); // Clean up completed game
+           const timeElapsed = Math.round((Date.now() - gameState.startTime) / 1000);
+
+           const loseEmbed = new EmbedBuilder()
+             .setTitle('❌ Game Over!')
+             .setColor(0xFF0000)
+             .setDescription(`The secret number was **${gameState.secretNumber}**!\n\nYou used all ${attempts} attempts in ${timeElapsed} seconds.`)
+             .addFields({
+               name: 'Your Guesses',
+               value: guesses.length > 0 ? guesses.map((g, i) => `${i + 1}. **${g.number}** - ${g.feedback}`).join('\n') : 'No guesses made',
+               inline: false
+             });
+
+           await safeInteractionUpdate(interaction, { embeds: [loseEmbed], components: [] });
+           return;
+         }
+
+         const embed = new EmbedBuilder()
+           .setTitle('🔢 Number Guessing Game')
+           .setColor(0x0099FF)
+           .setDescription(`I'm thinking of a number between **${min}** and **${max}**.\n\nYou have **${attempts - currentAttemptsUsed}** attempts remaining.\n\n**${guessNum}** - ${feedback}`)
+           .addFields({
+             name: 'Previous Guesses',
+             value: guesses.length > 0 ?
+               guesses.slice(-5).map((g, i) => `**${g.number}** - ${g.feedback}`).join('\n') :
+               'No guesses yet',
+             inline: false
+           });
+
+         // Create guess button
+         const row = new ActionRowBuilder().addComponents(
+           new ButtonBuilder().setCustomId(`guess_modal:${gameId}:${min}:${max}`).setLabel('🔢 Make Guess').setStyle(ButtonStyle.Primary)
+         );
+
+         await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+       }
+
+       return;
+     }
 
    } catch (error) {
      logger.error('Modal submit error', error, {
@@ -1820,12 +2198,60 @@ export async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot compare profiles for another user.', flags: MessageFlags.Ephemeral });
       }
 
+      validateUserId(compareUserId);
+
+      // Get both profiles
       const targetProfile = updateProfile(interaction.user.id, {});
       const compareProfile = updateProfile(compareUserId, {});
+
+      // Find the comparison user
+      const compareUser = interaction.guild?.members.cache.get(compareUserId)?.user;
+      if (!compareUser) {
+        return safeInteractionReply(interaction, { content: '❌ Could not find the user to compare with.', flags: MessageFlags.Ephemeral });
+      }
+
+      // Create comparison embed
       const embed = new EmbedBuilder()
         .setTitle('⚖️ Profile Comparison')
         .setColor(0x2196F3)
-        .setDescription('Profile comparison feature coming soon!');
+        .setDescription(`Comparing **${interaction.user.username}** vs **${compareUser.username}**`);
+
+      // Add comparison fields
+      if (targetProfile.level !== undefined && compareProfile.level !== undefined) {
+        const levelDiff = targetProfile.level - compareProfile.level;
+        embed.addFields({
+          name: '🏆 Level',
+          value: `**${interaction.user.username}:** ${targetProfile.level}\n**${compareUser.username}:** ${compareProfile.level}\n${levelDiff > 0 ? `📈 You are ${levelDiff} levels ahead` : levelDiff < 0 ? `📉 You are ${Math.abs(levelDiff)} levels behind` : '⚖️ Same level'}`,
+          inline: true
+        });
+      }
+
+      if (targetProfile.xp !== undefined && compareProfile.xp !== undefined) {
+        const xpDiff = targetProfile.xp - compareProfile.xp;
+        embed.addFields({
+          name: '⭐ Experience',
+          value: `**${interaction.user.username}:** ${targetProfile.xp}\n**${compareUser.username}:** ${compareProfile.xp}\n${xpDiff > 0 ? `📈 You have ${xpDiff} more XP` : xpDiff < 0 ? `📉 You have ${Math.abs(xpDiff)} less XP` : '⚖️ Same XP'}`,
+          inline: true
+        });
+      }
+
+      if (targetProfile.gold !== undefined && compareProfile.gold !== undefined) {
+        const goldDiff = targetProfile.gold - compareProfile.gold;
+        embed.addFields({
+          name: '💰 Gold',
+          value: `**${interaction.user.username}:** ${targetProfile.gold}\n**${compareUser.username}:** ${compareProfile.gold}\n${goldDiff > 0 ? `📈 You have ${goldDiff} more gold` : goldDiff < 0 ? `📉 You have ${Math.abs(goldDiff)} less gold` : '⚖️ Same gold amount'}`,
+          inline: true
+        });
+      }
+
+      if (targetProfile.achievements !== undefined && compareProfile.achievements !== undefined) {
+        const achievementsDiff = targetProfile.achievements - compareProfile.achievements;
+        embed.addFields({
+          name: '🏅 Achievements',
+          value: `**${interaction.user.username}:** ${targetProfile.achievements}\n**${compareUser.username}:** ${compareProfile.achievements}\n${achievementsDiff > 0 ? `📈 You have ${achievementsDiff} more achievements` : achievementsDiff < 0 ? `📉 You have ${Math.abs(achievementsDiff)} fewer achievements` : '⚖️ Same number of achievements'}`,
+          inline: true
+        });
+      }
 
       await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
       return;
@@ -2570,12 +2996,12 @@ export async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot continue chat for another user.', flags: MessageFlags.Ephemeral });
       }
 
-      const embed = new EmbedBuilder()
-        .setTitle('💬 AI Chat Continued')
-        .setColor(0x00FF00)
-        .setDescription('Chat continuation feature coming soon!');
+      // Show modal for continuing AI chat
+      const modal = new ModalBuilder().setCustomId(`ai_chat_continue_modal:${model}:${personality}:${interaction.user.id}`).setTitle('Continue AI Chat');
+      const messageInput = new TextInputBuilder().setCustomId('message').setLabel('Your message').setStyle(TextInputStyle.Paragraph).setRequired(true).setPlaceholder('What would you like to say next?');
 
-      await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+      modal.addComponents({ type: 1, components: [messageInput] });
+      await interaction.showModal(modal);
       return;
     }
 
@@ -2688,10 +3114,30 @@ export async function handleButtonInteraction(interaction, client) {
         return safeInteractionReply(interaction, { content: 'You cannot view leaderboard for another user.', flags: MessageFlags.Ephemeral });
       }
 
+      // Import achievement functions
+      const { getAchievementLeaderboard } = await import('./achievements.js');
+      const leaderboard = getAchievementLeaderboard(10);
+
+      if (!leaderboard || leaderboard.length === 0) {
+        const embed = new EmbedBuilder()
+          .setTitle('🏅 Achievement Leaderboard')
+          .setColor(0xFFD700)
+          .setDescription('No achievement data available yet.\n\nComplete achievements to appear on the leaderboard!');
+
+        await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+        return;
+      }
+
+      const description = leaderboard.map((entry, index) => {
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `**${index + 1}.**`;
+        return `${medal} **${entry.username}** - ${entry.totalAchievements} achievements, ${entry.totalPoints} points`;
+      }).join('\n');
+
       const embed = new EmbedBuilder()
         .setTitle('🏅 Achievement Leaderboard')
         .setColor(0xFFD700)
-        .setDescription('Achievement leaderboard feature coming soon!');
+        .setDescription(description)
+        .setFooter({ text: 'Top achievers this month' });
 
       await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
       return;

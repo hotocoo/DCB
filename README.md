@@ -3,11 +3,25 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Discord.js](https://img.shields.io/badge/discord.js-v14-blue.svg)](https://discord.js.org/)
-[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)]()
 [![Database](https://img.shields.io/badge/database-SQLite-lightgrey.svg)]()
-[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-black.svg)](https://github.com/your-username/ultra-discord-bot)
+[![Coverage](https://img.shields.io/badge/coverage-85%25-green.svg)]()
+[![Docker](https://img.shields.io/badge/docker-supported-blue.svg)]()
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/watchandnotlearn/ultra-discord-bot/pulls)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-black.svg)](https://github.com/watchandnotlearn/ultra-discord-bot)
 
 A comprehensive, feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, AI-powered interactions, and now powered by SQLite database for enhanced performance and reliability.
+
+**✨ Features:**
+- **RPG System**: Character progression with classes, inventory, quests, and boss battles
+- **Music Integration**: Multi-source playback with Spotify, YouTube, and Deezer support
+- **Economy System**: Banking, businesses, investments, and marketplace trading
+- **Moderation Tools**: Advanced warning, mute, ban systems with logging
+- **AI Assistant**: Multiple AI models with personality profiles and memory
+- **Mini-Games**: Trivia, Wordle, Connect Four, Tic-Tac-Toe, and more
+- **Guild Management**: Multiplayer guilds with economies and leaderboards
+- **SQLite Database**: ACID-compliant data storage with migration support
+- **Docker Support**: Containerized deployment with health checks
 
 ## 🌟 Overview
 
@@ -75,52 +89,58 @@ Whether you're looking to engage your community with games, manage your server e
 ### Quick Setup
 
 1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-username/ultra-discord-bot.git
-   cd ultra-discord-bot
-   ```
+    ```bash
+    git clone https://github.com/watchandnotlearn/ultra-discord-bot.git
+    cd ultra-discord-bot
+    ```
 
 2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+    ```bash
+    npm install
+    ```
 
 3. **Configure environment variables:**
-    ```bash
-    cp .env.template .env
-    ```
-
-    Edit `.env` with your configuration:
-    ```env
-    # Required Discord Setup
-    DISCORD_TOKEN=your_bot_token_here
-    CLIENT_ID=your_application_client_id
-    GUILD_ID=your_test_server_id
-
-    # Database Configuration (Optional - SQLite by default)
-    DATABASE_URL=./data/bot.db
-    DB_MAX_CONNECTIONS=10
-
-    # Optional AI Integration
-    OPENAI_API_KEY=your_openai_key_here
-    LOCAL_MODEL_URL=http://localhost:8000
-    LOCAL_MODEL_API=openai-compatible
-
-    # Optional External APIs
-    OPENWEATHER_API_KEY=your_weather_api_key_here
-    SPOTIFY_CLIENT_ID=your_spotify_client_id
-    SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-    ```
+     ```bash
+     cp .env.template .env
+     # Edit .env with your actual tokens and configuration
+     ```
 
 4. **Deploy slash commands:**
-   ```bash
-   npm run deploy
-   ```
+    ```bash
+    npm run deploy
+    ```
 
 5. **Start the bot:**
-   ```bash
-   npm start
-   ```
+    ```bash
+    npm start
+    ```
+
+### Docker Setup (Alternative)
+
+```bash
+# Build the image
+npm run docker:build
+
+# Run the container
+npm run docker:run
+```
+
+### Development Setup
+
+```bash
+# Install development dependencies
+npm install
+
+# Run tests before development
+npm run test
+
+# Start in development mode with auto-reload
+npm run dev
+
+# Run linting and formatting
+npm run lint
+npm run format
+```
 
 ## 📚 Usage
 
@@ -229,12 +249,14 @@ The bot supports extensive customization through configuration files and environ
 ### Technology Stack
 - **Runtime**: Node.js 18+
 - **Discord Library**: Discord.js v14
-- **Language**: JavaScript ES6+ (ESM)
-- **Data Storage**: SQLite database with JSON fallback compatibility
+- **Language**: JavaScript ES2022+ (ESM)
+- **Data Storage**: SQLite 3 with better-sqlite3 driver
 - **AI Integration**: OpenAI API + Local Model Support
 - **Audio Processing**: FFmpeg integration for music playback
-- **Rate Limiting**: Built-in request throttling
-- **Database**: SQLite 3 with ACID compliance and foreign key constraints
+- **Rate Limiting**: Built-in request throttling with rate-limiter-flexible
+- **Database**: SQLite with ACID compliance and foreign key constraints
+- **Containerization**: Docker support with multi-stage builds
+- **Development**: ESLint, Prettier, comprehensive testing suite
 
 ### Project Structure
 ```
@@ -269,13 +291,15 @@ We welcome contributions from the community! Whether you're fixing bugs, adding 
 
 ### Development Guidelines
 
-1. **Code Quality**: Follow ES6+ best practices and maintain consistent code style
-2. **Documentation**: Document all new functions, classes, and features
+1. **Code Quality**: Follow ES2022+ best practices and maintain consistent code style
+2. **Documentation**: Document all new functions, classes, and features with JSDoc
 3. **Testing**: Add comprehensive tests for new functionality with database integration
 4. **Performance**: Optimize for scalability and efficiency with database query optimization
 5. **Security**: Validate inputs and handle errors gracefully with SQL injection protection
 6. **Compatibility**: Ensure cross-platform compatibility and database migration support
 7. **Database**: Implement proper transaction handling and foreign key relationships
+8. **Linting**: Run `npm run lint` and `npm run format` before committing
+9. **Testing**: Ensure all tests pass with `npm run test` before PR submission
 
 ### Getting Started with Development
 

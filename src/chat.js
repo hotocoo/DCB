@@ -1,11 +1,16 @@
 /**
- * Chat module for Discord bot.
- * Handles AI-powered conversations and direct message interactions.
+ * Chat module for ULTRA Discord Bot.
+ * Handles AI-powered conversations and direct message interactions with enhanced error handling and performance monitoring.
+ *
+ * @fileoverview Advanced chat system with multiple AI providers, conversation memory, and fallback mechanisms.
+ * @author ULTRA Bot Development Team
+ * @version 3.0.1
+ * @license MIT
  */
 
 import 'dotenv/config';
 import { getGuild } from './storage.js';
-import { logger } from './logger.js';
+import { logger, logError } from './logger.js';
 
 /**
  * Configuration constants for chat functionality.
@@ -16,67 +21,173 @@ const LOCAL_MODEL_API = process.env.LOCAL_MODEL_API || 'openai-compatible';
 const OPENWEBUI_BASE = process.env.OPENWEBUI_BASE;
 const OPENWEBUI_PATH = process.env.OPENWEBUI_PATH || '/api/chat';
 
-// Chat configuration
-const DEFAULT_CHAT_COOLDOWN_MS = 2000;
-const DEFAULT_MAX_HISTORY = 8;
-const MAX_RESPONSE_LENGTH = 2000;
-const MAX_PROMPT_LENGTH = 1000;
+// Chat configuration with environment variable support
+const DEFAULT_CHAT_COOLDOWN_MS = parseInt(process.env.CHAT_COOLDOWN_MS || '2000', 10);
+const DEFAULT_MAX_HISTORY = parseInt(process.env.CHAT_MAX_HISTORY || '8', 10);
+const MAX_RESPONSE_LENGTH = parseInt(process.env.MAX_RESPONSE_LENGTH || '2000', 10);
+const MAX_PROMPT_LENGTH = parseInt(process.env.MAX_PROMPT_LENGTH || '1000', 10);
+const AI_MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS || '512', 10);
+const AI_TEMPERATURE = parseFloat(process.env.AI_TEMPERATURE || '0.8');
 
+// Performance limits
+const MAX_CONVERSATION_MEMORY_MB = 50; // Limit memory usage
+const CLEANUP_INTERVAL_MS = 300000; // 5 minutes cleanup
+
+/**
+ * Calls a local AI model with enhanced error handling and timeout protection.
+ * @param {string} prompt - The prompt to send to the model
+ * @param {string} [url] - The model endpoint URL
+ * @param {string} [api] - The API type ('openai-compatible', 'openwebui', etc.)
+ * @returns {Promise<string|null>} The model response or null if failed
+ */
 async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_API) {
-  // Try to be compatible with OpenAI-like local endpoints
+  if (!url) {
+    throw new Error('Local model URL not configured');
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
   try {
+    let response;
+
     if (api === 'openai-compatible') {
       const res = await fetch(`${url.replace(/\/$/, '')}/v1/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'gpt-oss-20b', messages: [{ role: 'user', content: prompt }], max_tokens: 512 }),
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'ULTRA-Bot/3.0.1'
+        },
+        body: JSON.stringify({
+          model: 'gpt-oss-20b',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: AI_MAX_TOKENS,
+          temperature: AI_TEMPERATURE
+        }),
+        signal: controller.signal
       });
-      if (!res.ok) throw new Error(await res.text());
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Local model API error ${res.status}: ${errorText}`);
+      }
+
       const data = await res.json();
-      return data.choices?.[0]?.message?.content ?? data.result ?? null;
-    }
-    if (api === 'openwebui') {
-      // OpenWebUI expects {prompt: '...'} at /api/chat or similar, adjust via OPENWEBUI_BASE/OPENWEBUI_PATH
+      response = data.choices?.[0]?.message?.content ?? data.result ?? null;
+
+    } else if (api === 'openwebui') {
       const base = OPENWEBUI_BASE || url;
-      const fulld = `${base.replace(/\/$/, '')}${OPENWEBUI_PATH}`;
-      const res = await fetch(fulld, {
+      if (!base) {
+        throw new Error('OpenWebUI base URL not configured');
+      }
+
+      const fullUrl = `${base.replace(/\/$/, '')}${OPENWEBUI_PATH}`;
+      const res = await fetch(fullUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'ULTRA-Bot/3.0.1'
+        },
         body: JSON.stringify({ prompt }),
+        signal: controller.signal
       });
-      if (!res.ok) throw new Error(await res.text());
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`OpenWebUI API error ${res.status}: ${errorText}`);
+      }
+
       const data = await res.json();
-      // Try common response shapes
-      return data.response ?? data.output ?? data.result ?? null;
+      response = data.response ?? data.output ?? data.result ?? null;
+
+    } else {
+      // Generic endpoint fallback
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'ULTRA-Bot/3.0.1'
+        },
+        body: JSON.stringify({ prompt }),
+        signal: controller.signal
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Generic model API error ${res.status}: ${errorText}`);
+      }
+
+      const data = await res.json();
+      response = data.result ?? data.output ?? null;
     }
 
-    // simple generic endpoint that returns {result: 'text'}
-    const res = await fetch(LOCAL_MODEL_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
-    return data.result ?? data.output ?? null;
+    clearTimeout(timeoutId);
+
+    if (!response || typeof response !== 'string') {
+      throw new Error('Invalid or empty response from local model');
+    }
+
+    return response.trim();
+
   } catch (err) {
-    console.error('Local model error', err);
-    throw err;
+    clearTimeout(timeoutId);
+
+    if (err.name === 'AbortError') {
+      logger.warn('Local model request timed out');
+      throw new Error('Local model request timed out after 30 seconds');
+    }
+
+    logger.error('Local model error', err instanceof Error ? err : new Error(String(err)));
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 
-// In-memory storage for conversation history and cooldowns
+// In-memory storage for conversation history and cooldowns with memory management
 const conversationMap = new Map();
 const cooldownMap = new Map();
 
+// Memory management - periodic cleanup to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+
+  // Clean up old cooldowns
+  for (const [userId, timestamp] of cooldownMap.entries()) {
+    if (now - timestamp > maxAge) {
+      cooldownMap.delete(userId);
+    }
+  }
+
+  // Clean up old conversations (keep recent ones)
+  let totalMemory = 0;
+  for (const [userId, history] of conversationMap.entries()) {
+    // Estimate memory usage (rough calculation)
+    const memoryEstimate = JSON.stringify(history).length * 2; // UTF-16 estimate
+    totalMemory += memoryEstimate;
+
+    // Remove old conversations if memory usage is too high
+    if (totalMemory > MAX_CONVERSATION_MEMORY_MB * 1024 * 1024) {
+      conversationMap.delete(userId);
+    }
+  }
+
+  if (totalMemory > MAX_CONVERSATION_MEMORY_MB * 1024 * 1024 * 0.8) {
+    logger.warn('High conversation memory usage detected', {
+      totalMemoryMB: (totalMemory / (1024 * 1024)).toFixed(2),
+      conversations: conversationMap.size,
+      cooldowns: cooldownMap.size
+    });
+  }
+}, CLEANUP_INTERVAL_MS);
+
 /**
- * Sends a prompt to OpenAI and returns the response.
- * @param {Array|string} messages - Chat messages or single prompt string
+ * Sends a prompt to OpenAI and returns the response with enhanced error handling.
+ * @param {Array<{role: string, content: string}>|string} messages - Chat messages or single prompt string
  * @returns {Promise<string|null>} AI response or null if failed
  */
 export async function respondWithOpenAI(messages) {
   if (!OPENAI_KEY) {
-    throw new Error('OPENAI_API_KEY not set');
+    throw new Error('OPENAI_API_KEY not set. Please configure your OpenAI API key in .env file.');
   }
 
   // Convert single prompt to messages format
@@ -84,30 +195,54 @@ export async function respondWithOpenAI(messages) {
 
   logger.debug('Calling OpenAI API', { messageCount: messageArray.length });
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_KEY}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: messageArray,
-      max_tokens: 300,
-      temperature: 0.8,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for OpenAI
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`OpenAI error: ${res.status} ${text}`);
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_KEY}`,
+        'User-Agent': 'ULTRA-Bot/3.0.1'
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        messages: messageArray,
+        max_tokens: AI_MAX_TOKENS,
+        temperature: AI_TEMPERATURE,
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`OpenAI API error ${res.status}: ${text}`);
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content?.trim();
+
+    if (!content) {
+      throw new Error('OpenAI returned empty response');
+    }
+
+    logger.debug('OpenAI response received', { contentLength: content.length });
+    return content;
+
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error.name === 'AbortError') {
+      logger.warn('OpenAI request timed out');
+      throw new Error('OpenAI request timed out after 60 seconds');
+    }
+
+    logger.error('OpenAI API error', error instanceof Error ? error : new Error(String(error)));
+    throw error instanceof Error ? error : new Error(String(error));
   }
-
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content?.trim();
-
-  logger.debug('OpenAI response received', { contentLength: content?.length || 0 });
-  return content || null;
 }
 
 /**

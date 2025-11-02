@@ -32,8 +32,17 @@ function restoreData() {
 async function run() {
   backupData();
   try {
-    // ensure clean start
+    // ensure clean start - remove both old and new data
     if (fs.existsSync(FILE)) fs.unlinkSync(FILE);
+    const playerDir = path.join(process.cwd(), 'data', 'players');
+    if (fs.existsSync(playerDir)) {
+      const files = fs.readdirSync(playerDir);
+      for (const file of files) {
+        if (file.startsWith('testuser1')) {
+          fs.unlinkSync(path.join(playerDir, file));
+        }
+      }
+    }
 
     const uid = 'testuser1';
     const char = createCharacter(uid, 'Tester');

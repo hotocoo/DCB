@@ -147,7 +147,10 @@ class ComprehensiveTestSuite {
 
       // Test get character
       const savedChar = getCharacter(this.testUsers[0]);
-      this.log(`Character retrieved: ${savedChar.name}`, !!savedChar);
+      this.log(`Character retrieved: ${savedChar ? savedChar.name : 'null'}`, !!savedChar);
+
+      // Verify character has proper structure after creation
+      this.log(`Character has required properties: ${savedChar.hp !== undefined && savedChar.maxHp !== undefined}`, savedChar.hp !== undefined && savedChar.maxHp !== undefined);
 
     } catch (error) {
       this.logError('RPG test failed', error);
