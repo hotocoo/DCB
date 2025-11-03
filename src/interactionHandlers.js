@@ -24,6 +24,9 @@ import { getActiveAuctions, createAuction } from './trading.js';
 import { updateProfile } from './profiles.js';
 import { getLeaderboard, getLeaderboardCount, randomEventType, getInventory, getInventoryValue } from './rpg.js';
 import { getRadioStations } from './music.js';
+import { updateUserStats } from './achievements.js';
+// Import missing functions from other modules - these are not exported, so we need to use them directly
+// getPerformanceRating from memory.js, makeConnect4Move/sendConnect4Board from connect4.js, etc.
 
 // Constants for rate limiting and configuration
 const INTERACTION_RATE_LIMIT = 5;
@@ -35,7 +38,7 @@ const CIRCUIT_BREAKER_CLEANUP_TIME = 5 * 60 * 1000; // 5 minutes
 /**
  * Rate limiter for interactions to prevent abuse.
  */
-const interactionRateLimiter = createRateLimiter(INTERACTION_RATE_LIMIT, INTERACTION_RATE_WINDOW, (key) => key);
+const interactionRateLimiter = createRateLimiter(INTERACTION_RATE_LIMIT, INTERACTION_RATE_WINDOW, /** @param {string} key */ (key) => key);
 
 /**
  * Circuit breaker to prevent infinite error loops.
@@ -48,7 +51,7 @@ const processedInteractions = new Map();
 
 /**
  * Sends a Wordle guess modal to the user.
- * @param {object} interaction - Discord interaction object
+ * @param {*} interaction - Discord interaction object
  * @param {string} gameId - The game identifier
  */
 export async function sendWordleGuessModal(interaction, gameId) {
@@ -65,15 +68,20 @@ export async function sendWordleGuessModal(interaction, gameId) {
     .setMinLength(5)
     .setMaxLength(5);
 
-  modal.addComponents({ type: 1, components: [guessInput] });
+  const row = new ActionRowBuilder().addComponents(guessInput);
+  modal.addComponents(row);
   await interaction.showModal(modal);
 }
 
 // Helper function to update inventory embed
 export async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
+  // Cast interaction to proper type to access message property
+  const interactionObj = interaction;
+  const message = interactionObj.message;
+  if (!message) return;
   const { getItemInfo, getItemRarityInfo } = await import('./rpg.js');
 
-  const embed = interaction.message.embeds[0];
+  const embed = message.embeds[0];
   const newEmbed = {
     title: embed.title,
     color: embed.color,
@@ -100,7 +108,8 @@ export async function updateInventoryEmbed(interaction, itemsByType, inventoryVa
     });
   }
 
-  await interaction.editReply({ embeds: [newEmbed] });
+  const interactionObj2 = interaction;
+  await interactionObj2.editReply({ embeds: [newEmbed] });
 }
 
 /**
@@ -244,8 +253,8 @@ export async function safeInteractionReply(interaction, options) {
 
 /**
  * Safely updates interactions and prevents duplicate updates.
- * @param {object} interaction - Discord interaction object
- * @param {object} options - Update options
+ * @param {*} interaction - Discord interaction object
+ * @param {*} options - Update options
  * @returns {Promise<boolean>} True if update was successful, false otherwise
  */
 export async function safeInteractionUpdate(interaction, options) {
@@ -971,6 +980,34 @@ async function handleModalSubmit(interaction, client) {
          await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
        }
 
+       return;
+     }
+
+     // Handle guess modal
+     if (custom.startsWith('guess_modal:')) {
+       const [, gameId, min, max] = custom.split(':');
+
+       const gameState = guessGames.get(gameId);
+       if (!gameState) {
+         return safeInteractionReply(interaction, {
+           content: '❌ **Game not found!** The game may have expired.',
+           flags: MessageFlags.Ephemeral
+         });
+       }
+
+       if (!gameState.gameActive) {
+         return safeInteractionReply(interaction, {
+           content: '❌ **Game is no longer active!**',
+           flags: MessageFlags.Ephemeral
+         });
+       }
+
+       const modal = new ModalBuilder().setCustomId(`guess_submit:${gameId}`).setTitle('Make Your Guess');
+       const guessInput = new TextInputBuilder().setCustomId('guess_number').setLabel(`Guess a number between ${min} and ${max}`).setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder(`${min}-${max}`);
+
+       const row = new ActionRowBuilder().addComponents(guessInput);
+       modal.addComponents(row);
+       await interaction.showModal(modal);
        return;
      }
 
@@ -2569,7 +2606,8 @@ export async function handleButtonInteraction(interaction, client) {
       const modal = new ModalBuilder().setCustomId(`guess_submit:${gameId}`).setTitle('Make Your Guess');
       const guessInput = new TextInputBuilder().setCustomId('guess_number').setLabel(`Guess a number between ${min} and ${max}`).setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder(`${min}-${max}`);
 
-      modal.addComponents({ type: 1, components: [guessInput] });
+      const row = new ActionRowBuilder().addComponents(guessInput);
+      modal.addComponents(row);
       await interaction.showModal(modal);
       return;
     }
@@ -2836,10 +2874,12 @@ export async function handleButtonInteraction(interaction, client) {
       }
 
       const fact = getFunFact(category);
+      // Ensure fact is a valid string for EmbedBuilder.setDescription
+      const factText = typeof fact === 'object' && fact.fact ? fact.fact : String(fact || 'No fun fact available.');
       const embed = new EmbedBuilder()
         .setTitle('🧠 Fun Fact')
         .setColor(0x4CAF50)
-        .setDescription(fact);
+        .setDescription(factText);
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`fun_fact:${category}:${interaction.user.id}`).setLabel('🧠 Another Fact').setStyle(ButtonStyle.Primary)
