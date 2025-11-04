@@ -1,4 +1,4 @@
-# Ultra Discord Bot
+# PulseBot
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
@@ -25,7 +25,7 @@ A comprehensive, feature-rich Discord bot built with Node.js and Discord.js, off
 
 ## 🌟 Overview
 
-Ultra Discord Bot is a versatile Discord bot that transforms your server into an interactive entertainment platform. Combining cutting-edge features with intuitive design, it provides everything from immersive RPG adventures and high-quality music streaming to sophisticated economic systems and powerful moderation tools.
+PulseBot is a versatile Discord bot that transforms your server into an interactive entertainment platform. Combining cutting-edge features with intuitive design, it provides everything from immersive RPG adventures and high-quality music streaming to sophisticated economic systems and powerful moderation tools.
 
 Whether you're looking to engage your community with games, manage your server effectively, or create immersive role-playing experiences, Ultra Discord Bot delivers professional-grade functionality with enterprise-level reliability.
 
@@ -274,7 +274,7 @@ The bot supports extensive customization through configuration files and environ
 
 ### Project Structure
 ```
-ultra-discord-bot/
+pulsebot/
 ├── src/
 │   ├── commands/        # Slash command implementations
 │   ├── minigames/       # Mini-game logic

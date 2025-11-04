@@ -1,5 +1,5 @@
 {
-  "name": "ultra-discord-bot",
+  "name": "pulsebot",
   "version": "3.0.0",
   "description": "ULTRA - The Most Advanced Discord Bot Ever Created",
   "main": "src/index.js",
