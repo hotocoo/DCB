@@ -1,10 +1,34 @@
-// Module file for Connect4 command
+/**
+ * @typedef {Object} GameState
+ * @property {string} id
+ * @property {(null|'red'|'yellow')[][]} board
+ * @property {Object} players
+ * @property {Object} players.red
+ * @property {string} players.red.id
+ * @property {string} players.red.name
+ * @property {string} players.red.symbol
+ * @property {Object} players.yellow
+ * @property {string} players.yellow.id
+ * @property {string} players.yellow.name
+ * @property {string} players.yellow.symbol
+ * @property {'red'|'yellow'} currentPlayer
+ * @property {'active'|'completed'} status
+ * @property {boolean} isAI
+ * @property {'easy'|'medium'|'hard'} difficulty
+ * @property {number} created
+ */
+
+/**
+ * @typedef {import('discord.js').ChatInputCommandInteraction} CommandInteraction
+ * @typedef {import('discord.js').ButtonInteraction} ButtonInteraction
+ */
+
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 
 import { updateUserStats } from '../achievements.js';
 import { connect4Games } from '../game-states.js';
-import { CommandError, handleCommandError } from '../errorHandler.js';
-import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers.js';
+import { CommandError, handleCommandError } from '../errorHandler';
+import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers';
 
 export const data = new SlashCommandBuilder()
   .setName('connect4')
@@ -23,9 +47,16 @@ export const data = new SlashCommandBuilder()
       )
       .setRequired(false));
 
+/**
+ * @param {CommandInteraction} interaction
+ */
+/**
+ * @param {CommandInteraction} interaction
+ */
 export async function execute(interaction) {
   try {
     const opponent = interaction.options.getUser('opponent');
+    if (!opponent) throw new CommandError('Opponent not found.', 'INVALID_ARGUMENT');
     const difficulty = interaction.options.getString('difficulty') || 'medium';
 
     // Validation: Cannot play against self
@@ -42,17 +73,18 @@ export async function execute(interaction) {
     const gameId = `c4_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     // Initialize game state
+    /** @type {GameState} */
     const gameState = {
       id: gameId,
-      board: Array.from({ length: 6 }).fill(null).map(() => Array.from({ length: 7 }).fill(null)),
+      board: Array.from({ length: 6 }).fill(null).map(() => /** @type {(null|'red'|'yellow')[]} */ (Array.from({ length: 7 }).fill(null))),
       players: {
         red: { id: interaction.user.id, name: interaction.user.username, symbol: '🔴' },
         yellow: { id: opponent.id, name: opponent.username, symbol: '🟡' }
       },
-      currentPlayer: 'red',
-      status: 'active',
+      currentPlayer: /** @type {'red'|'yellow'} */ ('red'),
+      status: /** @type {'active'|'completed'} */ ('active'),
       isAI: opponent.bot,
-      difficulty: difficulty || 'medium',
+      difficulty: /** @type {'easy'|'medium'|'hard'} */ (difficulty || 'medium'),
       created: Date.now()
     };
 
@@ -62,10 +94,14 @@ export async function execute(interaction) {
     await sendConnect4Board(interaction, gameState);
   }
   catch (error) {
-    await handleCommandError(interaction, error);
+    await handleCommandError(interaction, error instanceof Error ? error : new CommandError(String(error), 'UNKNOWN_ERROR'));
   }
 }
 
+/**
+ * @param {CommandInteraction|ButtonInteraction} interaction
+ * @param {GameState} gameState
+ */
 async function sendConnect4Board(interaction, gameState) {
   try {
     const { board, players, currentPlayer, status, isAI, difficulty } = gameState;
@@ -76,8 +112,8 @@ async function sendConnect4Board(interaction, gameState) {
       gameState.status = 'completed';
 
       if (winner !== 'tie') {
-        const winnerPlayer = players[winner];
-        if (winnerPlayer.id !== 'ai' && winnerPlayer.id) {
+        const winnerPlayer = winner === 'red' ? players.red : winner === 'yellow' ? players.yellow : null;
+        if (winnerPlayer && winnerPlayer.id !== 'ai' && winnerPlayer.id) {
           try {
             updateUserStats(winnerPlayer.id, { connect4_wins: 1 });
           }
@@ -93,7 +129,7 @@ async function sendConnect4Board(interaction, gameState) {
       const resultEmbed = new EmbedBuilder()
         .setTitle('🎯 Connect Four - Game Over!')
         .setColor(winner === 'tie' ? 0xFF_A5_00 : 0x00_FF_00)
-        .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${players[winner]?.name || 'Unknown'} wins!**`)
+        .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${(winner === 'red' ? players.red : winner === 'yellow' ? players.yellow : { name: 'Unknown' }).name} wins!**`)
         .addFields({
           name: 'Final Board',
           value: formatConnect4Board(board),
@@ -122,7 +158,7 @@ async function sendConnect4Board(interaction, gameState) {
     const row2 = new ActionRowBuilder();
 
     for (let col = 0; col < 7; col++) {
-      const canPlay = board[0][col] === null; // Check if top row is empty
+      const canPlay = board[0] && board[0][col] === null; // Check if top row is empty
 
       const button = new ButtonBuilder()
         .setCustomId(`c4_${col}_${gameState.id}`)
@@ -145,10 +181,10 @@ async function sendConnect4Board(interaction, gameState) {
       setTimeout(async() => {
         try {
           const aiMove = getConnect4AIMove(board, difficulty);
-          if (aiMove !== null) {
-            await makeConnect4Move(gameState, aiMove);
-            await sendConnect4Board(interaction, gameState);
-          }
+         if (aiMove !== null && aiMove !== undefined) {
+           await makeConnect4Move(gameState, aiMove);
+           await sendConnect4Board(interaction, gameState);
+         }
         }
         catch (aiError) {
           console.error('AI move error:', aiError);
@@ -158,10 +194,13 @@ async function sendConnect4Board(interaction, gameState) {
   }
   catch (error) {
     console.error('sendConnect4Board error:', error);
-    await handleCommandError(interaction, new CommandError('Failed to update game board.', 'UNKNOWN_ERROR', { originalError: error.message }));
+    await handleCommandError(interaction, new CommandError('Failed to update game board.', 'UNKNOWN_ERROR', { originalError: error instanceof Error ? error.message : String(error) }));
   }
 }
 
+/**
+ * @param {(null|'red'|'yellow')[][]} board
+ */
 function formatConnect4Board(board) {
   const symbols = {
     null: '⬜',
@@ -171,8 +210,11 @@ function formatConnect4Board(board) {
 
   let formatted = '';
   for (let row = 0; row < 6; row++) {
+    const boardRow = board[row];
+    if (!boardRow) continue;
     for (let col = 0; col < 7; col++) {
-      formatted += symbols[board[row][col]] || '⬜';
+      const cell = boardRow[col];
+      formatted += cell === null ? symbols.null : cell === 'red' ? symbols.red : cell === 'yellow' ? symbols.yellow : '⬜';
     }
     formatted += '\n';
   }
@@ -180,12 +222,17 @@ function formatConnect4Board(board) {
   return formatted;
 }
 
+/**
+ * @param {(null|'red'|'yellow')[][]} board
+ */
 function checkConnect4Winner(board) {
   // Check horizontal
   for (let row = 0; row < 6; row++) {
+    const boardRow = board[row];
+    if (!boardRow) continue;
     for (let col = 0; col < 4; col++) {
-      const cell = board[row][col];
-      if (cell && board[row][col + 1] === cell && board[row][col + 2] === cell && board[row][col + 3] === cell) {
+      const cell = boardRow[col];
+      if (cell && boardRow[col + 1] === cell && boardRow[col + 2] === cell && boardRow[col + 3] === cell) {
         return cell;
       }
     }
@@ -193,9 +240,14 @@ function checkConnect4Winner(board) {
 
   // Check vertical
   for (let row = 0; row < 3; row++) {
+    const boardRow0 = board[row];
+    const boardRow1 = board[row + 1];
+    const boardRow2 = board[row + 2];
+    const boardRow3 = board[row + 3];
+    if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 0; col < 7; col++) {
-      const cell = board[row][col];
-      if (cell && board[row + 1][col] === cell && board[row + 2][col] === cell && board[row + 3][col] === cell) {
+      const cell = boardRow0[col];
+      if (cell && boardRow1[col] === cell && boardRow2[col] === cell && boardRow3[col] === cell) {
         return cell;
       }
     }
@@ -203,9 +255,14 @@ function checkConnect4Winner(board) {
 
   // Check diagonal (top-left to bottom-right)
   for (let row = 0; row < 3; row++) {
+    const boardRow0 = board[row];
+    const boardRow1 = board[row + 1];
+    const boardRow2 = board[row + 2];
+    const boardRow3 = board[row + 3];
+    if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 0; col < 4; col++) {
-      const cell = board[row][col];
-      if (cell && board[row + 1][col + 1] === cell && board[row + 2][col + 2] === cell && board[row + 3][col + 3] === cell) {
+      const cell = boardRow0[col];
+      if (cell && boardRow1[col + 1] === cell && boardRow2[col + 2] === cell && boardRow3[col + 3] === cell) {
         return cell;
       }
     }
@@ -213,22 +270,31 @@ function checkConnect4Winner(board) {
 
   // Check diagonal (top-right to bottom-left)
   for (let row = 0; row < 3; row++) {
+    const boardRow0 = board[row];
+    const boardRow1 = board[row + 1];
+    const boardRow2 = board[row + 2];
+    const boardRow3 = board[row + 3];
+    if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 3; col < 7; col++) {
-      const cell = board[row][col];
-      if (cell && board[row + 1][col - 1] === cell && board[row + 2][col - 2] === cell && board[row + 3][col - 3] === cell) {
+      const cell = boardRow0[col];
+      if (cell && boardRow1[col - 1] === cell && boardRow2[col - 2] === cell && boardRow3[col - 3] === cell) {
         return cell;
       }
     }
   }
 
   // Check for tie
-  if (board[0].every(cell => cell !== null)) {
+  if (board[0] && board[0].every(/** @param {null|'red'|'yellow'} cell */ cell => cell !== null)) {
     return 'tie';
   }
 
   return null;
 }
 
+/**
+ * @param {GameState} gameState
+ * @param {number} column
+ */
 async function makeConnect4Move(gameState, column) {
   try {
     // Validate column input
@@ -240,8 +306,9 @@ async function makeConnect4Move(gameState, column) {
 
     // Find the lowest available row in the column
     for (let row = 5; row >= 0; row--) {
-      if (board[row][column] === null) {
-        board[row][column] = gameState.currentPlayer;
+      const boardRow = board[row];
+      if (boardRow && boardRow[column] === null) {
+        boardRow[column] = gameState.currentPlayer;
         gameState.currentPlayer = gameState.currentPlayer === 'red' ? 'yellow' : 'red';
         return true;
       }
@@ -255,11 +322,16 @@ async function makeConnect4Move(gameState, column) {
   }
 }
 
+/**
+ * @param {(null|'red'|'yellow')[][]} board
+ * @param {'easy'|'medium'|'hard'} difficulty
+ */
 function getConnect4AIMove(board, difficulty) {
   try {
+    /** @type {number[]} */
     const availableColumns = [];
     for (let col = 0; col < 7; col++) {
-      if (board[0][col] === null) {
+      if (board[0] && board[0][col] === null) {
         availableColumns.push(col);
       }
     }
@@ -302,7 +374,7 @@ function getConnect4AIMove(board, difficulty) {
     // Fallback to random move
     const fallbackColumns = [];
     for (let col = 0; col < 7; col++) {
-      if (board[0][col] === null) {
+      if (board[0] && board[0][col] === null) {
         fallbackColumns.push(col);
       }
     }
@@ -310,15 +382,20 @@ function getConnect4AIMove(board, difficulty) {
   }
 }
 
+/**
+ * @param {(null|'red'|'yellow')[][]} board
+ * @param {'red'|'yellow'} player
+ */
 function findConnect4WinningMove(board, player) {
   for (let col = 0; col < 7; col++) {
-    if (board[0][col] !== null) continue;
+    if (board[0] && board[0][col] !== null) continue;
 
     // Test the move
-    const testBoard = board.map(row => [...row]);
+    const testBoard = board.map(/** @param {(null|'red'|'yellow')[]} row */ row => [...row]);
     for (let row = 5; row >= 0; row--) {
-      if (testBoard[row][col] === null) {
-        testBoard[row][col] = player;
+      const testRow = testBoard[row];
+      if (testRow && testRow[col] === null) {
+        testRow[col] = player;
         if (checkConnect4Winner(testBoard) === player) {
           return col;
         }
@@ -329,20 +406,25 @@ function findConnect4WinningMove(board, player) {
   return null;
 }
 
+/**
+ * @param {(null|'red'|'yellow')[][]} board
+ * @param {'red'|'yellow'} player
+ */
 function getConnect4BestMove(board, player) {
   try {
     let bestScore = Number.NEGATIVE_INFINITY;
     let bestCol = null;
 
     for (let col = 0; col < 7; col++) {
-      if (board[0][col] !== null) continue;
-
-      const testBoard = board.map(row => [...row]);
+      if (board[0] && board[0][col] !== null) continue;
+  
+      const testBoard = board.map(/** @param {(null|'red'|'yellow')[]} row */ row => [...row]);
       let moveValid = false;
-
+  
       for (let row = 5; row >= 0; row--) {
-        if (testBoard[row][col] === null) {
-          testBoard[row][col] = player;
+        const testRow = testBoard[row];
+        if (testRow && testRow[col] === null) {
+          testRow[col] = player;
           const score = evaluateConnect4Position(testBoard, 0, player === 'yellow' ? 'red' : 'yellow');
           if (score > bestScore) {
             bestScore = score;
@@ -365,6 +447,11 @@ function getConnect4BestMove(board, player) {
   }
 }
 
+/**
+ * @param {(null|'red'|'yellow')[][]} board
+ * @param {number} depth
+ * @param {'red'|'yellow'} player
+ */
 function evaluateConnect4Position(board, depth, player) {
   const winner = checkConnect4Winner(board);
   if (winner === 'yellow') return 100 - depth;
@@ -376,16 +463,23 @@ function evaluateConnect4Position(board, depth, player) {
 
   // Check for 3 in a row (open ended)
   for (let row = 0; row < 6; row++) {
+    const boardRow = board[row];
+    if (!boardRow) continue;
     for (let col = 0; col < 4; col++) {
-      const window = [board[row][col], board[row][col + 1], board[row][col + 2], board[row][col + 3]];
+      const window = [boardRow[col], boardRow[col + 1], boardRow[col + 2], boardRow[col + 3]].filter(cell => cell != null);
       score += evaluateWindow(window, player);
     }
   }
 
   // Check vertical
   for (let row = 0; row < 3; row++) {
+    const boardRow0 = board[row];
+    const boardRow1 = board[row + 1];
+    const boardRow2 = board[row + 2];
+    const boardRow3 = board[row + 3];
+    if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 0; col < 7; col++) {
-      const window = [board[row][col], board[row + 1][col], board[row + 2][col], board[row + 3][col]];
+      const window = [boardRow0[col], boardRow1[col], boardRow2[col], boardRow3[col]].filter(cell => cell != null);
       score += evaluateWindow(window, player);
     }
   }
@@ -393,15 +487,23 @@ function evaluateConnect4Position(board, depth, player) {
   return score;
 }
 
+/**
+ * @param {(null|'red'|'yellow')[]} window
+ * @param {'red'|'yellow'} player
+ */
 function evaluateWindow(window, player) {
   const opponent = player === 'yellow' ? 'red' : 'yellow';
   let score = 0;
 
-  if (window.filter(cell => cell === player).length === 4) score += 100;
-  else if (window.filter(cell => cell === player).length === 3 && window.filter(cell => cell === null).length === 1) score += 10;
-  else if (window.filter(cell => cell === player).length === 2 && window.filter(cell => cell === null).length === 2) score += 2;
+  const playerCount = window.filter(/** @param {null|'red'|'yellow'} cell */ cell => cell === player).length;
+  const nullCount = window.filter(/** @param {null|'red'|'yellow'} cell */ cell => cell === null).length;
+  const opponentCount = window.filter(/** @param {null|'red'|'yellow'} cell */ cell => cell === opponent).length;
 
-  if (window.filter(cell => cell === opponent).length === 3 && window.filter(cell => cell === null).length === 1) score -= 80;
+  if (playerCount === 4) score += 100;
+  else if (playerCount === 3 && nullCount === 1) score += 10;
+  else if (playerCount === 2 && nullCount === 2) score += 2;
+
+  if (opponentCount === 3 && nullCount === 1) score -= 80;
 
   return score;
 }

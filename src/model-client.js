@@ -258,7 +258,7 @@ export async function generate(guildId, prompt) {
       const messages = [
         {
           role: 'system',
-          content: 'You are ULTRA, an advanced AI Discord bot. Provide creative, engaging responses for RPG narration and storytelling. Keep responses under 500 characters.'
+          content: 'You are Pulse, an advanced AI Discord bot. Provide creative, engaging responses for RPG narration and storytelling. Keep responses under 500 characters.'
         },
         {
           role: 'user',

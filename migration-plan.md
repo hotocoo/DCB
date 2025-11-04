@@ -1,7 +1,7 @@
 # Database Migration Plan
 
 ## Executive Summary
-This plan outlines the ongoing migration from JSON-based storage to SQLite database for the PulseBot. The migration will ensure data integrity, backward compatibility, and minimal downtime while accommodating recent features including polls, novels, trading system, and enhanced RPG locations.
+This plan outlines the ongoing migration from JSON-based storage to SQLite database for the Pulse Bot. The migration will ensure data integrity, backward compatibility, and minimal downtime while accommodating recent features including polls, novels, trading system, and enhanced RPG locations.
 
 ## Current Data Analysis
 

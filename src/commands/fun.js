@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 
-import { CommandError, handleCommandError } from '../errorHandler.js';
-import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers.js';
+import { CommandError, handleCommandError } from '../errorHandler';
+import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers';
 import {
   getRandomJoke,
   generateStory,
@@ -68,6 +68,9 @@ export const data = new SlashCommandBuilder()
     { name: 'Stories Generated', value: 'stories' }
   ).setRequired(false)));
 
+/**
+* @param {import('discord.js').ChatInputCommandInteraction} interaction
+*/
 export async function execute(interaction) {
   try {
     const sub = interaction.options.getSubcommand();
@@ -92,7 +95,7 @@ export async function execute(interaction) {
           updateEntertainmentStats(interaction.user.id, 'jokesHeard');
         }
         catch (error) {
-          console.warn('Failed to update joke stats:', error.message);
+          console.warn('Failed to update joke stats:', error instanceof Error ? error.message : String(error));
         }
 
         const row = new ActionRowBuilder().addComponents(
@@ -137,7 +140,7 @@ export async function execute(interaction) {
           updateEntertainmentStats(interaction.user.id, 'storiesGenerated');
         }
         catch (error) {
-          console.warn('Failed to update story stats:', error.message);
+          console.warn('Failed to update story stats:', error instanceof Error ? error.message : String(error));
         }
 
         const row = new ActionRowBuilder().addComponents(
@@ -168,7 +171,7 @@ export async function execute(interaction) {
           updateEntertainmentStats(interaction.user.id, 'riddlesAttempted');
         }
         catch (error) {
-          console.warn('Failed to update riddle stats:', error.message);
+          console.warn('Failed to update riddle stats:', error instanceof Error ? error.message : String(error));
         }
 
         const row = new ActionRowBuilder().addComponents(
@@ -199,7 +202,7 @@ export async function execute(interaction) {
           updateEntertainmentStats(interaction.user.id, 'factsLearned');
         }
         catch (error) {
-          console.warn('Failed to update fact stats:', error.message);
+          console.warn('Failed to update fact stats:', error instanceof Error ? error.message : String(error));
         }
 
         const row = new ActionRowBuilder().addComponents(
@@ -368,6 +371,7 @@ export async function execute(interaction) {
   catch (error) {
     console.error('Error in fun command execution:', error);
     await handleCommandError(interaction, error instanceof CommandError ? error :
-      new CommandError(error.message || 'An error occurred while processing the fun command.', 'UNKNOWN_ERROR'));
+      new CommandError(error instanceof Error ? error.message : String(error) || 'An error occurred while processing the fun command.', 'UNKNOWN_ERROR'));
   }
+  return;
 }

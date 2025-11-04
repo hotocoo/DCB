@@ -1,11 +1,11 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 
 import { searchSongs, play, pause, resume, skip, stop, getQueue, getMusicStats, getLyrics, getRadioStations, setVolume, shuffleQueue, clearQueue, back, setLoop, getLoop } from '../music.js';
-import { CommandError, handleCommandError } from '../errorHandler.js';
+import { CommandError, handleCommandError } from '../errorHandler';
 
 export const data = new SlashCommandBuilder()
   .setName('music')
-  .setDescription('🎵 ULTRA Music System - YouTube & Spotify Priority!')
+  .setDescription('🎵 Pulse Bot Music System - YouTube & Spotify Priority!')
   .addSubcommand(sub => sub.setName('play').setDescription('🎵 Play any song instantly').addStringOption(opt => opt.setName('query').setDescription('Song name or URL').setRequired(true)))
   .addSubcommand(sub => sub.setName('search').setDescription('🔍 Search millions of songs').addStringOption(opt => opt.setName('query').setDescription('Search term').setRequired(true)))
   .addSubcommand(sub => sub.setName('back').setDescription('⬅️ Go back to previous song'))

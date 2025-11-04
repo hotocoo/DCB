@@ -5,7 +5,7 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 
 import { exploreLocation, unlockLocation, enterDungeon, discoverLocation, getLocations } from '../locations.js';
 import { narrate } from '../rpg.js';
-import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler.js';
+import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler';
 
 // RPG data file path
 const FILE = path.join(process.cwd(), 'data', 'rpg.json');

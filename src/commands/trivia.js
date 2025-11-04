@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
 
 import { updateUserStats } from '../achievements.js';
-import { safeExecuteCommand, CommandError, validateRange } from '../errorHandler.js';
+import { safeExecuteCommand, CommandError, validateRange } from '../errorHandler';
 
 const triviaQuestions = [
   {

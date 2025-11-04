@@ -5,7 +5,7 @@ import assert from 'node:assert';
 // Stub the missing dependencies to run RPG tests in isolation
 import { logger } from '../src/logger.js';
 import { inputValidator, sanitizeInput, validateString, validateNumber } from '../src/validation.js';
-import { CommandError } from '../src/errorHandler.js';
+import { CommandError } from '../src/errorHandler';
 
 // Import RPG functions
 import { createCharacter, getCharacter, applyXp, spendSkillPoints, getLeaderboard, getLeaderboardCount, resetCharacter } from '../src/rpg.js';

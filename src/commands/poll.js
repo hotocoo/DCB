@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType , MessageFlags } from 'discord.js';
 
-import { CommandError, handleCommandError } from '../errorHandler.js';
+import { CommandError, handleCommandError } from '../errorHandler';
 import { pollGames } from '../game-states.js';
 
 export const data = new SlashCommandBuilder()

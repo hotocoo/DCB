@@ -5,7 +5,7 @@ import { getBalance, addBalance, transferBalance, buyFromMarket, sellToMarket, c
 import { warnUser, muteUser, isUserMuted, checkAutoMod, getUserModStats } from '../src/moderation.js';
 import { createCharacter, getCharacter, applyXp, addItemToInventory, getInventory, deleteCharacter } from '../src/rpg.js';
 import { searchSongs, play, pause, stop, getQueue } from '../src/music.js';
-import { CommandError, validateUser, validateGuild, validatePermissions, validateRange, validateNotEmpty, createRateLimiter } from '../src/errorHandler.js';
+import { CommandError, validateUser, validateGuild, validatePermissions, validateRange, validateNotEmpty, createRateLimiter } from '../src/errorHandler';
 import { inputValidator, sanitizeInput, validateUserId, validateNumber, validateString } from '../src/validation.js';
 
 class ComprehensiveTestSuite {

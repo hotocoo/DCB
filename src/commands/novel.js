@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, MessageFlags, EmbedBuilder } from 'discord.js';
 
 import { createNovel, listNovels, getNovel, generateChapter } from '../novel.js';
-import { CommandError, handleCommandError } from '../errorHandler.js';
+import { CommandError, handleCommandError } from '../errorHandler';
 
 export const data = new SlashCommandBuilder()
   .setName('novel')

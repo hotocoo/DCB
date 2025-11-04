@@ -3,7 +3,35 @@
  * Provides structured error handling, user-friendly messages, and validation helpers.
  */
 
+import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
+
 import { logError } from './logger.js';
+
+// Type definitions for Discord.js interactions
+/**
+ * @typedef {import('discord.js').ChatInputCommandInteraction | import('discord.js').ButtonInteraction | import('discord.js').ModalSubmitInteraction} DiscordInteraction
+ */
+/**
+ * @typedef {import('discord.js').Client} DiscordClient
+ */
+/**
+ * @typedef {import('discord.js').User} DiscordUser
+ */
+/**
+ * @typedef {import('discord.js').Guild} DiscordGuild
+ */
+/**
+ * @typedef {import('discord.js').Channel} DiscordChannel
+ */
+/**
+ * @typedef {import('discord.js').Role} DiscordRole
+ */
+/**
+ * @typedef {import('discord.js').GuildMember} DiscordGuildMember
+ */
+/**
+ * @typedef {import('discord.js').Message} DiscordMessage
+ */
 
 /**
  * Circuit breaker configuration constants.
@@ -71,16 +99,16 @@ export class CommandError extends Error {
 
 /**
  * Handles command errors by logging and responding to the user.
- * @param {object} interaction - Discord interaction object
+ * @param {DiscordInteraction} interaction - Discord interaction object
  * @param {CommandError|Error} error - The error that occurred
  * @param {object} context - Additional context for logging
- * @returns {Promise} Promise resolving to the interaction response
+ * @returns {Promise<void>} Promise resolving to the interaction response
  */
 /**
  * Circuit breaker check imported from interactionHandlers.js
  * This prevents recursive error handling loops.
  * @param {string} interactionId - The interaction identifier
- * @returns {boolean} True if operation can proceed, false if circuit is broken
+ * @returns {Promise<boolean>} True if operation can proceed, false if circuit is broken
  */
 async function checkCircuitBreaker(interactionId) {
   try {
@@ -101,11 +129,16 @@ async function checkCircuitBreaker(interactionId) {
   }
   catch (error) {
     // If import fails, allow operation to proceed
-    console.warn('[CIRCUIT_BREAKER] Failed to access circuit breaker, allowing operation:', error.message);
+    console.warn('[CIRCUIT_BREAKER] Failed to access circuit breaker, allowing operation:', error instanceof Error ? error.message : String(error));
     return true;
   }
 }
 
+/**
+ * @param {DiscordInteraction} interaction
+ * @param {CommandError|Error} error
+ * @param {object} context
+ */
 export async function handleCommandError(interaction, error, context = {}) {
   const interactionId = interaction?.id;
 
@@ -113,8 +146,8 @@ export async function handleCommandError(interaction, error, context = {}) {
   if (interactionId && !(await checkCircuitBreaker(interactionId))) {
     console.error('[HANDLE_COMMAND_ERROR] Circuit breaker tripped for interaction, skipping error response');
     logError('Circuit breaker tripped - cannot send error response', new Error('Circuit breaker activated'), {
-      originalCommand: interaction?.commandName,
-      originalError: error.message,
+      originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
+      originalError: error instanceof Error ? error.message : String(error),
       interactionId
     });
     return;
@@ -122,19 +155,19 @@ export async function handleCommandError(interaction, error, context = {}) {
 
   // Log the error with structured information
   logError('Command error occurred', error, {
-    command: interaction?.commandName,
+    command: 'commandName' in interaction ? interaction.commandName : undefined,
     user: interaction?.user?.id,
     guild: interaction?.guild?.id,
-    code: error.code,
-    details: error.details,
+    code: 'code' in error ? error.code : undefined,
+    details: 'details' in error ? error.details : undefined,
     ...context
   });
 
   // Determine user message based on environment
-  let userMessage = error.userMessage || error.message;
+  let userMessage = ('userMessage' in error ? error.userMessage : undefined) || error.message;
 
   if (process.env.NODE_ENV === 'development') {
-    userMessage = `❌ **Error:** ${error.message}\n\n**Code:** ${error.code}\n**Details:** ${JSON.stringify(error.details, null, 2)}`;
+    userMessage = `❌ **Error:** ${error.message}\n\n**Code:** ${'code' in error ? error.code : 'N/A'}\n**Details:** ${JSON.stringify('details' in error ? error.details : {}, null, 2)}`;
   }
 
   const responseOptions = {
@@ -150,7 +183,8 @@ export async function handleCommandError(interaction, error, context = {}) {
     INSUFFICIENT_FUNDS: '\n\n💡 *Earn more gold through work, businesses, or trading.*'
   };
 
-  if (hints[error.code]) {
+  if ('code' in error && error.code && error.code in hints) {
+    // @ts-ignore
     responseOptions.content += hints[error.code];
   }
 
@@ -162,7 +196,7 @@ export async function handleCommandError(interaction, error, context = {}) {
       replied: interaction?.replied,
       deferred: interaction?.deferred,
       type: interaction?.type,
-      commandName: interaction?.commandName
+      commandName: 'commandName' in interaction ? interaction.commandName : undefined
     });
 
     // Check for DiscordAPIError[10062]: Unknown interaction specifically
@@ -173,11 +207,11 @@ export async function handleCommandError(interaction, error, context = {}) {
         return;
       }
       catch (replyError) {
-        if (replyError.code === 10_062) {
+        if (replyError instanceof Error && 'code' in replyError && replyError.code === 10_062) {
           console.error('[HANDLE_COMMAND_ERROR] Interaction already expired/replied, cannot send error response');
           logError('Cannot send error response - interaction expired', replyError, {
-            originalCommand: interaction?.commandName,
-            originalError: error.message,
+            originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
+            originalError: error instanceof Error ? error.message : String(error),
             interactionId: interaction?.id
           });
           return;
@@ -192,11 +226,11 @@ export async function handleCommandError(interaction, error, context = {}) {
         return;
       }
       catch (followUpError) {
-        if (followUpError.code === 10_062) {
+        if (followUpError instanceof Error && 'code' in followUpError && followUpError.code === 10_062) {
           console.error('[HANDLE_COMMAND_ERROR] Interaction already expired, cannot send followUp error response');
           logError('Cannot send followUp error response - interaction expired', followUpError, {
-            originalCommand: interaction?.commandName,
-            originalError: error.message,
+            originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
+            originalError: error instanceof Error ? error.message : String(error),
             interactionId: interaction?.id
           });
           return;
@@ -207,8 +241,8 @@ export async function handleCommandError(interaction, error, context = {}) {
     else {
       console.error('[HANDLE_COMMAND_ERROR] Interaction object invalid or already handled');
       logError('Invalid interaction state for error response', new Error('Invalid interaction object'), {
-        originalCommand: interaction?.commandName,
-        originalError: error.message,
+        originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
+        originalError: error instanceof Error ? error.message : String(error),
         interactionId: interaction?.id,
         interactionExists: !!interaction
       });
@@ -216,32 +250,32 @@ export async function handleCommandError(interaction, error, context = {}) {
     }
   }
   catch (responseError) {
-    console.error('[HANDLE_COMMAND_ERROR] Failed to send error response:', responseError.message);
+    console.error('[HANDLE_COMMAND_ERROR] Failed to send error response:', responseError instanceof Error ? responseError.message : String(responseError));
     console.error('[HANDLE_COMMAND_ERROR] Response error details:', {
-      responseError: responseError.message,
-      stack: responseError.stack,
+      responseError: responseError instanceof Error ? responseError.message : String(responseError),
+      stack: responseError instanceof Error ? responseError.stack : undefined,
       interactionId: interaction?.id,
-      originalError: error.message,
-      errorCode: responseError.code
+      originalError: error instanceof Error ? error.message : String(error),
+      errorCode: responseError instanceof Error && 'code' in responseError ? responseError.code : undefined
     });
 
     // If we can't send a response, log it and continue - don't attempt to log error response failure recursively
-    logError('Failed to send error response to user', responseError, {
-      originalCommand: interaction?.commandName,
-      originalError: error.message,
+    logError('Failed to send error response to user', responseError instanceof Error ? responseError : new Error(String(responseError)), {
+      originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
+      originalError: error instanceof Error ? error.message : String(error),
       interactionReplied: interaction?.replied,
       interactionDeferred: interaction?.deferred,
-      errorCode: responseError.code
+      errorCode: responseError instanceof Error && 'code' in responseError ? responseError.code : undefined
     });
   }
 }
 
 /**
  * Safely executes a command function with error handling.
- * @param {object} interaction - Discord interaction object
+ * @param {DiscordInteraction} interaction - Discord interaction object
  * @param {Function} commandFunction - The command function to execute
  * @param {object} context - Additional context for error handling
- * @returns {Promise} Promise resolving to command result or error response
+ * @returns {Promise<any>} Promise resolving to command result or error response
  */
 export async function safeExecuteCommand(interaction, commandFunction, context = {}) {
   try {
@@ -249,14 +283,14 @@ export async function safeExecuteCommand(interaction, commandFunction, context =
   }
   catch (error) {
     // Log immediately before any interaction attempts
-    console.error('[SAFE_EXECUTE_COMMAND] Error occurred:', error.message);
-    console.error('[SAFE_EXECUTE_COMMAND] Error stack:', error.stack);
+    console.error('[SAFE_EXECUTE_COMMAND] Error occurred:', error instanceof Error ? error.message : String(error));
+    console.error('[SAFE_EXECUTE_COMMAND] Error stack:', error instanceof Error ? error.stack : undefined);
     console.error('[SAFE_EXECUTE_COMMAND] Interaction state:', {
       id: interaction?.id,
       replied: interaction?.replied,
       deferred: interaction?.deferred,
       type: interaction?.type,
-      commandName: interaction?.commandName
+      commandName: 'commandName' in interaction ? interaction.commandName : undefined
     });
 
     if (error instanceof CommandError) {
@@ -265,9 +299,9 @@ export async function safeExecuteCommand(interaction, commandFunction, context =
     else {
       // Wrap unknown errors in CommandError for consistency
       const commandError = new CommandError(
-        error.message || 'Unknown error occurred',
+        error instanceof Error ? error.message : 'Unknown error occurred',
         'UNKNOWN_ERROR',
-        { originalError: error.message, stack: error.stack }
+        { originalError: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined }
       );
       await handleCommandError(interaction, commandError, context);
     }
@@ -280,9 +314,9 @@ export async function safeExecuteCommand(interaction, commandFunction, context =
 
 /**
  * Validates and retrieves a user by ID.
- * @param {object} interaction - Discord interaction object
+ * @param {DiscordInteraction} interaction - Discord interaction object
  * @param {string} userId - User ID to validate
- * @returns {object} Discord user object
+ * @returns {DiscordUser} Discord user object
  * @throws {CommandError} If user is not found or ID is invalid
  */
 export function validateUser(interaction, userId) {
@@ -302,9 +336,9 @@ export function validateUser(interaction, userId) {
 
 /**
  * Validates and retrieves a channel by ID.
- * @param {object} interaction - Discord interaction object
+ * @param {DiscordInteraction} interaction - Discord interaction object
  * @param {string} channelId - Channel ID to validate
- * @returns {object} Discord channel object
+ * @returns {DiscordChannel} Discord channel object
  * @throws {CommandError} If channel is not found or ID is invalid
  */
 export function validateChannel(interaction, channelId) {
@@ -324,9 +358,9 @@ export function validateChannel(interaction, channelId) {
 
 /**
  * Validates and retrieves a role by ID.
- * @param {object} interaction - Discord interaction object
+ * @param {DiscordInteraction} interaction - Discord interaction object
  * @param {string} roleId - Role ID to validate
- * @returns {object} Discord role object
+ * @returns {DiscordRole} Discord role object
  * @throws {CommandError} If role is not found or ID is invalid
  */
 export function validateRole(interaction, roleId) {
@@ -345,8 +379,8 @@ export function validateRole(interaction, roleId) {
 
 /**
  * Validates that the command is being used in a guild.
- * @param {object} interaction - Discord interaction object
- * @returns {object} Discord guild object
+ * @param {DiscordInteraction} interaction - Discord interaction object
+ * @returns {DiscordGuild} Discord guild object
  * @throws {CommandError} If command is not used in a guild
  */
 export function validateGuild(interaction) {
@@ -359,7 +393,7 @@ export function validateGuild(interaction) {
 
 /**
  * Validates that the user has the required permissions.
- * @param {object} interaction - Discord interaction object
+ * @param {DiscordInteraction} interaction - Discord interaction object
  * @param {Array<string>} permissions - Array of permission strings
  * @throws {CommandError} If user lacks required permissions
  */
@@ -368,9 +402,19 @@ export function validatePermissions(interaction, permissions) {
     throw new CommandError('Unable to verify permissions.', 'PERMISSION_DENIED');
   }
 
-  const missingPermissions = permissions.filter(perm =>
-    !interaction.member.permissions.has(perm)
-  );
+  const memberPermissions = interaction.member?.permissions;
+  const missingPermissions = permissions.filter(perm => {
+    // @ts-ignore
+    const permBit = PermissionFlagsBits[perm];
+    if (typeof memberPermissions === 'string') {
+      // Permissions string - not supported for checking individual permissions
+      return true; // Assume missing if we can't check
+    }
+    else if (memberPermissions instanceof PermissionsBitField) {
+      return !memberPermissions.has(permBit);
+    }
+    return true; // Fallback
+  });
 
   if (missingPermissions.length > 0) {
     throw new CommandError(
@@ -439,7 +483,7 @@ export function createRateLimiter(points, duration, keyGenerator) {
       const userRequests = requests.get(userKey) || [];
 
       // Remove requests outside the current time window
-      const validRequests = userRequests.filter(time => now - time < duration);
+      const validRequests = userRequests.filter((/** @type {number} */ time) => now - time < duration);
 
       if (validRequests.length >= points) {
         const resetTime = validRequests[0] + duration;
@@ -467,7 +511,7 @@ export function createRateLimiter(points, duration, keyGenerator) {
  * @param {Function} operation - Async function to retry
  * @param {number} [maxRetries=DEFAULT_MAX_RETRIES] - Maximum number of retry attempts
  * @param {number} [delay=DEFAULT_RETRY_DELAY] - Base delay between retries in milliseconds
- * @returns {Promise} Promise resolving to operation result
+ * @returns {Promise<any>} Promise resolving to operation result
  * @throws {CommandError} If all retries are exhausted
  */
 export async function retryAsync(operation, maxRetries = DEFAULT_MAX_RETRIES, delay = DEFAULT_RETRY_DELAY) {
@@ -490,14 +534,14 @@ export async function retryAsync(operation, maxRetries = DEFAULT_MAX_RETRIES, de
     catch (error) {
       if (attempt === maxRetries) {
         throw new CommandError(
-          `Operation failed after ${maxRetries} attempts: ${error.message}`,
+          `Operation failed after ${maxRetries} attempts: ${error instanceof Error ? error.message : String(error)}`,
           'API_ERROR',
-          { originalError: error.message, attempts: maxRetries }
+          { originalError: error instanceof Error ? error.message : String(error), attempts: maxRetries }
         );
       }
 
       // Log retry attempt using logger instead of console.log
-      logError(`Retry attempt ${attempt} failed, retrying in ${delay * attempt}ms`, error, {
+      logError(`Retry attempt ${attempt} failed, retrying in ${delay * attempt}ms`, error instanceof Error ? error : new Error(String(error)), {
         attempt,
         maxRetries,
         delay: delay * attempt

@@ -14,7 +14,7 @@ import {
   getActiveAuctions,
   getMarketPrices
 } from '../trading.js';
-import { safeExecuteCommand, CommandError, validateUser, validateRange, validateNotEmpty } from '../errorHandler.js';
+import { safeExecuteCommand, CommandError, validateUser, validateRange, validateNotEmpty } from '../errorHandler';
 
 export const data = new SlashCommandBuilder()
   .setName('trade')

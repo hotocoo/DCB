@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 
 import { getGuild, setGuild } from '../storage.js';
-import { safeExecuteCommand, CommandError, validateGuild, validatePermissions } from '../errorHandler.js';
+import { safeExecuteCommand, CommandError, validateGuild, validatePermissions } from '../errorHandler';
 
 export const data = new SlashCommandBuilder()
   .setName('toggleplay')

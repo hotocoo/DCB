@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 
-import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler.js';
+import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

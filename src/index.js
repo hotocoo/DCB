@@ -1,9 +1,9 @@
 /**
- * Main entry point for the Ultra Discord Bot application.
+ * Main entry point for the Pulse Bot application.
  * Initializes the client, loads commands, sets up event listeners, and manages bot lifecycle.
  *
  * @fileoverview Main bot entry point with comprehensive error handling and graceful shutdown.
- * @author ULTRA Bot Development Team
+ * @author Pulse Bot Development Team
  * @version 3.0.1
  * @license MIT
  */
@@ -13,7 +13,7 @@ import { Client, Collection, GatewayIntentBits, Partials, ActivityType } from 'd
 
 // Core bot modules
 import { loadCommands } from './commandLoader.js';
-import { handleInteraction } from './interactionHandlers.js';
+import { handleInteraction } from './interactionHandlers';
 import { handleMessage } from './chat.js';
 import { logger, logError } from './logger.js';
 
@@ -97,7 +97,7 @@ const client = new Client({
       name: process.env.BOT_ACTIVITY || 'Playing RPG Adventures',
       type: ActivityType.Playing
     }],
-    status: status
+    status: /** @type {import('discord.js').PresenceStatusData} */ (status)
   }
 });
 
@@ -172,7 +172,9 @@ client.once('ready', () => {
 });
 
 client.on('interactionCreate', async interaction => {
-  await handleInteraction(interaction, client);
+  if (interaction.isChatInputCommand() || interaction.isButton() || interaction.isModalSubmit()) {
+    await handleInteraction(interaction, client);
+  }
 });
 /**
  * Handles incoming messages with enhanced error handling and logging.

@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 
-import { safeExecuteCommand, CommandError, validateNotEmpty } from '../errorHandler.js';
+import { safeExecuteCommand, CommandError, validateNotEmpty } from '../errorHandler';
 
 // Game constants
 const RPS_CHOICES = ['rock', 'paper', 'scissors'];

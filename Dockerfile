@@ -1,4 +1,4 @@
-# Ultra Discord Bot Dockerfile
+# Pulse Bot Dockerfile
 FROM node:20-alpine AS base
 
 # Install system dependencies for audio processing and SQLite
@@ -13,7 +13,7 @@ RUN apk add --no-cache \
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S ultra -u 1001
+    adduser -S pulse -u 1001
 
 WORKDIR /app
 
@@ -34,26 +34,26 @@ RUN apk add --no-cache \
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S ultra -u 1001
+    adduser -S pulse -u 1001
 
 WORKDIR /app
 
 # Copy installed dependencies from base stage
-COPY --from=base --chown=ultra:nodejs /app/node_modules ./node_modules
+COPY --from=base --chown=pulse:nodejs /app/node_modules ./node_modules
 
 # Copy application code
-COPY --chown=ultra:nodejs . .
+COPY --chown=pulse:nodejs . .
 
 # Create necessary directories with proper permissions
 RUN mkdir -p data logs && \
-    chown -R ultra:nodejs data logs
+    chown -R pulse:nodejs data logs
 
 # Set environment variables
 ENV NODE_ENV=production
 ENV DOCKER_DATABASE_PATH=/app/data/bot.db
 
 # Switch to non-root user
-USER ultra
+USER pulse
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

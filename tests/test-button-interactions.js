@@ -1,7 +1,7 @@
 // Test script specifically for button interaction handlers
 import assert from 'node:assert';
 
-import { handleButtonInteraction } from '../src/interactionHandlers.js';
+import { handleButtonInteraction } from '../src/interactionHandlers';
 
 // Mock interaction object
 const mockInteraction = {
@@ -19,14 +19,17 @@ const mockInteraction = {
     embeds: [{}],
     components: []
   },
+  /** @param {*} options */
   reply: async(options) => {
     console.log('Mock reply called with:', options.content);
     return;
   },
+  /** @param {*} options */
   update: async(options) => {
     console.log('Mock update called with:', options.content);
     return;
   },
+  /** @param {*} modal */
   showModal: async(modal) => {
     console.log('Mock showModal called with:', modal.customId);
     return;
@@ -34,9 +37,9 @@ const mockInteraction = {
 };
 
 // Mock client
-const mockClient = {
+const mockClient = /** @type {*} */({
   commands: new Map()
-};
+});
 
 async function testButtonHandlers() {
   console.log('🧪 Testing Button Interaction Handlers');
@@ -44,42 +47,42 @@ async function testButtonHandlers() {
   try {
     // Test 1: Unknown button action (should handle gracefully)
     console.log('\n1. Testing unknown button action...');
-    await handleButtonInteraction({
+    await handleButtonInteraction(/** @type {*} */({
       ...mockInteraction,
       customId: 'unknown_action:param'
-    }, mockClient);
+    }), mockClient);
     console.log('✅ Unknown action handled gracefully');
 
     // Test 2: Music pause button
     console.log('\n2. Testing music pause button...');
-    await handleButtonInteraction({
+    await handleButtonInteraction(/** @type {*} */({
       ...mockInteraction,
       customId: 'music_pause:testguild'
-    }, mockClient);
+    }), mockClient);
     console.log('✅ Music pause handled gracefully');
 
     // Test 3: Economy market button
     console.log('\n3. Testing economy market button...');
-    await handleButtonInteraction({
+    await handleButtonInteraction(/** @type {*} */({
       ...mockInteraction,
       customId: 'economy_market:123456789012345678'
-    }, mockClient);
+    }), mockClient);
     console.log('✅ Economy market handled gracefully');
 
     // Test 4: RPG leaderboard button
     console.log('\n4. Testing RPG leaderboard button...');
-    await handleButtonInteraction({
+    await handleButtonInteraction(/** @type {*} */({
       ...mockInteraction,
       customId: 'rpg_leaderboard:0:123456789012345678'
-    }, mockClient);
+    }), mockClient);
     console.log('✅ RPG leaderboard handled gracefully');
 
     // Test 5: Memory game button
     console.log('\n5. Testing memory game button...');
-    await handleButtonInteraction({
+    await handleButtonInteraction(/** @type {*} */({
       ...mockInteraction,
       customId: 'memory_reset:123456789012345678'
-    }, mockClient);
+    }), mockClient);
     console.log('✅ Memory game handled gracefully');
 
     console.log('\n🎉 All button interaction tests passed!');
@@ -87,9 +90,9 @@ async function testButtonHandlers() {
 
   }
   catch (error) {
-    console.error('❌ Button interaction test failed:', error.message);
-    console.error('Stack:', error.stack);
-    return { success: false, message: error.message, error };
+    console.error('❌ Button interaction test failed:', String((/** @type {*} */(error)).message));
+    console.error('Stack:', String((/** @type {*} */(error)).stack));
+    return { success: false, message: String((/** @type {*} */(error)).message), error };
   }
 }
 

@@ -2,8 +2,10 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 
 import { updateUserStats } from '../achievements.js';
 import { guessGames } from '../game-states.js';
-import { CommandError, handleCommandError } from '../errorHandler.js';
-import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers.js';
+import { CommandError, handleCommandError } from '../errorHandler';
+import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers';
+/** @typedef {import('../types.d').Guess} Guess */
+/** @typedef {import('../types.d').GuessGameState} GuessGameState */
 
 export const data = new SlashCommandBuilder()
   .setName('guess')
@@ -28,6 +30,9 @@ export const data = new SlashCommandBuilder()
       .setDescription('Custom maximum number')
       .setRequired(false));
 
+/**
+ * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ */
 export async function execute(interaction) {
   try {
     let min = 1;
@@ -108,10 +113,14 @@ export async function execute(interaction) {
     await sendGuessPrompt(interaction, gameState);
   }
   catch (error) {
-    await handleCommandError(interaction, error);
+    await handleCommandError(interaction, /** @type {Error | CommandError} */ (error));
   }
 }
 
+/**
+ * @param {import('discord.js').ChatInputCommandInteraction | import('discord.js').ButtonInteraction | import('discord.js').ModalSubmitInteraction} interaction
+ * @param {GuessGameState} gameState
+ */
 async function sendGuessPrompt(interaction, gameState) {
   try {
     const { attempts, attemptsUsed, min, max, guesses } = gameState;
@@ -130,7 +139,7 @@ async function sendGuessPrompt(interaction, gameState) {
         .setDescription(`The secret number was **${gameState.secretNumber}**!\n\nYou used all ${attempts} attempts in ${timeElapsed} seconds.`)
         .addFields({
           name: 'Your Guesses',
-          value: guesses.length > 0 ? guesses.map((g, i) => `${i + 1}. **${g.number}** - ${g.feedback}`).join('\n') : 'No guesses made',
+          value: guesses.length > 0 ? guesses.map(/** @param {Guess} g */ (g, /** @param {number} i */ i) => `${i + 1}. **${g.number}** - ${g.feedback}`).join('\n') : 'No guesses made',
           inline: false
         });
 
@@ -145,7 +154,7 @@ async function sendGuessPrompt(interaction, gameState) {
       .addFields({
         name: 'Previous Guesses',
         value: guesses.length > 0 ?
-          guesses.slice(-5).map((g, i) => `**${g.number}** - ${g.feedback}`).join('\n') :
+          guesses.slice(-5).map(/** @param {Guess} g */ (g, /** @param {number} i */ i) => `**${g.number}** - ${g.feedback}`).join('\n') :
           'No guesses yet',
         inline: false
       });
@@ -159,10 +168,14 @@ async function sendGuessPrompt(interaction, gameState) {
   }
   catch (error) {
     console.error('sendGuessPrompt error:', error);
-    await handleCommandError(interaction, new CommandError('Failed to update game prompt.', 'UNKNOWN_ERROR', { originalError: error.message }));
+    await handleCommandError(interaction, new CommandError('Failed to update game prompt.', 'UNKNOWN_ERROR', { originalError: String(error) }));
   }
 }
 
+/**
+ * @param {import('discord.js').ButtonInteraction} interaction
+ * @param {GuessGameState} gameState
+ */
 async function sendGuessModal(interaction, gameState) {
   const modal = new ModalBuilder().setCustomId(`guess_submit:${gameState.id}`).setTitle('Make Your Guess');
   const guessInput = new TextInputBuilder()
@@ -172,10 +185,15 @@ async function sendGuessModal(interaction, gameState) {
     .setRequired(true)
     .setPlaceholder(`${Math.floor((gameState.min + gameState.max) / 2)}`);
 
-  modal.addComponents({ type: 1, components: [guessInput] });
+  modal.addComponents(guessInput);
   await interaction.showModal(modal);
 }
 
+/**
+ * @param {import('discord.js').ModalSubmitInteraction} interaction
+ * @param {GuessGameState} gameState
+ * @param {string} guess
+ */
 async function processGuess(interaction, gameState, guess) {
   try {
     // Validate input
@@ -257,7 +275,7 @@ async function processGuess(interaction, gameState, guess) {
       if (gameState.guesses.length > 0) {
         winEmbed.addFields({
           name: '📝 Guess History',
-          value: gameState.guesses.map((g, i) => `${i + 1}. **${g.number}** - ${g.feedback}`).join('\n'),
+          value: gameState.guesses.map(/** @param {Guess} g */ (g, /** @param {number} i */ i) => `${i + 1}. **${g.number}** - ${g.feedback}`).join('\n'),
           inline: false
         });
       }
@@ -274,6 +292,6 @@ async function processGuess(interaction, gameState, guess) {
   catch (error) {
     console.error('processGuess error:', error);
     await handleCommandError(interaction, error instanceof CommandError ? error :
-      new CommandError('Failed to process guess.', 'UNKNOWN_ERROR', { originalError: error.message }));
+      new CommandError('Failed to process guess.', 'UNKNOWN_ERROR', { originalError: String(error) }));
   }
 }

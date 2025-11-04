@@ -1,9 +1,9 @@
 /**
- * Chat module for ULTRA Discord Bot.
+ * Chat module for Pulse Bot.
  * Handles AI-powered conversations and direct message interactions with enhanced error handling and performance monitoring.
  *
  * @fileoverview Advanced chat system with multiple AI providers, conversation memory, and fallback mechanisms.
- * @author ULTRA Bot Development Team
+ * @author Pulse Bot Development Team
  * @version 3.0.1
  * @license MIT
  */
@@ -56,7 +56,7 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'ULTRA-Bot/3.0.1'
+          'User-Agent': 'Pulse-Bot/3.0.1'
         },
         body: JSON.stringify({
           model: 'gpt-oss-20b',
@@ -87,7 +87,7 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'ULTRA-Bot/3.0.1'
+          'User-Agent': 'Pulse-Bot/3.0.1'
         },
         body: JSON.stringify({ prompt }),
         signal: controller.signal
@@ -108,7 +108,7 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'ULTRA-Bot/3.0.1'
+          'User-Agent': 'Pulse-Bot/3.0.1'
         },
         body: JSON.stringify({ prompt }),
         signal: controller.signal
@@ -207,7 +207,7 @@ export async function respondWithOpenAI(messages) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${OPENAI_KEY}`,
-        'User-Agent': 'ULTRA-Bot/3.0.1'
+        'User-Agent': 'Pulse-Bot/3.0.1'
       },
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
@@ -377,7 +377,7 @@ function handleSpecialCommands(command, message) {
     const users = message.client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0);
     const aiStatus = OPENAI_KEY ? 'OpenAI ✓' : (LOCAL_MODEL_URL ? 'Local Model ✓' : 'Basic Chat ✓');
 
-    return `🤖 **Bot Status:**\n• Servers: ${guilds}\n• Users: ${users}\n• AI: ${aiStatus}\n• Version: ULTRA v3.0`;
+    return `🤖 **Bot Status:**\n• Servers: ${guilds}\n• Users: ${users}\n• AI: ${aiStatus}\n• Version: Pulse v3.0`;
   }
 
   if (lowerCommand === '!commands') {
@@ -406,7 +406,7 @@ async function generateChatResponse(prompt, message, history, options) {
   const { useLocalUrl, useLocalApi, isDM } = options;
 
   // Build enhanced context prompt
-  const contextPrompt = `You are ULTRA, an advanced AI Discord bot with many features including RPG games, trivia, music, trading, and more. You have a friendly, helpful personality and love to engage users in conversation.
+  const contextPrompt = `You are Pulse, an advanced AI Discord bot with many features including RPG games, trivia, music, trading, and more. You have a friendly, helpful personality and love to engage users in conversation.
 
 Current context:
 - User: ${message.author.username}
@@ -451,7 +451,7 @@ Respond naturally and helpfully. If they're asking about bot features, mention r
       const messages = [
         {
           role: 'system',
-          content: 'You are ULTRA, an advanced AI Discord bot with RPG games, trivia, music, trading, and many other features. Be friendly, helpful, and engaging. Keep responses under 2000 characters.'
+          content: 'You are Pulse, an advanced AI Discord bot with RPG games, trivia, music, trading, and many other features. Be friendly, helpful, and engaging. Keep responses under 2000 characters.'
         },
         ...history.map(h => ({ role: h.role, content: h.content }))
       ];

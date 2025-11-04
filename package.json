@@ -1,7 +1,7 @@
 {
   "name": "pulsebot",
   "version": "3.0.0",
-  "description": "ULTRA - The Most Advanced Discord Bot Ever Created",
+  "description": "Pulse Bot - The Most Advanced Discord Bot Ever Created",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -29,8 +29,8 @@
     "db:backup": "node scripts/backup-db.js",
     "db:reset": "node scripts/reset-db.js",
     "logs:clean": "rm -rf logs/*.log",
-    "docker:build": "docker build -t ultra-discord-bot .",
-    "docker:run": "docker run -d --name ultra-bot --env-file .env ultra-discord-bot"
+    "docker:build": "docker build -t pulsebot .",
+    "docker:run": "docker run -d --name pulse-bot --env-file .env pulsebot"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -50,7 +50,7 @@
     "sqlite",
     "typescript-support"
   ],
-  "author": "ULTRA Bot Development Team",
+  "author": "Pulse Bot Development Team",
   "license": "MIT",
   "dependencies": {
     "@discordjs/opus": "^0.9.0",

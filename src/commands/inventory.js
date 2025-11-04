@@ -14,7 +14,7 @@ import {
   saveCharacter,
   removeItemFromInventory
 } from '../rpg.js';
-import { CommandError, handleCommandError } from '../errorHandler.js';
+import { CommandError, handleCommandError } from '../errorHandler';
 
 export const data = new SlashCommandBuilder()
   .setName('inventory')
