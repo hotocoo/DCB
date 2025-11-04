@@ -10,7 +10,7 @@ import { logger } from './logger.js';
 /**
  * Configuration constants for AI assistant.
  */
-const CACHE_DURATION_MS = 300000; // 5 minutes
+const CACHE_DURATION_MS = 300_000; // 5 minutes
 const MAX_CONVERSATION_HISTORY = 10;
 
 /**
@@ -122,7 +122,7 @@ class AIAssistantManager {
       throw new Error('Invalid message provided');
     }
 
-    const cacheKey = `${userId}_${message.substring(0, 50)}_${model}_${personality}`;
+    const cacheKey = `${userId}_${message.slice(0, 50)}_${model}_${personality}`;
     const cached = this.responseCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
       logger.debug('Using cached response', { userId, cacheKey });
@@ -182,8 +182,7 @@ Provide a response that matches the specified model and personality.`;
       }
 
       // Store in history
-      history.push({ role: 'user', content: message });
-      history.push({ role: 'assistant', content: response });
+      history.push({ role: 'user', content: message }, { role: 'assistant', content: response });
       if (history.length > MAX_CONVERSATION_HISTORY) {
         history.splice(0, history.length - MAX_CONVERSATION_HISTORY);
       }
@@ -198,7 +197,8 @@ Provide a response that matches the specified model and personality.`;
       logger.debug('Response generated successfully', { userId, responseLength: response.length });
       return response;
 
-    } catch (error) {
+    }
+    catch (error) {
       logger.error('AI Assistant error', error, { userId, model, personality });
       return this.generateFallbackResponse(message, model, personality);
     }
@@ -233,7 +233,8 @@ Provide a response that matches the specified model and personality.`;
       }
 
       logger.warn('Local AI call failed with status', { status: response.status, url });
-    } catch (error) {
+    }
+    catch (error) {
       logger.error('Local AI call error', error, { url });
     }
     return null;
@@ -270,7 +271,8 @@ Provide a response that matches the specified model and personality.`;
       }
 
       logger.warn('OpenAI call failed with status', { status: response.status });
-    } catch (error) {
+    }
+    catch (error) {
       logger.error('OpenAI call error', error);
     }
     return null;
@@ -338,10 +340,10 @@ Provide a response that matches the specified model and personality.`;
 
   async generateSummary(text, maxLength = 200) {
     // Simple text summarization
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const sentences = text.split(/[!.?]+/).filter(s => s.trim().length > 0);
     const summary = sentences.slice(0, 2).join('. ') + '.';
 
-    return summary.length > maxLength ? summary.substring(0, maxLength - 3) + '...' : summary;
+    return summary.length > maxLength ? summary.slice(0, Math.max(0, maxLength - 3)) + '...' : summary;
   }
 
   async translateText(text, targetLanguage = 'es') {
@@ -365,7 +367,7 @@ Provide a response that matches the specified model and personality.`;
 
   // AI Model Management
   getAvailableModels() {
-    return Array.from(this.aiModels.entries()).map(([key, config]) => ({
+    return [...this.aiModels.entries()].map(([key, config]) => ({
       id: key,
       name: config.name,
       description: config.description
@@ -373,7 +375,7 @@ Provide a response that matches the specified model and personality.`;
   }
 
   getAvailablePersonalities() {
-    return Array.from(this.personalityProfiles.entries()).map(([key, config]) => ({
+    return [...this.personalityProfiles.entries()].map(([key, config]) => ({
       id: key,
       name: config.name,
       style: config.style
@@ -431,30 +433,33 @@ Provide a response that matches the specified model and personality.`;
     const lowerDesc = description.toLowerCase();
     if (lowerDesc.includes('function') || lowerDesc.includes('method')) {
       return `// ${description}\nfunction performTask(data) {\n  // Implementation for ${description.toLowerCase()}\n  try {\n    // Your logic here\n    return processData(data);\n  } catch (error) {\n    console.error('Error:', error.message);\n    throw error;\n  }\n}\n\n// Usage example\nconst result = performTask(inputData);`;
-    } else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
+    }
+    else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
       return `// ${description}\nclass DataProcessor {\n  constructor(options = {}) {\n    this.options = options;\n    this.cache = new Map();\n  }\n\n  // Main method implementation\n  process(data) {\n    // Implementation for ${description.toLowerCase()}\n    if (this.cache.has(data)) {\n      return this.cache.get(data);\n    }\n\n    const result = this.transformData(data);\n    this.cache.set(data, result);\n    return result;\n  }\n\n  transformData(data) {\n    // Transform logic here\n    return data;\n  }\n}`;
     }
-    return `// ${description}\n// Implementation example\nconst ${description.replace(/\s+/g, '').toLowerCase()} = (input) => {\n  // Your implementation here\n  return input;\n};\n\n// Usage\nconst result = ${description.replace(/\s+/g, '').toLowerCase()}(inputValue);`;
+    return `// ${description}\n// Implementation example\nconst ${description.replaceAll(/\s+/g, '').toLowerCase()} = (input) => {\n  // Your implementation here\n  return input;\n};\n\n// Usage\nconst result = ${description.replaceAll(/\s+/g, '').toLowerCase()}(inputValue);`;
   }
 
   generatePythonSnippet(description) {
     const lowerDesc = description.toLowerCase();
     if (lowerDesc.includes('function') || lowerDesc.includes('method')) {
       return `# ${description}\ndef perform_task(data):\n    """\n    Implementation for ${description.lower()}\n    """\n    try:\n        # Your logic here\n        return process_data(data)\n    except Exception as e:\n        print(f"Error: {e}")\n        raise\n\n# Usage example\nresult = perform_task(input_data)`;
-    } else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
+    }
+    else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
       return `# ${description}\nclass DataProcessor:\n    def __init__(self, options=None):\n        self.options = options or {}\n        self.cache = {}\n\n    def process(self, data):\n        """\n        Implementation for ${description.lower()}\n        """\n        if data in self.cache:\n            return self.cache[data]\n\n        result = self.transform_data(data)\n        self.cache[data] = result\n        return result\n\n    def transform_data(self, data):\n        """Transform logic here"""\n        return data\n\n# Usage\nprocessor = DataProcessor()\nresult = processor.process(input_data)`;
     }
-    return `# ${description}\ndef ${description.replace(/\s+/g, '_').lower()}():\n    # Your implementation here\n    return input_value`;
+    return `# ${description}\ndef ${description.replaceAll(/\s+/g, '_').lower()}():\n    # Your implementation here\n    return input_value`;
   }
 
   generateJavaSnippet(description) {
     const lowerDesc = description.toLowerCase();
     if (lowerDesc.includes('function') || lowerDesc.includes('method')) {
       return `// ${description}\npublic class TaskProcessor {\n    public static Object performTask(Object data) {\n        try {\n            // Implementation for ${description.toLowerCase()}\n            return processData(data);\n        } catch (Exception e) {\n            System.err.println("Error: " + e.getMessage());\n            throw e;\n        }\n    }\n\n    private static Object processData(Object data) {\n        // Your logic here\n        return data;\n    }\n\n    // Usage\n    public static void main(String[] args) {\n        Object result = performTask(inputData);\n    }\n}`;
-    } else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
+    }
+    else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
       return `// ${description}\npublic class DataProcessor {\n    private Map<Object, Object> cache;\n    private Map<String, Object> options;\n\n    public DataProcessor(Map<String, Object> options) {\n        this.options = options;\n        this.cache = new HashMap<>();\n    }\n\n    public Object process(Object data) {\n        // Implementation for ${description.toLowerCase()}\n        if (cache.containsKey(data)) {\n            return cache.get(data);\n        }\n\n        Object result = transformData(data);\n        cache.put(data, result);\n        return result;\n    }\n\n    private Object transformData(Object data) {\n        // Transform logic here\n        return data;\n    }\n}`;
     }
-    return `// ${description}\n// Implementation example\npublic class ${description.replace(/\s+/g, '')} {\n    public static void main(String[] args) {\n        // Your implementation here\n    }\n}`;
+    return `// ${description}\n// Implementation example\npublic class ${description.replaceAll(/\s+/g, '')} {\n    public static void main(String[] args) {\n        // Your implementation here\n    }\n}`;
   }
 
   generateCppSnippet(description) {
@@ -504,8 +509,8 @@ Provide a response that matches the specified model and personality.`;
 
   calculateComplexity(text) {
     const words = text.split(' ').length;
-    const sentences = text.split(/[.!?]+/).length;
-    const avgWordLength = text.replace(/[^a-zA-Z]/g, '').length / Math.max(1, words);
+    const sentences = text.split(/[!.?]+/).length;
+    const avgWordLength = text.replaceAll(/[^A-Za-z]/g, '').length / Math.max(1, words);
 
     return {
       wordCount: words,
@@ -522,7 +527,8 @@ Provide a response that matches the specified model and personality.`;
       try {
         const response = await this.generateResponse(userId, message, { model });
         responses[model] = response;
-      } catch (error) {
+      }
+      catch {
         responses[model] = `Error generating response from ${model} model`;
       }
     }
@@ -536,37 +542,37 @@ Provide a response that matches the specified model and personality.`;
 
     if (history.length === 0) {
       return [
-        "Try asking me about games - I have trivia, RPG adventures, and more!",
-        "Ask me to tell you a joke or share a fun fact!",
-        "Want to play a game? Try /tictactoe or /connect4!",
-        "Create an RPG character and start your adventure!"
+        'Try asking me about games - I have trivia, RPG adventures, and more!',
+        'Ask me to tell you a joke or share a fun fact!',
+        'Want to play a game? Try /tictactoe or /connect4!',
+        'Create an RPG character and start your adventure!'
       ];
     }
 
     const recommendations = {
       gaming: [
-        "🎮 Try the new Connect Four game with AI opponents!",
-        "🧠 Challenge yourself with a trivia quiz!",
-        "⚔️ Continue your RPG adventure!",
-        "🎯 Play some strategy games!"
+        '🎮 Try the new Connect Four game with AI opponents!',
+        '🧠 Challenge yourself with a trivia quiz!',
+        '⚔️ Continue your RPG adventure!',
+        '🎯 Play some strategy games!'
       ],
       learning: [
-        "📚 Ask me about programming or technology!",
-        "🔢 Want to learn something new with fun facts?",
-        "💻 I can help with coding questions!",
-        "🧪 Explore scientific concepts!"
+        '📚 Ask me about programming or technology!',
+        '🔢 Want to learn something new with fun facts?',
+        '💻 I can help with coding questions!',
+        '🧪 Explore scientific concepts!'
       ],
       fun: [
-        "😂 Let me tell you a joke!",
-        "🎭 Generate a fun superhero name!",
-        "🔮 Ask the magic 8-ball a question!",
-        "📖 Want me to create a story for you?"
+        '😂 Let me tell you a joke!',
+        '🎭 Generate a fun superhero name!',
+        '🔮 Ask the magic 8-ball a question!',
+        '📖 Want me to create a story for you?'
       ],
       social: [
-        "👥 Check out the guild system!",
-        "💰 Try the economy and trading features!",
-        "🏆 View your achievements and profile!",
-        "🤝 Join a party for multiplayer fun!"
+        '👥 Check out the guild system!',
+        '💰 Try the economy and trading features!',
+        '🏆 View your achievements and profile!',
+        '🤝 Join a party for multiplayer fun!'
       ]
     };
 

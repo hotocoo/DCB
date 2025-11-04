@@ -1,5 +1,6 @@
+import assert from 'node:assert';
+
 import { getRandomJoke, generateStory, getRiddle, getFunFact, getRandomQuote, magic8Ball, generateFunName, createFunChallenge, updateEntertainmentStats, getFunLeaderboard } from '../src/entertainment.js';
-import assert from 'assert';
 
 class FunCommandTestSuite {
   constructor() {
@@ -45,7 +46,8 @@ class FunCommandTestSuite {
       assert(invalidCategoryJoke && invalidCategoryJoke.joke, 'Invalid category should fallback');
       this.log('Invalid category fallback: OK');
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Joke functionality test failed', error);
     }
   }
@@ -75,7 +77,8 @@ class FunCommandTestSuite {
         this.log(`Story genre ${genre}: OK`);
       }
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Story functionality test failed', error);
     }
   }
@@ -99,7 +102,8 @@ class FunCommandTestSuite {
       assert(invalidDifficultyRiddle && invalidDifficultyRiddle.riddle, 'Invalid difficulty should fallback');
       this.log('Invalid difficulty fallback: OK');
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Riddle functionality test failed', error);
     }
   }
@@ -116,7 +120,8 @@ class FunCommandTestSuite {
         this.log(`Fun fact category ${category}: OK`);
       }
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Fun fact functionality test failed', error);
     }
   }
@@ -135,7 +140,8 @@ class FunCommandTestSuite {
         this.log(`Quote category ${category}: OK`);
       }
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Quote functionality test failed', error);
     }
   }
@@ -152,20 +158,21 @@ class FunCommandTestSuite {
 
       // Test that answers are from the predefined list
       const validResponses = [
-        "It is certain.", "It is decidedly so.", "Without a doubt.", "Yes definitely.",
-        "You may rely on it.", "As I see it, yes.", "Most likely.", "Outlook good.",
-        "Yes.", "Signs point to yes.",
-        "Reply hazy, try again.", "Ask again later.", "Better not tell you now.",
-        "Cannot predict now.", "Concentrate and ask again.",
-        "Don't count on it.", "My reply is no.", "My sources say no.", "Outlook not so good.",
-        "Very doubtful."
+        'It is certain.', 'It is decidedly so.', 'Without a doubt.', 'Yes definitely.',
+        'You may rely on it.', 'As I see it, yes.', 'Most likely.', 'Outlook good.',
+        'Yes.', 'Signs point to yes.',
+        'Reply hazy, try again.', 'Ask again later.', 'Better not tell you now.',
+        'Cannot predict now.', 'Concentrate and ask again.',
+        "Don't count on it.", 'My reply is no.', 'My sources say no.', 'Outlook not so good.',
+        'Very doubtful.'
       ];
 
       assert(validResponses.includes(result.answer), '8-ball answer should be from predefined list');
 
       this.log('Magic 8-ball: OK');
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Magic 8-ball functionality test failed', error);
     }
   }
@@ -183,7 +190,8 @@ class FunCommandTestSuite {
         this.log(`Fun name type ${type}: OK`);
       }
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Fun name functionality test failed', error);
     }
   }
@@ -202,7 +210,8 @@ class FunCommandTestSuite {
         this.log(`Challenge type ${type}: OK`);
       }
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Challenge functionality test failed', error);
     }
   }
@@ -230,7 +239,8 @@ class FunCommandTestSuite {
 
       this.log('Entertainment stats: OK');
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Entertainment stats test failed', error);
     }
   }
@@ -263,7 +273,8 @@ class FunCommandTestSuite {
 
       this.log('Fun leaderboard: OK');
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Fun leaderboard test failed', error);
     }
   }

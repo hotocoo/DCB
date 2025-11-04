@@ -4,9 +4,10 @@
  */
 
 import 'dotenv/config';
+import { RateLimiterMemory } from 'rate-limiter-flexible';
+
 import { getGuild } from './storage.js';
 import { logger } from './logger.js';
-import { RateLimiterMemory } from 'rate-limiter-flexible';
 
 /**
  * Configuration constants for model clients.
@@ -18,7 +19,7 @@ const OPENWEBUI_BASE = process.env.OPENWEBUI_BASE;
 const OPENWEBUI_PATH = process.env.OPENWEBUI_PATH || '/api/chat';
 
 // Request limits and timeouts
-const REQUEST_TIMEOUT_MS = 30000;
+const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_LENGTH = 2000;
 
 // Rate limiters for external API calls
@@ -49,8 +50,9 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
   // Rate limiting for local model API
   try {
     await localModelRateLimiter.consume('local_model_api');
-  } catch (rejRes) {
-    const waitTime = Math.round(rejRes.msBeforeNext / 1000);
+  }
+  catch (error) {
+    const waitTime = Math.round(error.msBeforeNext / 1000);
     throw new Error(`Rate limit exceeded. Try again in ${waitTime} seconds.`);
   }
 
@@ -138,15 +140,16 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
     logger.debug('Generic API response received', { contentLength: content.length });
     return content;
 
-  } catch (err) {
+  }
+  catch (error) {
     clearTimeout(timeoutId);
 
-    if (err.name === 'AbortError') {
+    if (error.name === 'AbortError') {
       throw new Error(`Local model request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds`);
     }
 
-    logger.error('Local model error', err);
-    throw new Error(`Local model connection failed: ${err.message}`);
+    logger.error('Local model error', error);
+    throw new Error(`Local model connection failed: ${error.message}`);
   }
 }
 
@@ -163,8 +166,9 @@ async function callOpenAI(messages) {
   // Rate limiting for OpenAI API
   try {
     await openAIRateLimiter.consume('openai_api');
-  } catch (rejRes) {
-    const waitTime = Math.round(rejRes.msBeforeNext / 1000);
+  }
+  catch (error) {
+    const waitTime = Math.round(error.msBeforeNext / 1000);
     throw new Error(`Rate limit exceeded. Try again in ${waitTime} seconds.`);
   }
 
@@ -204,15 +208,16 @@ async function callOpenAI(messages) {
     logger.debug('OpenAI response received', { contentLength: content.length });
     return content.slice(0, MAX_RESPONSE_LENGTH); // Limit response length
 
-  } catch (err) {
+  }
+  catch (error) {
     clearTimeout(timeoutId);
 
-    if (err.name === 'AbortError') {
+    if (error.name === 'AbortError') {
       throw new Error(`OpenAI request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds`);
     }
 
-    logger.error('OpenAI API error', err);
-    throw new Error(`OpenAI connection failed: ${err.message}`);
+    logger.error('OpenAI API error', error);
+    throw new Error(`OpenAI connection failed: ${error.message}`);
   }
 }
 
@@ -241,8 +246,9 @@ export async function generate(guildId, prompt) {
         logger.info('Local model response generated successfully');
         return response;
       }
-    } catch (err) {
-      logger.warn('Local model failed, trying OpenAI fallback', err);
+    }
+    catch (error) {
+      logger.warn('Local model failed, trying OpenAI fallback', error);
     }
   }
 
@@ -265,19 +271,20 @@ export async function generate(guildId, prompt) {
         logger.info('OpenAI response generated successfully');
         return response;
       }
-    } catch (err) {
-      logger.error('OpenAI fallback failed', err);
+    }
+    catch (error) {
+      logger.error('OpenAI fallback failed', error);
     }
   }
 
   // Enhanced fallback with creative responses
   const fallbackResponses = [
-    "In the mystical realm, ancient forces stir as our hero approaches...",
-    "The adventure continues with unexpected twists and hidden dangers...",
-    "Legends speak of great treasures waiting for worthy champions...",
-    "Dark magic swirls as the hero faces their greatest challenge yet...",
-    "The gods watch as fate unfolds in this epic tale...",
-    "Mysterious energies pulse through the air, revealing new possibilities..."
+    'In the mystical realm, ancient forces stir as our hero approaches...',
+    'The adventure continues with unexpected twists and hidden dangers...',
+    'Legends speak of great treasures waiting for worthy champions...',
+    'Dark magic swirls as the hero faces their greatest challenge yet...',
+    'The gods watch as fate unfolds in this epic tale...',
+    'Mysterious energies pulse through the air, revealing new possibilities...'
   ];
 
   const fallback = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];

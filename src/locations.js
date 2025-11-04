@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const LOCATIONS_FILE = path.join(process.cwd(), 'data', 'locations.json');
 
@@ -22,9 +22,10 @@ class LocationManager {
 
   loadLocations() {
     try {
-      const data = JSON.parse(fs.readFileSync(LOCATIONS_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(LOCATIONS_FILE));
       this.locations = data;
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to load locations:', error);
       this.locations = {};
     }
@@ -33,7 +34,8 @@ class LocationManager {
   saveLocations() {
     try {
       fs.writeFileSync(LOCATIONS_FILE, JSON.stringify(this.locations, null, 2));
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to save locations:', error);
     }
   }
@@ -51,7 +53,7 @@ class LocationManager {
         encounters: ['friendly_npc', 'easy_monster', 'treasure_chest', 'magic_spring'],
         ai_prompt: 'Describe a mystical forest with ancient trees that seem to whisper secrets. Include ambient sounds and magical elements.',
         rewards: { xp: 5, gold: 10, items: ['health_potion', 'magic_crystal'] },
-        color: 0x228B22,
+        color: 0x22_8B_22,
         emoji: '🌲',
         unlocked: true
       },
@@ -65,7 +67,7 @@ class LocationManager {
         encounters: ['crystal_golem', 'treasure_room', 'dark_pit', 'magic_circle'],
         ai_prompt: 'Describe a breathtaking cavern filled with glowing crystals of various colors. Include echoes and mystical energies.',
         rewards: { xp: 15, gold: 25, items: ['mana_potion', 'magic_staff', 'crystal_shard'] },
-        color: 0x9370DB,
+        color: 0x93_70_DB,
         emoji: '💎',
         unlocked: false
       },
@@ -79,7 +81,7 @@ class LocationManager {
         encounters: ['fire_elemental', 'lava_golem', 'phoenix_nest', 'ancient_altar'],
         ai_prompt: 'Describe a dramatic volcanic landscape with rivers of lava, intense heat, and the raw power of nature.',
         rewards: { xp: 50, gold: 100, items: ['fire_sword', 'phoenix_feather', 'dragon_scale'] },
-        color: 0xFF4500,
+        color: 0xFF_45_00,
         emoji: '🌋',
         unlocked: false
       },
@@ -93,7 +95,7 @@ class LocationManager {
         encounters: ['stone_guardian', 'curse_trap', 'blessed_shrine', 'divine_relic'],
         ai_prompt: 'Describe mysterious ancient ruins overgrown with vines, filled with mystical symbols and divine energy.',
         rewards: { xp: 75, gold: 150, items: ['holy_amulet', 'ancient_scroll', 'divine_blessing'] },
-        color: 0xDAA520,
+        color: 0xDA_A5_20,
         emoji: '🏛️',
         unlocked: false
       },
@@ -107,7 +109,7 @@ class LocationManager {
         encounters: ['shadow_beast', 'void_walker', 'dark_portal', 'essence_crystal'],
         ai_prompt: 'Describe a terrifying realm of pure darkness where shadows come alive and whisper forbidden knowledge.',
         rewards: { xp: 200, gold: 500, items: ['shadow_blade', 'void_crystal', 'legendary_blade'] },
-        color: 0x2F2F4F,
+        color: 0x2F_2F_4F,
         emoji: '🌑',
         unlocked: false
       },
@@ -121,7 +123,7 @@ class LocationManager {
         encounters: ['celestial_guardian', 'star_dragon', 'divine_trial', 'cosmic_artifact'],
         ai_prompt: 'Describe a breathtaking tower reaching into the heavens, surrounded by stars and cosmic phenomena.',
         rewards: { xp: 500, gold: 1000, items: ['celestial_armor', 'star_fragment', 'godly_relic'] },
-        color: 0xFFD700,
+        color: 0xFF_D7_00,
         emoji: '⭐',
         unlocked: false
       }
@@ -167,33 +169,33 @@ class LocationManager {
   getEncounterDescription(encounterType, level) {
     const descriptions = {
       // Friendly encounters
-      'friendly_npc': `A wise traveler offers guidance and shares ancient knowledge from their journeys.`,
-      'magic_spring': `Crystal-clear water glows with restorative magic, healing wounds and granting wisdom.`,
-      'blessed_shrine': `A sacred altar radiates divine energy, offering blessings to worthy adventurers.`,
+      'friendly_npc': 'A wise traveler offers guidance and shares ancient knowledge from their journeys.',
+      'magic_spring': 'Crystal-clear water glows with restorative magic, healing wounds and granting wisdom.',
+      'blessed_shrine': 'A sacred altar radiates divine energy, offering blessings to worthy adventurers.',
 
       // Combat encounters
-      'easy_monster': `A curious forest creature emerges, more frightened than dangerous.`,
-      'crystal_golem': `Animated crystals form a humanoid shape, defending the cavern's treasures.`,
-      'fire_elemental': `Living flames dance with destructive beauty, born from the volcano's heart.`,
-      'stone_guardian': `An ancient statue awakens, sworn to protect the temple's secrets.`,
-      'shadow_beast': `Darkness coalesces into a terrifying creature from your deepest fears.`,
-      'celestial_guardian': `A being of pure starlight descends to test your worthiness.`,
+      'easy_monster': 'A curious forest creature emerges, more frightened than dangerous.',
+      'crystal_golem': 'Animated crystals form a humanoid shape, defending the cavern\'s treasures.',
+      'fire_elemental': 'Living flames dance with destructive beauty, born from the volcano\'s heart.',
+      'stone_guardian': 'An ancient statue awakens, sworn to protect the temple\'s secrets.',
+      'shadow_beast': 'Darkness coalesces into a terrifying creature from your deepest fears.',
+      'celestial_guardian': 'A being of pure starlight descends to test your worthiness.',
 
       // Treasure encounters
-      'treasure_chest': `An ornate chest glows with magical energy, promising valuable rewards.`,
-      'treasure_room': `A chamber filled with precious artifacts and forgotten wealth.`,
-      'ancient_altar': `A mystical altar holds offerings from civilizations long past.`,
+      'treasure_chest': 'An ornate chest glows with magical energy, promising valuable rewards.',
+      'treasure_room': 'A chamber filled with precious artifacts and forgotten wealth.',
+      'ancient_altar': 'A mystical altar holds offerings from civilizations long past.',
 
       // Special encounters
-      'dark_pit': `A seemingly bottomless pit exhales cold, malevolent air.`,
-      'magic_circle': `Glowing runes form a perfect circle of arcane power.`,
-      'phoenix_nest': `A magnificent nest made of golden flames and precious materials.`,
-      'divine_relic': `A holy artifact pulses with celestial energy.`,
-      'dark_portal': `A swirling vortex connects to realms beyond mortal comprehension.`,
-      'cosmic_artifact': `An otherworldly object defies the laws of reality.`
+      'dark_pit': 'A seemingly bottomless pit exhales cold, malevolent air.',
+      'magic_circle': 'Glowing runes form a perfect circle of arcane power.',
+      'phoenix_nest': 'A magnificent nest made of golden flames and precious materials.',
+      'divine_relic': 'A holy artifact pulses with celestial energy.',
+      'dark_portal': 'A swirling vortex connects to realms beyond mortal comprehension.',
+      'cosmic_artifact': 'An otherworldly object defies the laws of reality.'
     };
 
-    return descriptions[encounterType] || `An mysterious encounter awaits in this location.`;
+    return descriptions[encounterType] || 'An mysterious encounter awaits in this location.';
   }
 
   calculateEncounterRewards(encounterType, level) {
@@ -265,7 +267,7 @@ class LocationManager {
 
     // Generate dungeon instance with multiple floors/rooms
     const dungeonInstance = {
-      id: `dungeon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `dungeon_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       locationId,
       userId,
       currentFloor: 1,
@@ -312,7 +314,7 @@ class LocationManager {
     const level = baseLevel + (floor - 1);
 
     switch (roomType) {
-      case 'combat':
+      case 'combat': {
         return {
           type: 'monster',
           name: `Dungeon Guardian (Level ${level})`,
@@ -321,23 +323,27 @@ class LocationManager {
           def: 2 + Math.floor(level / 3),
           spd: 2 + Math.floor(level / 4)
         };
+      }
 
-      case 'puzzle':
+      case 'puzzle': {
         return {
           type: 'riddle',
           riddle: this.generateRiddle(level),
           answer: this.getRiddleAnswer()
         };
+      }
 
-      case 'treasure':
+      case 'treasure': {
         return {
           type: 'lock',
           difficulty: level,
           trap_chance: Math.min(50, level * 5)
         };
+      }
 
-      default:
+      default: {
         return { type: 'none' };
+      }
     }
   }
 
@@ -345,26 +351,31 @@ class LocationManager {
     const level = baseLevel + (floor - 1);
 
     switch (roomType) {
-      case 'combat':
+      case 'combat': {
         return { xp: level * 10, gold: level * 5, items: ['random_item'] };
-      case 'treasure':
+      }
+      case 'treasure': {
         return { xp: level * 5, gold: level * 15, items: ['rare_item', 'gold_bonus'] };
-      case 'puzzle':
+      }
+      case 'puzzle': {
         return { xp: level * 20, gold: level * 8, items: ['skill_book'] };
-      case 'boss':
+      }
+      case 'boss': {
         return { xp: level * 50, gold: level * 30, items: ['legendary_item', 'boss_loot'] };
-      default:
+      }
+      default: {
         return { xp: level * 3, gold: level * 2 };
+      }
     }
   }
 
   generateRiddle(level) {
     const riddles = [
-      "I speak without a mouth and hear without ears. I have no body, but I come alive with the wind. What am I?",
+      'I speak without a mouth and hear without ears. I have no body, but I come alive with the wind. What am I?',
       "I have keys but no locks. I have space but no room. You can enter, but you can't go outside. What am I?",
-      "The more you take, the more you leave behind. What am I?",
+      'The more you take, the more you leave behind. What am I?',
       "I am not alive, but I grow; I don't have lungs, but I need air; I don't have a mouth, but water kills me. What am I?",
-      "I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?"
+      'I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?'
     ];
 
     return riddles[Math.floor(Math.random() * riddles.length)];
@@ -372,7 +383,7 @@ class LocationManager {
 
   getRiddleAnswer() {
     // This would return the correct answer for riddle verification
-    return "echo";
+    return 'echo';
   }
 
   // Location Discovery System

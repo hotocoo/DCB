@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
+
 import { safeExecuteCommand, CommandError, validateNotEmpty } from '../errorHandler.js';
 
 // Game constants
@@ -55,13 +56,13 @@ export const data = new SlashCommandBuilder()
   .setDescription('Play rock-paper-scissors against the bot')
   .addStringOption(opt =>
     opt.setName('choice')
-    .setDescription('Your choice')
-    .setRequired(true)
-    .addChoices(
-      { name: 'Rock 🪨', value: 'rock' },
-      { name: 'Paper 📄', value: 'paper' },
-      { name: 'Scissors ✂️', value: 'scissors' }
-    )
+      .setDescription('Your choice')
+      .setRequired(true)
+      .addChoices(
+        { name: 'Rock 🪨', value: 'rock' },
+        { name: 'Paper 📄', value: 'paper' },
+        { name: 'Scissors ✂️', value: 'scissors' }
+      )
   );
 
 /**
@@ -70,7 +71,7 @@ export const data = new SlashCommandBuilder()
  * @returns {Promise<void>}
  */
 export async function execute(interaction) {
-  return safeExecuteCommand(interaction, async () => {
+  return safeExecuteCommand(interaction, async() => {
     // Validate interaction and user
     validateNotEmpty(interaction, 'interaction');
     validateNotEmpty(interaction.user, 'user');

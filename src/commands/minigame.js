@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, MessageFlags } from 'discord.js';
+
 import { startTypingGame, checkTypingAttempt } from '../minigames/typing.js';
 import { CommandError, handleCommandError } from '../errorHandler.js';
 
@@ -81,19 +82,21 @@ export async function execute(interaction) {
           const { getNovel } = await import('../novel.js');
           const novel = getNovel(novelId);
           if (novel && novel.chapters && novel.chapters.length > 0) {
-            const text = novel.chapters[novel.chapters.length - 1].text;
-            const sentences = text.split(/[\.\!\?]\s+/).filter(Boolean);
+            const text = novel.chapters.at(-1).text;
+            const sentences = text.split(/[!.?]\s+/).filter(Boolean);
             if (sentences.length > 0) {
               sentence = sentences[Math.floor(Math.random() * sentences.length)].trim();
             }
-          } else {
+          }
+          else {
             return interaction.reply({
               content: '❌ Novel not found or has no chapters.',
               flags: MessageFlags.Ephemeral
             });
           }
-        } catch (err) {
-          console.error('Failed to load novel for typing:', err);
+        }
+        catch (error) {
+          console.error('Failed to load novel for typing:', error);
           return interaction.reply({
             content: '❌ Failed to load novel data.',
             flags: MessageFlags.Ephemeral
@@ -112,7 +115,8 @@ export async function execute(interaction) {
         ephemeral: false
       });
     }
-  } catch (error) {
+  }
+  catch (error) {
     return handleCommandError(interaction, error);
   }
 }

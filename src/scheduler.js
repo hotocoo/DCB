@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const SCHEDULES_FILE = path.join(process.cwd(), 'data', 'schedules.json');
 
@@ -38,9 +38,10 @@ class SchedulerManager {
 
   loadSchedules() {
     try {
-      const data = JSON.parse(fs.readFileSync(SCHEDULES_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(SCHEDULES_FILE));
       this.schedules = data;
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to load schedules:', error);
       this.schedules = {
         reminders: {},
@@ -54,14 +55,15 @@ class SchedulerManager {
   saveSchedules() {
     try {
       fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(this.schedules, null, 2));
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to save schedules:', error);
     }
   }
 
   // Advanced Reminder System
   createReminder(userId, reminderData) {
-    const reminderId = `reminder_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const reminderId = `reminder_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const reminder = {
       id: reminderId,
@@ -133,11 +135,13 @@ class SchedulerManager {
           const guild = await this.client.guilds.fetch(reminder.guildId);
           const channel = await guild.channels.fetch(reminder.channelId);
           await channel.send(message);
-        } else {
+        }
+        else {
           const channel = await this.client.channels.fetch(reminder.channelId);
           await channel.send(message);
         }
-      } catch (error) {
+      }
+      catch (error) {
         console.error('Failed to send reminder:', error);
       }
     }
@@ -154,7 +158,7 @@ class SchedulerManager {
 
     const newReminder = {
       ...originalReminder,
-      id: `reminder_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `reminder_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       scheduledFor: nextExecution,
       executed: false,
       created: Date.now()
@@ -172,18 +176,22 @@ class SchedulerManager {
     const date = new Date(lastExecution);
 
     switch (recurrence.type) {
-      case 'daily':
+      case 'daily': {
         date.setDate(date.getDate() + (recurrence.interval || 1));
         break;
-      case 'weekly':
+      }
+      case 'weekly': {
         date.setDate(date.getDate() + ((recurrence.interval || 1) * 7));
         break;
-      case 'monthly':
+      }
+      case 'monthly': {
         date.setMonth(date.getMonth() + (recurrence.interval || 1));
         break;
-      case 'hourly':
+      }
+      case 'hourly': {
         date.setHours(date.getHours() + (recurrence.interval || 1));
         break;
+      }
     }
 
     return date.getTime();
@@ -191,14 +199,14 @@ class SchedulerManager {
 
   // Event Management System
   createEvent(eventData) {
-    const eventId = `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const eventId = `event_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const event = {
       id: eventId,
       title: eventData.title,
       description: eventData.description,
       scheduledFor: eventData.scheduledFor,
-      duration: eventData.duration || 3600000, // 1 hour default
+      duration: eventData.duration || 3_600_000, // 1 hour default
       channelId: eventData.channelId,
       guildId: eventData.guildId,
       creatorId: eventData.creatorId,
@@ -237,7 +245,7 @@ class SchedulerManager {
     this.activeTimers.set(event.id, timerId);
 
     // Schedule reminders if any
-    event.reminders.forEach((reminderOffset, index) => {
+    for (const [index, reminderOffset] of event.reminders.entries()) {
       const reminderTime = event.scheduledFor - reminderOffset;
       if (reminderTime > Date.now()) {
         const reminderTimerId = setTimeout(() => {
@@ -246,7 +254,7 @@ class SchedulerManager {
 
         this.activeTimers.set(`${event.id}_reminder_${index}`, reminderTimerId);
       }
-    });
+    }
   }
 
   async executeEvent(event) {
@@ -270,11 +278,13 @@ class SchedulerManager {
           const guild = await this.client.guilds.fetch(event.guildId);
           const channel = await guild.channels.fetch(event.channelId);
           await channel.send(message);
-        } else {
+        }
+        else {
           const channel = await this.client.channels.fetch(event.channelId);
           await channel.send(message);
         }
-      } catch (error) {
+      }
+      catch (error) {
         console.error('Failed to send event:', error);
       }
     }
@@ -287,7 +297,7 @@ class SchedulerManager {
   }
 
   async sendEventReminder(event, reminderOffset) {
-    const timeUntilEvent = Math.round(reminderOffset / 60000); // Convert to minutes
+    const timeUntilEvent = Math.round(reminderOffset / 60_000); // Convert to minutes
     const message = `⏰ **Event Reminder: ${event.title}**\nStarts in ${timeUntilEvent} minutes!\n${event.description}`;
 
     if (this.client) {
@@ -296,11 +306,13 @@ class SchedulerManager {
           const guild = await this.client.guilds.fetch(event.guildId);
           const channel = await guild.channels.fetch(event.channelId);
           await channel.send(message);
-        } else {
+        }
+        else {
           const channel = await this.client.channels.fetch(event.channelId);
           await channel.send(message);
         }
-      } catch (error) {
+      }
+      catch (error) {
         console.error('Failed to send event reminder:', error);
       }
     }
@@ -319,15 +331,15 @@ class SchedulerManager {
     if (timeString.includes('in ')) {
       const match = timeString.match(/in\s+(\d+)\s*(second|minute|hour|day|week)s?/i);
       if (match) {
-        const amount = parseInt(match[1]);
+        const amount = Number.parseInt(match[1]);
         const unit = match[2].toLowerCase();
 
         const multipliers = {
           second: 1000,
-          minute: 60000,
-          hour: 3600000,
-          day: 86400000,
-          week: 604800000
+          minute: 60_000,
+          hour: 3_600_000,
+          day: 86_400_000,
+          week: 604_800_000
         };
 
         return now.getTime() + (amount * multipliers[unit]);
@@ -361,8 +373,8 @@ class SchedulerManager {
   parseTimeWithDate(timeString, date) {
     const timeMatch = timeString.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
     if (timeMatch) {
-      let hours = parseInt(timeMatch[1]);
-      const minutes = parseInt(timeMatch[2] || '0');
+      let hours = Number.parseInt(timeMatch[1]);
+      const minutes = Number.parseInt(timeMatch[2] || '0');
       const ampm = timeMatch[3].toLowerCase();
 
       if (ampm === 'pm' && hours !== 12) hours += 12;
@@ -439,9 +451,9 @@ class SchedulerManager {
 
     // Cancel all related timers
     this.activeTimers.delete(eventId);
-    event.reminders.forEach((_, index) => {
+    for (const [index, _] of event.reminders.entries()) {
       this.activeTimers.delete(`${eventId}_reminder_${index}`);
-    });
+    }
 
     this.saveSchedules();
     return true;

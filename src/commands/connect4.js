@@ -1,5 +1,6 @@
 // Module file for Connect4 command
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+
 import { updateUserStats } from '../achievements.js';
 import { connect4Games } from '../game-states.js';
 import { CommandError, handleCommandError } from '../errorHandler.js';
@@ -23,145 +24,142 @@ export const data = new SlashCommandBuilder()
       .setRequired(false));
 
 export async function execute(interaction) {
-   try {
-     const opponent = interaction.options.getUser('opponent');
-     const difficulty = interaction.options.getString('difficulty') || 'medium';
+  try {
+    const opponent = interaction.options.getUser('opponent');
+    const difficulty = interaction.options.getString('difficulty') || 'medium';
 
-     // Validation: Cannot play against self
-     if (opponent.id === interaction.user.id) {
-       throw new CommandError('You cannot play against yourself!', 'INVALID_ARGUMENT');
-     }
+    // Validation: Cannot play against self
+    if (opponent.id === interaction.user.id) {
+      throw new CommandError('You cannot play against yourself!', 'INVALID_ARGUMENT');
+    }
 
-     // Validation: Require difficulty for AI games
-     if (opponent.bot && !difficulty) {
-       throw new CommandError('Please specify difficulty when playing against AI.', 'INVALID_ARGUMENT');
-     }
+    // Validation: Require difficulty for AI games
+    if (opponent.bot && !difficulty) {
+      throw new CommandError('Please specify difficulty when playing against AI.', 'INVALID_ARGUMENT');
+    }
 
-     // Generate unique game ID
-     const gameId = `c4_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate unique game ID
+    const gameId = `c4_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
-     // Initialize game state
-     const gameState = {
-       id: gameId,
-       board: Array(6).fill(null).map(() => Array(7).fill(null)),
-       players: {
-         red: { id: interaction.user.id, name: interaction.user.username, symbol: '🔴' },
-         yellow: { id: opponent.id, name: opponent.username, symbol: '🟡' }
-       },
-       currentPlayer: 'red',
-       status: 'active',
-       isAI: opponent.bot,
-       difficulty: difficulty || 'medium',
-       created: Date.now()
-     };
+    // Initialize game state
+    const gameState = {
+      id: gameId,
+      board: Array.from({ length: 6 }).fill(null).map(() => Array.from({ length: 7 }).fill(null)),
+      players: {
+        red: { id: interaction.user.id, name: interaction.user.username, symbol: '🔴' },
+        yellow: { id: opponent.id, name: opponent.username, symbol: '🟡' }
+      },
+      currentPlayer: 'red',
+      status: 'active',
+      isAI: opponent.bot,
+      difficulty: difficulty || 'medium',
+      created: Date.now()
+    };
 
-     // Store game state
-     connect4Games.set(gameId, gameState);
+    // Store game state
+    connect4Games.set(gameId, gameState);
 
-     await sendConnect4Board(interaction, gameState);
-   } catch (error) {
-     await handleCommandError(interaction, error);
-   }
+    await sendConnect4Board(interaction, gameState);
+  }
+  catch (error) {
+    await handleCommandError(interaction, error);
+  }
 }
 
 async function sendConnect4Board(interaction, gameState) {
-   try {
-     const { board, players, currentPlayer, status, isAI, difficulty } = gameState;
+  try {
+    const { board, players, currentPlayer, status, isAI, difficulty } = gameState;
 
-     // Check for winner
-     const winner = checkConnect4Winner(board);
-     if (winner) {
-       gameState.status = 'completed';
+    // Check for winner
+    const winner = checkConnect4Winner(board);
+    if (winner) {
+      gameState.status = 'completed';
 
-       if (winner !== 'tie') {
-         const winnerPlayer = players[winner];
-         if (winnerPlayer.id !== 'ai' && winnerPlayer.id) {
-           try {
-             updateUserStats(winnerPlayer.id, { connect4_wins: 1 });
-           } catch (statsError) {
-             console.error('Failed to update user stats:', statsError);
-           }
-         }
-       }
+      if (winner !== 'tie') {
+        const winnerPlayer = players[winner];
+        if (winnerPlayer.id !== 'ai' && winnerPlayer.id) {
+          try {
+            updateUserStats(winnerPlayer.id, { connect4_wins: 1 });
+          }
+          catch (statsError) {
+            console.error('Failed to update user stats:', statsError);
+          }
+        }
+      }
 
-       // Clean up game state
-       connect4Games.delete(gameState.id);
+      // Clean up game state
+      connect4Games.delete(gameState.id);
 
-       const resultEmbed = new EmbedBuilder()
-         .setTitle('🎯 Connect Four - Game Over!')
-         .setColor(winner === 'tie' ? 0xFFA500 : 0x00FF00)
-         .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${players[winner]?.name || 'Unknown'} wins!**`)
-         .addFields({
-           name: 'Final Board',
-           value: formatConnect4Board(board),
-           inline: false
-         });
+      const resultEmbed = new EmbedBuilder()
+        .setTitle('🎯 Connect Four - Game Over!')
+        .setColor(winner === 'tie' ? 0xFF_A5_00 : 0x00_FF_00)
+        .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${players[winner]?.name || 'Unknown'} wins!**`)
+        .addFields({
+          name: 'Final Board',
+          value: formatConnect4Board(board),
+          inline: false
+        });
 
-       if (interaction.replied || interaction.deferred) {
-         await safeInteractionUpdate(interaction, { embeds: [resultEmbed], components: [] });
-       } else {
-         await safeInteractionReply(interaction, { embeds: [resultEmbed] });
-       }
-       return;
-     }
+      await (interaction.replied || interaction.deferred ? safeInteractionUpdate(interaction, { embeds: [resultEmbed], components: [] }) : safeInteractionReply(interaction, { embeds: [resultEmbed] }));
+      return;
+    }
 
-     // Update game state in storage
-     connect4Games.set(gameState.id, gameState);
+    // Update game state in storage
+    connect4Games.set(gameState.id, gameState);
 
-     const embed = new EmbedBuilder()
-       .setTitle('🎯 Connect Four')
-       .setColor(currentPlayer === 'red' ? 0xFF0000 : 0xFFFF00)
-       .setDescription(`${players[currentPlayer]?.name || 'Unknown'}'s turn ${players[currentPlayer]?.symbol || '❓'}`)
-       .addFields({
-         name: 'Game Board',
-         value: formatConnect4Board(board),
-         inline: false
-       });
+    const embed = new EmbedBuilder()
+      .setTitle('🎯 Connect Four')
+      .setColor(currentPlayer === 'red' ? 0xFF_00_00 : 0xFF_FF_00)
+      .setDescription(`${players[currentPlayer]?.name || 'Unknown'}'s turn ${players[currentPlayer]?.symbol || '❓'}`)
+      .addFields({
+        name: 'Game Board',
+        value: formatConnect4Board(board),
+        inline: false
+      });
 
-     // Create column buttons (0-6) - Split into two rows since max 5 per row
-     const row1 = new ActionRowBuilder();
-     const row2 = new ActionRowBuilder();
+    // Create column buttons (0-6) - Split into two rows since max 5 per row
+    const row1 = new ActionRowBuilder();
+    const row2 = new ActionRowBuilder();
 
-     for (let col = 0; col < 7; col++) {
-       const canPlay = board[0][col] === null; // Check if top row is empty
+    for (let col = 0; col < 7; col++) {
+      const canPlay = board[0][col] === null; // Check if top row is empty
 
-       const button = new ButtonBuilder()
-         .setCustomId(`c4_${col}_${gameState.id}`)
-         .setLabel(`${col + 1}`)
-         .setStyle(canPlay ? (currentPlayer === 'red' ? ButtonStyle.Danger : ButtonStyle.Secondary) : ButtonStyle.Secondary)
-         .setDisabled(!canPlay || (isAI && currentPlayer === 'yellow'));
+      const button = new ButtonBuilder()
+        .setCustomId(`c4_${col}_${gameState.id}`)
+        .setLabel(`${col + 1}`)
+        .setStyle(canPlay ? (currentPlayer === 'red' ? ButtonStyle.Danger : ButtonStyle.Secondary) : ButtonStyle.Secondary)
+        .setDisabled(!canPlay || (isAI && currentPlayer === 'yellow'));
 
-       if (col < 5) {
-         row1.addComponents(button);
-       } else {
-         row2.addComponents(button);
-       }
-     }
+      if (col < 5) {
+        row1.addComponents(button);
+      }
+      else {
+        row2.addComponents(button);
+      }
+    }
 
-     if (interaction.replied || interaction.deferred) {
-       await safeInteractionUpdate(interaction, { embeds: [embed], components: [row1, row2] });
-     } else {
-       await safeInteractionReply(interaction, { embeds: [embed], components: [row1, row2] });
-     }
+    await (interaction.replied || interaction.deferred ? safeInteractionUpdate(interaction, { embeds: [embed], components: [row1, row2] }) : safeInteractionReply(interaction, { embeds: [embed], components: [row1, row2] }));
 
-     // AI move if it's AI's turn
-     if (isAI && currentPlayer === 'yellow' && status === 'active') {
-       setTimeout(async () => {
-         try {
-           const aiMove = getConnect4AIMove(board, difficulty);
-           if (aiMove !== null) {
-             await makeConnect4Move(gameState, aiMove);
-             await sendConnect4Board(interaction, gameState);
-           }
-         } catch (aiError) {
-           console.error('AI move error:', aiError);
-         }
-       }, 1500);
-     }
-   } catch (error) {
-     console.error('sendConnect4Board error:', error);
-     await handleCommandError(interaction, new CommandError('Failed to update game board.', 'UNKNOWN_ERROR', { originalError: error.message }));
-   }
+    // AI move if it's AI's turn
+    if (isAI && currentPlayer === 'yellow' && status === 'active') {
+      setTimeout(async() => {
+        try {
+          const aiMove = getConnect4AIMove(board, difficulty);
+          if (aiMove !== null) {
+            await makeConnect4Move(gameState, aiMove);
+            await sendConnect4Board(interaction, gameState);
+          }
+        }
+        catch (aiError) {
+          console.error('AI move error:', aiError);
+        }
+      }, 1500);
+    }
+  }
+  catch (error) {
+    console.error('sendConnect4Board error:', error);
+    await handleCommandError(interaction, new CommandError('Failed to update game board.', 'UNKNOWN_ERROR', { originalError: error.message }));
+  }
 }
 
 function formatConnect4Board(board) {
@@ -232,78 +230,84 @@ function checkConnect4Winner(board) {
 }
 
 async function makeConnect4Move(gameState, column) {
-   try {
-     // Validate column input
-     if (column < 0 || column > 6 || !Number.isInteger(column)) {
-       throw new Error(`Invalid column: ${column}`);
-     }
+  try {
+    // Validate column input
+    if (column < 0 || column > 6 || !Number.isInteger(column)) {
+      throw new Error(`Invalid column: ${column}`);
+    }
 
-     const { board } = gameState;
+    const { board } = gameState;
 
-     // Find the lowest available row in the column
-     for (let row = 5; row >= 0; row--) {
-       if (board[row][column] === null) {
-         board[row][column] = gameState.currentPlayer;
-         gameState.currentPlayer = gameState.currentPlayer === 'red' ? 'yellow' : 'red';
-         return true;
-       }
-     }
+    // Find the lowest available row in the column
+    for (let row = 5; row >= 0; row--) {
+      if (board[row][column] === null) {
+        board[row][column] = gameState.currentPlayer;
+        gameState.currentPlayer = gameState.currentPlayer === 'red' ? 'yellow' : 'red';
+        return true;
+      }
+    }
 
-     return false; // Column is full
-   } catch (error) {
-     console.error('makeConnect4Move error:', error);
-     return false;
-   }
+    return false; // Column is full
+  }
+  catch (error) {
+    console.error('makeConnect4Move error:', error);
+    return false;
+  }
 }
 
 function getConnect4AIMove(board, difficulty) {
-   try {
-     const availableColumns = [];
-     for (let col = 0; col < 7; col++) {
-       if (board[0][col] === null) {
-         availableColumns.push(col);
-       }
-     }
+  try {
+    const availableColumns = [];
+    for (let col = 0; col < 7; col++) {
+      if (board[0][col] === null) {
+        availableColumns.push(col);
+      }
+    }
 
-     if (availableColumns.length === 0) return null;
+    if (availableColumns.length === 0) return null;
 
-     switch (difficulty) {
-       case 'easy':
-         // Random move, but prefer center columns
-         const centerColumns = availableColumns.filter(col => col >= 2 && col <= 4);
-         const preferredColumns = centerColumns.length > 0 ? centerColumns : availableColumns;
-         return preferredColumns[Math.floor(Math.random() * preferredColumns.length)];
+    switch (difficulty) {
+      case 'easy': {
+        // Random move, but prefer center columns
+        const centerColumns = availableColumns.filter(col => col >= 2 && col <= 4);
+        const preferredColumns = centerColumns.length > 0 ? centerColumns : availableColumns;
+        return preferredColumns[Math.floor(Math.random() * preferredColumns.length)];
+      }
 
-       case 'medium':
-         // Check for winning moves and blocking moves
-         const winningCol = findConnect4WinningMove(board, 'yellow');
-         if (winningCol !== null) return winningCol;
+      case 'medium': {
+        // Check for winning moves and blocking moves
+        const winningCol = findConnect4WinningMove(board, 'yellow');
+        if (winningCol !== null) return winningCol;
 
-         const blockingCol = findConnect4WinningMove(board, 'red');
-         if (blockingCol !== null) return blockingCol;
+        const blockingCol = findConnect4WinningMove(board, 'red');
+        if (blockingCol !== null) return blockingCol;
 
-         // Prefer center
-         const centers = [3, 2, 4, 1, 5, 0, 6].filter(col => availableColumns.includes(col));
-         return centers[0] !== undefined ? centers[0] : availableColumns[Math.floor(Math.random() * availableColumns.length)];
+        // Prefer center
+        const center = [3, 2, 4, 1, 5, 0, 6].find(col => availableColumns.includes(col));
+        return center !== undefined ? center : availableColumns[Math.floor(Math.random() * availableColumns.length)];
+      }
 
-       case 'hard':
-         // Use minimax algorithm for strategic play
-         return getConnect4BestMove(board, 'yellow');
+      case 'hard': {
+        // Use minimax algorithm for strategic play
+        return getConnect4BestMove(board, 'yellow');
+      }
 
-       default:
-         return availableColumns[Math.floor(Math.random() * availableColumns.length)];
-     }
-   } catch (error) {
-     console.error('getConnect4AIMove error:', error);
-     // Fallback to random move
-     const fallbackColumns = [];
-     for (let col = 0; col < 7; col++) {
-       if (board[0][col] === null) {
-         fallbackColumns.push(col);
-       }
-     }
-     return fallbackColumns.length > 0 ? fallbackColumns[Math.floor(Math.random() * fallbackColumns.length)] : null;
-   }
+      default: {
+        return availableColumns[Math.floor(Math.random() * availableColumns.length)];
+      }
+    }
+  }
+  catch (error) {
+    console.error('getConnect4AIMove error:', error);
+    // Fallback to random move
+    const fallbackColumns = [];
+    for (let col = 0; col < 7; col++) {
+      if (board[0][col] === null) {
+        fallbackColumns.push(col);
+      }
+    }
+    return fallbackColumns.length > 0 ? fallbackColumns[Math.floor(Math.random() * fallbackColumns.length)] : null;
+  }
 }
 
 function findConnect4WinningMove(board, player) {
@@ -326,38 +330,39 @@ function findConnect4WinningMove(board, player) {
 }
 
 function getConnect4BestMove(board, player) {
-   try {
-     let bestScore = -Infinity;
-     let bestCol = null;
+  try {
+    let bestScore = Number.NEGATIVE_INFINITY;
+    let bestCol = null;
 
-     for (let col = 0; col < 7; col++) {
-       if (board[0][col] !== null) continue;
+    for (let col = 0; col < 7; col++) {
+      if (board[0][col] !== null) continue;
 
-       const testBoard = board.map(row => [...row]);
-       let moveValid = false;
+      const testBoard = board.map(row => [...row]);
+      let moveValid = false;
 
-       for (let row = 5; row >= 0; row--) {
-         if (testBoard[row][col] === null) {
-           testBoard[row][col] = player;
-           const score = evaluateConnect4Position(testBoard, 0, player === 'yellow' ? 'red' : 'yellow');
-           if (score > bestScore) {
-             bestScore = score;
-             bestCol = col;
-           }
-           moveValid = true;
-           break;
-         }
-       }
+      for (let row = 5; row >= 0; row--) {
+        if (testBoard[row][col] === null) {
+          testBoard[row][col] = player;
+          const score = evaluateConnect4Position(testBoard, 0, player === 'yellow' ? 'red' : 'yellow');
+          if (score > bestScore) {
+            bestScore = score;
+            bestCol = col;
+          }
+          moveValid = true;
+          break;
+        }
+      }
 
-       if (!moveValid) continue; // Skip if no valid move in this column
-     }
+      if (!moveValid) continue; // Skip if no valid move in this column
+    }
 
-     // Fallback to center column if no best move found
-     return bestCol !== null ? bestCol : 3;
-   } catch (error) {
-     console.error('getConnect4BestMove error:', error);
-     return 3; // Return center column as fallback
-   }
+    // Fallback to center column if no best move found
+    return bestCol !== null ? bestCol : 3;
+  }
+  catch (error) {
+    console.error('getConnect4BestMove error:', error);
+    return 3; // Return center column as fallback
+  }
 }
 
 function evaluateConnect4Position(board, depth, player) {
@@ -400,3 +405,5 @@ function evaluateWindow(window, player) {
 
   return score;
 }
+
+export { sendConnect4Board, makeConnect4Move };

@@ -1,11 +1,12 @@
+import assert from 'node:assert';
+import fs from 'node:fs';
+
 import { getBalance, addBalance, transferBalance, buyFromMarket, sellToMarket, createInvestment, getUserInvestments, getMarketPrice } from '../src/economy.js';
 import { warnUser, muteUser, isUserMuted, checkAutoMod, getUserModStats } from '../src/moderation.js';
 import { createCharacter, getCharacter, applyXp, addItemToInventory, getInventory, deleteCharacter } from '../src/rpg.js';
 import { searchSongs, play, pause, stop, getQueue } from '../src/music.js';
 import { CommandError, validateUser, validateGuild, validatePermissions, validateRange, validateNotEmpty, createRateLimiter } from '../src/errorHandler.js';
 import { inputValidator, sanitizeInput, validateUserId, validateNumber, validateString } from '../src/validation.js';
-import assert from 'assert';
-import fs from 'fs';
 
 class ComprehensiveTestSuite {
   constructor() {
@@ -46,7 +47,8 @@ class ComprehensiveTestSuite {
     try {
       deleteCharacter(userId);
       this.log(`Cleaned up character for ${userId}`, true);
-    } catch (error) {
+    }
+    catch (error) {
       this.logError(`Failed to clean up character for ${userId}`, error);
     }
   }
@@ -88,7 +90,8 @@ class ComprehensiveTestSuite {
       const investments = getUserInvestments(this.testUsers[0]);
       this.log(`Investments count: ${investments.length}`, investments.length > 0);
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Economy test failed', error);
     }
   }
@@ -101,7 +104,7 @@ class ComprehensiveTestSuite {
       this.log(`Warning issued: ${warn.id}`, !!warn.id);
 
       // Test mute
-      const mute = muteUser(this.testGuild, this.testUsers[0], this.testUsers[1], 'Test mute', 60000);
+      const mute = muteUser(this.testGuild, this.testUsers[0], this.testUsers[1], 'Test mute', 60_000);
       this.log(`Mute issued: ${mute.id}`, !!mute.id);
 
       // Test is muted
@@ -119,7 +122,8 @@ class ComprehensiveTestSuite {
       const stats = getUserModStats(this.testGuild, this.testUsers[0]);
       this.log(`User mod stats: warnings ${stats.warnings}`, stats.warnings > 0);
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Moderation test failed', error);
     }
   }
@@ -152,7 +156,8 @@ class ComprehensiveTestSuite {
       // Verify character has proper structure after creation
       this.log(`Character has required properties: ${savedChar.hp !== undefined && savedChar.maxHp !== undefined}`, savedChar.hp !== undefined && savedChar.maxHp !== undefined);
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('RPG test failed', error);
     }
   }
@@ -175,7 +180,8 @@ class ComprehensiveTestSuite {
       const stopResult = await stop(this.testGuild);
       this.log(`Stop executed: ${stopResult}`, true);
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Music test failed', error);
     }
   }
@@ -204,7 +210,8 @@ class ComprehensiveTestSuite {
       const sanitizedSQL = sanitizeInput(sqlInjectionAttempt);
       this.log(`SQL injection attempt sanitized: ${sanitizedSQL.length < sqlInjectionAttempt.length}`, sanitizedSQL.length < sqlInjectionAttempt.length);
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Integration test failed', error);
     }
   }
@@ -227,7 +234,7 @@ class ComprehensiveTestSuite {
       this.log(`Input sanitization: ${sanitized === 'alert("xss")Hello'}`, sanitized === 'alert("xss")Hello');
 
       // Test invalid transfer
-      const invalidTransfer = transferBalance(this.testUsers[0], this.testUsers[1], 10000);
+      const invalidTransfer = transferBalance(this.testUsers[0], this.testUsers[1], 10_000);
       this.log(`Invalid transfer rejected: ${!invalidTransfer.success}`, !invalidTransfer.success);
 
       // Test insufficient funds
@@ -244,7 +251,8 @@ class ComprehensiveTestSuite {
       for (let i = 0; i < 5; i++) {
         try {
           await rateLimiter.consume('test_user');
-        } catch (error) {
+        }
+        catch (error) {
           if (error instanceof CommandError && error.code === 'RATE_LIMITED') {
             rateLimitTriggered = true;
           }
@@ -252,7 +260,8 @@ class ComprehensiveTestSuite {
       }
       this.log(`Rate limiter working: ${rateLimitTriggered}`, rateLimitTriggered);
 
-    } catch (error) {
+    }
+    catch (error) {
       this.logError('Error handling test failed', error);
     }
   }

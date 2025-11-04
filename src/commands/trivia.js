@@ -1,55 +1,56 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
+
 import { updateUserStats } from '../achievements.js';
 import { safeExecuteCommand, CommandError, validateRange } from '../errorHandler.js';
 
 const triviaQuestions = [
   {
-    question: "What is the capital of France?",
-    options: ["London", "Berlin", "Paris", "Madrid"],
+    question: 'What is the capital of France?',
+    options: ['London', 'Berlin', 'Paris', 'Madrid'],
     correct: 2,
-    category: "Geography"
+    category: 'Geography'
   },
   {
-    question: "Which planet is known as the Red Planet?",
-    options: ["Venus", "Mars", "Jupiter", "Saturn"],
+    question: 'Which planet is known as the Red Planet?',
+    options: ['Venus', 'Mars', 'Jupiter', 'Saturn'],
     correct: 1,
-    category: "Science"
+    category: 'Science'
   },
   {
-    question: "What is 2 + 2 × 3?",
-    options: ["8", "10", "12", "14"],
+    question: 'What is 2 + 2 × 3?',
+    options: ['8', '10', '12', '14'],
     correct: 0,
-    category: "Math"
+    category: 'Math'
   },
   {
-    question: "Who painted the Mona Lisa?",
-    options: ["Vincent van Gogh", "Pablo Picasso", "Leonardo da Vinci", "Michelangelo"],
+    question: 'Who painted the Mona Lisa?',
+    options: ['Vincent van Gogh', 'Pablo Picasso', 'Leonardo da Vinci', 'Michelangelo'],
     correct: 2,
-    category: "Art"
+    category: 'Art'
   },
   {
-    question: "What is the largest mammal in the world?",
-    options: ["African Elephant", "Blue Whale", "Giraffe", "Hippopotamus"],
+    question: 'What is the largest mammal in the world?',
+    options: ['African Elephant', 'Blue Whale', 'Giraffe', 'Hippopotamus'],
     correct: 1,
-    category: "Nature"
+    category: 'Nature'
   },
   {
-    question: "In which year did World War II end?",
-    options: ["1944", "1945", "1946", "1947"],
+    question: 'In which year did World War II end?',
+    options: ['1944', '1945', '1946', '1947'],
     correct: 1,
-    category: "History"
+    category: 'History'
   },
   {
-    question: "What is the chemical symbol for gold?",
-    options: ["Go", "Gd", "Au", "Ag"],
+    question: 'What is the chemical symbol for gold?',
+    options: ['Go', 'Gd', 'Au', 'Ag'],
     correct: 2,
-    category: "Science"
+    category: 'Science'
   },
   {
     question: "Which programming language is known as the 'mother of all languages'?",
-    options: ["Python", "C", "Assembly", "Java"],
+    options: ['Python', 'C', 'Assembly', 'Java'],
     correct: 1,
-    category: "Technology"
+    category: 'Technology'
   }
 ];
 
@@ -118,7 +119,8 @@ export async function execute(interaction) {
     if (selectedQuestions.length < questionCount) {
       throw new CommandError('Failed to select sufficient unique questions.', 'COMMAND_ERROR');
     }
-  } catch (error) {
+  }
+  catch (error) {
     throw new CommandError(`Failed to prepare trivia questions: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
   }
 
@@ -155,7 +157,7 @@ async function sendQuestion(interaction, gameState) {
   const embed = new EmbedBuilder()
     .setTitle(`🧠 Trivia Quiz - Question ${gameState.currentQuestion + 1}/${gameState.questions.length}`)
     .setDescription(`**${question.question}**`)
-    .setColor(0x0099FF)
+    .setColor(0x00_99_FF)
     .addFields({
       name: 'Category',
       value: question.category,
@@ -181,13 +183,13 @@ async function sendQuestion(interaction, gameState) {
   const collector = interaction.channel.createMessageComponentCollector({
     componentType: ComponentType.Button,
     filter,
-    time: 30000,
+    time: 30_000,
     max: 1
   });
 
-  collector.on('collect', async (i) => {
+  collector.on('collect', async(i) => {
     try {
-      const selectedAnswer = parseInt(i.customId.split('_')[1]);
+      const selectedAnswer = Number.parseInt(i.customId.split('_')[1]);
 
       if (isNaN(selectedAnswer) || selectedAnswer < 0 || selectedAnswer >= question.options.length) {
         await i.reply({ content: 'Invalid answer selection.', flags: MessageFlags.Ephemeral });
@@ -215,7 +217,7 @@ async function sendQuestion(interaction, gameState) {
       const feedbackEmbed = new EmbedBuilder()
         .setTitle(isCorrect ? '✅ Correct!' : '❌ Incorrect!')
         .setDescription(`**${question.question}**\n\nYour answer: **${question.options[selectedAnswer]}**\nCorrect answer: **${question.options[question.correct]}**`)
-        .setColor(isCorrect ? 0x00FF00 : 0xFF0000)
+        .setColor(isCorrect ? 0x00_FF_00 : 0xFF_00_00)
         .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` });
 
       await i.reply({ embeds: [feedbackEmbed], flags: MessageFlags.Ephemeral });
@@ -224,18 +226,19 @@ async function sendQuestion(interaction, gameState) {
       setTimeout(() => {
         sendQuestion(interaction, gameState);
       }, 2000);
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Error in trivia collector:', error);
       await i.reply({ content: 'An error occurred while processing your answer.', flags: MessageFlags.Ephemeral });
     }
   });
 
-  collector.on('end', async (collected) => {
+  collector.on('end', async(collected) => {
     if (collected.size === 0) {
       const timeoutEmbed = new EmbedBuilder()
         .setTitle('⏰ Time\'s Up!')
-        .setDescription(`You didn't answer in time. Moving to next question...`)
-        .setColor(0xFFA500);
+        .setDescription('You didn\'t answer in time. Moving to next question...')
+        .setColor(0xFF_A5_00);
 
       await interaction.followUp({ embeds: [timeoutEmbed], flags: MessageFlags.Ephemeral });
 
@@ -255,11 +258,7 @@ async function sendQuestion(interaction, gameState) {
     }
   });
 
-  if (interaction.replied || interaction.deferred) {
-    await interaction.followUp({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
-  } else {
-    await interaction.reply({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
-  }
+  await (interaction.replied || interaction.deferred ? interaction.followUp({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral }) : interaction.reply({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral }));
 }
 
 async function sendResults(interaction, gameState) {
@@ -279,32 +278,29 @@ async function sendResults(interaction, gameState) {
       trivia_correct: correctAnswers,
       features_tried: 1
     });
-  } catch (error) {
+  }
+  catch (error) {
     console.warn('Failed to update trivia achievements:', error.message);
   }
 
   const embed = new EmbedBuilder()
     .setTitle('🎯 Trivia Quiz Complete!')
     .setDescription(`${resultMessage}\n\n**Final Score: ${gameState.score}/${gameState.questions.length} (${percentage}%)**\n⏱️ Time: ${totalTime}s`)
-    .setColor(percentage >= 70 ? 0x00FF00 : percentage >= 50 ? 0xFFA500 : 0xFF0000)
+    .setColor(percentage >= 70 ? 0x00_FF_00 : (percentage >= 50 ? 0xFF_A5_00 : 0xFF_00_00))
     .setTimestamp();
 
   // Add detailed results
-  gameState.answers.forEach((answer, index) => {
-    const emoji = answer.isCorrect ? '✅' : answer.timeout ? '⏰' : '❌';
-    const status = answer.isCorrect ? 'Correct' : answer.timeout ? 'Timeout' : 'Incorrect';
+  for (const [index, answer] of gameState.answers.entries()) {
+    const emoji = answer.isCorrect ? '✅' : (answer.timeout ? '⏰' : '❌');
+    const status = answer.isCorrect ? 'Correct' : (answer.timeout ? 'Timeout' : 'Incorrect');
     embed.addFields({
       name: `Q${index + 1}: ${status}`,
       value: `${emoji} **${answer.question}**\n${answer.isCorrect ? 'Your answer: ' + answer.userChoice : `Your answer: ${answer.userChoice}\nCorrect: ${answer.correctChoice}`}`,
       inline: false
     });
-  });
-
-  if (interaction.replied || interaction.deferred) {
-    await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
-  } else {
-    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   }
+
+  await (interaction.replied || interaction.deferred ? interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral }) : interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral }));
 }
 
 export async function safeExecute(interaction) {

@@ -22,16 +22,16 @@ const OPENWEBUI_BASE = process.env.OPENWEBUI_BASE;
 const OPENWEBUI_PATH = process.env.OPENWEBUI_PATH || '/api/chat';
 
 // Chat configuration with environment variable support
-const DEFAULT_CHAT_COOLDOWN_MS = parseInt(process.env.CHAT_COOLDOWN_MS || '2000', 10);
-const DEFAULT_MAX_HISTORY = parseInt(process.env.CHAT_MAX_HISTORY || '8', 10);
-const MAX_RESPONSE_LENGTH = parseInt(process.env.MAX_RESPONSE_LENGTH || '2000', 10);
-const MAX_PROMPT_LENGTH = parseInt(process.env.MAX_PROMPT_LENGTH || '1000', 10);
-const AI_MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS || '512', 10);
-const AI_TEMPERATURE = parseFloat(process.env.AI_TEMPERATURE || '0.8');
+const DEFAULT_CHAT_COOLDOWN_MS = Number.parseInt(process.env.CHAT_COOLDOWN_MS || '2000', 10);
+const DEFAULT_MAX_HISTORY = Number.parseInt(process.env.CHAT_MAX_HISTORY || '8', 10);
+const MAX_RESPONSE_LENGTH = Number.parseInt(process.env.MAX_RESPONSE_LENGTH || '2000', 10);
+const MAX_PROMPT_LENGTH = Number.parseInt(process.env.MAX_PROMPT_LENGTH || '1000', 10);
+const AI_MAX_TOKENS = Number.parseInt(process.env.AI_MAX_TOKENS || '512', 10);
+const AI_TEMPERATURE = Number.parseFloat(process.env.AI_TEMPERATURE || '0.8');
 
 // Performance limits
 const MAX_CONVERSATION_MEMORY_MB = 50; // Limit memory usage
-const CLEANUP_INTERVAL_MS = 300000; // 5 minutes cleanup
+const CLEANUP_INTERVAL_MS = 300_000; // 5 minutes cleanup
 
 /**
  * Calls a local AI model with enhanced error handling and timeout protection.
@@ -46,7 +46,7 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 30_000); // 30 second timeout
 
   try {
     let response;
@@ -75,7 +75,8 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
       const data = await res.json();
       response = data.choices?.[0]?.message?.content ?? data.result ?? null;
 
-    } else if (api === 'openwebui') {
+    }
+    else if (api === 'openwebui') {
       const base = OPENWEBUI_BASE || url;
       if (!base) {
         throw new Error('OpenWebUI base URL not configured');
@@ -100,7 +101,8 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
       const data = await res.json();
       response = data.response ?? data.output ?? data.result ?? null;
 
-    } else {
+    }
+    else {
       // Generic endpoint fallback
       const res = await fetch(url, {
         method: 'POST',
@@ -129,16 +131,17 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
 
     return response.trim();
 
-  } catch (err) {
+  }
+  catch (error) {
     clearTimeout(timeoutId);
 
-    if (err.name === 'AbortError') {
+    if (error.name === 'AbortError') {
       logger.warn('Local model request timed out');
       throw new Error('Local model request timed out after 30 seconds');
     }
 
-    logger.error('Local model error', err instanceof Error ? err : new Error(String(err)));
-    throw err instanceof Error ? err : new Error(String(err));
+    logger.error('Local model error', error instanceof Error ? error : new Error(String(error)));
+    throw error instanceof Error ? error : new Error(String(error));
   }
 }
 
@@ -196,7 +199,7 @@ export async function respondWithOpenAI(messages) {
   logger.debug('Calling OpenAI API', { messageCount: messageArray.length });
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for OpenAI
+  const timeoutId = setTimeout(() => controller.abort(), 60_000); // 60 second timeout for OpenAI
 
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -232,7 +235,8 @@ export async function respondWithOpenAI(messages) {
     logger.debug('OpenAI response received', { contentLength: content.length });
     return content;
 
-  } catch (error) {
+  }
+  catch (error) {
     clearTimeout(timeoutId);
 
     if (error.name === 'AbortError') {
@@ -251,13 +255,13 @@ export async function respondWithOpenAI(messages) {
  * @returns {Promise<string|null>} Response message or null if no response needed
  */
 export async function handleMessage(message) {
+  const isDM = message.channel.type === 1 || message.channel?.type === 'DM';
+
   try {
     // Ignore bots and system messages
     if (message.author.bot || message.system) {
       return null;
     }
-
-    const isDM = message.channel.type === 1 || message.channel?.type === 'DM';
 
     // Only respond to DMs or mentions
     const isMention = message.mentions && message.mentions.has && message.mentions.has(message.client.user.id);
@@ -265,7 +269,7 @@ export async function handleMessage(message) {
       return null;
     }
 
-    const raw = message.content.replace(/<@!?.+?>/g, '').trim() || '';
+    const raw = message.content.replaceAll(/<@!?.+?>/g, '').trim() || '';
 
     logger.debug('Processing chat message', {
       userId: message.author.id,
@@ -312,7 +316,7 @@ export async function handleMessage(message) {
 
     // Get and update conversation history
     let history = conversationMap.get(message.author.id) || [];
-    history.push({ role: 'user', content: prompt.substring(0, MAX_PROMPT_LENGTH) });
+    history.push({ role: 'user', content: prompt.slice(0, Math.max(0, MAX_PROMPT_LENGTH)) });
 
     // Trim history to prevent memory issues
     const MAX_HISTORY = Number(process.env.CHAT_MAX_HISTORY || DEFAULT_MAX_HISTORY);
@@ -329,13 +333,14 @@ export async function handleMessage(message) {
 
     // Update conversation history with response
     if (response) {
-      history.push({ role: 'assistant', content: response.substring(0, MAX_RESPONSE_LENGTH) });
+      history.push({ role: 'assistant', content: response.slice(0, Math.max(0, MAX_RESPONSE_LENGTH)) });
       conversationMap.set(message.author.id, history);
     }
 
     return response;
 
-  } catch (error) {
+  }
+  catch (error) {
     logger.error('Chat message handling failed', error, {
       userId: message.author.id,
       username: message.author.username,
@@ -370,7 +375,7 @@ function handleSpecialCommands(command, message) {
   if (lowerCommand === '!status') {
     const guilds = message.client.guilds.cache.size;
     const users = message.client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0);
-    const aiStatus = OPENAI_KEY ? 'OpenAI ✓' : LOCAL_MODEL_URL ? 'Local Model ✓' : 'Basic Chat ✓';
+    const aiStatus = OPENAI_KEY ? 'OpenAI ✓' : (LOCAL_MODEL_URL ? 'Local Model ✓' : 'Basic Chat ✓');
 
     return `🤖 **Bot Status:**\n• Servers: ${guilds}\n• Users: ${users}\n• AI: ${aiStatus}\n• Version: ULTRA v3.0`;
   }
@@ -382,7 +387,7 @@ function handleSpecialCommands(command, message) {
   // Check for playful prompts (8ball, rps, dice rolls, jokes)
   const playfulResponse = handlePlayfulPrompt(command, message);
   if (playfulResponse) {
-    logger.debug('Playful prompt handled', { userId: message.author.id, command: command.substring(0, 50) });
+    logger.debug('Playful prompt handled', { userId: message.author.id, command: command.slice(0, 50) });
     return playfulResponse;
   }
 
@@ -422,7 +427,7 @@ Respond naturally and helpfully. If they're asking about bot features, mention r
       logger.debug('Attempting local model for chat', { userId: message.author.id });
       const response = await callLocalModel(contextPrompt, useLocalUrl, useLocalApi);
       if (response) {
-        const cleanResponse = response.trim().substring(0, MAX_RESPONSE_LENGTH);
+        const cleanResponse = response.trim().slice(0, Math.max(0, MAX_RESPONSE_LENGTH));
         logger.info('Local model chat response generated', {
           userId: message.author.id,
           responseLength: cleanResponse.length,
@@ -430,9 +435,10 @@ Respond naturally and helpfully. If they're asking about bot features, mention r
         });
         return cleanResponse;
       }
-    } catch (err) {
+    }
+    catch (error) {
       logger.warn('Local model failed for chat, falling back to OpenAI', {
-        error: err.message,
+        error: error.message,
         userId: message.author.id
       });
     }
@@ -452,15 +458,16 @@ Respond naturally and helpfully. If they're asking about bot features, mention r
 
       const reply = await respondWithOpenAI(messages);
       if (reply) {
-        const cleanReply = reply.trim().substring(0, MAX_RESPONSE_LENGTH);
+        const cleanReply = reply.trim().slice(0, Math.max(0, MAX_RESPONSE_LENGTH));
         logger.info('OpenAI chat response generated', {
           userId: message.author.id,
           responseLength: cleanReply.length
         });
         return cleanReply;
       }
-    } catch (err) {
-      logger.error('OpenAI API failed for chat', err, {
+    }
+    catch (error) {
+      logger.error('OpenAI API failed for chat', error, {
         userId: message.author.id,
         promptLength: prompt.length
       });
@@ -470,7 +477,7 @@ Respond naturally and helpfully. If they're asking about bot features, mention r
   // Fallback responses
   const fallbackResponses = [
     `💭 I'm thinking... "${prompt}" is an interesting message! While my AI brain is loading, did you know you can use /rpg to start an adventure?`,
-    `🤔 Processing your message: "${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}". My neural networks are warming up! Try /help to explore all features.`,
+    `🤔 Processing your message: "${prompt.slice(0, 50)}${prompt.length > 50 ? '...' : ''}". My neural networks are warming up! Try /help to explore all features.`,
     `🧠 Analyzing: "${prompt}". I'm getting smarter every day! Meanwhile, you can play /trivia or start an RPG adventure with /rpg.`,
     `⚡ "${prompt}" - fascinating input! While I'm connecting to my AI core, why not try /music to play some tunes?`
   ];
@@ -516,7 +523,7 @@ function handlePlayfulPrompt(text, message) {
 
   // prompt to play
   if (/\b(play|game|let's play|wanna play)\b/.test(lower)) {
-    return `Wanna play? Try /rps <rock|paper|scissors>, /roll 2d6, or /8ball <question> — or DM me directly and say "roll 1d20" or "rps rock".`;
+    return 'Wanna play? Try /rps <rock|paper|scissors>, /roll 2d6, or /8ball <question> — or DM me directly and say "roll 1d20" or "rps rock".';
   }
 
   return null;
@@ -549,7 +556,8 @@ function playRPS(userChoice, username) {
       (userChoice === 'paper' && bot === 'rock') ||
       (userChoice === 'scissors' && bot === 'paper')) {
     result = 'you win';
-  } else if (userChoice !== bot) {
+  }
+  else if (userChoice !== bot) {
     result = 'you lose';
   }
 
@@ -580,7 +588,7 @@ function randomJoke() {
   const jokes = [
     "I told my computer I needed a break, and it said: 'No problem — I'll go to sleep.'",
     'Why do programmers prefer dark mode? Because light attracts bugs!',
-    "Why did the developer go broke? Because he used up all his cache."
+    'Why did the developer go broke? Because he used up all his cache.'
   ];
   return jokes[Math.floor(Math.random() * jokes.length)];
 }

@@ -1,15 +1,29 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { generate } from './model-client.js';
 
 const FILE = path.join(process.cwd(), 'data', 'novels.json');
 
-function ensureDir() { const dir = path.dirname(FILE); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); }
+function ensureDir() {
+  const dir = path.dirname(FILE); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
 
-function readAll() { ensureDir(); if (!fs.existsSync(FILE)) return {}; try { return JSON.parse(fs.readFileSync(FILE, 'utf8')) || {}; } catch (error) { return {}; } }
-function writeAll(obj) { ensureDir(); fs.writeFileSync(FILE, JSON.stringify(obj, null, 2), 'utf8'); }
+function readAll() {
+  ensureDir(); if (!fs.existsSync(FILE)) return {}; try {
+    return JSON.parse(fs.readFileSync(FILE)) || {};
+  }
+  catch {
+    return {};
+  }
+}
+function writeAll(obj) {
+  ensureDir(); fs.writeFileSync(FILE, JSON.stringify(obj, null, 2), 'utf8');
+}
 
-export function listNovels() { return Object.keys(readAll()); }
+export function listNovels() {
+  return Object.keys(readAll());
+}
 
 export function createNovel(ownerId, title, prompt) {
   const all = readAll();
@@ -19,7 +33,9 @@ export function createNovel(ownerId, title, prompt) {
   return all[id];
 }
 
-export function getNovel(id) { const all = readAll(); return all[id] || null; }
+export function getNovel(id) {
+  const all = readAll(); return all[id] || null;
+}
 
 export async function generateChapter(guildId, novelId) {
   const novel = getNovel(novelId);

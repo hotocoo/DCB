@@ -47,6 +47,8 @@ export async function execute(interaction) {
   await sendMemoryBoard(interaction, gameState);
 }
 
+export { sendMemoryBoard, getPerformanceRating };
+
 async function sendMemoryBoard(interaction, gameState) {
   if (!gameState.gameActive) return;
 
@@ -60,7 +62,7 @@ async function sendMemoryBoard(interaction, gameState) {
     const winEmbed = new EmbedBuilder()
       .setTitle('🎉 Memory Master!')
       .setDescription(`Congratulations! You matched all ${totalPairs} pairs in ${moves} moves and ${timeElapsed} seconds! 🏆`)
-      .setColor(0x00FF00)
+      .setColor(0x00_FF_00)
       .addFields(
         {
           name: '📊 Stats',
@@ -74,23 +76,19 @@ async function sendMemoryBoard(interaction, gameState) {
         }
       );
 
-    if (interaction.replied || interaction.deferred) {
-      await interaction.editReply({ embeds: [winEmbed], components: [] });
-    } else {
-      await interaction.reply({ embeds: [winEmbed] });
-    }
-  
+    await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [winEmbed], components: [] }) : interaction.reply({ embeds: [winEmbed] }));
+
     // Clean up game state
     const { memoryGames } = await import('../game-states.js');
     memoryGames.delete(interaction.message?.id || interaction.id);
-  
+
     return;
   }
 
   const embed = new EmbedBuilder()
     .setTitle(`🧠 Memory Game - ${matchedPairs}/${totalPairs} Pairs Found`)
     .setDescription(`**Moves:** ${moves} | **Difficulty:** ${gameState.difficulty.toUpperCase()}`)
-    .setColor(0x0099FF);
+    .setColor(0x00_99_FF);
 
   // Create card grid (4x3 for easy, 4x4 for medium/hard)
   const gridSize = gameState.totalPairs <= 6 ? 3 : 4;
@@ -120,7 +118,7 @@ async function sendMemoryBoard(interaction, gameState) {
       row.addComponents(
         new ButtonBuilder()
           .setCustomId(`memory_${j}`)
-          .setLabel(card.isMatched ? '✅' : card.isFlipped ? card.emoji : '🂠')
+          .setLabel(card.isMatched ? '✅' : (card.isFlipped ? card.emoji : '🂠'))
           .setStyle(card.isMatched ? ButtonStyle.Success : ButtonStyle.Primary)
           .setDisabled(card.isMatched || flippedCards.includes(j))
       );
@@ -137,11 +135,7 @@ async function sendMemoryBoard(interaction, gameState) {
     );
   }
 
-  if (interaction.replied || interaction.deferred) {
-    await interaction.editReply({ embeds: [embed], components: buttons });
-  } else {
-    await interaction.reply({ embeds: [embed], components: buttons });
-  }
+  await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [embed], components: buttons }) : interaction.reply({ embeds: [embed], components: buttons }));
 
   // Store game state after reply (if not already stored)
   const messageId = interaction.message?.id || interaction.id;

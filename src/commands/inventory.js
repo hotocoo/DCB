@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+
 import {
   getInventory,
   getItemInfo,
@@ -33,178 +34,192 @@ export async function execute(interaction) {
       throw new CommandError('Invalid user ID', 'VALIDATION_ERROR');
     }
 
-    if (sub === 'view') {
-      const inventory = getInventory(userId);
-      const inventoryValue = getInventoryValue(userId);
+    switch (sub) {
+      case 'view': {
+        const inventory = getInventory(userId);
+        const inventoryValue = getInventoryValue(userId);
 
-      if (!inventory || Object.keys(inventory).length === 0) {
-        return interaction.reply({ content: '🛄 Your inventory is empty. Go explore to find items!', flags: MessageFlags.Ephemeral });
-      }
+        if (!inventory || Object.keys(inventory).length === 0) {
+          return interaction.reply({ content: '🛄 Your inventory is empty. Go explore to find items!', flags: MessageFlags.Ephemeral });
+        }
 
-    // Group items by type
-    const itemsByType = {};
-    for (const [itemId, quantity] of Object.entries(inventory)) {
-      const item = getItemInfo(itemId);
-      if (item) {
-        if (!itemsByType[item.type]) itemsByType[item.type] = [];
-        itemsByType[item.type].push({ itemId, ...item, quantity });
-      }
-    }
+        // Group items by type
+        const itemsByType = {};
+        for (const [itemId, quantity] of Object.entries(inventory)) {
+          const item = getItemInfo(itemId);
+          if (item) {
+            if (!itemsByType[item.type]) itemsByType[item.type] = [];
+            itemsByType[item.type].push({ itemId, ...item, quantity });
+          }
+        }
 
-    const embed = new EmbedBuilder()
-      .setTitle(`🛄 ${interaction.user.username}'s Inventory`)
-      .setColor(0x0099FF)
-      .setDescription(`💰 Total Value: ${inventoryValue} gold`);
+        const embed = new EmbedBuilder()
+          .setTitle(`🛄 ${interaction.user.username}'s Inventory`)
+          .setColor(0x00_99_FF)
+          .setDescription(`💰 Total Value: ${inventoryValue} gold`);
 
-    // Add equipped items section
-    const character = getCharacter(userId);
-    if (character && (character.equipped?.weapon || character.equipped?.armor)) {
-      const equippedItems = [];
-      if (character.equipped.weapon) {
-        const weapon = getItemInfo(character.equipped.weapon);
-        if (weapon) equippedItems.push(`⚔️ ${weapon.name}`);
-      }
-      if (character.equipped.armor) {
-        const armor = getItemInfo(character.equipped.armor);
-        if (armor) equippedItems.push(`🛡️ ${armor.name}`);
-      }
-      embed.addFields({
-        name: '⚡ Equipped',
-        value: equippedItems.join('\n') || 'None',
-        inline: true
-      });
-    }
+        // Add equipped items section
+        const character = getCharacter(userId);
+        if (character && (character.equipped?.weapon || character.equipped?.armor)) {
+          const equippedItems = [];
+          if (character.equipped.weapon) {
+            const weapon = getItemInfo(character.equipped.weapon);
+            if (weapon) equippedItems.push(`⚔️ ${weapon.name}`);
+          }
+          if (character.equipped.armor) {
+            const armor = getItemInfo(character.equipped.armor);
+            if (armor) equippedItems.push(`🛡️ ${armor.name}`);
+          }
+          embed.addFields({
+            name: '⚡ Equipped',
+            value: equippedItems.join('\n') || 'None',
+            inline: true
+          });
+        }
 
-    // Add buttons for inventory actions
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`inventory_refresh:${userId}`).setLabel('🔄 Refresh').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`inventory_random:${userId}`).setLabel('🎲 Get Random Item').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`inventory_sell_all:${userId}`).setLabel('💰 Sell All Junk').setStyle(ButtonStyle.Success)
-    );
+        // Add buttons for inventory actions
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`inventory_refresh:${userId}`).setLabel('🔄 Refresh').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`inventory_random:${userId}`).setLabel('🎲 Get Random Item').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId(`inventory_sell_all:${userId}`).setLabel('💰 Sell All Junk').setStyle(ButtonStyle.Success)
+        );
 
-    await interaction.reply({ embeds: [embed], components: [row] });
+        await interaction.reply({ embeds: [embed], components: [row] });
 
-    // Update embed with actual inventory data
-    await updateInventoryEmbed(interaction, itemsByType, inventoryValue);
+        // Update embed with actual inventory data
+        await updateInventoryEmbed(interaction, itemsByType, inventoryValue);
 
-  } else if (sub === 'use') {
-    const itemName = interaction.options.getString('item');
-    const inventory = getInventory(userId);
-
-    // Find item by name
-    let targetItemId = null;
-    for (const [itemId, quantity] of Object.entries(inventory)) {
-      const item = getItemInfo(itemId);
-      if (item && item.name.toLowerCase() === itemName.toLowerCase()) {
-        targetItemId = itemId;
         break;
       }
-    }
+      case 'use': {
+        const itemName = interaction.options.getString('item');
+        const inventory = getInventory(userId);
 
-    if (!targetItemId) {
-      return interaction.reply({ content: `❌ You don't have "${itemName}" in your inventory.`, flags: MessageFlags.Ephemeral });
-    }
+        // Find item by name
+        let targetItemId = null;
+        for (const [itemId, quantity] of Object.entries(inventory)) {
+          const item = getItemInfo(itemId);
+          if (item && item.name.toLowerCase() === itemName.toLowerCase()) {
+            targetItemId = itemId;
+            break;
+          }
+        }
 
-    // Validate item is consumable
-    const item = getItemInfo(targetItemId);
-    if (!item || item.type !== 'consumable') {
-      return interaction.reply({ content: `❌ "${itemName}" is not a consumable item.`, flags: MessageFlags.Ephemeral });
-    }
+        if (!targetItemId) {
+          return interaction.reply({ content: `❌ You don't have "${itemName}" in your inventory.`, flags: MessageFlags.Ephemeral });
+        }
 
-    const result = useConsumableItem(userId, targetItemId);
-    if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
-    }
+        // Validate item is consumable
+        const item = getItemInfo(targetItemId);
+        if (!item || item.type !== 'consumable') {
+          return interaction.reply({ content: `❌ "${itemName}" is not a consumable item.`, flags: MessageFlags.Ephemeral });
+        }
 
-    let response = `✅ Used ${getItemInfo(targetItemId).name}!`;
-    if (result.effects.hp_restored) {
-      response += `\n❤️ Restored ${result.effects.hp_restored} HP`;
-    }
-    if (result.effects.revive) {
-      response += `\n🔮 You have been revived!`;
-    }
+        const result = useConsumableItem(userId, targetItemId);
+        if (!result.success) {
+          return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
+        }
 
-    await interaction.reply({ content: response });
-  } else if (sub === 'equip') {
-    const itemName = interaction.options.getString('item');
-    const inventory = getInventory(userId);
+        let response = `✅ Used ${getItemInfo(targetItemId).name}!`;
+        if (result.effects.hp_restored) {
+          response += `\n❤️ Restored ${result.effects.hp_restored} HP`;
+        }
+        if (result.effects.revive) {
+          response += '\n🔮 You have been revived!';
+        }
 
-    // Find item by name
-    let targetItemId = null;
-    for (const [itemId, quantity] of Object.entries(inventory)) {
-      const item = getItemInfo(itemId);
-      if (item && item.name.toLowerCase() === itemName.toLowerCase()) {
-        targetItemId = itemId;
+        await interaction.reply({ content: response });
+
         break;
       }
-    }
+      case 'equip': {
+        const itemName = interaction.options.getString('item');
+        const inventory = getInventory(userId);
 
-    if (!targetItemId) {
-      return interaction.reply({ content: `❌ You don't have "${itemName}" in your inventory.`, flags: MessageFlags.Ephemeral });
-    }
+        // Find item by name
+        let targetItemId = null;
+        for (const [itemId, quantity] of Object.entries(inventory)) {
+          const item = getItemInfo(itemId);
+          if (item && item.name.toLowerCase() === itemName.toLowerCase()) {
+            targetItemId = itemId;
+            break;
+          }
+        }
 
-    const item = getItemInfo(targetItemId);
-    if (item.type !== 'weapon' && item.type !== 'armor') {
-      return interaction.reply({ content: `❌ You can only equip weapons and armor, not ${item.type}s.`, flags: MessageFlags.Ephemeral });
-    }
+        if (!targetItemId) {
+          return interaction.reply({ content: `❌ You don't have "${itemName}" in your inventory.`, flags: MessageFlags.Ephemeral });
+        }
 
-    const character = getCharacter(userId);
-    if (!character) {
-      return interaction.reply({ content: '❌ You need a character first. Use `/rpg start` to create one.', flags: MessageFlags.Ephemeral });
-    }
+        const item = getItemInfo(targetItemId);
+        if (item.type !== 'weapon' && item.type !== 'armor') {
+          return interaction.reply({ content: `❌ You can only equip weapons and armor, not ${item.type}s.`, flags: MessageFlags.Ephemeral });
+        }
 
-    const slot = item.type === 'weapon' ? 'weapon' : 'armor';
+        const character = getCharacter(userId);
+        if (!character) {
+          return interaction.reply({ content: '❌ You need a character first. Use `/rpg start` to create one.', flags: MessageFlags.Ephemeral });
+        }
 
-    // Check if item is already equipped
-    if (character.equipped && character.equipped[slot] === targetItemId) {
-      return interaction.reply({ content: `❌ **${item.name}** is already equipped in the ${slot} slot.`, flags: MessageFlags.Ephemeral });
-    }
+        const slot = item.type === 'weapon' ? 'weapon' : 'armor';
 
-    // Unequip current item in that slot if any
-    if (character.equipped && character.equipped[slot]) {
-      const currentItemId = character.equipped[slot];
-      const currentItem = getItemInfo(currentItemId);
-      if (currentItem) {
-        addItemToInventory(userId, currentItemId, 1);
+        // Check if item is already equipped
+        if (character.equipped && character.equipped[slot] === targetItemId) {
+          return interaction.reply({ content: `❌ **${item.name}** is already equipped in the ${slot} slot.`, flags: MessageFlags.Ephemeral });
+        }
+
+        // Unequip current item in that slot if any
+        if (character.equipped && character.equipped[slot]) {
+          const currentItemId = character.equipped[slot];
+          const currentItem = getItemInfo(currentItemId);
+          if (currentItem) {
+            addItemToInventory(userId, currentItemId, 1);
+          }
+        }
+
+        // Equip new item
+        if (!character.equipped) character.equipped = {};
+        character.equipped[slot] = targetItemId;
+        removeItemFromInventory(userId, targetItemId, 1);
+        saveCharacter(userId, character);
+
+        await interaction.reply({ content: `✅ Equipped **${item.name}** in ${slot} slot!` });
+
+        break;
       }
+      case 'unequip': {
+        const slot = interaction.options.getString('slot');
+
+        if (slot !== 'weapon' && slot !== 'armor') {
+          return interaction.reply({ content: '❌ Invalid slot. Use weapon or armor.', flags: MessageFlags.Ephemeral });
+        }
+
+        const character = getCharacter(userId);
+        if (!character) {
+          return interaction.reply({ content: '❌ You need a character first. Use `/rpg start` to create one.', flags: MessageFlags.Ephemeral });
+        }
+
+        if (!character.equipped || !character.equipped[slot]) {
+          return interaction.reply({ content: `❌ You don't have anything equipped in the ${slot} slot.`, flags: MessageFlags.Ephemeral });
+        }
+
+        const itemId = character.equipped[slot];
+        const item = getItemInfo(itemId);
+
+        // Add item back to inventory
+        addItemToInventory(userId, itemId, 1);
+
+        // Unequip item
+        character.equipped[slot] = null;
+        saveCharacter(userId, character);
+
+        await interaction.reply({ content: `✅ Unequipped **${item.name}** from ${slot} slot!` });
+
+        break;
+      }
+    // No default
     }
-
-    // Equip new item
-    if (!character.equipped) character.equipped = {};
-    character.equipped[slot] = targetItemId;
-    removeItemFromInventory(userId, targetItemId, 1);
-    saveCharacter(userId, character);
-
-    await interaction.reply({ content: `✅ Equipped **${item.name}** in ${slot} slot!` });
-  } else if (sub === 'unequip') {
-    const slot = interaction.options.getString('slot');
-
-    if (slot !== 'weapon' && slot !== 'armor') {
-      return interaction.reply({ content: '❌ Invalid slot. Use weapon or armor.', flags: MessageFlags.Ephemeral });
-    }
-
-    const character = getCharacter(userId);
-    if (!character) {
-      return interaction.reply({ content: '❌ You need a character first. Use `/rpg start` to create one.', flags: MessageFlags.Ephemeral });
-    }
-
-    if (!character.equipped || !character.equipped[slot]) {
-      return interaction.reply({ content: `❌ You don't have anything equipped in the ${slot} slot.`, flags: MessageFlags.Ephemeral });
-    }
-
-    const itemId = character.equipped[slot];
-    const item = getItemInfo(itemId);
-
-    // Add item back to inventory
-    addItemToInventory(userId, itemId, 1);
-
-    // Unequip item
-    character.equipped[slot] = null;
-    saveCharacter(userId, character);
-
-    await interaction.reply({ content: `✅ Unequipped **${item.name}** from ${slot} slot!` });
   }
-  } catch (error) {
+  catch (error) {
     return handleCommandError(interaction, error);
   }
 }

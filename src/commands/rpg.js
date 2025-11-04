@@ -1,5 +1,6 @@
-import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder , MessageFlags} from 'discord.js';
-import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, resetCharacter, getCharacterClasses, getClassInfo, bossEncounter, getCraftingRecipes, canCraftItem, craftItem, createQuest, listQuests, completeQuest, spendSkillPoints } from '../rpg.js';
+import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder , MessageFlags } from 'discord.js';
+
+import { createCharacter, getCharacter, saveCharacter, encounterMonster, fightTurn, narrate, randomEventType, applyXp, getLeaderboard, getLeaderboardCount, resetCharacter, getCharacterClasses, getClassInfo, bossEncounter, getCraftingRecipes, canCraftItem, craftItem, createQuest, listQuests, completeQuest, spendSkillPoints } from '../rpg.js';
 import { updateUserStats } from '../achievements.js';
 import { exploreLocation } from '../locations.js';
 
@@ -75,7 +76,7 @@ export async function execute(interaction) {
     return interaction.reply({ content: 'Use `/inventory view` to manage your inventory!', flags: MessageFlags.Ephemeral });
   }
 
-  const char = getCharacter(userId);
+  let char = getCharacter(userId);
   if (!char) return interaction.reply({ content: 'You have no character. Run /rpg start', flags: MessageFlags.Ephemeral });
 
   if (sub === 'stats') {
@@ -128,7 +129,8 @@ export async function execute(interaction) {
 
       log.push(`You defeated ${monster.name}! Gained ${monster.lvl * 5} XP.`);
       if (res.gained > 0) log.push(`Level up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`);
-    } else if (char.hp <= 0) {
+    }
+    else if (char.hp <= 0) {
       char.hp = Math.max(1, Math.floor(char.maxHp / 2));
       saveCharacter(userId, char);
       log.push('You were defeated and recover to half HP.');
@@ -173,7 +175,7 @@ export async function execute(interaction) {
 
   if (sub === 'boss') {
     const boss = bossEncounter(Math.max(3, char.lvl + 2));
-    const narr = await narrate(interaction.guildId, `A dire boss ${boss.name} appears. Give a short epic intro.`, `A fearsome boss appears!`);
+    const narr = await narrate(interaction.guildId, `A dire boss ${boss.name} appears. Give a short epic intro.`, 'A fearsome boss appears!');
     let out = `${narr}`;
     // exchange
     const dmg = fightTurn(char, boss);
@@ -186,7 +188,8 @@ export async function execute(interaction) {
       char.hp = Math.max(1, Math.floor(char.maxHp / 2));
       saveCharacter(userId, char);
       out += '\nYou were defeated but live to fight another day.';
-    } else {
+    }
+    else {
       const res = applyXp(userId, char, boss.lvl * 20);
       char = res.char;
       saveCharacter(userId, char);
@@ -217,13 +220,13 @@ export async function execute(interaction) {
     const offset = 0;
     const list = getLeaderboard(limit, offset);
     const total = getLeaderboardCount();
-    if (!list.length) return interaction.reply({ content: 'No players yet.', flags: MessageFlags.Ephemeral });
+    if (list.length === 0) return interaction.reply({ content: 'No players yet.', flags: MessageFlags.Ephemeral });
     const page = Math.floor(offset / limit) + 1;
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const row = new ActionRowBuilder();
     if (offset > 0) row.addComponents(new ButtonBuilder().setCustomId(`rpg_leaderboard:${Math.max(0, offset - limit)}:${userId}`).setLabel('Prev').setStyle(ButtonStyle.Secondary));
     if (offset + limit < total) row.addComponents(new ButtonBuilder().setCustomId(`rpg_leaderboard:${offset + limit}:${userId}`).setLabel('Next').setStyle(ButtonStyle.Primary));
-    return interaction.reply({ content: `Leaderboard — Page ${page}/${totalPages}\n` + list.map((p, i) => `${offset + i + 1}. ${p.name} — Level ${p.lvl} XP ${p.xp} ATK ${p.atk}`).join('\n'), components: row.components.length ? [row] : [] });
+    return interaction.reply({ content: `Leaderboard — Page ${page}/${totalPages}\n` + list.map((p, i) => `${offset + i + 1}. ${p.name} — Level ${p.lvl} XP ${p.xp} ATK ${p.atk}`).join('\n'), components: row.components.length > 0 ? [row] : [] });
   }
 
   if (sub === 'reset') {
@@ -241,7 +244,7 @@ export async function execute(interaction) {
     const classes = getCharacterClasses();
     const embed = new EmbedBuilder()
       .setTitle('🏛️ Character Classes')
-      .setColor(0x0099FF)
+      .setColor(0x00_99_FF)
       .setDescription('Choose your class when creating a character with `/rpg start`');
 
     for (const [key, classInfo] of Object.entries(classes)) {
@@ -265,7 +268,7 @@ export async function execute(interaction) {
     }
     if (action === 'list') {
       const qs = listQuests(userId);
-      if (!qs.length) return interaction.reply({ content: 'No quests.', flags: MessageFlags.Ephemeral });
+      if (qs.length === 0) return interaction.reply({ content: 'No quests.', flags: MessageFlags.Ephemeral });
       return interaction.reply(qs.map(q => `${q.id} - ${q.title} [${q.status}]`).join('\n'));
     }
     if (action === 'complete') {
@@ -291,7 +294,8 @@ export async function execute(interaction) {
     if (!canCraft.success) {
       if (canCraft.reason === 'level_too_low') {
         return interaction.reply({ content: `❌ You need to be level ${canCraft.required} to craft this item.`, flags: MessageFlags.Ephemeral });
-      } else if (canCraft.reason === 'missing_materials') {
+      }
+      else if (canCraft.reason === 'missing_materials') {
         return interaction.reply({ content: `❌ You're missing materials. You need: ${canCraft.missing}`, flags: MessageFlags.Ephemeral });
       }
       return interaction.reply({ content: `❌ Cannot craft this item: ${canCraft.reason}`, flags: MessageFlags.Ephemeral });
@@ -303,7 +307,7 @@ export async function execute(interaction) {
       const recipe = recipes[itemId];
       const embed = new EmbedBuilder()
         .setTitle('🔨 Item Crafted!')
-        .setColor(0x00FF00)
+        .setColor(0x00_FF_00)
         .setDescription(`Successfully crafted **${result.item.name}**!`)
         .addFields(
           { name: '📦 Item', value: `${result.item.name} (${result.item.rarity})`, inline: true },
@@ -315,7 +319,8 @@ export async function execute(interaction) {
       updateUserStats(userId, { items_crafted: 1 });
 
       await interaction.reply({ embeds: [embed] });
-    } else {
+    }
+    else {
       await interaction.reply({ content: `❌ Failed to craft item: ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
   }

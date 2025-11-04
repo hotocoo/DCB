@@ -3,8 +3,9 @@
  * Provides JSON file-based storage with error handling and validation.
  */
 
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { logger } from './logger.js';
 
 /**
@@ -26,7 +27,8 @@ function ensureDataDirectory() {
       fs.mkdirSync(DATA_DIR, { recursive: true });
       logger.info('Created data directory', { path: DATA_DIR });
     }
-  } catch (error) {
+  }
+  catch (error) {
     logger.error('Failed to create data directory', error, { path: DATA_DIR });
     throw error;
   }
@@ -60,7 +62,8 @@ function createBackup(filename) {
     try {
       fs.copyFileSync(filePath, backupPath);
       logger.debug('Created backup', { filePath, backupPath });
-    } catch (error) {
+    }
+    catch (error) {
       logger.warn('Failed to create backup', error, { filePath, backupPath });
     }
   }
@@ -78,13 +81,13 @@ function validateData(data) {
   }
 
   if (typeof data !== 'object') {
-    throw new Error('Data must be an object');
+    throw new TypeError('Data must be an object');
   }
 
   // Basic sanitization - remove circular references and functions
   return JSON.parse(JSON.stringify(data, (key, value) => {
     if (typeof value === 'function') {
-      return undefined; // Remove functions
+      return; // Remove functions
     }
     return value;
   }));
@@ -123,18 +126,20 @@ export function readAll() {
     }
 
     return parsed || {};
-  } catch (error) {
+  }
+  catch (error) {
     logger.error('Failed to read storage file', error, { filePath });
     // Try to restore from backup if available
     const backupPath = filePath + BACKUP_SUFFIX;
     if (fs.existsSync(backupPath)) {
       try {
         logger.info('Attempting to restore from backup', { backupPath });
-        const backupData = fs.readFileSync(backupPath, DEFAULT_ENCODING);
+        const backupData = fs.readFileSync(backupPath);
         const parsedBackup = JSON.parse(backupData);
         fs.copyFileSync(backupPath, filePath); // Restore backup
         return parsedBackup || {};
-      } catch (backupError) {
+      }
+      catch (backupError) {
         logger.error('Failed to restore from backup', backupError, { backupPath });
       }
     }
@@ -171,7 +176,8 @@ export function writeAll(data) {
     fs.renameSync(tempPath, filePath);
 
     logger.debug('Successfully wrote to storage file', { filePath, size: jsonString.length });
-  } catch (error) {
+  }
+  catch (error) {
     logger.error('Failed to write storage file', error, { filePath });
     throw error;
   }
@@ -219,7 +225,8 @@ export function setGuild(id, data) {
 
     logger.debug('Updated guild data', { id, dataKeys: Object.keys(data) });
     return true;
-  } catch (error) {
+  }
+  catch (error) {
     logger.error('Failed to set guild data', error, { id });
     return false;
   }

@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
+
 import { safeExecuteCommand, validateNotEmpty } from '../errorHandler.js';
 
 /**
@@ -14,7 +15,7 @@ export const data = new SlashCommandBuilder()
  * @returns {Promise<void>}
  */
 export async function execute(interaction) {
-  return safeExecuteCommand(interaction, async () => {
+  return safeExecuteCommand(interaction, async() => {
     // Validate interaction object
     validateNotEmpty(interaction, 'interaction');
     validateNotEmpty(interaction.client, 'client');

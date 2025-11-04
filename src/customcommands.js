@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const CUSTOM_COMMANDS_FILE = path.join(process.cwd(), 'data', 'customcommands.json');
 
@@ -27,9 +27,10 @@ class CustomCommandManager {
 
   loadCustomCommands() {
     try {
-      const data = JSON.parse(fs.readFileSync(CUSTOM_COMMANDS_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(CUSTOM_COMMANDS_FILE));
       this.customCommands = data;
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to load custom commands:', error);
       this.customCommands = {
         commands: {},
@@ -42,14 +43,15 @@ class CustomCommandManager {
   saveCustomCommands() {
     try {
       fs.writeFileSync(CUSTOM_COMMANDS_FILE, JSON.stringify(this.customCommands, null, 2));
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to save custom commands:', error);
     }
   }
 
   // Custom Command Creation
   createCommand(guildId, commandData) {
-    const commandId = `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const commandId = `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const command = {
       id: commandId,
@@ -125,13 +127,13 @@ class CustomCommandManager {
 
     // Replace variables
     for (const [key, value] of Object.entries(command.variables)) {
-      response = response.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), value);
+      response = response.replaceAll(new RegExp(`\\$\\{${key}\\}`, 'g'), value);
     }
 
     // Replace user variables
-    response = response.replace(/\$\{user\}/g, `<@${userId}>`);
-    response = response.replace(/\$\{username\}/g, args.username || 'User');
-    response = response.replace(/\$\{guild\}/g, args.guildName || 'Server');
+    response = response.replaceAll('${user}', `<@${userId}>`);
+    response = response.replaceAll('${username}', args.username || 'User');
+    response = response.replaceAll('${guild}', args.guildName || 'Server');
 
     // Process dynamic content
     if (command.type === 'dynamic') {
@@ -148,13 +150,13 @@ class CustomCommandManager {
 
   async processDynamicResponse(response, args) {
     // Process dynamic content like random selections, calculations, etc.
-    response = response.replace(/\$\{random:([^}]+)\}/g, (match, options) => {
+    response = response.replaceAll(/\${random:([^}]+)}/g, (match, options) => {
       const choices = options.split('|');
       return choices[Math.floor(Math.random() * choices.length)].trim();
     });
 
-    response = response.replace(/\$\{date\}/g, new Date().toLocaleDateString());
-    response = response.replace(/\$\{time\}/g, new Date().toLocaleTimeString());
+    response = response.replaceAll('${date}', new Date().toLocaleDateString());
+    response = response.replaceAll('${time}', new Date().toLocaleTimeString());
 
     return response;
   }
@@ -187,7 +189,7 @@ class CustomCommandManager {
 
   // Command Templates
   createTemplate(templateData) {
-    const templateId = `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const templateId = `template_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const template = {
       id: templateId,
@@ -276,7 +278,7 @@ class CustomCommandManager {
   // Advanced Features
   createCommandChain(guildId, commands) {
     // Create a chain of commands that execute in sequence
-    const chainId = `chain_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const chainId = `chain_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const chain = {
       id: chainId,
@@ -330,9 +332,9 @@ class CustomCommandManager {
     const totalUsage = commandList.reduce((sum, cmd) => sum + cmd.usage_count, 0);
     const categories = {};
 
-    commandList.forEach(cmd => {
+    for (const cmd of commandList) {
       categories[cmd.category] = (categories[cmd.category] || 0) + 1;
-    });
+    }
 
     return {
       totalCommands: commandList.length,
@@ -365,7 +367,7 @@ class CustomCommandManager {
     }
 
     for (const command of importData.commands) {
-      const commandId = `imported_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const commandId = `imported_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
       command.id = commandId;
       command.imported_at = Date.now();
       this.customCommands.commands[guildId][commandId] = command;
@@ -387,13 +389,13 @@ class CustomCommandManager {
       errors.push('Command response is required');
     }
 
-    if (commandData.name && !/^[a-zA-Z0-9_-]+$/.test(commandData.name)) {
+    if (commandData.name && !/^[\w-]+$/.test(commandData.name)) {
       errors.push('Command name can only contain letters, numbers, hyphens, and underscores');
     }
 
     if (commandData.aliases) {
       for (const alias of commandData.aliases) {
-        if (!/^[a-zA-Z0-9_-]+$/.test(alias)) {
+        if (!/^[\w-]+$/.test(alias)) {
           errors.push(`Invalid alias: ${alias}`);
         }
       }

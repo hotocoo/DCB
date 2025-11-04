@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const MODERATION_FILE = path.join(process.cwd(), 'data', 'moderation.json');
 
@@ -37,9 +37,10 @@ class ModerationManager {
 
   loadModerationData() {
     try {
-      const data = JSON.parse(fs.readFileSync(MODERATION_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(MODERATION_FILE));
       this.moderationData = data;
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to load moderation data:', error);
       this.moderationData = {
         warnings: {},
@@ -54,7 +55,8 @@ class ModerationManager {
   saveModerationData() {
     try {
       fs.writeFileSync(MODERATION_FILE, JSON.stringify(this.moderationData, null, 2));
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to save moderation data:', error);
     }
   }
@@ -69,7 +71,7 @@ class ModerationManager {
     }
 
     const warning = {
-      id: `warn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `warn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       userId,
       moderatorId,
       reason,
@@ -108,13 +110,13 @@ class ModerationManager {
   }
 
   // Advanced Mute System
-  muteUser(guildId, userId, moderatorId, reason, duration = 3600000) { // 1 hour default
+  muteUser(guildId, userId, moderatorId, reason, duration = 3_600_000) { // 1 hour default
     if (!this.moderationData.mutes[guildId]) {
       this.moderationData.mutes[guildId] = {};
     }
 
     const mute = {
-      id: `mute_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `mute_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       userId,
       moderatorId,
       reason,
@@ -125,7 +127,7 @@ class ModerationManager {
     };
 
     this.moderationData.mutes[guildId][userId] = mute;
-    this.logModAction(guildId, 'mute', userId, moderatorId, `${reason} (${Math.round(duration / 60000)}m)`);
+    this.logModAction(guildId, 'mute', userId, moderatorId, `${reason} (${Math.round(duration / 60_000)}m)`);
 
     this.saveModerationData();
     return mute;
@@ -170,7 +172,7 @@ class ModerationManager {
     }
 
     const ban = {
-      id: `ban_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `ban_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       userId,
       moderatorId,
       reason,
@@ -230,7 +232,7 @@ class ModerationManager {
     }
 
     const kick = {
-      id: `kick_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `kick_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       userId,
       moderatorId,
       reason,
@@ -247,7 +249,7 @@ class ModerationManager {
   // Moderation Action Logging
   logModAction(guildId, action, targetUserId, moderatorId, reason) {
     const modAction = {
-      id: `mod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `mod_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       guildId,
       action,
       targetUserId,
@@ -311,7 +313,7 @@ class ModerationManager {
 
     // Check for repeated messages
     const repeatedMessages = recentMessages.filter(msg =>
-      msg.content === message.content && now - msg.timestamp < 10000
+      msg.content === message.content && now - msg.timestamp < 10_000
     );
 
     if (repeatedMessages.length >= 3) {
@@ -462,7 +464,8 @@ class ModerationManager {
       if (recentMessages.length === 0) {
         this.warningCache.delete(key);
         console.log(`[MODERATION] Cleaned up warning cache for key: ${key}`);
-      } else {
+      }
+      else {
         this.warningCache.set(key, recentMessages);
       }
     }
@@ -484,7 +487,7 @@ export function warnUser(guildId, userId, moderatorId, reason, severity = 'mediu
   return moderationManager.warnUser(guildId, userId, moderatorId, reason, severity);
 }
 
-export function muteUser(guildId, userId, moderatorId, reason, duration = 3600000) {
+export function muteUser(guildId, userId, moderatorId, reason, duration = 3_600_000) {
   return moderationManager.muteUser(guildId, userId, moderatorId, reason, duration);
 }
 

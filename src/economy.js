@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
 
@@ -31,9 +31,10 @@ class EconomyManager {
 
   loadEconomy() {
     try {
-      const data = JSON.parse(fs.readFileSync(ECONOMY_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(ECONOMY_FILE));
       this.economyData = data;
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to load economy:', error);
       this.economyData = {
         userBalances: {},
@@ -48,7 +49,8 @@ class EconomyManager {
   saveEconomy() {
     try {
       fs.writeFileSync(ECONOMY_FILE, JSON.stringify(this.economyData, null, 2));
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to save economy:', error);
     }
   }
@@ -95,12 +97,12 @@ class EconomyManager {
 
   // Advanced Transaction System
   logTransaction(transaction) {
-    transaction.id = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    transaction.id = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     this.economyData.transactions.push(transaction);
 
     // Keep only last 10000 transactions
-    if (this.economyData.transactions.length > 10000) {
-      this.economyData.transactions = this.economyData.transactions.slice(-10000);
+    if (this.economyData.transactions.length > 10_000) {
+      this.economyData.transactions = this.economyData.transactions.slice(-10_000);
     }
 
     this.saveEconomy();
@@ -120,7 +122,7 @@ class EconomyManager {
       return { success: false, reason: 'insufficient_funds' };
     }
 
-    const businessId = `business_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const businessId = `business_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const business = {
       id: businessId,
@@ -240,7 +242,7 @@ class EconomyManager {
       return { success: false, reason: 'insufficient_funds' };
     }
 
-    const investmentId = `investment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const investmentId = `investment_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const investment = {
       id: investmentId,
@@ -272,8 +274,8 @@ class EconomyManager {
   getInvestmentTypes() {
     return {
       'bank': { name: 'Bank Deposit', rate: 0.05, duration: 30, minAmount: 100 },
-      'stock': { name: 'Stock Market', rate: 0.10, duration: 30, minAmount: 500 },
-      'venture': { name: 'High Risk Venture', rate: 0.20, duration: 30, minAmount: 1000 },
+      'stock': { name: 'Stock Market', rate: 0.1, duration: 30, minAmount: 500 },
+      'venture': { name: 'High Risk Venture', rate: 0.2, duration: 30, minAmount: 1000 },
       'real_estate': { name: 'Real Estate', rate: 0.15, duration: 45, minAmount: 2000 },
       'crypto': { name: 'Cryptocurrency', rate: 0.25, duration: 15, minAmount: 300, risk: 'high' },
       'bond': { name: 'Government Bond', rate: 0.03, duration: 60, minAmount: 500, risk: 'low' }
@@ -328,7 +330,7 @@ class EconomyManager {
     }
 
     // Start price fluctuation
-    setInterval(() => this.updateMarketPrices(), 300000); // Every 5 minutes
+    setInterval(() => this.updateMarketPrices(), 300_000); // Every 5 minutes
   }
 
   updateMarketPrices() {
@@ -500,7 +502,7 @@ class EconomyManager {
       uniqueUsers,
       marketVolume,
       averageBalance: uniqueUsers > 0 ? Math.round(totalMoney / uniqueUsers) : 0,
-      marketHealth: marketVolume > 10000 ? 'excellent' : marketVolume > 5000 ? 'good' : 'developing'
+      marketHealth: marketVolume > 10_000 ? 'excellent' : (marketVolume > 5000 ? 'good' : 'developing')
     };
   }
 
@@ -521,19 +523,19 @@ class EconomyManager {
     const recommendations = [];
 
     if (stats.balance < 100) {
-      recommendations.push("💡 Consider starting a business to generate passive income!");
+      recommendations.push('💡 Consider starting a business to generate passive income!');
     }
 
     if (stats.businesses === 0) {
-      recommendations.push("🏪 Businesses provide steady income. Use `/business create` to start!");
+      recommendations.push('🏪 Businesses provide steady income. Use `/business create` to start!');
     }
 
     if (stats.investments === 0 && stats.balance > 500) {
-      recommendations.push("📈 Consider investing your gold for long-term growth!");
+      recommendations.push('📈 Consider investing your gold for long-term growth!');
     }
 
     if (stats.transactionCount < 10) {
-      recommendations.push("🤝 More trading activity can increase your economy level!");
+      recommendations.push('🤝 More trading activity can increase your economy level!');
     }
 
     return recommendations;
@@ -553,7 +555,7 @@ class EconomyManager {
         trends.push({
           item: itemId,
           change: Math.round(change),
-          trend: change > 5 ? '📈' : change < -5 ? '📉' : '➡️'
+          trend: change > 5 ? '📈' : (change < -5 ? '📉' : '➡️')
         });
       }
     }
@@ -594,7 +596,7 @@ class EconomyManager {
 
     if (now - lastClaim < oneDay) {
       const hoursLeft = Math.ceil((oneDay - (now - lastClaim)) / (60 * 60 * 1000));
-      return { success: false, reason: `daily_cooldown`, hoursLeft };
+      return { success: false, reason: 'daily_cooldown', hoursLeft };
     }
 
     // Calculate reward based on streak

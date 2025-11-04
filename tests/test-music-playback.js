@@ -22,7 +22,8 @@ async function testMusicPlayback() {
 
       // Test URL validation
       console.log(`✅ Song URL format: ${song.url.startsWith('http') ? 'Valid' : 'Invalid'}`);
-    } else {
+    }
+    else {
       console.log('❌ No search results found');
     }
 
@@ -31,7 +32,8 @@ async function testMusicPlayback() {
     const ytResults = await searchSongs('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 1);
     if (ytResults.length > 0) {
       console.log(`✅ YouTube URL validation successful: "${ytResults[0].title}"`);
-    } else {
+    }
+    else {
       console.log('❌ YouTube URL validation failed');
     }
 
@@ -40,7 +42,8 @@ async function testMusicPlayback() {
     const deezerResults = await searchSongs('https://www.deezer.com/track/3135556', 1);
     if (deezerResults.length > 0) {
       console.log(`✅ Deezer URL validation successful: "${deezerResults[0].title}"`);
-    } else {
+    }
+    else {
       console.log('❌ Deezer URL validation failed');
     }
 
@@ -56,21 +59,24 @@ async function testMusicPlayback() {
 
     // Check if there are any logs
     console.log('\n📋 Checking for error logs...');
-    const fs = await import('fs');
+    const fs = await import('node:fs');
     if (fs.existsSync('logs/bot-2025-10-31.log')) {
       const logContent = fs.readFileSync('logs/bot-2025-10-31.log', 'utf8');
       const errorLines = logContent.split('\n').filter(line => line.includes('ERROR') || line.includes('error'));
       if (errorLines.length > 0) {
         console.log('⚠️ Found error logs:');
-        errorLines.slice(-5).forEach(line => console.log(`   ${line}`));
-      } else {
+        for (const line of errorLines.slice(-5)) console.log(`   ${line}`);
+      }
+      else {
         console.log('✅ No errors found in logs');
       }
-    } else {
+    }
+    else {
       console.log('📝 No log file found yet (bot not fully started)');
     }
 
-  } catch (error) {
+  }
+  catch (error) {
     console.error('❌ Test failed:', error.message);
     console.error('Stack:', error.stack);
     return false;

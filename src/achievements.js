@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const ACHIEVEMENTS_FILE = path.join(process.cwd(), 'data', 'achievements.json');
 
@@ -147,10 +147,10 @@ const ACHIEVEMENT_DEFINITIONS = {
 };
 
 const ACHIEVEMENT_RARITIES = {
-  common: { name: 'Common', color: 0x8B8B8B, multiplier: 1 },
-  rare: { name: 'Rare', color: 0x4CAF50, multiplier: 1.5 },
-  epic: { name: 'Epic', color: 0x9C27B0, multiplier: 2 },
-  legendary: { name: 'Legendary', color: 0xFF9800, multiplier: 3 }
+  common: { name: 'Common', color: 0x8B_8B_8B, multiplier: 1 },
+  rare: { name: 'Rare', color: 0x4C_AF_50, multiplier: 1.5 },
+  epic: { name: 'Epic', color: 0x9C_27_B0, multiplier: 2 },
+  legendary: { name: 'Legendary', color: 0xFF_98_00, multiplier: 3 }
 };
 
 class AchievementManager {
@@ -171,9 +171,10 @@ class AchievementManager {
 
   loadAchievements() {
     try {
-      const data = JSON.parse(fs.readFileSync(ACHIEVEMENTS_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(ACHIEVEMENTS_FILE));
       this.userAchievements = data;
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to load achievements:', error);
       this.userAchievements = {};
     }
@@ -182,7 +183,8 @@ class AchievementManager {
   saveAchievements() {
     try {
       fs.writeFileSync(ACHIEVEMENTS_FILE, JSON.stringify(this.userAchievements, null, 2));
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to save achievements:', error);
     }
   }
@@ -267,7 +269,7 @@ class AchievementManager {
   }
 
   getLeaderboard(limit = 10) {
-    const users = Object.entries(this.userAchievements)
+    return Object.entries(this.userAchievements)
       .map(([userId, data]) => ({
         userId,
         total_points: data.total_points,
@@ -276,8 +278,6 @@ class AchievementManager {
       }))
       .sort((a, b) => b.total_points - a.total_points)
       .slice(0, limit);
-
-    return users;
   }
 }
 

@@ -3,9 +3,10 @@
  * Dynamically loads command modules from the commands directory.
  */
 
-import fs from 'fs';
-import path from 'path';
-import { pathToFileURL } from 'url';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 import { logger } from './logger.js';
 
 /**
@@ -45,7 +46,8 @@ export async function loadCommands(client) {
     }
 
     logger.success('Commands loaded successfully', { total, loaded: loadedCount });
-  } catch (error) {
+  }
+  catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     logger.error('Failed to load commands', err, { path: commandsPath });
   }
@@ -84,7 +86,8 @@ async function loadCommandFile(client, commandsPath, file) {
 
     logger.debug('Command loaded', { name: commandName, file });
     return true;
-  } catch (error) {
+  }
+  catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     logger.error('Failed to load command file', err, { file, filePath });
     return false;

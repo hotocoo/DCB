@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const PROFILES_DIR = path.join(process.cwd(), 'data', 'players');
 
@@ -25,11 +25,12 @@ class ProfileManager {
     for (const file of files) {
       const userId = path.basename(file, '.json');
       try {
-        const data = JSON.parse(fs.readFileSync(path.join(PROFILES_DIR, file), 'utf8'));
+        const data = JSON.parse(fs.readFileSync(path.join(PROFILES_DIR, file)));
         if (data.profile) {
           this.profiles[userId] = data.profile;
         }
-      } catch (error) {
+      }
+      catch (error) {
         console.error(`Failed to load profile for ${userId}:`, error);
       }
     }
@@ -45,7 +46,8 @@ class ProfileManager {
     };
     try {
       fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-    } catch (error) {
+    }
+    catch (error) {
       console.error(`Failed to save profile for ${userId}:`, error);
     }
   }
@@ -63,11 +65,12 @@ class ProfileManager {
       const filePath = path.join(PROFILES_DIR, `${userId}.json`);
       if (fs.existsSync(filePath)) {
         try {
-          const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          const data = JSON.parse(fs.readFileSync(filePath));
           if (data.profile) {
             this.profiles[userId] = data.profile;
           }
-        } catch (error) {
+        }
+        catch (error) {
           console.error(`Failed to load profile for ${userId}:`, error);
         }
       }
@@ -203,7 +206,7 @@ class ProfileManager {
 
   updateDerivedStats(profile, category, stat, value) {
     switch (category) {
-      case 'rpg':
+      case 'rpg': {
         if (stat === 'characters_created') {
           // Update total characters across all classes
         }
@@ -211,8 +214,9 @@ class ProfileManager {
           profile.statistics.social.reputation += value * 2;
         }
         break;
+      }
 
-      case 'games':
+      case 'games': {
         if (stat === 'trivia_correct') {
           const totalGames = profile.statistics.games.trivia_games_played;
           if (totalGames > 0) {
@@ -220,12 +224,14 @@ class ProfileManager {
           }
         }
         break;
+      }
 
-      case 'social':
+      case 'social': {
         if (stat === 'trades_completed') {
           profile.statistics.social.reputation += value;
         }
         break;
+      }
     }
   }
 
@@ -290,7 +296,7 @@ class ProfileManager {
       activityScore,
       engagementLevel,
       mostActiveCategory,
-      totalPlayTime: Math.round(stats.activity.total_session_time / 3600000), // Convert to hours
+      totalPlayTime: Math.round(stats.activity.total_session_time / 3_600_000), // Convert to hours
       accountAge: Math.round((Date.now() - stats.activity.first_seen) / (24 * 60 * 60 * 1000)), // Days
       favoriteCommand: stats.activity.favorite_command,
       streakDays: stats.activity.streak_days
@@ -471,17 +477,29 @@ class ProfileManager {
     // Activity insights
     if (analytics.activityScore > 80) {
       insights.push("🌟 You're incredibly active in the community!");
-    } else if (analytics.activityScore > 50) {
+    }
+    else if (analytics.activityScore > 50) {
       insights.push("🎯 You're a dedicated bot user!");
     }
 
     // Category insights
-    if (analytics.mostActiveCategory === 'rpg') {
-      insights.push("⚔️ You love RPG adventures!");
-    } else if (analytics.mostActiveCategory === 'games') {
-      insights.push("🎮 Games are your passion!");
-    } else if (analytics.mostActiveCategory === 'social') {
-      insights.push("🤝 You thrive on social interactions!");
+    switch (analytics.mostActiveCategory) {
+      case 'rpg': {
+        insights.push('⚔️ You love RPG adventures!');
+
+        break;
+      }
+      case 'games': {
+        insights.push('🎮 Games are your passion!');
+
+        break;
+      }
+      case 'social': {
+        insights.push('🤝 You thrive on social interactions!');
+
+        break;
+      }
+    // No default
     }
 
     // Achievement insights
@@ -512,17 +530,15 @@ class ProfileManager {
     ];
 
     for (const milestone of milestones) {
-      if (!profile.milestones.find(m => m.id === milestone.id)) {
-        // Simple requirement check (in real implementation, use more sophisticated evaluation)
-        if (this.evaluateRequirement(profile, milestone.requirement)) {
-          profile.milestones.push({
-            id: milestone.id,
-            name: milestone.name,
-            description: milestone.description,
-            achieved: Date.now()
-          });
-          newMilestones.push(milestone);
-        }
+      if (!profile.milestones.find(m => m.id === milestone.id) && // Simple requirement check (in real implementation, use more sophisticated evaluation)
+        this.evaluateRequirement(profile, milestone.requirement)) {
+        profile.milestones.push({
+          id: milestone.id,
+          name: milestone.name,
+          description: milestone.description,
+          achieved: Date.now()
+        });
+        newMilestones.push(milestone);
       }
     }
 
@@ -540,7 +556,7 @@ class ProfileManager {
       const stats = profile.statistics;
 
       // Replace stat paths with actual values, e.g., 'rpg.highest_level' -> stats.rpg.highest_level
-      const expression = requirement.replace(/(\w+(?:\.\w+)*)/g, (match) => {
+      const expression = requirement.replaceAll(/(\w+(?:\.\w+)*)/g, (match) => {
         const keys = match.split('.');
         let value = stats;
         for (const key of keys) {
@@ -551,7 +567,8 @@ class ProfileManager {
 
       // Use a safe evaluator for basic comparisons
       return this.safeEval(expression);
-    } catch {
+    }
+    catch {
       return false;
     }
   }
@@ -562,15 +579,21 @@ class ProfileManager {
     const match = expr.match(/^(\d+)(==|!=|>=|<=|>|<)(\d+)$/);
     if (match) {
       const [, left, op, right] = match;
-      const l = parseInt(left);
-      const r = parseInt(right);
+      const l = Number.parseInt(left);
+      const r = Number.parseInt(right);
       switch (op) {
-        case '==': return l == r;
-        case '!=': return l != r;
-        case '>=': return l >= r;
-        case '<=': return l <= r;
-        case '>': return l > r;
-        case '<': return l < r;
+        case '==': { return l == r;
+        }
+        case '!=': { return l != r;
+        }
+        case '>=': { return l >= r;
+        }
+        case '<=': { return l <= r;
+        }
+        case '>': { return l > r;
+        }
+        case '<': { return l < r;
+        }
       }
     }
     return false;

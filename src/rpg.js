@@ -1,5 +1,6 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { generate } from './model-client.js';
 import { logger } from './logger.js';
 import { inputValidator, sanitizeInput, validateString, validateNumber } from './validation.js';
@@ -20,7 +21,7 @@ const CHARACTER_CLASSES = {
     baseStats: { hp: 25, maxHp: 25, mp: 10, maxMp: 10, atk: 7, def: 3, spd: 1 },
     statGrowth: { hp: 3, maxHp: 3, mp: 1, maxMp: 1, atk: 2, def: 1, spd: 0 },
     abilities: ['Power Strike', 'Shield Block', 'Battle Cry'],
-    color: 0xFF0000
+    color: 0xFF_00_00
   },
   mage: {
     name: 'Mage',
@@ -28,7 +29,7 @@ const CHARACTER_CLASSES = {
     baseStats: { hp: 15, maxHp: 15, mp: 30, maxMp: 30, atk: 10, def: 1, spd: 2 },
     statGrowth: { hp: 1, maxHp: 1, mp: 4, maxMp: 4, atk: 3, def: 0, spd: 1 },
     abilities: ['Fireball', 'Magic Shield', 'Mana Surge'],
-    color: 0x9933FF
+    color: 0x99_33_FF
   },
   rogue: {
     name: 'Rogue',
@@ -36,7 +37,7 @@ const CHARACTER_CLASSES = {
     baseStats: { hp: 18, maxHp: 18, mp: 15, maxMp: 15, atk: 6, def: 2, spd: 4 },
     statGrowth: { hp: 2, maxHp: 2, mp: 2, maxMp: 2, atk: 2, def: 1, spd: 2 },
     abilities: ['Backstab', 'Dodge', 'Sprint'],
-    color: 0x333333
+    color: 0x33_33_33
   },
   paladin: {
     name: 'Paladin',
@@ -44,7 +45,7 @@ const CHARACTER_CLASSES = {
     baseStats: { hp: 22, maxHp: 22, mp: 20, maxMp: 20, atk: 5, def: 4, spd: 1 },
     statGrowth: { hp: 3, maxHp: 3, mp: 3, maxMp: 3, atk: 1, def: 2, spd: 0 },
     abilities: ['Holy Strike', 'Heal', 'Divine Shield'],
-    color: 0xFFD700
+    color: 0xFF_D7_00
   }
 };
 
@@ -60,32 +61,32 @@ function readAll() {
   const oldFile = path.join(process.cwd(), 'data', 'rpg.json');
   if (fs.existsSync(oldFile)) {
     try {
-      const oldData = JSON.parse(fs.readFileSync(oldFile, 'utf8')) || {};
+      const oldData = JSON.parse(fs.readFileSync(oldFile)) || {};
       console.log(`[RPG DEBUG] Migrating ${Object.keys(oldData).length} characters from old rpg.json`);
       for (const [userId, char] of Object.entries(oldData)) {
         // Ensure defaults
-        if (typeof char.xp === 'undefined') char.xp = 0;
-        if (typeof char.lvl === 'undefined') char.lvl = levelFromXp(char.xp);
-        if (typeof char.skillPoints === 'undefined') char.skillPoints = 0;
-        if (typeof char.hp === 'undefined') char.hp = 20;
-        if (typeof char.maxHp === 'undefined') char.maxHp = 20;
-        if (typeof char.mp === 'undefined') char.mp = 10;
-        if (typeof char.maxMp === 'undefined') char.maxMp = 10;
-        if (typeof char.atk === 'undefined') char.atk = 5;
-        if (typeof char.def === 'undefined') char.def = 2;
-        if (typeof char.spd === 'undefined') char.spd = 2;
-        if (typeof char.class === 'undefined') char.class = 'warrior';
-        if (typeof char.abilities === 'undefined') char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
-        if (typeof char.color === 'undefined') char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
-        if (typeof char.inventory === 'undefined') char.inventory = {};
-        if (typeof char.equipped_weapon === 'undefined') char.equipped_weapon = null;
-        if (typeof char.equipped_armor === 'undefined') char.equipped_armor = null;
-        if (typeof char.gold === 'undefined') char.gold = 0;
-        if (typeof char.dailyExplorations === 'undefined') char.dailyExplorations = 0;
-        if (typeof char.lastDailyReset === 'undefined') char.lastDailyReset = Date.now();
-        if (typeof char.sessionXpGained === 'undefined') char.sessionXpGained = 0;
-        if (typeof char.lastSessionReset === 'undefined') char.lastSessionReset = Date.now();
-        if (typeof char.createdAt === 'undefined') char.createdAt = Date.now();
+        if (char.xp === undefined) char.xp = 0;
+        if (char.lvl === undefined) char.lvl = levelFromXp(char.xp);
+        if (char.skillPoints === undefined) char.skillPoints = 0;
+        if (char.hp === undefined) char.hp = 20;
+        if (char.maxHp === undefined) char.maxHp = 20;
+        if (char.mp === undefined) char.mp = 10;
+        if (char.maxMp === undefined) char.maxMp = 10;
+        if (char.atk === undefined) char.atk = 5;
+        if (char.def === undefined) char.def = 2;
+        if (char.spd === undefined) char.spd = 2;
+        if (char.class === undefined) char.class = 'warrior';
+        if (char.abilities === undefined) char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
+        if (char.color === undefined) char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+        if (char.inventory === undefined) char.inventory = {};
+        if (char.equipped_weapon === undefined) char.equipped_weapon = null;
+        if (char.equipped_armor === undefined) char.equipped_armor = null;
+        if (char.gold === undefined) char.gold = 0;
+        if (char.dailyExplorations === undefined) char.dailyExplorations = 0;
+        if (char.lastDailyReset === undefined) char.lastDailyReset = Date.now();
+        if (char.sessionXpGained === undefined) char.sessionXpGained = 0;
+        if (char.lastSessionReset === undefined) char.lastSessionReset = Date.now();
+        if (char.createdAt === undefined) char.createdAt = Date.now();
         all[userId] = char;
         // Save to individual file
         const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
@@ -96,9 +97,10 @@ function readAll() {
       // Backup and remove old file
       fs.copyFileSync(oldFile, `${oldFile}.bak`);
       fs.unlinkSync(oldFile);
-      console.log(`[RPG DEBUG] Migration completed, old file backed up`);
-    } catch (err) {
-      console.error('Failed to migrate old RPG data:', err);
+      console.log('[RPG DEBUG] Migration completed, old file backed up');
+    }
+    catch (error) {
+      console.error('Failed to migrate old RPG data:', error);
     }
   }
 
@@ -108,32 +110,33 @@ function readAll() {
     for (const file of files) {
       const userId = path.basename(file, '.json');
       try {
-        const char = JSON.parse(fs.readFileSync(path.join(PLAYERS_DIR, file), 'utf8')) || {};
+        const char = JSON.parse(fs.readFileSync(path.join(PLAYERS_DIR, file))) || {};
         // migrate / ensure defaults for older characters
-        if (typeof char.xp === 'undefined') char.xp = 0;
-        if (typeof char.lvl === 'undefined') char.lvl = levelFromXp(char.xp);
-        if (typeof char.skillPoints === 'undefined') char.skillPoints = 0;
-        if (typeof char.hp === 'undefined') char.hp = 20;
-        if (typeof char.maxHp === 'undefined') char.maxHp = 20;
-        if (typeof char.mp === 'undefined') char.mp = 10;
-        if (typeof char.maxMp === 'undefined') char.maxMp = 10;
-        if (typeof char.atk === 'undefined') char.atk = 5;
-        if (typeof char.def === 'undefined') char.def = 2;
-        if (typeof char.spd === 'undefined') char.spd = 2;
-        if (typeof char.class === 'undefined') char.class = 'warrior';
-        if (typeof char.abilities === 'undefined') char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
-        if (typeof char.color === 'undefined') char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
-        if (typeof char.inventory === 'undefined') char.inventory = {};
-        if (typeof char.equipped_weapon === 'undefined') char.equipped_weapon = null;
-        if (typeof char.equipped_armor === 'undefined') char.equipped_armor = null;
-        if (typeof char.gold === 'undefined') char.gold = 0;
-        if (typeof char.dailyExplorations === 'undefined') char.dailyExplorations = 0;
-        if (typeof char.lastDailyReset === 'undefined') char.lastDailyReset = Date.now();
-        if (typeof char.sessionXpGained === 'undefined') char.sessionXpGained = 0;
-        if (typeof char.lastSessionReset === 'undefined') char.lastSessionReset = Date.now();
+        if (char.xp === undefined) char.xp = 0;
+        if (char.lvl === undefined) char.lvl = levelFromXp(char.xp);
+        if (char.skillPoints === undefined) char.skillPoints = 0;
+        if (char.hp === undefined) char.hp = 20;
+        if (char.maxHp === undefined) char.maxHp = 20;
+        if (char.mp === undefined) char.mp = 10;
+        if (char.maxMp === undefined) char.maxMp = 10;
+        if (char.atk === undefined) char.atk = 5;
+        if (char.def === undefined) char.def = 2;
+        if (char.spd === undefined) char.spd = 2;
+        if (char.class === undefined) char.class = 'warrior';
+        if (char.abilities === undefined) char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
+        if (char.color === undefined) char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+        if (char.inventory === undefined) char.inventory = {};
+        if (char.equipped_weapon === undefined) char.equipped_weapon = null;
+        if (char.equipped_armor === undefined) char.equipped_armor = null;
+        if (char.gold === undefined) char.gold = 0;
+        if (char.dailyExplorations === undefined) char.dailyExplorations = 0;
+        if (char.lastDailyReset === undefined) char.lastDailyReset = Date.now();
+        if (char.sessionXpGained === undefined) char.sessionXpGained = 0;
+        if (char.lastSessionReset === undefined) char.lastSessionReset = Date.now();
         all[userId] = char;
-      } catch (err) {
-        console.error(`Failed to read player data for ${userId}`, err);
+      }
+      catch (error) {
+        console.error(`Failed to read player data for ${userId}`, error);
       }
     }
   }
@@ -154,74 +157,77 @@ function writeAll(obj) {
       fs.renameSync(tmp, filePath);
     }
     cache = obj;
-  } catch (err) {
-    console.error('Failed to write RPG data:', err);
+  }
+  catch (error) {
+    console.error('Failed to write RPG data:', error);
     // Attempt to restore from cache if available
     if (cache) {
       console.log('Restoring from cache after write failure');
-    } else {
-      throw new Error(`Failed to save RPG data: ${err.message}`);
+    }
+    else {
+      throw new Error(`Failed to save RPG data: ${error.message}`);
     }
   }
 }
 
 export function createCharacter(userId, name, charClass = 'warrior') {
-   // Validate inputs
-   if (!userId || typeof userId !== 'string') {
-     throw new CommandError('Invalid user ID', 'INVALID_ARGUMENT');
-   }
+  // Validate inputs
+  if (!userId || typeof userId !== 'string') {
+    throw new CommandError('Invalid user ID', 'INVALID_ARGUMENT');
+  }
 
-   const sanitizedName = sanitizeInput(name || `Player${userId.slice(0,4)}`);
-   const nameValidation = validateString(sanitizedName, { minLength: 2, maxLength: 32 });
-   if (!nameValidation.valid) {
-     throw new CommandError(nameValidation.reason, 'INVALID_ARGUMENT');
-   }
+  const sanitizedName = sanitizeInput(name || `Player${userId.slice(0,4)}`);
+  const nameValidation = validateString(sanitizedName, { minLength: 2, maxLength: 32 });
+  if (!nameValidation.valid) {
+    throw new CommandError(nameValidation.reason, 'INVALID_ARGUMENT');
+  }
 
-   // Validate character class
-   if (!charClass || typeof charClass !== 'string') {
-     throw new CommandError('Invalid character class', 'INVALID_ARGUMENT');
-   }
+  // Validate character class
+  if (!charClass || typeof charClass !== 'string') {
+    throw new CommandError('Invalid character class', 'INVALID_ARGUMENT');
+  }
 
-   const classData = CHARACTER_CLASSES[charClass];
-   if (!classData) {
-     throw new CommandError(`Invalid character class: ${charClass}. Available classes: warrior, mage, rogue, paladin`, 'INVALID_ARGUMENT');
-   }
+  const classData = CHARACTER_CLASSES[charClass];
+  if (!classData) {
+    throw new CommandError(`Invalid character class: ${charClass}. Available classes: warrior, mage, rogue, paladin`, 'INVALID_ARGUMENT');
+  }
 
-   if (locks.has(userId)) {
-     throw new CommandError('Character creation already in progress', 'RATE_LIMITED');
-   }
+  if (locks.has(userId)) {
+    throw new CommandError('Character creation already in progress', 'RATE_LIMITED');
+  }
 
-   locks.add(userId);
-   try {
-     const all = cache || readAll();
-     if (all[userId]) {
-       throw new CommandError('Character already exists for this user', 'ALREADY_EXISTS');
-     }
+  locks.add(userId);
+  try {
+    const all = cache || readAll();
+    if (all[userId]) {
+      throw new CommandError('Character already exists for this user', 'ALREADY_EXISTS');
+    }
 
-     const char = {
-       name: sanitizedName,
-       class: charClass,
-       ...classData.baseStats,
-       lvl: 1,
-       xp: 0,
-       skillPoints: 0,
-       abilities: [...classData.abilities],
-       color: classData.color,
-       inventory: {},
-       equipped_weapon: null,
-       equipped_armor: null,
-       gold: 0,
-       createdAt: Date.now()
-     };
+    const char = {
+      name: sanitizedName,
+      class: charClass,
+      ...classData.baseStats,
+      lvl: 1,
+      xp: 0,
+      skillPoints: 0,
+      abilities: [...classData.abilities],
+      color: classData.color,
+      inventory: {},
+      equipped_weapon: null,
+      equipped_armor: null,
+      gold: 0,
+      createdAt: Date.now()
+    };
 
-     all[userId] = char;
-     writeAll(all);
+    all[userId] = char;
+    writeAll(all);
 
-     logger.info('Character created', { userId, name: sanitizedName, class: charClass });
-     return char;
-   } finally {
-     locks.delete(userId);
-   }
+    logger.info('Character created', { userId, name: sanitizedName, class: charClass });
+    return char;
+  }
+  finally {
+    locks.delete(userId);
+  }
 }
 
 export function levelFromXp(xp) {
@@ -244,7 +250,8 @@ export function applyXp(userId, char, amount = 0) {
     char.hp = char.maxHp || 20;
     char.mp = char.maxMp || 10;
     logger.info('Level up', { userId, oldLvl, newLvl, gained, xp: char.xp });
-  } else {
+  }
+  else {
     char.lvl = newLvl;
   }
 
@@ -267,40 +274,42 @@ export function getCharacter(userId) {
   if (!fs.existsSync(filePath)) return null;
 
   try {
-    const char = JSON.parse(fs.readFileSync(filePath, 'utf8')) || {};
+    const char = JSON.parse(fs.readFileSync(filePath)) || {};
     // migrate / ensure defaults for older characters
-    if (typeof char.xp === 'undefined') char.xp = 0;
-    if (typeof char.lvl === 'undefined') char.lvl = levelFromXp(char.xp);
-    if (typeof char.skillPoints === 'undefined') char.skillPoints = 0;
-    if (typeof char.hp === 'undefined') char.hp = 20;
-    if (typeof char.maxHp === 'undefined') char.maxHp = 20;
-    if (typeof char.mp === 'undefined') char.mp = 10;
-    if (typeof char.maxMp === 'undefined') char.maxMp = 10;
-    if (typeof char.atk === 'undefined') char.atk = 5;
-    if (typeof char.def === 'undefined') char.def = 2;
-    if (typeof char.spd === 'undefined') char.spd = 2;
-    if (typeof char.class === 'undefined') char.class = 'warrior';
-    if (typeof char.abilities === 'undefined') char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
-    if (typeof char.color === 'undefined') char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
-    if (typeof char.inventory === 'undefined') char.inventory = {};
-    if (typeof char.equipped_weapon === 'undefined') char.equipped_weapon = null;
-    if (typeof char.equipped_armor === 'undefined') char.equipped_armor = null;
-    if (typeof char.gold === 'undefined') char.gold = 0;
-    if (typeof char.dailyExplorations === 'undefined') char.dailyExplorations = 0;
-    if (typeof char.lastDailyReset === 'undefined') char.lastDailyReset = Date.now();
-    if (typeof char.sessionXpGained === 'undefined') char.sessionXpGained = 0;
-    if (typeof char.lastSessionReset === 'undefined') char.lastSessionReset = Date.now();
+    if (char.xp === undefined) char.xp = 0;
+    if (char.lvl === undefined) char.lvl = levelFromXp(char.xp);
+    if (char.skillPoints === undefined) char.skillPoints = 0;
+    if (char.hp === undefined) char.hp = 20;
+    if (char.maxHp === undefined) char.maxHp = 20;
+    if (char.mp === undefined) char.mp = 10;
+    if (char.maxMp === undefined) char.maxMp = 10;
+    if (char.atk === undefined) char.atk = 5;
+    if (char.def === undefined) char.def = 2;
+    if (char.spd === undefined) char.spd = 2;
+    if (char.class === undefined) char.class = 'warrior';
+    if (char.abilities === undefined) char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
+    if (char.color === undefined) char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+    if (char.inventory === undefined) char.inventory = {};
+    if (char.equipped_weapon === undefined) char.equipped_weapon = null;
+    if (char.equipped_armor === undefined) char.equipped_armor = null;
+    if (char.gold === undefined) char.gold = 0;
+    if (char.dailyExplorations === undefined) char.dailyExplorations = 0;
+    if (char.lastDailyReset === undefined) char.lastDailyReset = Date.now();
+    if (char.sessionXpGained === undefined) char.sessionXpGained = 0;
+    if (char.lastSessionReset === undefined) char.lastSessionReset = Date.now();
 
     // Update cache
     if (cache) {
       cache[userId] = char;
-    } else {
+    }
+    else {
       cache = { [userId]: char };
     }
 
     return char;
-  } catch (err) {
-    console.error(`Failed to read character data for ${userId}`, err);
+  }
+  catch (error) {
+    console.error(`Failed to read character data for ${userId}`, error);
     return null;
   }
 }
@@ -325,7 +334,8 @@ export function saveCharacter(userId, char) {
       cache[userId] = char;
     }
     return true;
-  } finally {
+  }
+  finally {
     locks.delete(userId);
   }
 }
@@ -358,7 +368,8 @@ export function resetCharacter(userId, charClass = 'warrior') {
     all[userId] = def;
     writeAll(all);
     return def;
-  } finally {
+  }
+  finally {
     locks.delete(userId);
   }
 }
@@ -373,7 +384,8 @@ export function deleteCharacter(userId) {
     delete all[userId];
     writeAll(all);
     return true;
-  } finally {
+  }
+  finally {
     locks.delete(userId);
   }
 }
@@ -381,7 +393,9 @@ export function deleteCharacter(userId) {
 export function getLeaderboard(limit = 10, offset = 0) {
   const all = cache || readAll();
   const arr = Object.entries(all).map(([id, c]) => ({ id, name: c.name, lvl: c.lvl || 1, xp: c.xp || 0, atk: c.atk || 0 }));
-  arr.sort((a, b) => { if (b.lvl !== a.lvl) return b.lvl - a.lvl; if (b.xp !== a.xp) return b.xp - a.xp; return b.atk - a.atk; });
+  arr.sort((a, b) => {
+    if (b.lvl !== a.lvl) return b.lvl - a.lvl; if (b.xp !== a.xp) return b.xp - a.xp; return b.atk - a.atk;
+  });
   return arr.slice(offset, offset + limit);
 }
 
@@ -391,8 +405,7 @@ export function getLeaderboardCount() {
 }
 
 export function encounterMonster(lvl = 1) {
-  const monster = { name: `Goblin L${lvl}`, hp: 10 + lvl * 3, atk: 3 + lvl, lvl };
-  return monster;
+  return { name: `Goblin L${lvl}`, hp: 10 + lvl * 3, atk: 3 + lvl, lvl };
 }
 
 export function fightTurn(attacker, defender) {
@@ -422,8 +435,9 @@ export async function narrate(guildId, prompt, fallback) {
   try {
     const out = await generate(guildId, prompt);
     return out || fallback || '';
-  } catch (err) {
-    console.error('Narration failed', err);
+  }
+  catch (error) {
+    console.error('Narration failed', error);
     return fallback || '';
   }
 }
@@ -506,10 +520,10 @@ const CRAFTING_RECIPES = {
 };
 
 const ITEM_RARITIES = {
-  common: { color: 0x8B8B8B, chance: 50 },
-  uncommon: { color: 0x4CAF50, chance: 25 },
-  rare: { color: 0x2196F3, chance: 15 },
-  legendary: { color: 0xFF9800, chance: 10 }
+  common: { color: 0x8B_8B_8B, chance: 50 },
+  uncommon: { color: 0x4C_AF_50, chance: 25 },
+  rare: { color: 0x21_96_F3, chance: 15 },
+  legendary: { color: 0xFF_98_00, chance: 10 }
 };
 
 export function generateRandomItem(level = 1) {
@@ -523,7 +537,8 @@ export function generateRandomItem(level = 1) {
     adjustedRarities.rare.chance += 5;
     adjustedRarities.uncommon.chance += 5;
     adjustedRarities.common.chance -= 15;
-  } else if (level >= 10) {
+  }
+  else if (level >= 10) {
     adjustedRarities.rare.chance += 3;
     adjustedRarities.uncommon.chance += 3;
     adjustedRarities.common.chance -= 6;
@@ -735,13 +750,15 @@ export function unequipItem(userId, slot) {
       char.atk -= ITEMS[itemId].atk || 0;
     }
     char.equipped_weapon = null;
-  } else if (slot === 'armor' && char.equipped_armor) {
+  }
+  else if (slot === 'armor' && char.equipped_armor) {
     itemId = char.equipped_armor;
     if (ITEMS[itemId]) {
       char.def -= ITEMS[itemId].def || 0;
     }
     char.equipped_armor = null;
-  } else {
+  }
+  else {
     return { success: false, reason: 'no_item_equipped' };
   }
 
@@ -832,7 +849,12 @@ export function bossEncounter(lvl = 5) {
 function readQuests() {
   const p = path.join(process.cwd(), 'data', 'quests.json');
   if (!fs.existsSync(p)) return {};
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')) || {}; } catch (error) { return {}; }
+  try {
+    return JSON.parse(fs.readFileSync(p)) || {};
+  }
+  catch {
+    return {};
+  }
 }
 
 function writeQuests(q) {
@@ -944,76 +966,100 @@ export function completeQuest(userId, questId) {
 
 // Spend skill points for a character and persist change
 export function spendSkillPoints(userId, stat, amount = 1) {
-   // Validate inputs
-    if (!userId || typeof userId !== 'string') {
-      throw new CommandError('Invalid user ID', 'INVALID_ARGUMENT');
+  // Validate inputs
+  if (!userId || typeof userId !== 'string') {
+    throw new CommandError('Invalid user ID', 'INVALID_ARGUMENT');
+  }
+
+  if (!stat || typeof stat !== 'string') {
+    throw new CommandError('Invalid stat specified', 'INVALID_ARGUMENT');
+  }
+
+  const amountValidation = validateNumber(amount, { min: 1, max: 100, integer: true, positive: true });
+  if (!amountValidation.valid) {
+    throw new CommandError(amountValidation.reason, 'INVALID_ARGUMENT');
+  }
+
+  // Validate stat type
+  const validStats = ['hp', 'maxhp', 'mp', 'maxmp', 'atk', 'def', 'spd'];
+  if (!validStats.includes(stat)) {
+    throw new CommandError(`Invalid stat. Must be one of: ${validStats.join(', ')}`, 'INVALID_ARGUMENT');
+  }
+
+  if (locks.has(userId)) {
+    throw new CommandError('Character update already in progress', 'RATE_LIMITED');
+  }
+
+  locks.add(userId);
+  try {
+    const all = cache || readAll();
+    const char = all[userId];
+
+    if (!char) {
+      throw new CommandError('Character not found', 'NOT_FOUND');
     }
 
-    if (!stat || typeof stat !== 'string') {
-      throw new CommandError('Invalid stat specified', 'INVALID_ARGUMENT');
+    const pts = char.skillPoints || 0;
+    if (pts < amount) {
+      throw new CommandError(`Not enough skill points. Have: ${pts}, Need: ${amount}`, 'INSUFFICIENT_FUNDS');
     }
 
-    const amountValidation = validateNumber(amount, { min: 1, max: 100, integer: true, positive: true });
-    if (!amountValidation.valid) {
-      throw new CommandError(amountValidation.reason, 'INVALID_ARGUMENT');
-    }
-
-    // Validate stat type
-    const validStats = ['hp', 'maxhp', 'mp', 'maxmp', 'atk', 'def', 'spd'];
-    if (!validStats.includes(stat)) {
-      throw new CommandError(`Invalid stat. Must be one of: ${validStats.join(', ')}`, 'INVALID_ARGUMENT');
-    }
-
-    if (locks.has(userId)) {
-      throw new CommandError('Character update already in progress', 'RATE_LIMITED');
-    }
-
-    locks.add(userId);
-    try {
-      const all = cache || readAll();
-      const char = all[userId];
-
-      if (!char) {
-        throw new CommandError('Character not found', 'NOT_FOUND');
-      }
-
-      const pts = char.skillPoints || 0;
-      if (pts < amount) {
-        throw new CommandError(`Not enough skill points. Have: ${pts}, Need: ${amount}`, 'INSUFFICIENT_FUNDS');
-      }
-
-      // Apply stat changes with validation
-      if (stat === 'hp') {
+    // Apply stat changes with validation
+    switch (stat) {
+      case 'hp': {
         const currentHp = char.hp || 0;
         const maxHp = char.maxHp || 20;
         char.hp = Math.min(currentHp + amount * 2, maxHp);
-      } else if (stat === 'maxhp') {
+
+        break;
+      }
+      case 'maxhp': {
         char.maxHp = (char.maxHp || 20) + amount * 5;
         char.hp = Math.min((char.hp || 0) + amount * 2, char.maxHp);
-      } else if (stat === 'mp') {
+
+        break;
+      }
+      case 'mp': {
         const currentMp = char.mp || 0;
         const maxMp = char.maxMp || 10;
         char.mp = Math.min(currentMp + amount * 3, maxMp);
-      } else if (stat === 'maxmp') {
+
+        break;
+      }
+      case 'maxmp': {
         char.maxMp = (char.maxMp || 10) + amount * 5;
         char.mp = Math.min((char.mp || 0) + amount * 3, char.maxMp);
-      } else if (stat === 'atk') {
-        char.atk = (char.atk || 5) + amount;
-      } else if (stat === 'def') {
-        char.def = (char.def || 2) + amount;
-      } else if (stat === 'spd') {
-        char.spd = (char.spd || 2) + amount;
+
+        break;
       }
+      case 'atk': {
+        char.atk = (char.atk || 5) + amount;
 
-      char.skillPoints = pts - amount;
-      all[userId] = char;
-      writeAll(all);
+        break;
+      }
+      case 'def': {
+        char.def = (char.def || 2) + amount;
 
-      logger.info('Skill points spent', { userId, stat, amount, newValue: char[stat] });
-      return { success: true, char };
-    } finally {
-      locks.delete(userId);
+        break;
+      }
+      case 'spd': {
+        char.spd = (char.spd || 2) + amount;
+
+        break;
+      }
+    // No default
     }
+
+    char.skillPoints = pts - amount;
+    all[userId] = char;
+    writeAll(all);
+
+    logger.info('Skill points spent', { userId, stat, amount, newValue: char[stat] });
+    return { success: true, char };
+  }
+  finally {
+    locks.delete(userId);
+  }
 }
 
 // Function to check daily exploration limit

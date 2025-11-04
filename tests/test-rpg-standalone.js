@@ -1,16 +1,16 @@
-import fs from 'fs';
-import path from 'path';
-import assert from 'assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert';
 
 // Stub the missing dependencies to run RPG tests in isolation
 import { logger } from '../src/logger.js';
 import { inputValidator, sanitizeInput, validateString, validateNumber } from '../src/validation.js';
 import { CommandError } from '../src/errorHandler.js';
 
-const FILE = path.join(process.cwd(), 'data', 'rpg.json');
-
 // Import RPG functions
 import { createCharacter, getCharacter, applyXp, spendSkillPoints, getLeaderboard, getLeaderboardCount, resetCharacter } from '../src/rpg.js';
+
+const FILE = path.join(process.cwd(), 'data', 'rpg.json');
 
 // Use a temp data dir to avoid clobbering real data during tests
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -23,7 +23,8 @@ function restoreData() {
   if (fs.existsSync(BACKUP)) {
     fs.copyFileSync(BACKUP, FILE);
     fs.unlinkSync(BACKUP);
-  } else {
+  }
+  else {
     // remove test file if created
     if (fs.existsSync(FILE)) fs.unlinkSync(FILE);
   }
@@ -75,9 +76,12 @@ async function run() {
     assert.equal(def.lvl, 1);
 
     console.log('All RPG tests passed');
-  } finally {
+  }
+  finally {
     restoreData();
   }
 }
 
-run().catch(err => { console.error(err); process.exit(1); });
+run().catch(error => {
+  console.error(error); process.exit(1);
+});

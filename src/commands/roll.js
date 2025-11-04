@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
+
 import { safeExecuteCommand, CommandError, validateRange, validateNotEmpty } from '../errorHandler.js';
 
 /**
@@ -9,8 +10,8 @@ export const data = new SlashCommandBuilder()
   .setDescription('Roll dice in NdM format, e.g., 2d6')
   .addStringOption(opt =>
     opt.setName('dice')
-    .setDescription('Dice expression (e.g., 2d6, 1d20)')
-    .setRequired(false)
+      .setDescription('Dice expression (e.g., 2d6, 1d20)')
+      .setRequired(false)
   );
 
 /**
@@ -19,7 +20,7 @@ export const data = new SlashCommandBuilder()
  * @returns {Promise<void>}
  */
 export async function execute(interaction) {
-  return safeExecuteCommand(interaction, async () => {
+  return safeExecuteCommand(interaction, async() => {
     // Validate interaction and user
     validateNotEmpty(interaction, 'interaction');
     validateNotEmpty(interaction.user, 'user');

@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+
 import { CommandError, handleCommandError } from '../errorHandler.js';
 import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers.js';
 import {
@@ -71,274 +72,300 @@ export async function execute(interaction) {
   try {
     const sub = interaction.options.getSubcommand();
 
-    if (sub === 'joke') {
-      const category = interaction.options.getString('category') || 'general';
-      const joke = getRandomJoke(category);
+    switch (sub) {
+      case 'joke': {
+        const category = interaction.options.getString('category') || 'general';
+        const joke = getRandomJoke(category);
 
-      if (!joke || !joke.joke) {
-        throw new CommandError('Failed to retrieve joke. Please try again.', 'ENTERTAINMENT_ERROR');
+        if (!joke || !joke.joke) {
+          throw new CommandError('Failed to retrieve joke. Please try again.', 'ENTERTAINMENT_ERROR');
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle('😂 Random Joke')
+          .setColor(0xFF_D7_00)
+          .setDescription(joke.joke)
+          .setFooter({ text: `${category.charAt(0).toUpperCase() + category.slice(1)} Jokes` });
+
+        // Track entertainment stats
+        try {
+          updateEntertainmentStats(interaction.user.id, 'jokesHeard');
+        }
+        catch (error) {
+          console.warn('Failed to update joke stats:', error.message);
+        }
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`fun_joke:${category}:${interaction.user.id}`).setLabel('😂 Another Joke').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`fun_rate:${joke.id}:5:${interaction.user.id}`).setLabel('⭐ Rate 5 Stars').setStyle(ButtonStyle.Secondary)
+        );
+
+        await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
+
+        break;
       }
+      case 'story': {
+        const prompt = interaction.options.getString('prompt');
+        const genre = interaction.options.getString('genre') || 'fantasy';
 
-      const embed = new EmbedBuilder()
-        .setTitle('😂 Random Joke')
-        .setColor(0xFFD700)
-        .setDescription(joke.joke)
-        .setFooter({ text: `${category.charAt(0).toUpperCase() + category.slice(1)} Jokes` });
+        if (!prompt || prompt.trim().length === 0) {
+          throw new CommandError('Story prompt cannot be empty.', 'INVALID_ARGUMENT');
+        }
 
-      // Track entertainment stats
-      try {
-        updateEntertainmentStats(interaction.user.id, 'jokesHeard');
-      } catch (error) {
-        console.warn('Failed to update joke stats:', error.message);
+        if (prompt.length > 500) {
+          throw new CommandError('Story prompt is too long. Maximum 500 characters allowed.', 'INVALID_ARGUMENT');
+        }
+
+        const story = generateStory(prompt, genre);
+
+        if (!story || !story.story) {
+          throw new CommandError('Failed to generate story. Please try again.', 'ENTERTAINMENT_ERROR');
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle(`📖 ${genre.charAt(0).toUpperCase() + genre.slice(1)} Story`)
+          .setColor(0x99_32_CC)
+          .setDescription(story.story)
+          .addFields({
+            name: '🎯 Prompt',
+            value: prompt,
+            inline: false
+          });
+
+        // Track entertainment stats
+        try {
+          updateEntertainmentStats(interaction.user.id, 'storiesGenerated');
+        }
+        catch (error) {
+          console.warn('Failed to update story stats:', error.message);
+        }
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`fun_story:${genre}:${interaction.user.id}`).setLabel('📖 Another Story').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`fun_share:${story.id}:${interaction.user.id}`).setLabel('📤 Share Story').setStyle(ButtonStyle.Secondary)
+        );
+
+        await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
+
+        break;
       }
+      case 'riddle': {
+        const difficulty = interaction.options.getString('difficulty') || 'medium';
+        const riddle = getRiddle(difficulty);
 
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`fun_joke:${category}:${interaction.user.id}`).setLabel('😂 Another Joke').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId(`fun_rate:${joke.id}:5:${interaction.user.id}`).setLabel('⭐ Rate 5 Stars').setStyle(ButtonStyle.Secondary)
-      );
+        if (!riddle || !riddle.riddle) {
+          throw new CommandError('Failed to retrieve riddle. Please try again.', 'ENTERTAINMENT_ERROR');
+        }
 
-      await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
+        const embed = new EmbedBuilder()
+          .setTitle(`🧩 ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Riddle`)
+          .setColor(0xFF_8C_00)
+          .setDescription(riddle.riddle)
+          .setFooter({ text: 'Think hard and reply with your answer!' });
 
-    } else if (sub === 'story') {
-      const prompt = interaction.options.getString('prompt');
-      const genre = interaction.options.getString('genre') || 'fantasy';
+        // Track entertainment stats
+        try {
+          updateEntertainmentStats(interaction.user.id, 'riddlesAttempted');
+        }
+        catch (error) {
+          console.warn('Failed to update riddle stats:', error.message);
+        }
 
-      if (!prompt || prompt.trim().length === 0) {
-        throw new CommandError('Story prompt cannot be empty.', 'INVALID_ARGUMENT');
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`fun_riddle:${difficulty}:${riddle.id}:${interaction.user.id}`).setLabel('💡 Show Answer').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`fun_riddle_new:${difficulty}:${interaction.user.id}`).setLabel('🧩 Another Riddle').setStyle(ButtonStyle.Secondary)
+        );
+
+        await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
+
+        break;
       }
+      case 'fact': {
+        const category = interaction.options.getString('category') || 'random';
+        const fact = getFunFact(category);
 
-      if (prompt.length > 500) {
-        throw new CommandError('Story prompt is too long. Maximum 500 characters allowed.', 'INVALID_ARGUMENT');
+        if (!fact || !fact.fact) {
+          throw new CommandError('Failed to retrieve fun fact. Please try again.', 'ENTERTAINMENT_ERROR');
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle(`🧠 ${category === 'random' ? 'Random' : category.charAt(0).toUpperCase() + category.slice(1)} Fun Fact`)
+          .setColor(0x4C_AF_50)
+          .setDescription(fact.fact)
+          .setFooter({ text: `${fact.category} Facts` });
+
+        // Track entertainment stats
+        try {
+          updateEntertainmentStats(interaction.user.id, 'factsLearned');
+        }
+        catch (error) {
+          console.warn('Failed to update fact stats:', error.message);
+        }
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`fun_fact:${category}:${interaction.user.id}`).setLabel('🧠 Another Fact').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`fun_share:${fact.id}:${interaction.user.id}`).setLabel('📤 Share Fact').setStyle(ButtonStyle.Secondary)
+        );
+
+        await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
+
+        break;
       }
+      case 'quote': {
+        const category = interaction.options.getString('category') || 'inspirational';
+        const quote = getRandomQuote(category);
 
-      const story = generateStory(prompt, genre);
+        if (!quote || !quote.quote || !quote.author) {
+          throw new CommandError('Failed to retrieve quote. Please try again.', 'ENTERTAINMENT_ERROR');
+        }
 
-      if (!story || !story.story) {
-        throw new CommandError('Failed to generate story. Please try again.', 'ENTERTAINMENT_ERROR');
+        const embed = new EmbedBuilder()
+          .setTitle(`💬 ${category.charAt(0).toUpperCase() + category.slice(1)} Quote`)
+          .setColor(0xE9_1E_63)
+          .addFields(
+            { name: 'Quote', value: `"${quote.quote}"`, inline: false },
+            { name: 'Author', value: quote.author, inline: true },
+            { name: 'Category', value: category, inline: true }
+          );
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`fun_quote:${category}:${interaction.user.id}`).setLabel('💬 Another Quote').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`fun_share:${quote.id}:${interaction.user.id}`).setLabel('📤 Share Quote').setStyle(ButtonStyle.Secondary)
+        );
+
+        await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
+
+        break;
       }
+      case '8ball': {
+        const question = interaction.options.getString('question');
 
-      const embed = new EmbedBuilder()
-        .setTitle(`📖 ${genre.charAt(0).toUpperCase() + genre.slice(1)} Story`)
-        .setColor(0x9932CC)
-        .setDescription(story.story)
-        .addFields({
-          name: '🎯 Prompt',
-          value: prompt,
-          inline: false
-        });
+        if (!question || question.trim().length === 0) {
+          throw new CommandError('8-ball question cannot be empty.', 'INVALID_ARGUMENT');
+        }
 
-      // Track entertainment stats
-      try {
-        updateEntertainmentStats(interaction.user.id, 'storiesGenerated');
-      } catch (error) {
-        console.warn('Failed to update story stats:', error.message);
+        if (question.length > 200) {
+          throw new CommandError('8-ball question is too long. Maximum 200 characters allowed.', 'INVALID_ARGUMENT');
+        }
+
+        const result = magic8Ball(question);
+
+        if (!result || !result.answer) {
+          throw new CommandError('Failed to get 8-ball response. Please try again.', 'ENTERTAINMENT_ERROR');
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle('🔮 Magic 8-Ball')
+          .setColor(0x9C_27_B0)
+          .addFields(
+            { name: 'Question', value: question, inline: false },
+            { name: 'Answer', value: result.answer, inline: false }
+          );
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`fun_8ball:${interaction.user.id}`).setLabel('🔮 Ask Again').setStyle(ButtonStyle.Primary)
+        );
+
+        await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
+
+        break;
       }
+      case 'name': {
+        const type = interaction.options.getString('type') || 'superhero';
+        const name = generateFunName(type);
 
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`fun_story:${genre}:${interaction.user.id}`).setLabel('📖 Another Story').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId(`fun_share:${story.id}:${interaction.user.id}`).setLabel('📤 Share Story').setStyle(ButtonStyle.Secondary)
-      );
+        if (!name || !name.name) {
+          throw new CommandError('Failed to generate fun name. Please try again.', 'ENTERTAINMENT_ERROR');
+        }
 
-      await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
+        const embed = new EmbedBuilder()
+          .setTitle(`🎭 ${type.charAt(0).toUpperCase() + type.slice(1)} Name Generator`)
+          .setColor(0xFF_57_22)
+          .setDescription(`**Your ${type} name:** ${name.name}`)
+          .addFields({
+            name: 'Type',
+            value: type,
+            inline: true
+          });
 
-  } else if (sub === 'riddle') {
-    const difficulty = interaction.options.getString('difficulty') || 'medium';
-    const riddle = getRiddle(difficulty);
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`fun_name:${type}:${interaction.user.id}`).setLabel('🎭 Another Name').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`fun_name_random:${interaction.user.id}`).setLabel('🎲 Random Type').setStyle(ButtonStyle.Secondary)
+        );
 
-    if (!riddle || !riddle.riddle) {
-      throw new CommandError('Failed to retrieve riddle. Please try again.', 'ENTERTAINMENT_ERROR');
-    }
+        await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
 
-    const embed = new EmbedBuilder()
-      .setTitle(`🧩 ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Riddle`)
-      .setColor(0xFF8C00)
-      .setDescription(riddle.riddle)
-      .setFooter({ text: 'Think hard and reply with your answer!' });
-
-    // Track entertainment stats
-    try {
-      updateEntertainmentStats(interaction.user.id, 'riddlesAttempted');
-    } catch (error) {
-      console.warn('Failed to update riddle stats:', error.message);
-    }
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`fun_riddle:${difficulty}:${riddle.id}:${interaction.user.id}`).setLabel('💡 Show Answer').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`fun_riddle_new:${difficulty}:${interaction.user.id}`).setLabel('🧩 Another Riddle').setStyle(ButtonStyle.Secondary)
-    );
-
-    await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
-
-  } else if (sub === 'fact') {
-    const category = interaction.options.getString('category') || 'random';
-    const fact = getFunFact(category);
-
-    if (!fact || !fact.fact) {
-      throw new CommandError('Failed to retrieve fun fact. Please try again.', 'ENTERTAINMENT_ERROR');
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle(`🧠 ${category === 'random' ? 'Random' : category.charAt(0).toUpperCase() + category.slice(1)} Fun Fact`)
-      .setColor(0x4CAF50)
-      .setDescription(fact.fact)
-      .setFooter({ text: `${fact.category} Facts` });
-
-    // Track entertainment stats
-    try {
-      updateEntertainmentStats(interaction.user.id, 'factsLearned');
-    } catch (error) {
-      console.warn('Failed to update fact stats:', error.message);
-    }
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`fun_fact:${category}:${interaction.user.id}`).setLabel('🧠 Another Fact').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`fun_share:${fact.id}:${interaction.user.id}`).setLabel('📤 Share Fact').setStyle(ButtonStyle.Secondary)
-    );
-
-    await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
-
-  } else if (sub === 'quote') {
-    const category = interaction.options.getString('category') || 'inspirational';
-    const quote = getRandomQuote(category);
-
-    if (!quote || !quote.quote || !quote.author) {
-      throw new CommandError('Failed to retrieve quote. Please try again.', 'ENTERTAINMENT_ERROR');
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle(`💬 ${category.charAt(0).toUpperCase() + category.slice(1)} Quote`)
-      .setColor(0xE91E63)
-      .addFields(
-        { name: 'Quote', value: `"${quote.quote}"`, inline: false },
-        { name: 'Author', value: quote.author, inline: true },
-        { name: 'Category', value: category, inline: true }
-      );
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`fun_quote:${category}:${interaction.user.id}`).setLabel('💬 Another Quote').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`fun_share:${quote.id}:${interaction.user.id}`).setLabel('📤 Share Quote').setStyle(ButtonStyle.Secondary)
-    );
-
-    await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
-
-  } else if (sub === '8ball') {
-    const question = interaction.options.getString('question');
-
-    if (!question || question.trim().length === 0) {
-      throw new CommandError('8-ball question cannot be empty.', 'INVALID_ARGUMENT');
-    }
-
-    if (question.length > 200) {
-      throw new CommandError('8-ball question is too long. Maximum 200 characters allowed.', 'INVALID_ARGUMENT');
-    }
-
-    const result = magic8Ball(question);
-
-    if (!result || !result.answer) {
-      throw new CommandError('Failed to get 8-ball response. Please try again.', 'ENTERTAINMENT_ERROR');
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle('🔮 Magic 8-Ball')
-      .setColor(0x9C27B0)
-      .addFields(
-        { name: 'Question', value: question, inline: false },
-        { name: 'Answer', value: result.answer, inline: false }
-      );
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`fun_8ball:${interaction.user.id}`).setLabel('🔮 Ask Again').setStyle(ButtonStyle.Primary)
-    );
-
-    await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
-
-  } else if (sub === 'name') {
-    const type = interaction.options.getString('type') || 'superhero';
-    const name = generateFunName(type);
-
-    if (!name || !name.name) {
-      throw new CommandError('Failed to generate fun name. Please try again.', 'ENTERTAINMENT_ERROR');
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle(`🎭 ${type.charAt(0).toUpperCase() + type.slice(1)} Name Generator`)
-      .setColor(0xFF5722)
-      .setDescription(`**Your ${type} name:** ${name.name}`)
-      .addFields({
-        name: 'Type',
-        value: type,
-        inline: true
-      });
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`fun_name:${type}:${interaction.user.id}`).setLabel('🎭 Another Name').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`fun_name_random:${interaction.user.id}`).setLabel('🎲 Random Type').setStyle(ButtonStyle.Secondary)
-    );
-
-    await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
-
-  } else if (sub === 'challenge') {
-    const type = interaction.options.getString('type') || 'daily';
-    const challenge = createFunChallenge(type);
-
-    if (!challenge || !challenge.challenge) {
-      throw new CommandError('Failed to generate challenge. Please try again.', 'ENTERTAINMENT_ERROR');
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle(`🎯 ${type.charAt(0).toUpperCase() + type.slice(1)} Challenge`)
-      .setColor(0xFFC107)
-      .setDescription(challenge.challenge)
-      .addFields({
-        name: 'Reward',
-        value: challenge.reward,
-        inline: false
-      });
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`fun_challenge:${type}:${interaction.user.id}`).setLabel('🎯 Accept Challenge').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`fun_challenge_new:${type}:${interaction.user.id}`).setLabel('🔄 New Challenge').setStyle(ButtonStyle.Secondary)
-    );
-
-    await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
-
-  } else if (sub === 'leaderboard') {
-    const category = interaction.options.getString('category') || 'jokes';
-
-    const leaderboard = getFunLeaderboard(category, 10);
-
-    if (!Array.isArray(leaderboard)) {
-      throw new CommandError('Failed to retrieve leaderboard data.', 'ENTERTAINMENT_ERROR');
-    }
-
-    if (leaderboard.length === 0) {
-      return await safeInteractionReply(interaction, {
-        content: '🏆 No data available for this leaderboard yet. Be the first to participate!',
-        flags: MessageFlags.Ephemeral
-      });
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle(`🏆 Fun Leaderboard - ${category.charAt(0).toUpperCase() + category.slice(1)}`)
-      .setColor(0xFFD700);
-
-    leaderboard.forEach((entry, index) => {
-      if (!entry || typeof entry.score !== 'number') {
-        console.warn('Invalid leaderboard entry:', entry);
-        return;
+        break;
       }
-      const rank = index + 1;
-      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '🏅';
-      embed.addFields({
-        name: `${medal} #${rank}`,
-        value: `**${entry.score}** ${category}`,
-        inline: true
-      });
-    });
+      case 'challenge': {
+        const type = interaction.options.getString('type') || 'daily';
+        const challenge = createFunChallenge(type);
 
-    await safeInteractionReply(interaction, { embeds: [embed] });
+        if (!challenge || !challenge.challenge) {
+          throw new CommandError('Failed to generate challenge. Please try again.', 'ENTERTAINMENT_ERROR');
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle(`🎯 ${type.charAt(0).toUpperCase() + type.slice(1)} Challenge`)
+          .setColor(0xFF_C1_07)
+          .setDescription(challenge.challenge)
+          .addFields({
+            name: 'Reward',
+            value: challenge.reward,
+            inline: false
+          });
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`fun_challenge:${type}:${interaction.user.id}`).setLabel('🎯 Accept Challenge').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`fun_challenge_new:${type}:${interaction.user.id}`).setLabel('🔄 New Challenge').setStyle(ButtonStyle.Secondary)
+        );
+
+        await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
+
+        break;
+      }
+      case 'leaderboard': {
+        const category = interaction.options.getString('category') || 'jokes';
+
+        const leaderboard = getFunLeaderboard(category, 10);
+
+        if (!Array.isArray(leaderboard)) {
+          throw new CommandError('Failed to retrieve leaderboard data.', 'ENTERTAINMENT_ERROR');
+        }
+
+        if (leaderboard.length === 0) {
+          return await safeInteractionReply(interaction, {
+            content: '🏆 No data available for this leaderboard yet. Be the first to participate!',
+            flags: MessageFlags.Ephemeral
+          });
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle(`🏆 Fun Leaderboard - ${category.charAt(0).toUpperCase() + category.slice(1)}`)
+          .setColor(0xFF_D7_00);
+
+        for (const [index, entry] of leaderboard.entries()) {
+          if (!entry || typeof entry.score !== 'number') {
+            console.warn('Invalid leaderboard entry:', entry);
+            continue;
+          }
+          const rank = index + 1;
+          const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '🏅';
+          embed.addFields({
+            name: `${medal} #${rank}`,
+            value: `**${entry.score}** ${category}`,
+            inline: true
+          });
+        }
+
+        await safeInteractionReply(interaction, { embeds: [embed] });
+
+        break;
+      }
+    // No default
+    }
   }
-  } catch (error) {
+  catch (error) {
     console.error('Error in fun command execution:', error);
     await handleCommandError(interaction, error instanceof CommandError ? error :
       new CommandError(error.message || 'An error occurred while processing the fun command.', 'UNKNOWN_ERROR'));

@@ -17,7 +17,7 @@ function isValidLocation(location) {
   if (!location || typeof location !== 'string') return false;
   if (location.length < 2 || location.length > 100) return false;
   // Basic check for potentially malicious input
-  if (/[<>\"';&]/.test(location)) return false;
+  if (/["&';<>]/.test(location)) return false;
   return true;
 }
 
@@ -47,7 +47,7 @@ function getWeatherEmoji(condition) {
  * @returns {string} Wind direction abbreviation.
  */
 function getWindDirection(degrees) {
-  if (degrees == null) return '';
+  if (degrees == undefined) return '';
   const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
   const index = Math.round(degrees / 22.5) % 16;
   return directions[index];
@@ -82,27 +82,33 @@ export async function execute(interaction) {
     // Rate limiting for weather API
     try {
       await weatherRateLimiter.consume(interaction.user.id);
-    } catch (rejRes) {
+    }
+    catch (error) {
       return await interaction.reply({
-        content: `⏰ **Rate limit exceeded!** Please wait ${Math.round(rejRes.msBeforeNext / 1000)} seconds before trying again.`,
+        content: `⏰ **Rate limit exceeded!** Please wait ${Math.round(error.msBeforeNext / 1000)} seconds before trying again.`,
         flags: MessageFlags.Ephemeral
       });
     }
 
     // Using a free weather API (you may want to replace with a paid one for production)
     const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`, {
-      timeout: 10000 // 10 second timeout
+      timeout: 10_000 // 10 second timeout
     });
 
     if (!response.ok) {
-      if (response.status === 401) {
-        return await interaction.reply({ content: '❌ Weather API key not configured. Please contact an administrator.', flags: MessageFlags.Ephemeral });
-      } else if (response.status === 404) {
-        return await interaction.reply({ content: `❌ Location "${location}" not found. Please check the spelling and try again.`, flags: MessageFlags.Ephemeral });
-      } else if (response.status === 429) {
-        return await interaction.reply({ content: '❌ Weather API rate limit exceeded. Please try again later.', flags: MessageFlags.Ephemeral });
-      } else {
-        return await interaction.reply({ content: `❌ Unable to fetch weather data. Please try again later.`, flags: MessageFlags.Ephemeral });
+      switch (response.status) {
+        case 401: {
+          return await interaction.reply({ content: '❌ Weather API key not configured. Please contact an administrator.', flags: MessageFlags.Ephemeral });
+        }
+        case 404: {
+          return await interaction.reply({ content: `❌ Location "${location}" not found. Please check the spelling and try again.`, flags: MessageFlags.Ephemeral });
+        }
+        case 429: {
+          return await interaction.reply({ content: '❌ Weather API rate limit exceeded. Please try again later.', flags: MessageFlags.Ephemeral });
+        }
+        default: {
+          return await interaction.reply({ content: '❌ Unable to fetch weather data. Please try again later.', flags: MessageFlags.Ephemeral });
+        }
       }
     }
 
@@ -115,7 +121,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setTitle(`🌤️ Weather in ${data.name}, ${data.sys.country}`)
-      .setColor(0x0099FF)
+      .setColor(0x00_99_FF)
       .addFields(
         {
           name: '🌡️ Temperature',
@@ -153,13 +159,16 @@ export async function execute(interaction) {
 
     await interaction.reply({ embeds: [embed] });
 
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Weather command error:', error);
     if (error.name === 'AbortError') {
       await interaction.reply({ content: '❌ Request timed out. Please try again later.', flags: MessageFlags.Ephemeral });
-    } else if (error.message.includes('fetch')) {
+    }
+    else if (error.message.includes('fetch')) {
       await interaction.reply({ content: '❌ Network error. Please check your connection and try again.', flags: MessageFlags.Ephemeral });
-    } else {
+    }
+    else {
       await interaction.reply({ content: '❌ An error occurred while fetching weather data. Please try again later.', flags: MessageFlags.Ephemeral });
     }
   }

@@ -1,6 +1,7 @@
 // Test script specifically for button interaction handlers
+import assert from 'node:assert';
+
 import { handleButtonInteraction } from '../src/interactionHandlers.js';
-import assert from 'assert';
 
 // Mock interaction object
 const mockInteraction = {
@@ -18,17 +19,17 @@ const mockInteraction = {
     embeds: [{}],
     components: []
   },
-  reply: async (options) => {
+  reply: async(options) => {
     console.log('Mock reply called with:', options.content);
-    return Promise.resolve();
+    return;
   },
-  update: async (options) => {
+  update: async(options) => {
     console.log('Mock update called with:', options.content);
-    return Promise.resolve();
+    return;
   },
-  showModal: async (modal) => {
+  showModal: async(modal) => {
     console.log('Mock showModal called with:', modal.customId);
-    return Promise.resolve();
+    return;
   }
 };
 
@@ -84,7 +85,8 @@ async function testButtonHandlers() {
     console.log('\n🎉 All button interaction tests passed!');
     return { success: true, message: 'All button handlers work correctly' };
 
-  } catch (error) {
+  }
+  catch (error) {
     console.error('❌ Button interaction test failed:', error.message);
     console.error('Stack:', error.stack);
     return { success: false, message: error.message, error };

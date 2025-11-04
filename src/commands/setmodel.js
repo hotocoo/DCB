@@ -1,4 +1,5 @@
-import { SlashCommandBuilder , MessageFlags} from 'discord.js';
+import { SlashCommandBuilder , MessageFlags } from 'discord.js';
+
 import { setGuild } from '../storage.js';
 
 export const data = new SlashCommandBuilder()

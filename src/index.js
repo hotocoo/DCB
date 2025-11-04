@@ -29,11 +29,10 @@ import { schedulerManager } from './scheduler.js';
  * @property {(interaction: import('discord.js').CommandInteraction) => Promise<void>} execute - The command execution function.
  */
 
-
 /**
  * Constants for bot configuration.
  */
-const LOGIN_TIMEOUT_MS = 15000;
+const LOGIN_TIMEOUT_MS = 15_000;
 
 /**
  * Validates the Discord token from environment variables.
@@ -49,7 +48,7 @@ function validateToken() {
   }
 
   // Basic token format validation
-  if (!/^[A-Za-z0-9_-]{24,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{27,}$/.test(token)) {
+  if (!/^[\w-]{24,}\.[\w-]{6,}\.[\w-]{27,}$/.test(token)) {
     logger.warn('DISCORD_TOKEN format appears invalid. Please ensure it is a valid Discord bot token.');
   }
 
@@ -63,7 +62,8 @@ let token;
 try {
   token = validateToken();
   logger.info('Token validation successful');
-} catch (error) {
+}
+catch (error) {
   logger.error('Token validation failed', error instanceof Error ? error : new Error(String(error)));
   process.exit(1);
 }
@@ -74,7 +74,8 @@ const validStatuses = ['online', 'idle', 'dnd', 'invisible'];
 let status;
 if (validStatuses.includes(botStatus.toLowerCase())) {
   status = botStatus.toLowerCase();
-} else {
+}
+else {
   console.warn(`Invalid BOT_STATUS: ${botStatus}. Defaulting to 'online'.`);
   status = 'online';
 }
@@ -105,7 +106,7 @@ client.commands = /** @type {import('discord.js').Collection<string, Command>} *
 
 // Initialize database connection and commands
 let commandStats = { total: 0, loaded: 0 };
-(async () => {
+(async() => {
   try {
     logger.info('Initializing database connection...');
     await initializeDatabase();
@@ -119,7 +120,8 @@ let commandStats = { total: 0, loaded: 0 };
     // Initialize scheduler if available
     await schedulerManager.setClient(client);
     logger.success('Scheduler initialized successfully');
-  } catch (error) {
+  }
+  catch (error) {
     logger.error('Failed to initialize database', error instanceof Error ? error : new Error(String(error)));
     process.exit(1);
   }
@@ -203,9 +205,9 @@ client.on('messageCreate', async message => {
     if (attempt) {
       const response = attempt.ok
         ? `Nice! You typed it correctly: ${attempt.expected}`
-        : attempt.reason === 'timeout'
+        : (attempt.reason === 'timeout'
           ? 'Too slow! The typing challenge expired.'
-          : 'Invalid typing attempt.';
+          : 'Invalid typing attempt.');
       await message.reply({ content: response });
       return;
     }
@@ -226,8 +228,9 @@ client.on('messageCreate', async message => {
       });
     }
 
-  } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
+  }
+  catch (error_) {
+    const error = error_ instanceof Error ? error_ : new Error(String(error_));
     logError('Message handling failed', error, {
       user: `${message.author.username}#${message.author.discriminator}`,
       userId: message.author.id,
@@ -266,7 +269,8 @@ async function gracefulShutdown(client, signal) {
       process.exit(0);
     }, 2000);
 
-  } catch (error) {
+  }
+  catch (error) {
     logger.error('Error during graceful shutdown', error instanceof Error ? error : new Error(String(error)));
     process.exit(1);
   }
@@ -275,7 +279,7 @@ async function gracefulShutdown(client, signal) {
 /**
  * Initiates the bot login process with timeout protection and enhanced error handling.
  */
-(async () => {
+(async() => {
   try {
     logger.info('Attempting to login to Discord...');
     const loginPromise = client.login(token);
@@ -285,17 +289,21 @@ async function gracefulShutdown(client, signal) {
     await Promise.race([loginPromise, timeoutPromise]);
     logger.success('Login successful');
 
-  } catch (error) {
+  }
+  catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     logger.error('Failed to login to Discord', err);
 
     if (err.message.includes('timeout')) {
       logger.error('Login timed out. Please check your internet connection and try again.');
-    } else if (err.message.includes('Invalid token') || err.message.includes('Incorrect login details')) {
+    }
+    else if (err.message.includes('Invalid token') || err.message.includes('Incorrect login details')) {
       logger.error('Invalid token provided. Please ensure DISCORD_TOKEN in .env is set to a valid Discord bot token from https://discord.com/developers/applications');
-    } else if (err.message.includes('Privileged intent')) {
+    }
+    else if (err.message.includes('Privileged intent')) {
       logger.error('Missing privileged intents. Please enable required intents in your Discord application settings.');
-    } else {
+    }
+    else {
       logger.error('Unknown login error occurred. Please check your configuration and try again.');
     }
 

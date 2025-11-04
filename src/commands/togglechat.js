@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, MessageFlags } from 'discord.js';
+
 import { getGuild, setGuild } from '../storage.js';
 import { safeExecuteCommand, CommandError, validateGuild, validatePermissions } from '../errorHandler.js';
 
@@ -27,7 +28,8 @@ export async function execute(interaction) {
       content: `✅ Chat responder is now **${enabled ? 'enabled' : 'disabled'}** for this guild.`,
       flags: MessageFlags.Ephemeral
     });
-  } catch (error) {
+  }
+  catch (error) {
     throw new CommandError(`Failed to toggle chat responder: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
   }
 }

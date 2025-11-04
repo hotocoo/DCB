@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const COOLDOWNS_FILE = path.join(process.cwd(), 'data', 'cooldowns.json');
 
@@ -23,9 +23,10 @@ class CooldownManager {
 
   loadCooldowns() {
     try {
-      const data = JSON.parse(fs.readFileSync(COOLDOWNS_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(COOLDOWNS_FILE));
       this.persistentCooldowns = data;
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to load cooldowns:', error);
       this.persistentCooldowns = {};
     }
@@ -34,7 +35,8 @@ class CooldownManager {
   saveCooldowns() {
     try {
       fs.writeFileSync(COOLDOWNS_FILE, JSON.stringify(this.persistentCooldowns, null, 2));
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to save cooldowns:', error);
     }
   }
@@ -43,20 +45,20 @@ class CooldownManager {
   getDefaultCooldowns() {
     return {
       // Command cooldowns
-      'rpg_explore': 30000,      // 30 seconds between explorations
-      'rpg_fight': 10000,        // 10 seconds between fights
-      'rpg_boss': 300000,        // 5 minutes between boss fights
-      'guild_create': 3600000,   // 1 hour between guild creation
-      'guild_join': 60000,       // 1 minute between guild joins
-      'trade_offer': 30000,      // 30 seconds between trade offers
-      'auction_create': 600000,  // 10 minutes between auction creation
+      'rpg_explore': 30_000,      // 30 seconds between explorations
+      'rpg_fight': 10_000,        // 10 seconds between fights
+      'rpg_boss': 300_000,        // 5 minutes between boss fights
+      'guild_create': 3_600_000,   // 1 hour between guild creation
+      'guild_join': 60_000,       // 1 minute between guild joins
+      'trade_offer': 30_000,      // 30 seconds between trade offers
+      'auction_create': 600_000,  // 10 minutes between auction creation
 
       // Game cooldowns
-      'trivia_game': 60000,      // 1 minute between trivia games
-      'hangman_game': 30000,     // 30 seconds between hangman games
-      'memory_game': 45000,      // 45 seconds between memory games
+      'trivia_game': 60_000,      // 1 minute between trivia games
+      'hangman_game': 30_000,     // 30 seconds between hangman games
+      'memory_game': 45_000,      // 45 seconds between memory games
       'coin_flip': 5000,         // 5 seconds between coin flips
-      'weather_check': 10000,    // 10 seconds between weather checks
+      'weather_check': 10_000,    // 10 seconds between weather checks
 
       // Button cooldowns
       'button_explore': 5000,    // 5 seconds between button presses for exploration
@@ -124,7 +126,7 @@ class CooldownManager {
     this.tempCooldowns.set(key, endTime);
 
     // Store persistently for longer cooldowns
-    if (cooldown > 60000) { // Only persist cooldowns longer than 1 minute
+    if (cooldown > 60_000) { // Only persist cooldowns longer than 1 minute
       this.persistentCooldowns[key] = endTime;
       this.saveCooldowns();
     }
@@ -140,9 +142,11 @@ class CooldownManager {
 
     if (hours > 0) {
       return `${hours}h ${minutes % 60}m`;
-    } else if (minutes > 0) {
+    }
+    else if (minutes > 0) {
       return `${minutes}m ${seconds % 60}s`;
-    } else {
+    }
+    else {
       return `${seconds}s`;
     }
   }
@@ -186,28 +190,24 @@ class CooldownManager {
 
     // Check in-memory cooldowns
     for (const [key, endTime] of this.tempCooldowns) {
-      if (key.startsWith(`${userId}_`)) {
-        if (now < endTime) {
-          const action = key.replace(`${userId}_`, '');
-          cooldowns[action] = {
-            remaining: endTime - now,
-            endTime: endTime
-          };
-        }
+      if (key.startsWith(`${userId}_`) && now < endTime) {
+        const action = key.replace(`${userId}_`, '');
+        cooldowns[action] = {
+          remaining: endTime - now,
+          endTime: endTime
+        };
       }
     }
 
     // Check persistent cooldowns
     for (const [key, endTime] of Object.entries(this.persistentCooldowns)) {
-      if (key.startsWith(`${userId}_`)) {
-        if (now < endTime) {
-          const action = key.replace(`${userId}_`, '');
-          if (!cooldowns[action]) {
-            cooldowns[action] = {
-              remaining: endTime - now,
-              endTime: endTime
-            };
-          }
+      if (key.startsWith(`${userId}_`) && now < endTime) {
+        const action = key.replace(`${userId}_`, '');
+        if (!cooldowns[action]) {
+          cooldowns[action] = {
+            remaining: endTime - now,
+            endTime: endTime
+          };
         }
       }
     }
@@ -358,4 +358,4 @@ export function getButtonCooldownType(customId) {
 // Auto-cleanup every minute
 setInterval(() => {
   cooldownManager.cleanup();
-}, 60000);
+}, 60_000);

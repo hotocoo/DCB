@@ -1,6 +1,7 @@
-import assert from 'assert';
-import fs from 'fs';
-import path from 'path';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { createCharacter, getCharacter, applyXp, spendSkillPoints, getLeaderboard, getLeaderboardCount, resetCharacter } from '../src/rpg.js';
 
 // Use a temp data dir to avoid clobbering real data during tests
@@ -15,7 +16,8 @@ function restoreData() {
   if (fs.existsSync(BACKUP)) {
     fs.copyFileSync(BACKUP, FILE);
     fs.unlinkSync(BACKUP);
-  } else {
+  }
+  else {
     // remove test file if created
     if (fs.existsSync(FILE)) fs.unlinkSync(FILE);
   }
@@ -58,9 +60,12 @@ async function run() {
     assert.equal(def.lvl, 1);
 
     console.log('All tests passed');
-  } finally {
+  }
+  finally {
     restoreData();
   }
 }
 
-run().catch(err => { console.error(err); process.exit(1); });
+run().catch(error => {
+  console.error(error); process.exit(1);
+});

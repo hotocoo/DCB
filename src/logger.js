@@ -3,8 +3,8 @@
  * Provides structured logging with file output and console formatting.
  */
 
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * Configuration constants for logging.
@@ -18,11 +18,11 @@ const KEEP_RECENT_ENTRIES = 50;
  * ANSI color codes for console output formatting.
  */
 const CONSOLE_COLORS = {
-  info: '\x1b[36m',    // Cyan
-  warn: '\x1b[33m',    // Yellow
-  error: '\x1b[31m',   // Red
-  success: '\x1b[32m', // Green
-  debug: '\x1b[35m'    // Magenta
+  info: '\u001B[36m',    // Cyan
+  warn: '\u001B[33m',    // Yellow
+  error: '\u001B[31m',   // Red
+  success: '\u001B[32m', // Green
+  debug: '\u001B[35m'    // Magenta
 };
 
 /**
@@ -77,7 +77,8 @@ class Logger {
     try {
       const logFile = this.getLogFilePath();
       fs.appendFileSync(logFile, message + '\n');
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to write to log file:', error);
     }
   }
@@ -93,7 +94,7 @@ class Logger {
 
     // Console output with color formatting
     const color = CONSOLE_COLORS[level] || CONSOLE_COLORS.info;
-    console.log(`${color}${formattedMessage}\x1b[0m`);
+    console.log(`${color}${formattedMessage}\u001B[0m`);
 
     // File output (only for important levels to reduce I/O)
     if (['error', 'warn', 'info', 'success'].includes(level)) {
@@ -205,7 +206,8 @@ class Logger {
 
     if (success) {
       this.success(`Command executed: /${interaction.commandName}`, meta);
-    } else {
+    }
+    else {
       this.error(`Command failed: /${interaction.commandName}`, error, meta);
     }
   }

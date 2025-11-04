@@ -1,4 +1,5 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType , MessageFlags} from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType , MessageFlags } from 'discord.js';
+
 import { CommandError, handleCommandError } from '../errorHandler.js';
 import { pollGames } from '../game-states.js';
 
@@ -93,115 +94,116 @@ export async function execute(interaction) {
     const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
     const validOptions = trimmedOptions;
 
-  const embed = new EmbedBuilder()
-    .setTitle(`📊 ${question}`)
-    .setColor(0x0099FF)
-    .setDescription(validOptions.map((option, index) => `${emojis[index]} ${option}`).join('\n\n'))
-    .addFields({
-      name: 'Instructions',
-      value: 'Click the buttons below to vote! You can change your vote at any time.',
-      inline: false
-    })
-    .setFooter({ text: `Poll created by ${interaction.user.username} • Ends in ${durationMinutes} minutes` })
-    .setTimestamp(Date.now() + durationMinutes * 60000);
+    const embed = new EmbedBuilder()
+      .setTitle(`📊 ${question}`)
+      .setColor(0x00_99_FF)
+      .setDescription(validOptions.map((option, index) => `${emojis[index]} ${option}`).join('\n\n'))
+      .addFields({
+        name: 'Instructions',
+        value: 'Click the buttons below to vote! You can change your vote at any time.',
+        inline: false
+      })
+      .setFooter({ text: `Poll created by ${interaction.user.username} • Ends in ${durationMinutes} minutes` })
+      .setTimestamp(Date.now() + durationMinutes * 60_000);
 
-  // Create buttons for each option
-  const buttons = validOptions.map((option, index) =>
-    new ButtonBuilder()
-      .setCustomId(`poll_${index}`)
-      .setLabel(`${emojis[index]} ${option.length > 15 ? option.substring(0, 15) + '...' : option}`)
-      .setStyle(ButtonStyle.Primary)
-  );
+    // Create buttons for each option
+    const buttons = validOptions.map((option, index) =>
+      new ButtonBuilder()
+        .setCustomId(`poll_${index}`)
+        .setLabel(`${emojis[index]} ${option.length > 15 ? option.slice(0, 15) + '...' : option}`)
+        .setStyle(ButtonStyle.Primary)
+    );
 
-  const rows = [];
-  for (let i = 0; i < buttons.length; i += 2) {
-    const row = new ActionRowBuilder().addComponents(buttons.slice(i, i + 2));
-    rows.push(row);
-  }
-
-  const message = await interaction.reply({ embeds: [embed], components: rows });
-
-  // Store poll data for tracking votes globally
-  const pollData = {
-    question,
-    options: validOptions,
-    votes: new Map(), // userId -> optionIndex
-    totalVotes: 0,
-    endTime: Date.now() + durationMinutes * 60000,
-    messageId: message.id,
-    pollType: 'single' // Currently single choice, can be extended later
-  };
-
-  // Store in global poll games map
-  pollGames.set(message.id, pollData);
-
-  // Set up collector for button interactions
-  const filter = (i) => i.customId.startsWith('poll_') && i.message.id === message.id;
-  const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, filter, time: durationMinutes * 60000 });
-
-  collector.on('collect', async (i) => {
-    const optionIndex = parseInt(i.customId.split('_')[1]);
-    const userId = i.user.id;
-
-    // Remove previous vote if exists
-    const previousVote = pollData.votes.get(userId);
-    if (previousVote !== undefined) {
-      pollData.totalVotes--;
+    const rows = [];
+    for (let i = 0; i < buttons.length; i += 2) {
+      const row = new ActionRowBuilder().addComponents(buttons.slice(i, i + 2));
+      rows.push(row);
     }
 
-    // Add new vote
-    pollData.votes.set(userId, optionIndex);
-    pollData.totalVotes++;
+    const message = await interaction.reply({ embeds: [embed], components: rows });
 
-    // Update embed with current results
-    const updatedEmbed = new EmbedBuilder()
-      .setTitle(`📊 ${question}`)
-      .setColor(0x0099FF)
-      .setDescription(
-        options.map((option, index) => {
-          const voteCount = Array.from(pollData.votes.values()).filter(v => v === index).length;
-          const percentage = pollData.totalVotes > 0 ? Math.round((voteCount / pollData.totalVotes) * 100) : 0;
-          return `${emojis[index]} ${option}\n${'█'.repeat(Math.max(1, percentage / 5))}${voteCount > 0 ? ` **${voteCount}** (${percentage}%)` : ''}`;
-        }).join('\n\n')
-      )
-      .setFooter({ text: `Total votes: ${pollData.totalVotes} • Poll ends` })
-      .setTimestamp(pollData.endTime);
+    // Store poll data for tracking votes globally
+    const pollData = {
+      question,
+      options: validOptions,
+      votes: new Map(), // userId -> optionIndex
+      totalVotes: 0,
+      endTime: Date.now() + durationMinutes * 60_000,
+      messageId: message.id,
+      pollType: 'single' // Currently single choice, can be extended later
+    };
 
-    await i.update({ embeds: [updatedEmbed], components: rows });
-  });
+    // Store in global poll games map
+    pollGames.set(message.id, pollData);
 
-  collector.on('end', async () => {
-    // Clean up poll data from global map
-    pollGames.delete(message.id);
+    // Set up collector for button interactions
+    const filter = (i) => i.customId.startsWith('poll_') && i.message.id === message.id;
+    const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, filter, time: durationMinutes * 60_000 });
 
-    // Final update when poll ends
-    const finalEmbed = new EmbedBuilder()
-      .setTitle(`📊 ${question} [ENDED]`)
-      .setColor(0x666666)
-      .setDescription(
-        options.map((option, index) => {
-          const voteCount = Array.from(pollData.votes.values()).filter(v => v === index).length;
-          const percentage = pollData.totalVotes > 0 ? Math.round((voteCount / pollData.totalVotes) * 100) : 0;
-          return `${emojis[index]} ${option}\n${'█'.repeat(Math.max(1, percentage / 5))}${voteCount > 0 ? ` **${voteCount}** (${percentage}%)` : ''}`;
-        }).join('\n\n')
-      )
-      .setFooter({ text: `Final results • Total votes: ${pollData.totalVotes}` })
-      .setTimestamp();
+    collector.on('collect', async(i) => {
+      const optionIndex = Number.parseInt(i.customId.split('_')[1]);
+      const userId = i.user.id;
 
-    // Disable all buttons
-    const disabledRows = rows.map(row => {
-      const disabledRow = new ActionRowBuilder();
-      row.components.forEach(button => {
-        disabledRow.addComponents(
-          ButtonBuilder.from(button).setDisabled(true)
-        );
-      });
-      return disabledRow;
+      // Remove previous vote if exists
+      const previousVote = pollData.votes.get(userId);
+      if (previousVote !== undefined) {
+        pollData.totalVotes--;
+      }
+
+      // Add new vote
+      pollData.votes.set(userId, optionIndex);
+      pollData.totalVotes++;
+
+      // Update embed with current results
+      const updatedEmbed = new EmbedBuilder()
+        .setTitle(`📊 ${question}`)
+        .setColor(0x00_99_FF)
+        .setDescription(
+          options.map((option, index) => {
+            const voteCount = [...pollData.votes.values()].filter(v => v === index).length;
+            const percentage = pollData.totalVotes > 0 ? Math.round((voteCount / pollData.totalVotes) * 100) : 0;
+            return `${emojis[index]} ${option}\n${'█'.repeat(Math.max(1, percentage / 5))}${voteCount > 0 ? ` **${voteCount}** (${percentage}%)` : ''}`;
+          }).join('\n\n')
+        )
+        .setFooter({ text: `Total votes: ${pollData.totalVotes} • Poll ends` })
+        .setTimestamp(pollData.endTime);
+
+      await i.update({ embeds: [updatedEmbed], components: rows });
     });
 
-    await interaction.editReply({ embeds: [finalEmbed], components: disabledRows });
-  });
-  } catch (error) {
+    collector.on('end', async() => {
+    // Clean up poll data from global map
+      pollGames.delete(message.id);
+
+      // Final update when poll ends
+      const finalEmbed = new EmbedBuilder()
+        .setTitle(`📊 ${question} [ENDED]`)
+        .setColor(0x66_66_66)
+        .setDescription(
+          options.map((option, index) => {
+            const voteCount = [...pollData.votes.values()].filter(v => v === index).length;
+            const percentage = pollData.totalVotes > 0 ? Math.round((voteCount / pollData.totalVotes) * 100) : 0;
+            return `${emojis[index]} ${option}\n${'█'.repeat(Math.max(1, percentage / 5))}${voteCount > 0 ? ` **${voteCount}** (${percentage}%)` : ''}`;
+          }).join('\n\n')
+        )
+        .setFooter({ text: `Final results • Total votes: ${pollData.totalVotes}` })
+        .setTimestamp();
+
+      // Disable all buttons
+      const disabledRows = rows.map(row => {
+        const disabledRow = new ActionRowBuilder();
+        for (const button of row.components) {
+          disabledRow.addComponents(
+            ButtonBuilder.from(button).setDisabled(true)
+          );
+        }
+        return disabledRow;
+      });
+
+      await interaction.editReply({ embeds: [finalEmbed], components: disabledRows });
+    });
+  }
+  catch (error) {
     return handleCommandError(interaction, error);
   }
 }

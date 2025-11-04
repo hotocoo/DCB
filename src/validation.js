@@ -19,7 +19,7 @@ const SANITIZATION_PATTERNS = [
   /[<>]/g, // Remove potential HTML tags
   /javascript:/gi, // Remove javascript: protocol
   /on\w+=/gi, // Remove event handlers
-  /[^\x20-\x7E]/g // Remove non-printable characters
+  /[^\u0020-\u007E]/g // Remove non-printable characters
 ];
 
 class InputValidator {
@@ -71,7 +71,8 @@ class InputValidator {
       }
 
       return { valid: true };
-    } catch (error) {
+    }
+    catch (error) {
       logger.error('Error in validateString', error, { input: typeof input, options });
       return { valid: false, reason: 'Validation error occurred' };
     }
@@ -85,8 +86,8 @@ class InputValidator {
    */
   validateNumber(input, options = {}) {
     const {
-      min = -Infinity,
-      max = Infinity,
+      min = Number.NEGATIVE_INFINITY,
+      max = Number.POSITIVE_INFINITY,
       integer = false,
       positive = false,
       required = false
@@ -227,20 +228,27 @@ class InputValidator {
     }
 
     switch (commandName) {
-      case 'rpg':
+      case 'rpg': {
         return this.validateRPGCommand(options);
-      case 'guild':
+      }
+      case 'guild': {
         return this.validateGuildCommand(options);
-      case 'trade':
+      }
+      case 'trade': {
         return this.validateTradeCommand(options);
-      case 'inventory':
+      }
+      case 'inventory': {
         return this.validateInventoryCommand(options);
-      case 'weather':
+      }
+      case 'weather': {
         return this.validateWeatherCommand(options);
-      case 'poll':
+      }
+      case 'poll': {
         return this.validatePollCommand(options);
-      default:
+      }
+      default: {
         return { valid: true };
+      }
     }
   }
 
@@ -250,7 +258,7 @@ class InputValidator {
     const subOptions = options;
 
     switch (subcommand) {
-      case 'start':
+      case 'start': {
         if (subOptions.name) {
           const nameValidation = this.validateUsername(subOptions.name);
           if (!nameValidation.valid) return nameValidation;
@@ -260,8 +268,9 @@ class InputValidator {
           if (!classValidation.valid) return classValidation;
         }
         break;
+      }
 
-      case 'levelup':
+      case 'levelup': {
         if (subOptions.stat) {
           const statValidation = this.validateRPGStat(subOptions.stat);
           if (!statValidation.valid) return statValidation;
@@ -273,6 +282,7 @@ class InputValidator {
           if (!amountValidation.valid) return amountValidation;
         }
         break;
+      }
 
       case 'fight':
       case 'explore':
@@ -282,11 +292,12 @@ class InputValidator {
       case 'reset':
       case 'class':
       case 'inventory':
-      case 'craft':
+      case 'craft': {
         // No additional validation needed for these
         break;
+      }
 
-      case 'quest':
+      case 'quest': {
         if (subOptions.action) {
           const validActions = ['create', 'list', 'complete'];
           if (!validActions.includes(subOptions.action)) {
@@ -294,9 +305,11 @@ class InputValidator {
           }
         }
         break;
+      }
 
-      default:
+      default: {
         return { valid: false, reason: 'Invalid RPG subcommand' };
+      }
     }
 
     return { valid: true };
@@ -306,36 +319,38 @@ class InputValidator {
     const subcommand = options.subcommand || options.sub;
 
     switch (subcommand) {
-      case 'create':
+      case 'create': {
         if (options.name) {
           const nameValidation = this.validateGuildName(options.name);
           if (!nameValidation.valid) return nameValidation;
         }
         break;
+      }
 
-      case 'join':
+      case 'join': {
         if (options.name) {
           const nameValidation = this.validateGuildName(options.name);
           if (!nameValidation.valid) return nameValidation;
         }
         break;
+      }
 
-      case 'party':
+      case 'party': {
         if (options.action) {
           const validActions = ['create', 'join', 'leave'];
           if (!validActions.includes(options.action)) {
             return { valid: false, reason: 'Invalid party action. Use: create, join, leave' };
           }
         }
-        if (options.action === 'join' && options.party_id) {
-          if (!options.party_id.startsWith('party_')) {
-            return { valid: false, reason: 'Invalid party ID format' };
-          }
+        if (options.action === 'join' && options.party_id && !options.party_id.startsWith('party_')) {
+          return { valid: false, reason: 'Invalid party ID format' };
         }
         break;
+      }
 
-      default:
+      default: {
         return { valid: false, reason: 'Invalid guild subcommand' };
+      }
     }
 
     return { valid: true };
@@ -345,16 +360,16 @@ class InputValidator {
     const subcommand = options.subcommand || options.sub;
 
     switch (subcommand) {
-      case 'offer':
+      case 'offer': {
         if (options.offer_gold) {
           const goldValidation = this.validateNumber(options.offer_gold, {
-            min: 0, max: 100000, integer: true, required: false
+            min: 0, max: 100_000, integer: true, required: false
           });
           if (!goldValidation.valid) return goldValidation;
         }
         if (options.request_gold) {
           const goldValidation = this.validateNumber(options.request_gold, {
-            min: 0, max: 100000, integer: true, required: false
+            min: 0, max: 100_000, integer: true, required: false
           });
           if (!goldValidation.valid) return goldValidation;
         }
@@ -368,28 +383,27 @@ class InputValidator {
           }
         }
         break;
+      }
 
-      case 'auction':
-        if (options.action === 'create') {
-          if (options.price) {
-            const priceValidation = this.validateNumber(options.price, {
-              min: 1, max: 10000, integer: true, positive: true, required: true
-            });
-            if (!priceValidation.valid) return priceValidation;
-          }
+      case 'auction': {
+        if (options.action === 'create' && options.price) {
+          const priceValidation = this.validateNumber(options.price, {
+            min: 1, max: 10_000, integer: true, positive: true, required: true
+          });
+          if (!priceValidation.valid) return priceValidation;
         }
-        if (options.action === 'bid') {
-          if (options.price) {
-            const priceValidation = this.validateNumber(options.price, {
-              min: 1, max: 100000, integer: true, positive: true, required: true
-            });
-            if (!priceValidation.valid) return priceValidation;
-          }
+        if (options.action === 'bid' && options.price) {
+          const priceValidation = this.validateNumber(options.price, {
+            min: 1, max: 100_000, integer: true, positive: true, required: true
+          });
+          if (!priceValidation.valid) return priceValidation;
         }
         break;
+      }
 
-      default:
+      default: {
         return { valid: false, reason: 'Invalid trade subcommand' };
+      }
     }
 
     return { valid: true };
@@ -462,7 +476,8 @@ class InputValidator {
 
       // Limit length
       return sanitized.slice(0, MAX_STRING_LENGTH);
-    } catch (error) {
+    }
+    catch (error) {
       logger.error('Error in sanitizeInput', error, { inputType: typeof input });
       return ''; // Return empty string on error
     }
@@ -538,21 +553,38 @@ class InputValidator {
         }
 
         if (value !== null && value !== undefined) {
-          if (rules.type === 'string') {
-            const stringValidation = this.validateString(value, rules);
-            if (!stringValidation.valid) errors.push(`${key}: ${stringValidation.reason}`);
-          } else if (rules.type === 'number') {
-            const numberValidation = this.validateNumber(value, rules);
-            if (!numberValidation.valid) errors.push(`${key}: ${numberValidation.reason}`);
-          } else if (rules.type === 'userId') {
-            const userIdValidation = this.validateUserId(value);
-            if (!userIdValidation.valid) errors.push(`${key}: ${userIdValidation.reason}`);
-          } else if (rules.type === 'channelId') {
-            const channelIdValidation = this.validateChannelId(value);
-            if (!channelIdValidation.valid) errors.push(`${key}: ${channelIdValidation.reason}`);
-          } else if (rules.type === 'roleId') {
-            const roleIdValidation = this.validateRoleId(value);
-            if (!roleIdValidation.valid) errors.push(`${key}: ${roleIdValidation.reason}`);
+          switch (rules.type) {
+            case 'string': {
+              const stringValidation = this.validateString(value, rules);
+              if (!stringValidation.valid) errors.push(`${key}: ${stringValidation.reason}`);
+
+              break;
+            }
+            case 'number': {
+              const numberValidation = this.validateNumber(value, rules);
+              if (!numberValidation.valid) errors.push(`${key}: ${numberValidation.reason}`);
+
+              break;
+            }
+            case 'userId': {
+              const userIdValidation = this.validateUserId(value);
+              if (!userIdValidation.valid) errors.push(`${key}: ${userIdValidation.reason}`);
+
+              break;
+            }
+            case 'channelId': {
+              const channelIdValidation = this.validateChannelId(value);
+              if (!channelIdValidation.valid) errors.push(`${key}: ${channelIdValidation.reason}`);
+
+              break;
+            }
+            case 'roleId': {
+              const roleIdValidation = this.validateRoleId(value);
+              if (!roleIdValidation.valid) errors.push(`${key}: ${roleIdValidation.reason}`);
+
+              break;
+            }
+          // No default
           }
         }
       }
@@ -561,7 +593,8 @@ class InputValidator {
         valid: errors.length === 0,
         errors
       };
-    } catch (error) {
+    }
+    catch (error) {
       logger.error('Error in validateObject', error, { objKeys: Object.keys(obj || {}), schemaKeys: Object.keys(schema || {}) });
       return { valid: false, errors: ['Validation error occurred'] };
     }

@@ -1,20 +1,30 @@
 
 import { logger } from './logger.js';
+
 import 'dotenv/config';
-import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection, StreamType, NoSubscriberBehavior, entersState, VoiceConnectionStatus } from '@discordjs/voice';
-import ytdl from '@distube/ytdl-core';
-import axios from 'axios';
-import yts from 'yt-search';
+import { spawn, execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+
 import ffmpeg from 'ffmpeg-static';
-import { spawn, execSync } from 'child_process';
-import { existsSync } from 'fs';
-import path from 'path';
+import yts from 'yt-search';
+import axios from 'axios';
+import ytdl from '@distube/ytdl-core';
+import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection, StreamType, NoSubscriberBehavior, entersState, VoiceConnectionStatus } from '@discordjs/voice';
+import { RateLimiterMemory } from 'rate-limiter-flexible';
+import SpotifyWebApi from 'spotify-web-api-node';
+import pkg from 'libsodium-wrappers';
+
+// Import validation utilities
+import { inputValidator, sanitizeInput, validateString } from './validation.js';
+import { CommandError, handleCommandError } from './errorHandler.js';
 
 // FFmpeg binary path resolution and validation
 let ffmpegPath = ffmpeg;
 if (typeof ffmpeg === 'string' && existsSync(ffmpeg)) {
   ffmpegPath = ffmpeg;
-} else {
+}
+else {
   // Fallback: try to find ffmpeg in system PATH
   try {
     ffmpegPath = execSync('where ffmpeg 2>nul || which ffmpeg 2>/dev/null || echo ""', { encoding: 'utf8' }).trim();
@@ -22,7 +32,8 @@ if (typeof ffmpeg === 'string' && existsSync(ffmpeg)) {
       // Last resort: use the static binary directly
       ffmpegPath = path.resolve('ffmpeg-static');
     }
-  } catch (e) {
+  }
+  catch {
     ffmpegPath = path.resolve('ffmpeg-static');
   }
 }
@@ -33,8 +44,8 @@ if (ffmpegPath && !path.isAbsolute(ffmpegPath)) {
 }
 
 // Diagnostic logs for debugging
-console.log('[MUSIC] FFmpeg path resolved:', ffmpegPath);
-console.log('[MUSIC] FFmpeg exists at resolved path:', existsSync(ffmpegPath));
+logger.info('FFmpeg path resolved', { ffmpegPath });
+logger.info('FFmpeg exists at resolved path', { ffmpegExists: existsSync(ffmpegPath) });
 logger.info('MusicManager initialization diagnostics', {
   originalFfmpegPath: ffmpeg,
   resolvedFfmpegPath: ffmpegPath,
@@ -42,14 +53,7 @@ logger.info('MusicManager initialization diagnostics', {
   nodeVersion: process.version,
   platform: process.platform
 });
-import { RateLimiterMemory } from 'rate-limiter-flexible';
-import SpotifyWebApi from 'spotify-web-api-node';
-import pkg from 'libsodium-wrappers';
 const { ready: sodiumReady } = pkg;
-
-// Import validation utilities
-import { inputValidator, sanitizeInput, validateString } from './validation.js';
-import { CommandError, handleCommandError } from './errorHandler.js';
 
 // Enhanced Music System with YouTube & Spotify Priority
 class MusicManager {
@@ -88,8 +92,8 @@ class MusicManager {
     // Rate limiter for YouTube API (10000 requests per day)
     this.youtubeRateLimiter = new RateLimiterMemory({
       keyPrefix: 'youtube_api',
-      points: 10000,
-      duration: 86400,
+      points: 10_000,
+      duration: 86_400,
     });
   }
 
@@ -120,7 +124,7 @@ class MusicManager {
 
     // Clean up history maps for inactive guilds
     for (const [guildId, history] of this.history.entries()) {
-      if (history.length === 0 || (now - history[history.length - 1]?.playedAt) > cleanupThreshold) {
+      if (history.length === 0 || (now - history.at(-1)?.playedAt) > cleanupThreshold) {
         this.history.delete(guildId);
         cleanedCount++;
       }
@@ -172,7 +176,7 @@ class MusicManager {
       if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET ||
           process.env.SPOTIFY_CLIENT_ID === 'your-spotify-client-id-here' ||
           process.env.SPOTIFY_CLIENT_SECRET === 'your-spotify-client-secret-here') {
-        console.log('[MUSIC] Spotify credentials not configured, skipping token refresh');
+        logger.info('Spotify credentials not configured, skipping token refresh');
         return;
       }
 
@@ -182,10 +186,11 @@ class MusicManager {
       // Refresh token before it expires
       const refreshTime = Math.max((data.body['expires_in'] - 60) * 1000, 60 * 1000); // At least 1 minute
       setTimeout(() => this.refreshSpotifyToken(), refreshTime);
-      console.log('[MUSIC] Spotify token refreshed successfully');
-    } catch (error) {
-      console.error('[MUSIC] Failed to refresh Spotify token:', error.message);
-      console.log('[MUSIC] Please check your Spotify API credentials in .env file');
+      logger.info('Spotify token refreshed successfully');
+    }
+    catch (error) {
+      logger.error('Failed to refresh Spotify token', error);
+      logger.warn('Please check Spotify API credentials in .env file');
       // Retry in 10 minutes for credential issues
       setTimeout(() => this.refreshSpotifyToken(), 10 * 60 * 1000);
     }
@@ -199,7 +204,7 @@ class MusicManager {
 
     const queue = this.queue.get(guildId);
     queue.push({
-      id: `song_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `song_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       ...song,
       addedBy: song.addedBy,
       addedAt: Date.now()
@@ -270,7 +275,7 @@ class MusicManager {
           }
         })
         .catch(error => {
-          console.error(`[MUSIC] Unexpected error playing previous song:`, error);
+          console.error('[MUSIC] Unexpected error playing previous song:', error);
           this.playNext(guildId);
         });
     }
@@ -295,7 +300,7 @@ class MusicManager {
 
   // Playlist Management
   createPlaylist(guildId, name, creatorId) {
-    const playlistId = `playlist_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const playlistId = `playlist_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const playlist = {
       id: playlistId,
@@ -323,7 +328,7 @@ class MusicManager {
     if (!playlist) return false;
 
     playlist.songs.push({
-      id: `playlist_song_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `playlist_song_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       ...song,
       addedAt: Date.now()
     });
@@ -336,63 +341,64 @@ class MusicManager {
     return settings?.playlists?.get(playlistId) || null;
   }
 
-   // Search and Discovery - YouTube & Spotify Priority with enhanced validation and caching
-   async searchSongs(query, limit = 10) {
-     try {
-       // Validate and sanitize input
-       if (!query || typeof query !== 'string') {
-         throw new CommandError('Search query must be a non-empty string', 'INVALID_ARGUMENT');
-       }
+  // Search and Discovery - YouTube & Spotify Priority with enhanced validation and caching
+  async searchSongs(query, limit = 10) {
+    try {
+      // Validate and sanitize input
+      if (!query || typeof query !== 'string') {
+        throw new CommandError('Search query must be a non-empty string', 'INVALID_ARGUMENT');
+      }
 
-       const sanitizedQuery = sanitizeInput(query.trim());
-       if (sanitizedQuery.length < 1) {
-         throw new CommandError('Search query is too short', 'INVALID_ARGUMENT');
-       }
+      const sanitizedQuery = sanitizeInput(query.trim());
+      if (sanitizedQuery.length === 0) {
+        throw new CommandError('Search query is too short', 'INVALID_ARGUMENT');
+      }
 
-       if (limit < 1 || limit > 50) {
-         limit = Math.max(1, Math.min(50, limit));
-       }
+      if (limit < 1 || limit > 50) {
+        limit = Math.max(1, Math.min(50, limit));
+      }
 
-       // Check cache first (simple in-memory cache for recent searches)
-       const cacheKey = `${sanitizedQuery}_${limit}`;
-       const cached = this.searchCache?.get(cacheKey);
-       if (cached && (Date.now() - cached.timestamp) < 300000) { // 5 minute cache
-         return cached.results;
-       }
+      // Check cache first (simple in-memory cache for recent searches)
+      const cacheKey = `${sanitizedQuery}_${limit}`;
+      const cached = this.searchCache?.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp) < 300_000) { // 5 minute cache
+        return cached.results;
+      }
 
-       const results = [];
+      const results = [];
 
-       // Check if query is a Spotify URL
-       const spotifyMatch = sanitizedQuery.match(/(?:spotify\.com\/track\/|spotify:track:)([a-zA-Z0-9]{22})/);
-       if (spotifyMatch) {
-         try {
-           await this.rateLimiter.consume('spotify_api');
-           const trackId = spotifyMatch[1];
-           const data = await this.spotifyApi.getTrack(trackId);
-           const track = data.body;
+      // Check if query is a Spotify URL
+      const spotifyMatch = sanitizedQuery.match(/(?:spotify\.com\/track\/|spotify:track:)([\dA-Za-z]{22})/);
+      if (spotifyMatch) {
+        try {
+          await this.rateLimiter.consume('spotify_api');
+          const trackId = spotifyMatch[1];
+          const data = await this.spotifyApi.getTrack(trackId);
+          const track = data.body;
 
-           if (track && track.name) {
-             const result = [{
-               title: sanitizeInput(track.name),
-               artist: sanitizeInput(track.artists.map(a => a.name).join(', ')),
-               duration: track.duration_ms ? `${Math.floor(track.duration_ms / 60000)}:${Math.floor((track.duration_ms % 60000) / 1000).toString().padStart(2, '0')}` : 'Unknown',
-               url: sanitizedQuery,
-               thumbnail: track.album?.images?.[0]?.url || '',
-               source: 'spotify',
-               spotifyId: track.id,
-               preview: track.preview_url || null
-             }];
+          if (track && track.name) {
+            const result = [{
+              title: sanitizeInput(track.name),
+              artist: sanitizeInput(track.artists.map(a => a.name).join(', ')),
+              duration: track.duration_ms ? `${Math.floor(track.duration_ms / 60_000)}:${Math.floor((track.duration_ms % 60_000) / 1000).toString().padStart(2, '0')}` : 'Unknown',
+              url: sanitizedQuery,
+              thumbnail: track.album?.images?.[0]?.url || '',
+              source: 'spotify',
+              spotifyId: track.id,
+              preview: track.preview_url || null
+            }];
 
-             // Cache the result
-             if (!this.searchCache) this.searchCache = new Map();
-             this.searchCache.set(cacheKey, { results: result, timestamp: Date.now() });
+            // Cache the result
+            if (!this.searchCache) this.searchCache = new Map();
+            this.searchCache.set(cacheKey, { results: result, timestamp: Date.now() });
 
-             return result;
-           }
-         } catch (urlError) {
-           logger.error('Spotify URL validation failed', urlError, { query: sanitizedQuery });
-         }
-       }
+            return result;
+          }
+        }
+        catch (urlError) {
+          logger.error('Spotify URL validation failed', urlError, { query: sanitizedQuery });
+        }
+      }
 
       // Check if query is a YouTube URL (high priority)
       if (ytdl.validateURL(query)) {
@@ -400,49 +406,50 @@ class MusicManager {
           await this.youtubeRateLimiter.consume('youtube_api');
 
           // Add retry logic for YouTube API issues
-                let info;
-                for (let attempt = 1; attempt <= 3; attempt++) {
-                  try {
-                    const modernHeaders = {
-                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                      'Accept-Language': 'en-US,en;q=0.9',
-                      'Accept-Encoding': 'gzip, deflate, br',
-                      'Cache-Control': 'max-age=0',
-                      'Sec-Fetch-Dest': 'document',
-                      'Sec-Fetch-Mode': 'navigate',
-                      'Sec-Fetch-Site': 'none',
-                      'Sec-Fetch-User': '?1',
-                      'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-                      'Sec-Ch-Ua-Mobile': '?0',
-                      'Sec-Ch-Ua-Platform': '"Windows"',
-                      'Upgrade-Insecure-Requests': '1'
-                    };
+          let info;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              const modernHeaders = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Cache-Control': 'max-age=0',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"Windows"',
+                'Upgrade-Insecure-Requests': '1'
+              };
 
-                    logger.debug('YouTube getInfo attempt with modern headers', {
-                      attempt,
-                      query,
-                      userAgent: modernHeaders['User-Agent']
-                    });
+              logger.debug('YouTube getInfo attempt with modern headers', {
+                attempt,
+                query,
+                userAgent: modernHeaders['User-Agent']
+              });
 
-                    info = await ytdl.getInfo(query, {
-                      requestOptions: {
-                        headers: modernHeaders
-                      }
-                    });
-                    break; // Success, exit retry loop
-                  } catch (retryError) {
-                    console.log(`[MUSIC] YouTube attempt ${attempt} failed for ${query}: ${retryError.message}`);
-                    logger.warn('YouTube getInfo retry failed', {
-                      attempt,
-                      query,
-                      error: retryError.message,
-                      stack: retryError.stack
-                    });
-                    if (attempt === 3) throw retryError;
-                    await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Wait longer before retry
-                  }
+              info = await ytdl.getInfo(query, {
+                requestOptions: {
+                  headers: modernHeaders
                 }
+              });
+              break; // Success, exit retry loop
+            }
+            catch (retryError) {
+              console.log(`[MUSIC] YouTube attempt ${attempt} failed for ${query}: ${retryError.message}`);
+              logger.warn('YouTube getInfo retry failed', {
+                attempt,
+                query,
+                error: retryError.message,
+                stack: retryError.stack
+              });
+              if (attempt === 3) throw retryError;
+              await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Wait longer before retry
+            }
+          }
 
           const video = info.videoDetails;
 
@@ -460,7 +467,8 @@ class MusicManager {
             source: 'youtube',
             youtubeId: video.videoId
           }];
-        } catch (urlError) {
+        }
+        catch (urlError) {
           console.error(`[MUSIC] YouTube URL validation failed for ${query}:`, urlError.message);
           // Try to extract basic info without full validation
           try {
@@ -478,8 +486,9 @@ class MusicManager {
                 youtubeId: videoId
               }];
             }
-          } catch (fallbackError) {
-            console.error(`[MUSIC] YouTube fallback failed:`, fallbackError.message);
+          }
+          catch (fallbackError) {
+            console.error('[MUSIC] YouTube fallback failed:', fallbackError.message);
           }
           return [];
         }
@@ -503,7 +512,8 @@ class MusicManager {
               preview: track.preview || null
             }];
           }
-        } catch (urlError) {
+        }
+        catch (urlError) {
           console.error(`[MUSIC] Deezer URL validation failed for ${query}:`, urlError.message);
           return [];
         }
@@ -536,11 +546,13 @@ class MusicManager {
                     youtubeId: video.videoId
                   });
                 }
-              } else {
+              }
+              else {
                 logger.debug('Skipping invalid YouTube URL', { url: video.url });
               }
             }
-          } catch (videoError) {
+          }
+          catch (videoError) {
             logger.debug('Skipping unavailable video', {
               title: video.title,
               url: video.url,
@@ -561,7 +573,8 @@ class MusicManager {
 
           return validVideos;
         }
-      } catch (error) {
+      }
+      catch (error) {
         logger.error('YouTube search failed', error, { query: sanitizedQuery });
         // Try with different search options
         try {
@@ -599,7 +612,8 @@ class MusicManager {
 
             return validVideos;
           }
-        } catch (retryError) {
+        }
+        catch (retryError) {
           logger.error('YouTube retry search failed', retryError, { query: sanitizedQuery });
         }
       }
@@ -621,7 +635,7 @@ class MusicManager {
           const results = tracks.map(track => ({
             title: sanitizeInput(track.name),
             artist: sanitizeInput(track.artists.map(a => a.name).join(', ')),
-            duration: track.duration_ms ? `${Math.floor(track.duration_ms / 60000)}:${Math.floor((track.duration_ms % 60000) / 1000).toString().padStart(2, '0')}` : 'Unknown',
+            duration: track.duration_ms ? `${Math.floor(track.duration_ms / 60_000)}:${Math.floor((track.duration_ms % 60_000) / 1000).toString().padStart(2, '0')}` : 'Unknown',
             url: track.external_urls.spotify,
             thumbnail: track.album?.images?.[0]?.url || '',
             source: 'spotify',
@@ -640,10 +654,12 @@ class MusicManager {
 
           return results;
         }
-      } catch (error) {
+      }
+      catch (error) {
         if (error.message.includes('No token provided') || error.message.includes('invalid_client')) {
           logger.debug('Spotify credentials not configured or invalid, skipping Spotify search');
-        } else {
+        }
+        else {
           logger.error('Spotify search failed', error, { query: sanitizedQuery });
         }
       }
@@ -674,13 +690,15 @@ class MusicManager {
 
           return results;
         }
-      } catch (error) {
+      }
+      catch (error) {
         logger.error('Deezer legacy search failed', error, { query: sanitizedQuery });
       }
 
       logger.warn('No search results found', { query: sanitizedQuery });
       return [];
-    } catch (error) {
+    }
+    catch (error) {
       logger.error('Music search error', error, { query: typeof query === 'string' ? query : 'invalid' });
       throw new CommandError('Failed to search for songs. Please try again.', 'API_ERROR');
     }
@@ -703,7 +721,7 @@ class MusicManager {
     // Check cache first
     const cacheKey = `validate_${url}`;
     const cached = this.validationCache?.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp) < 600000) { // 10 minute cache
+    if (cached && (Date.now() - cached.timestamp) < 600_000) { // 10 minute cache
       return cached.result;
     }
 
@@ -712,7 +730,7 @@ class MusicManager {
         // For Spotify, check if track exists and has preview
         try {
           await this.rateLimiter.consume('spotify_api');
-          const trackId = song.spotifyId || url.match(/spotify\.com\/track\/([a-zA-Z0-9]{22})/)?.[1];
+          const trackId = song.spotifyId || url.match(/spotify\.com\/track\/([\dA-Za-z]{22})/)?.[1];
           if (trackId) {
             const data = await this.spotifyApi.getTrack(trackId);
             if (data.body && data.body.name) {
@@ -727,7 +745,8 @@ class MusicManager {
             }
           }
           throw new Error('Track not found');
-        } catch (error) {
+        }
+        catch (error) {
           logger.error('Spotify URL validation failed', error, { title, url });
           return {
             valid: false,
@@ -735,7 +754,8 @@ class MusicManager {
             canFallback: true
           };
         }
-      } else if (song.source === 'deezer') {
+      }
+      else if (song.source === 'deezer') {
         // For Deezer, check if track exists (legacy support)
         try {
           const trackId = url.match(/deezer\.com\/track\/(\d+)/)?.[1];
@@ -750,7 +770,8 @@ class MusicManager {
             }
           }
           throw new Error('Track not found');
-        } catch (error) {
+        }
+        catch (error) {
           logger.error('Deezer URL validation failed', error, { title, url });
           return {
             valid: false,
@@ -758,65 +779,68 @@ class MusicManager {
             canFallback: true
           };
         }
-      } else if (ytdl.validateURL(url)) {
+      }
+      else if (ytdl.validateURL(url)) {
         try {
           await this.youtubeRateLimiter.consume('youtube_api');
 
           // Add retry logic for YouTube validation with modern headers
-           let info;
-           for (let attempt = 1; attempt <= 3; attempt++) {
-             try {
-               const modernHeaders = {
-                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                 'Accept-Language': 'en-US,en;q=0.9',
-                 'Accept-Encoding': 'gzip, deflate, br',
-                 'Cache-Control': 'max-age=0',
-                 'Sec-Fetch-Dest': 'document',
-                 'Sec-Fetch-Mode': 'navigate',
-                 'Sec-Fetch-Site': 'none',
-                 'Sec-Fetch-User': '?1',
-                 'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-                 'Sec-Ch-Ua-Mobile': '?0',
-                 'Sec-Ch-Ua-Platform': '"Windows"',
-                 'Upgrade-Insecure-Requests': '1'
-               };
+          let info;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              const modernHeaders = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Cache-Control': 'max-age=0',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"Windows"',
+                'Upgrade-Insecure-Requests': '1'
+              };
 
-               logger.debug('YouTube validation getInfo attempt with modern headers', {
-                 attempt,
-                 title,
-                 url,
-                 userAgent: modernHeaders['User-Agent']
-               });
+              logger.debug('YouTube validation getInfo attempt with modern headers', {
+                attempt,
+                title,
+                url,
+                userAgent: modernHeaders['User-Agent']
+              });
 
-               info = await ytdl.getInfo(url, {
-                 requestOptions: {
-                   headers: modernHeaders
-                 }
-               });
-               break; // Success, exit retry loop
-             } catch (retryError) {
-           logger.debug(`YouTube validation attempt ${attempt} failed`, {
-             title,
-             url,
-             error: retryError.message,
-             errorCode: retryError.code
-           });
+              info = await ytdl.getInfo(url, {
+                requestOptions: {
+                  headers: modernHeaders
+                }
+              });
+              break; // Success, exit retry loop
+            }
+            catch (retryError) {
+              logger.debug(`YouTube validation attempt ${attempt} failed`, {
+                title,
+                url,
+                error: retryError.message,
+                errorCode: retryError.code
+              });
 
-           // Check if it's the specific YouTube parsing error and handle gracefully
-           if (retryError.message && retryError.message.includes('Error when parsing watch.html')) {
-               logger.warn('YouTube parsing error detected - this may be due to YouTube API changes. Attempting fallback.');
-               // Continue to next attempt or throw if this was the last attempt
-               if (attempt === 3) {
-                   // Create a more user-friendly error
-                   const userError = new Error(`YouTube search temporarily unavailable due to API changes. Please try again later or use a direct URL.`);
-                   userError.code = 'YOUTUBE_API_ERROR';
-                   throw userError;
-               }
-           } else if (attempt === 3) throw retryError;
-               await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Wait longer before retry
-             }
-           }
+              // Check if it's the specific YouTube parsing error and handle gracefully
+              if (retryError.message && retryError.message.includes('Error when parsing watch.html')) {
+                logger.warn('YouTube parsing error detected - this may be due to YouTube API changes. Attempting fallback.');
+                // Continue to next attempt or throw if this was the last attempt
+                if (attempt === 3) {
+                  // Create a more user-friendly error
+                  const userError = new Error('YouTube search temporarily unavailable due to API changes. Please try again later or use a direct URL.');
+                  userError.code = 'YOUTUBE_API_ERROR';
+                  throw userError;
+                }
+              }
+              else if (attempt === 3) throw retryError;
+              await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Wait longer before retry
+            }
+          }
 
           const video = info.videoDetails;
 
@@ -833,7 +857,8 @@ class MusicManager {
           if (!this.validationCache) this.validationCache = new Map();
           this.validationCache.set(cacheKey, { result, timestamp: Date.now() });
           return result;
-        } catch (error) {
+        }
+        catch (error) {
           logger.error('YouTube URL validation failed', error, { title, url });
           return {
             valid: false,
@@ -850,7 +875,8 @@ class MusicManager {
       this.validationCache.set(cacheKey, { result, timestamp: Date.now() });
       return result;
 
-    } catch (error) {
+    }
+    catch (error) {
       logger.error('Song URL validation error', error, { title, url, source: song.source });
       return {
         valid: false,
@@ -876,20 +902,23 @@ class MusicManager {
     try {
       const sodiumModule = await import('sodium');
       logger.debug(`Sodium available: ${!!sodiumModule.default}`);
-    } catch (e) {
-      logger.debug(`Sodium error: ${e.message}`);
+    }
+    catch (error) {
+      logger.debug(`Sodium error: ${error.message}`);
     }
     try {
       const tweetnaclModule = await import('tweetnacl');
       logger.debug(`TweetNaCl available: ${!!tweetnaclModule.default}`);
-    } catch (e) {
-      logger.debug(`TweetNaCl error: ${e.message}`);
+    }
+    catch (error) {
+      logger.debug(`TweetNaCl error: ${error.message}`);
     }
     try {
       await sodiumReady;
       logger.debug('libsodium-wrappers loaded');
-    } catch (e) {
-      logger.debug(`libsodium-wrappers error: ${e.message}`);
+    }
+    catch (error) {
+      logger.debug(`libsodium-wrappers error: ${error.message}`);
     }
 
     const currentVolume = this.getVolume(guildId) / 100;
@@ -957,7 +986,8 @@ class MusicManager {
           player.play(resource);
 
           return { success: true };
-        } else {
+        }
+        else {
           // No preview available, try to find YouTube version as fallback
           console.log(`[MUSIC] No Spotify preview available for "${song.title}", attempting YouTube fallback`);
           logger.info('No Spotify preview, attempting YouTube fallback', {
@@ -991,7 +1021,8 @@ class MusicManager {
             errorType: 'no_preview'
           };
         }
-      } catch (streamError) {
+      }
+      catch (streamError) {
         console.error(`[MUSIC] Spotify stream error for "${song.title}":`, streamError.message);
         logger.error('Spotify stream creation failed', {
           guildId,
@@ -1005,7 +1036,8 @@ class MusicManager {
           errorType: 'spotify_stream'
         };
       }
-    } else if (song.source === 'deezer') {
+    }
+    else if (song.source === 'deezer') {
       // For Deezer tracks, try to use preview URL if available, fallback to test audio
       let streamUrl;
       if (song.preview) {
@@ -1014,7 +1046,8 @@ class MusicManager {
           guildId,
           songTitle: song.title
         });
-      } else {
+      }
+      else {
         streamUrl = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
         logger.debug(`Stream URL for Deezer (TEST MODE - no preview): ${streamUrl}`, {
           guildId,
@@ -1088,7 +1121,8 @@ class MusicManager {
 
         return { success: true };
 
-      } catch (streamError) {
+      }
+      catch (streamError) {
         console.error(`[MUSIC] Deezer stream error for "${song.title}":`, streamError.message);
         logger.error('Deezer stream creation failed', {
           guildId,
@@ -1115,7 +1149,8 @@ class MusicManager {
           errorType: 'deezer_stream'
         };
       }
-    } else if (ytdl.validateURL(song.url)) {
+    }
+    else if (ytdl.validateURL(song.url)) {
       console.log(`[MUSIC] Creating ytdl stream for YouTube URL: ${song.title}`);
       logger.debug(`Stream URL for YouTube: ${song.url}`);
       logger.info('Starting YouTube stream creation', {
@@ -1158,30 +1193,30 @@ class MusicManager {
         }
 
         const ytdlStream = ytdl(song.url, {
-           filter: 'audioonly',
-           highWaterMark: 1 << 62,
-           dlChunkSize: 0,
-           bitrate: 128,
-           quality: 'lowestaudio',
-           requestOptions: {
-             headers: {
-               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-               'Accept-Language': 'en-US,en;q=0.9',
-               'Accept-Encoding': 'gzip, deflate, br',
-               'Cache-Control': 'max-age=0',
-               'Connection': 'keep-alive',
-               'Sec-Fetch-Dest': 'document',
-               'Sec-Fetch-Mode': 'navigate',
-               'Sec-Fetch-Site': 'none',
-               'Sec-Fetch-User': '?1',
-               'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-               'Sec-Ch-Ua-Mobile': '?0',
-               'Sec-Ch-Ua-Platform': '"Windows"',
-               'Upgrade-Insecure-Requests': '1'
-             }
-           }
-         });
+          filter: 'audioonly',
+          highWaterMark: 1 << 62,
+          dlChunkSize: 0,
+          bitrate: 128,
+          quality: 'lowestaudio',
+          requestOptions: {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Cache-Control': 'max-age=0',
+              'Connection': 'keep-alive',
+              'Sec-Fetch-Dest': 'document',
+              'Sec-Fetch-Mode': 'navigate',
+              'Sec-Fetch-Site': 'none',
+              'Sec-Fetch-User': '?1',
+              'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+              'Sec-Ch-Ua-Mobile': '?0',
+              'Sec-Ch-Ua-Platform': '"Windows"',
+              'Upgrade-Insecure-Requests': '1'
+            }
+          }
+        });
 
         // Set up comprehensive error handling for ytdl stream
         let streamError = null;
@@ -1211,32 +1246,32 @@ class MusicManager {
         });
 
         // Transcode to Opus using ffmpeg
-         logger.debug('Spawning FFmpeg for YouTube audio transcoding', {
-           guildId,
-           songTitle: song.title,
-           ffmpegPath: ffmpegPath,
-           ffmpegExists: existsSync(ffmpegPath),
-           ffmpegArgs: [
-             '-hide_banner',
-             '-loglevel', 'error',
-             '-analyzeduration', '0',
-             '-i', 'pipe:0',
-             '-f', 's16le',
-             '-ar', '48000',
-             '-ac', '2',
-             'pipe:1'
-           ]
-         });
-         const ffmpegProcess = spawn(ffmpegPath, [
-           '-hide_banner',
-           '-loglevel', 'error',
-           '-analyzeduration', '0',
-           '-i', 'pipe:0',
-           '-f', 's16le',
-           '-ar', '48000',
-           '-ac', '2',
-           'pipe:1'
-         ]);
+        logger.debug('Spawning FFmpeg for YouTube audio transcoding', {
+          guildId,
+          songTitle: song.title,
+          ffmpegPath: ffmpegPath,
+          ffmpegExists: existsSync(ffmpegPath),
+          ffmpegArgs: [
+            '-hide_banner',
+            '-loglevel', 'error',
+            '-analyzeduration', '0',
+            '-i', 'pipe:0',
+            '-f', 's16le',
+            '-ar', '48000',
+            '-ac', '2',
+            'pipe:1'
+          ]
+        });
+        const ffmpegProcess = spawn(ffmpegPath, [
+          '-hide_banner',
+          '-loglevel', 'error',
+          '-analyzeduration', '0',
+          '-i', 'pipe:0',
+          '-f', 's16le',
+          '-ar', '48000',
+          '-ac', '2',
+          'pipe:1'
+        ]);
 
         // Handle ffmpeg process errors
         ffmpegProcess.stderr.on('data', (data) => {
@@ -1251,21 +1286,24 @@ class MusicManager {
               songTitle: song.title,
               errorMsg
             });
-          } else if (errorMsg.includes('No such file or directory')) {
+          }
+          else if (errorMsg.includes('No such file or directory')) {
             logger.error('FFmpeg binary not found', {
               guildId,
               songTitle: song.title,
               ffmpegPath: ffmpeg,
               errorMsg
             });
-          } else if (errorMsg.includes('Permission denied')) {
+          }
+          else if (errorMsg.includes('Permission denied')) {
             logger.error('FFmpeg permission denied', {
               guildId,
               songTitle: song.title,
               ffmpegPath: ffmpeg,
               errorMsg
             });
-          } else {
+          }
+          else {
             logger.warn('FFmpeg stderr output', {
               guildId,
               songTitle: song.title,
@@ -1374,10 +1412,10 @@ class MusicManager {
           logger.warn('YouTube playback start timeout', {
             guildId,
             songTitle: song.title,
-            timeout: 30000,
+            timeout: 30_000,
             timestamp: new Date().toISOString()
           });
-        }, 30000);
+        }, 30_000);
 
         player.once(AudioPlayerStatus.Playing, () => {
           clearTimeout(playbackTimeout);
@@ -1395,12 +1433,12 @@ class MusicManager {
           logger.error('YouTube playback timeout exceeded', {
             guildId,
             songTitle: song.title,
-            timeoutDuration: 30000,
+            timeoutDuration: 30_000,
             timestamp: new Date().toISOString()
           });
           // Stop the player to prevent hanging
           player.stop(true);
-        }, 30000);
+        }, 30_000);
 
         player.once(AudioPlayerStatus.Playing, () => {
           clearTimeout(timeoutId);
@@ -1410,7 +1448,8 @@ class MusicManager {
 
         return { success: true };
 
-      } catch (streamError) {
+      }
+      catch (streamError) {
         const errorDuration = Date.now() - startTime;
         console.error(`[MUSIC] Stream creation error for "${song.title}" after ${errorDuration}ms:`, streamError.message);
         logger.error('YouTube stream creation failed', {
@@ -1443,7 +1482,8 @@ class MusicManager {
           errorType: 'stream_creation'
         };
       }
-    } else {
+    }
+    else {
       // For direct stream URLs (like radio)
       console.log(`[MUSIC] Creating direct stream for URL: ${song.title}`);
       logger.debug(`Stream URL for direct: ${song.url}`);
@@ -1503,7 +1543,8 @@ class MusicManager {
               errorMsg,
               ffmpegPath: ffmpegPath
             });
-          } else {
+          }
+          else {
             logger.warn('FFmpeg direct stderr', {
               guildId,
               songTitle: song.title,
@@ -1538,7 +1579,8 @@ class MusicManager {
 
         return { success: true };
 
-      } catch (streamError) {
+      }
+      catch (streamError) {
         console.error(`[MUSIC] Direct stream error for "${song.title}":`, streamError.message);
         logger.error('Direct stream creation failed', {
           guildId,
@@ -1602,9 +1644,11 @@ class MusicManager {
         });
         try {
           await entersState(connection, VoiceConnectionStatus.Ready, 5000);
-        } catch (_) {}
+        }
+        catch {}
         console.log(`[MUSIC] Joined voice channel, connection status: ${connection.state.status}`);
-      } else if (connection.state.status === 'connecting') {
+      }
+      else if (connection.state.status === 'connecting') {
         // Wait a moment for connection to stabilize
         await new Promise(resolve => setTimeout(resolve, 2000));
         const updatedConnection = getVoiceConnection(guildId);
@@ -1615,7 +1659,7 @@ class MusicManager {
 
       // Ensure connection stability
       if (!this.ensureConnectionStability(guildId)) {
-        console.log(`[MUSIC] Connection unstable, attempting reconnection`);
+        console.log('[MUSIC] Connection unstable, attempting reconnection');
         logger.warn('Connection instability detected, attempting reconnection', {
           guildId,
           voiceChannelId: voiceChannel.id,
@@ -1691,7 +1735,8 @@ class MusicManager {
       try {
         connection.subscribe(player);
         logger.debug('Ensured audio player subscription', { guildId });
-      } catch (subscriptionError) {
+      }
+      catch (subscriptionError) {
         logger.error('Failed to subscribe audio player to connection', {
           guildId,
           error: subscriptionError.message
@@ -1743,7 +1788,8 @@ class MusicManager {
                 fallbackUrl: fallbackResults[0].url
               });
               song = fallbackResults[0];
-            } else {
+            }
+            else {
               logger.error('No suitable fallback found', {
                 guildId,
                 fallbackResultsCount: fallbackResults.length
@@ -1754,7 +1800,8 @@ class MusicManager {
                 errorType: 'validation_failed'
               };
             }
-          } catch (fallbackError) {
+          }
+          catch (fallbackError) {
             console.error('[MUSIC] Fallback search failed:', fallbackError.message);
             logger.error('Fallback search failed', {
               guildId,
@@ -1767,7 +1814,8 @@ class MusicManager {
               errorType: 'validation_failed'
             };
           }
-        } else {
+        }
+        else {
           logger.error('Song validation failed with no fallback possible', {
             guildId,
             songTitle: song.title,
@@ -1779,7 +1827,8 @@ class MusicManager {
             errorType: 'validation_failed'
           };
         }
-      } else {
+      }
+      else {
         logger.debug('Song validation successful', {
           guildId,
           songTitle: song.title,
@@ -1824,7 +1873,8 @@ class MusicManager {
           voiceConnectionState: connection.state.status
         });
         return { success: true, song };
-      } else {
+      }
+      else {
         // Handle playback failure
         logger.error('Playback failed in playWithErrorHandling', {
           guildId,
@@ -1835,7 +1885,8 @@ class MusicManager {
         return this.handlePlaybackError(guildId, new Error(playResult.error), playResult.errorType);
       }
 
-    } catch (error) {
+    }
+    catch (error) {
       console.error(`[MUSIC] Play music error for guild ${guildId}:`, error);
       logger.error('Unexpected error in play method', {
         guildId,
@@ -1871,7 +1922,7 @@ class MusicManager {
       audioPlayerStatus: this.audioPlayers.get(guildId)?.state?.status || 'no_player'
     };
 
-    console.error(`[MUSIC] Error details:`, JSON.stringify(errorDetails, null, 2));
+    console.error('[MUSIC] Error details:', JSON.stringify(errorDetails, null, 2));
     logger.error('Detailed playback error information', errorDetails);
 
     // Attempt to recover from FFmpeg issues
@@ -1893,7 +1944,8 @@ class MusicManager {
           // Re-subscribe connection
           connection.subscribe(player);
           logger.info('Player and connection reset for recovery', { guildId });
-        } catch (resetError) {
+        }
+        catch (resetError) {
           logger.error('Failed to reset player/connection', {
             guildId,
             resetError: resetError.message
@@ -1905,7 +1957,7 @@ class MusicManager {
     // Check if we should skip to next song
     const queue = this.getQueue(guildId);
     if (queue.length > 0) {
-      console.log(`[MUSIC] Skipping to next song in queue due to error`);
+      console.log('[MUSIC] Skipping to next song in queue due to error');
       logger.info('Skipping to next song due to playback error', {
         guildId,
         errorType,
@@ -1917,8 +1969,9 @@ class MusicManager {
         error: `Playback failed: ${error.message}. Skipping to next song.`,
         errorType: 'skipped_to_next'
       };
-    } else {
-      console.log(`[MUSIC] No songs in queue, stopping playback`);
+    }
+    else {
+      console.log('[MUSIC] No songs in queue, stopping playback');
       logger.info('Stopping playback due to error with no queue', {
         guildId,
         errorType
@@ -2028,8 +2081,9 @@ class MusicManager {
           voiceChannelName: voiceChannel.name
         });
         return newConnection;
-      } catch (stateError) {
-        console.error(`[MUSIC] Failed to reach ready state after reconnection:`, stateError.message);
+      }
+      catch (stateError) {
+        console.error('[MUSIC] Failed to reach ready state after reconnection:', stateError.message);
         logger.error('Failed to reach ready state after reconnection', {
           guildId,
           voiceChannelName: voiceChannel.name,
@@ -2038,8 +2092,9 @@ class MusicManager {
         newConnection.destroy();
         return null;
       }
-    } catch (error) {
-      console.error(`[MUSIC] Failed to reconnect to voice channel:`, error);
+    }
+    catch (error) {
+      console.error('[MUSIC] Failed to reconnect to voice channel:', error);
       logger.error('Voice channel reconnection failed', {
         guildId,
         voiceChannelId: voiceChannel.id,
@@ -2061,7 +2116,8 @@ class MusicManager {
         await entersState(altConnection, VoiceConnectionStatus.Ready, 3000); // Shorter timeout
         logger.info('Alternative reconnection successful', { guildId });
         return altConnection;
-      } catch (altError) {
+      }
+      catch (altError) {
         logger.error('Alternative reconnection also failed', {
           guildId,
           error: altError.message
@@ -2071,7 +2127,6 @@ class MusicManager {
       return null;
     }
   }
-
 
   // Simplified Music Controls
   pause(guildId) {
@@ -2101,14 +2156,16 @@ class MusicManager {
       try {
         player.pause();
         logger.debug('Audio player paused successfully', { guildId });
-      } catch (error) {
+      }
+      catch (error) {
         logger.error('Failed to pause audio player', {
           guildId,
           error: error.message
         });
         return false;
       }
-    } else {
+    }
+    else {
       logger.warn('No audio player found to pause', { guildId });
       return false;
     }
@@ -2145,14 +2202,16 @@ class MusicManager {
       try {
         player.unpause();
         logger.debug('Audio player resumed successfully', { guildId });
-      } catch (error) {
+      }
+      catch (error) {
         logger.error('Failed to resume audio player', {
           guildId,
           error: error.message
         });
         return false;
       }
-    } else {
+    }
+    else {
       logger.warn('No audio player found to resume', { guildId });
       return false;
     }
@@ -2190,11 +2249,12 @@ class MusicManager {
             }
           })
           .catch(error => {
-            console.error(`[MUSIC] Unexpected error skipping to song:`, error);
+            console.error('[MUSIC] Unexpected error skipping to song:', error);
             this.playNext(guildId);
           });
-      } else {
-        console.error(`[MUSIC] No voice connection available for skip`);
+      }
+      else {
+        console.error('[MUSIC] No voice connection available for skip');
         return false;
       }
     }
@@ -2232,17 +2292,20 @@ class MusicManager {
     let nextSong;
     if (loopMode === 'single' && currentSong) {
       nextSong = currentSong;
-    } else if (queue.length === 0) {
+    }
+    else if (queue.length === 0) {
       if (loopMode === 'queue' && currentSong) {
         // Add current back to queue and play it
         this.addToQueue(guildId, currentSong);
         nextSong = currentSong;
-      } else {
+      }
+      else {
         this.currentlyPlaying.delete(guildId);
         this.isPlaying.set(guildId, false);
         return false;
       }
-    } else {
+    }
+    else {
       nextSong = queue.shift();
       if (loopMode === 'queue' && currentSong) {
         this.addToQueue(guildId, currentSong);
@@ -2269,12 +2332,13 @@ class MusicManager {
           }
         })
         .catch(error => {
-          console.error(`[MUSIC] Unexpected error playing next song:`, error);
+          console.error('[MUSIC] Unexpected error playing next song:', error);
           // Try to play the song after next
           setTimeout(() => this.playNext(guildId), 1000);
         });
-    } else {
-      console.error(`[MUSIC] No player or connection available for playNext`);
+    }
+    else {
+      console.error('[MUSIC] No player or connection available for playNext');
       this.currentlyPlaying.delete(guildId);
       this.isPlaying.set(guildId, false);
       return false;
@@ -2306,12 +2370,14 @@ class MusicManager {
               if (resource && resource.volume) {
                 resource.volume.setVolume(newVolume);
               }
-            } else {
+            }
+            else {
               console.error(`[MUSIC] Failed to update volume for "${currentSong.title}":`, playResult.error);
             }
           }
-        } catch (error) {
-          console.error(`[MUSIC] Error updating volume:`, error);
+        }
+        catch (error) {
+          console.error('[MUSIC] Error updating volume:', error);
           // Don't fail the volume change, just log the error
         }
       }
@@ -2373,7 +2439,8 @@ class MusicManager {
             source: 'Lyrics.ovh'
           };
         }
-      } catch (apiError) {
+      }
+      catch {
         console.log('Lyrics.ovh API failed, trying alternative');
       }
 
@@ -2382,17 +2449,18 @@ class MusicManager {
         title: songTitle,
         artist,
         lyrics: `🎵 **Lyrics for "${songTitle}" by ${artist}**\n\n` +
-                `Lyrics are not currently available for this song.\n\n` +
-                `**To find lyrics, try:**\n` +
+                'Lyrics are not currently available for this song.\n\n' +
+                '**To find lyrics, try:**\n' +
                 `• 🎤 Search on Genius: https://genius.com/search?q=${encodeURIComponent(searchQuery)}\n` +
                 `• 📝 Search on AZLyrics: https://www.azlyrics.com/lyrics/${encodeURIComponent(artist.toLowerCase())}/${encodeURIComponent(songTitle.toLowerCase())}.html\n` +
-                `• 🎧 Use Spotify or YouTube Music for synced lyrics\n` +
-                `• 📱 Check the official music video on YouTube\n\n` +
-                `💡 *Full lyrics integration would require API keys from Genius, Musixmatch, or similar services*`,
+                '• 🎧 Use Spotify or YouTube Music for synced lyrics\n' +
+                '• 📱 Check the official music video on YouTube\n\n' +
+                '💡 *Full lyrics integration would require API keys from Genius, Musixmatch, or similar services*',
         source: 'Search Suggestions',
         note: 'Consider upgrading to premium music services for synced lyrics'
       };
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Lyrics fetch error:', error);
       return {
         title: songTitle,

@@ -1,5 +1,6 @@
-import { searchSongs, play, pause, resume, skip, stop, getQueue, getMusicStats, setVolume, getVolume } from '../src/music.js';
 import axios from 'axios';
+
+import { searchSongs, play, pause, resume, skip, stop, getQueue, getMusicStats, setVolume, getVolume } from '../src/music.js';
 
 class MusicTestSuite {
   constructor() {
@@ -44,17 +45,14 @@ class MusicTestSuite {
           const hasRequiredFields = result.title && result.artist && result.url && result.source === 'deezer';
           await this.log(`Deezer result has required fields: ${hasRequiredFields}`, hasRequiredFields);
         }
-      } else {
+      }
+      else {
         await this.log('Deezer search returned no results', false);
       }
 
       // Test 2: Deezer URL search
       const urlResults = await searchSongs('https://www.deezer.com/track/3135556', 1);
-      if (urlResults.length > 0) {
-        await this.log(`Deezer URL search successful: ${urlResults[0].title}`);
-      } else {
-        await this.log('Deezer URL search failed', false);
-      }
+      await (urlResults.length > 0 ? this.log(`Deezer URL search successful: ${urlResults[0].title}`) : this.log('Deezer URL search failed', false));
 
       // Test 3: Rate limiting (should handle gracefully)
       const rateLimitResults = [];
@@ -64,7 +62,8 @@ class MusicTestSuite {
       }
       await this.log(`Rate limiting test completed: ${rateLimitResults.join(', ')} requests`);
 
-    } catch (error) {
+    }
+    catch (error) {
       await this.logError('Deezer search test failed', error);
     }
   }
@@ -81,13 +80,10 @@ class MusicTestSuite {
 
       // Test 2: YouTube URL search
       const ytResults = await searchSongs('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 1);
-      if (ytResults.length > 0) {
-        await this.log(`YouTube URL search successful: ${ytResults[0].title}`);
-      } else {
-        await this.log('YouTube URL search failed', false);
-      }
+      await (ytResults.length > 0 ? this.log(`YouTube URL search successful: ${ytResults[0].title}`) : this.log('YouTube URL search failed', false));
 
-    } catch (error) {
+    }
+    catch (error) {
       await this.logError('YouTube fallback test failed', error);
     }
   }
@@ -117,7 +113,8 @@ class MusicTestSuite {
       const updatedStats = getMusicStats(this.guildId);
       await this.log(`Music stats retrieved: ${typeof updatedStats === 'object'}`);
 
-    } catch (error) {
+    }
+    catch (error) {
       await this.logError('Queue management test failed', error);
     }
   }
@@ -141,7 +138,8 @@ class MusicTestSuite {
       const specialCharResults = await searchSongs('!@#$%^&*()', 1);
       await this.log(`Special characters handled: ${Array.isArray(specialCharResults)}`);
 
-    } catch (error) {
+    }
+    catch (error) {
       await this.logError('Error handling test failed', error);
     }
   }
@@ -158,13 +156,10 @@ class MusicTestSuite {
 
       for (const url of testUrls) {
         const results = await searchSongs(url, 1);
-        if (results.length > 0) {
-          await this.log(`Direct URL supported: ${url}`);
-        } else {
-          await this.log(`Direct URL failed: ${url}`, false);
-        }
+        await (results.length > 0 ? this.log(`Direct URL supported: ${url}`) : this.log(`Direct URL failed: ${url}`, false));
       }
-    } catch (error) {
+    }
+    catch (error) {
       await this.logError('Direct URL test failed', error);
     }
   }
@@ -196,7 +191,8 @@ class MusicTestSuite {
       const currentLoop = getLoop(this.guildId);
       await this.log(`Loop mode retrieved: ${currentLoop === 'single'}`);
 
-    } catch (error) {
+    }
+    catch (error) {
       await this.logError('Music controls test failed', error);
     }
   }
@@ -206,21 +202,14 @@ class MusicTestSuite {
     try {
       // Test Deezer API connectivity
       const deezerResponse = await axios.get('https://api.deezer.com/track/3135556', { timeout: 5000 });
-      if (deezerResponse.data && deezerResponse.data.title) {
-        await this.log(`Deezer API connectivity: ✅ Connected`);
-      } else {
-        await this.log(`Deezer API connectivity: ❌ Invalid response`, false);
-      }
+      await (deezerResponse.data && deezerResponse.data.title ? this.log('Deezer API connectivity: ✅ Connected') : this.log('Deezer API connectivity: ❌ Invalid response', false));
 
       // Test YouTube search functionality
       const ytResponse = await axios.get('https://www.youtube.com/', { timeout: 5000 });
-      if (ytResponse.status === 200) {
-        await this.log(`YouTube connectivity: ✅ Connected`);
-      } else {
-        await this.log(`YouTube connectivity: ❌ Connection failed`, false);
-      }
+      await (ytResponse.status === 200 ? this.log('YouTube connectivity: ✅ Connected') : this.log('YouTube connectivity: ❌ Connection failed', false));
 
-    } catch (error) {
+    }
+    catch (error) {
       await this.logError('API connectivity test failed', error);
     }
   }
@@ -263,7 +252,8 @@ class MusicTestSuite {
       const stats = getMusicStats(this.guildId);
       await this.log(`Queue and stats accessible: ${typeof stats === 'object'}`);
 
-    } catch (error) {
+    }
+    catch (error) {
       await this.logError('Discord command simulation test failed', error);
     }
   }
@@ -289,7 +279,7 @@ class MusicTestSuite {
     console.log(`Success Rate: ${((this.passCount / this.testCount) * 100).toFixed(1)}%`);
 
     // Save results to file
-    const fs = await import('fs');
+    const fs = await import('node:fs');
     fs.writeFileSync('test-results.json', JSON.stringify(this.testResults, null, 2));
     console.log('\n📄 Detailed results saved to test-results.json');
 

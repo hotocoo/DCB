@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, MessageFlags, EmbedBuilder } from 'discord.js';
+
 import { createNovel, listNovels, getNovel, generateChapter } from '../novel.js';
 import { CommandError, handleCommandError } from '../errorHandler.js';
 
@@ -49,7 +50,7 @@ export async function execute(interaction) {
       const novel = createNovel(userId, title.trim(), prompt?.trim() || '');
       const embed = new EmbedBuilder()
         .setTitle('📖 Novel Created')
-        .setColor(0x00FF00)
+        .setColor(0x00_FF_00)
         .setDescription(`**${novel.title}**\n\nID: \`${novel.id}\`\nAuthor: ${interaction.user.username}`)
         .addFields({
           name: 'Next Steps',
@@ -70,7 +71,7 @@ export async function execute(interaction) {
 
       const embed = new EmbedBuilder()
         .setTitle('📚 Available Novels')
-        .setColor(0x0099FF)
+        .setColor(0x00_99_FF)
         .setDescription(novels.join('\n\n'));
 
       return interaction.reply({ embeds: [embed] });
@@ -113,7 +114,7 @@ export async function execute(interaction) {
 
       const embed = new EmbedBuilder()
         .setTitle(`📖 ${novel.title}`)
-        .setColor(0x9932CC)
+        .setColor(0x99_32_CC)
         .setDescription(`**Chapter ${chap.index}**\n\n${chap.text}`)
         .setFooter({ text: `Novel ID: ${novel.id} • Total Chapters: ${novel.chapters.length}` });
 
@@ -151,19 +152,21 @@ export async function execute(interaction) {
 
         const embed = new EmbedBuilder()
           .setTitle(`📝 Chapter ${chapter.index} Generated`)
-          .setColor(0x00FF00)
+          .setColor(0x00_FF_00)
           .setDescription(`**${novel.title}**\n\n${chapter.text}`)
           .setFooter({ text: `Novel ID: ${novel.id} • Use /novel read to view full context` });
 
         return interaction.editReply({ embeds: [embed] });
-      } catch (error) {
+      }
+      catch (error) {
         console.error('Chapter generation error:', error);
         return interaction.editReply({
           content: '❌ An error occurred while generating the chapter. Please try again.'
         });
       }
     }
-  } catch (error) {
+  }
+  catch (error) {
     return handleCommandError(interaction, error);
   }
 }

@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const GUILDS_FILE = path.join(process.cwd(), 'data', 'guilds.json');
 
@@ -22,9 +22,10 @@ class GuildManager {
 
   loadGuilds() {
     try {
-      const data = JSON.parse(fs.readFileSync(GUILDS_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(GUILDS_FILE));
       this.guilds = data;
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to load guilds:', error);
       this.guilds = {};
     }
@@ -33,7 +34,8 @@ class GuildManager {
   saveGuilds() {
     try {
       fs.writeFileSync(GUILDS_FILE, JSON.stringify(this.guilds, null, 2));
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to save guilds:', error);
     }
   }
@@ -104,7 +106,7 @@ class GuildManager {
 
   // Party Management Functions
   createParty(leaderId, leaderName) {
-    const partyId = `party_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const partyId = `party_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     const party = {
       id: partyId,
       leader: leaderId,
@@ -156,7 +158,8 @@ class GuildManager {
     // Disband party if no members left
     if (Object.keys(party.members).length === 0) {
       delete this.parties[partyId];
-    } else if (party.leader === userId) {
+    }
+    else if (party.leader === userId) {
       // Transfer leadership to another member
       const newLeader = Object.keys(party.members)[0];
       party.leader = newLeader;
@@ -168,7 +171,7 @@ class GuildManager {
 
   // Guild Statistics and Leaderboards
   getGuildLeaderboard(limit = 10) {
-    const guildList = Object.entries(this.guilds)
+    return Object.entries(this.guilds)
       .map(([name, guild]) => ({
         name,
         level: guild.level,
@@ -182,8 +185,6 @@ class GuildManager {
         return b.gold - a.gold;
       })
       .slice(0, limit);
-
-    return guildList;
   }
 
   getUserGuild(userId) {

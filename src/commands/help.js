@@ -1,7 +1,8 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import fs from 'fs';
-import path from 'path';
-import { pathToFileURL } from 'url';
 
 async function getAllCommands() {
   const commandsPath = path.join(process.cwd(), 'src', 'commands');
@@ -17,7 +18,8 @@ async function getAllCommands() {
           if (command.data && command.data.name) {
             commands.push(command.data);
           }
-        } catch (error) {
+        }
+        catch (error) {
           console.error(`Failed to load command ${file}:`, error);
         }
       }
@@ -69,11 +71,11 @@ export async function execute(interaction) {
 
   const embed = new EmbedBuilder()
     .setTitle('🤖 Discord Bot Help')
-    .setColor(0x0099FF)
+    .setColor(0x00_99_FF)
     .setTimestamp();
 
   switch (category) {
-    case 'rpg':
+    case 'rpg': {
       embed.setDescription('**RPG System Commands**\n\n' + commandCategories.rpg.join('\n'));
       embed.addFields({
         name: 'RPG Features',
@@ -81,8 +83,9 @@ export async function execute(interaction) {
         inline: false
       });
       break;
+    }
 
-    case 'games':
+    case 'games': {
       embed.setDescription('**Minigame Commands**\n\n' + commandCategories.games.join('\n'));
       embed.addFields({
         name: 'Available Games',
@@ -90,8 +93,9 @@ export async function execute(interaction) {
         inline: false
       });
       break;
+    }
 
-    case 'utility':
+    case 'utility': {
       embed.setDescription('**Utility Commands**\n\n' + commandCategories.utility.join('\n'));
       embed.addFields({
         name: 'Utility Features',
@@ -99,8 +103,9 @@ export async function execute(interaction) {
         inline: false
       });
       break;
+    }
 
-    case 'chat':
+    case 'chat': {
       embed.setDescription('**Chat & AI Features**\n\n' + commandCategories.chat.join('\n'));
       embed.addFields({
         name: 'AI Integration',
@@ -108,8 +113,9 @@ export async function execute(interaction) {
         inline: false
       });
       break;
+    }
 
-    case 'admin':
+    case 'admin': {
       embed.setDescription('**Admin & Moderation Commands**\n\n' + commandCategories.admin.join('\n'));
       embed.addFields({
         name: 'Admin Features',
@@ -117,8 +123,9 @@ export async function execute(interaction) {
         inline: false
       });
       break;
+    }
 
-    default:
+    default: {
       embed.setDescription('**All Available Commands**\n\n' +
         '🏆 **RPG System**\n' + commandCategories.rpg.join('\n') + '\n\n' +
         '🛡️ **Admin & Moderation**\n' + commandCategories.admin.join('\n') + '\n\n' +
@@ -137,6 +144,7 @@ export async function execute(interaction) {
           inline: true
         }
       );
+    }
   }
 
   await interaction.reply({ embeds: [embed], ephemeral: true });

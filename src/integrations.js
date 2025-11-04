@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const INTEGRATIONS_FILE = path.join(process.cwd(), 'data', 'integrations.json');
 
@@ -29,9 +29,10 @@ class IntegrationManager {
 
   loadIntegrations() {
     try {
-      const data = JSON.parse(fs.readFileSync(INTEGRATIONS_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(INTEGRATIONS_FILE));
       this.integrations = data;
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to load integrations:', error);
       this.integrations = {
         apiKeys: {},
@@ -45,7 +46,8 @@ class IntegrationManager {
   saveIntegrations() {
     try {
       fs.writeFileSync(INTEGRATIONS_FILE, JSON.stringify(this.integrations, null, 2));
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to save integrations:', error);
     }
   }
@@ -131,18 +133,18 @@ class IntegrationManager {
 
   getServiceRateLimit(service) {
     const limits = {
-      'openweather': { maxRequests: 60, windowMs: 60000 }, // 60 per minute
-      'newsapi': { maxRequests: 1000, windowMs: 86400000 }, // 1000 per day
-      'jokes': { maxRequests: 100, windowMs: 60000 }, // 100 per minute
-      'catfacts': { maxRequests: 50, windowMs: 60000 }, // 50 per minute
-      'numbersapi': { maxRequests: 100, windowMs: 60000 } // 100 per minute
+      'openweather': { maxRequests: 60, windowMs: 60_000 }, // 60 per minute
+      'newsapi': { maxRequests: 1000, windowMs: 86_400_000 }, // 1000 per day
+      'jokes': { maxRequests: 100, windowMs: 60_000 }, // 100 per minute
+      'catfacts': { maxRequests: 50, windowMs: 60_000 }, // 50 per minute
+      'numbersapi': { maxRequests: 100, windowMs: 60_000 } // 100 per minute
     };
 
-    return limits[service] || { maxRequests: 10, windowMs: 60000 };
+    return limits[service] || { maxRequests: 10, windowMs: 60_000 };
   }
 
   // Advanced Caching System
-  getCachedData(key, maxAge = 300000) { // 5 minutes default
+  getCachedData(key, maxAge = 300_000) { // 5 minutes default
     const cached = this.apiCache.get(key);
     if (cached && Date.now() - cached.timestamp < maxAge) {
       return cached.data;
@@ -158,8 +160,8 @@ class IntegrationManager {
 
     // Clean old cache entries
     if (this.apiCache.size > 1000) {
-      const oldestKeys = Array.from(this.apiCache.keys()).slice(0, 200);
-      oldestKeys.forEach(key => this.apiCache.delete(key));
+      const oldestKeys = [...this.apiCache.keys()].slice(0, 200);
+      for (const key of oldestKeys) this.apiCache.delete(key);
     }
   }
 
@@ -179,7 +181,7 @@ class IntegrationManager {
 
     // Check cache
     const cacheKey = `news_${query}_${limit}`;
-    const cached = this.getCachedData(cacheKey, 1800000); // 30 minutes
+    const cached = this.getCachedData(cacheKey, 1_800_000); // 30 minutes
     if (cached) {
       return { success: true, data: cached };
     }
@@ -198,7 +200,8 @@ class IntegrationManager {
       this.setCachedData(cacheKey, data.articles);
 
       return { success: true, data: data.articles };
-    } catch (error) {
+    }
+    catch (error) {
       this.recordAPIError(service, error);
       return { success: false, reason: error.message };
     }
@@ -224,7 +227,8 @@ class IntegrationManager {
       this.recordAPIUsage(service);
 
       return { success: true, data: joke };
-    } catch (error) {
+    }
+    catch (error) {
       this.recordAPIError(service, error);
       return { success: false, reason: error.message };
     }
@@ -250,7 +254,8 @@ class IntegrationManager {
       this.recordAPIUsage(service);
 
       return { success: true, data: fact };
-    } catch (error) {
+    }
+    catch (error) {
       this.recordAPIError(service, error);
       return { success: false, reason: error.message };
     }
@@ -278,7 +283,8 @@ class IntegrationManager {
       this.recordAPIUsage(service);
 
       return { success: true, data: fact };
-    } catch (error) {
+    }
+    catch (error) {
       this.recordAPIError(service, error);
       return { success: false, reason: error.message };
     }
@@ -298,7 +304,8 @@ class IntegrationManager {
       const joke = await response.json();
 
       return { success: true, data: joke };
-    } catch (error) {
+    }
+    catch (error) {
       return { success: false, reason: error.message };
     }
   }
@@ -315,7 +322,8 @@ class IntegrationManager {
       const quote = await response.json();
 
       return { success: true, data: quote };
-    } catch (error) {
+    }
+    catch (error) {
       return { success: false, reason: error.message };
     }
   }
@@ -343,7 +351,8 @@ class IntegrationManager {
           created: user.created_at
         }
       };
-    } catch (error) {
+    }
+    catch (error) {
       return { success: false, reason: error.message };
     }
   }
@@ -373,7 +382,8 @@ class IntegrationManager {
       this.recordAPIUsage(service);
 
       return { success: true, data };
-    } catch (error) {
+    }
+    catch (error) {
       this.recordAPIError(service, error);
       return { success: false, reason: error.message };
     }
@@ -414,14 +424,17 @@ class IntegrationManager {
         let testResult;
 
         switch (service) {
-          case 'openweather':
+          case 'openweather': {
             testResult = await this.getWeather('London');
             break;
-          case 'newsapi':
+          }
+          case 'newsapi': {
             testResult = await this.getNews('technology', 1);
             break;
-          default:
+          }
+          default: {
             testResult = await this.getDadJoke();
+          }
         }
 
         health[service] = {
@@ -429,7 +442,8 @@ class IntegrationManager {
           lastCheck: Date.now(),
           error: testResult.success ? null : testResult.reason
         };
-      } catch (error) {
+      }
+      catch (error) {
         health[service] = {
           status: 'error',
           lastCheck: Date.now(),
@@ -446,7 +460,7 @@ class IntegrationManager {
     // Clean old cache
     const now = Date.now();
     for (const [key, cached] of this.apiCache) {
-      if (now - cached.timestamp > 3600000) { // 1 hour
+      if (now - cached.timestamp > 3_600_000) { // 1 hour
         this.apiCache.delete(key);
       }
     }

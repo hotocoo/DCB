@@ -1,8 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+
 import { exploreLocation, unlockLocation, enterDungeon, discoverLocation, getLocations } from '../locations.js';
 import { narrate } from '../rpg.js';
-import fs from 'fs';
-import path from 'path';
 import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler.js';
 
 // RPG data file path
@@ -22,20 +24,21 @@ function readAll() {
   ensureDir();
   if (!fs.existsSync(FILE)) return {};
   try {
-    const raw = JSON.parse(fs.readFileSync(FILE, 'utf8')) || {};
+    const raw = JSON.parse(fs.readFileSync(FILE)) || {};
     // migrate / ensure defaults for older characters
     for (const k of Object.keys(raw)) {
       const c = raw[k] || {};
-      if (typeof c.dailyExplorations === 'undefined') c.dailyExplorations = 0;
-      if (typeof c.lastDailyReset === 'undefined') c.lastDailyReset = Date.now();
-      if (typeof c.sessionXpGained === 'undefined') c.sessionXpGained = 0;
-      if (typeof c.lastSessionReset === 'undefined') c.lastSessionReset = Date.now();
+      if (c.dailyExplorations === undefined) c.dailyExplorations = 0;
+      if (c.lastDailyReset === undefined) c.lastDailyReset = Date.now();
+      if (c.sessionXpGained === undefined) c.sessionXpGained = 0;
+      if (c.lastSessionReset === undefined) c.lastSessionReset = Date.now();
       raw[k] = c;
     }
     cache = raw;
     return raw;
-  } catch (err) {
-    console.error('Failed to read rpg storage', err);
+  }
+  catch (error) {
+    console.error('Failed to read rpg storage', error);
     return {};
   }
 }
@@ -49,13 +52,15 @@ function writeAll(obj) {
     fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8');
     fs.renameSync(tmp, FILE);
     cache = obj;
-  } catch (err) {
-    console.error('Failed to write RPG data:', err);
+  }
+  catch (error) {
+    console.error('Failed to write RPG data:', error);
     // Attempt to restore from cache if available
     if (cache) {
       console.log('Restoring from cache after write failure');
-    } else {
-      throw new Error(`Failed to save RPG data: ${err.message}`);
+    }
+    else {
+      throw new Error(`Failed to save RPG data: ${error.message}`);
     }
   }
 }
@@ -144,166 +149,178 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('enter').setDescription('Enter a location for adventure').addStringOption(opt => opt.setName('location').setDescription('Location to explore').setRequired(true)));
 
 export async function execute(interaction) {
-  return safeExecuteCommand(interaction, async () => {
+  return safeExecuteCommand(interaction, async() => {
     const sub = interaction.options.getSubcommand();
     const userId = interaction.user.id;
 
-  if (sub === 'locations') {
-    const locations = getLocations();
-    const availableLocations = Object.values(locations).filter(loc => loc.unlocked);
+    switch (sub) {
+      case 'locations': {
+        const locations = getLocations();
+        const availableLocations = Object.values(locations).filter(loc => loc.unlocked);
 
-    if (availableLocations.length === 0) {
-      return interaction.reply({
-        content: '🏕️ No locations available yet. Start your adventure by exploring the Whispering Woods!\nUse `/explore discover location:whispering_woods`',
-        flags: MessageFlags.Ephemeral
-      });
-    }
+        if (availableLocations.length === 0) {
+          return interaction.reply({
+            content: '🏕️ No locations available yet. Start your adventure by exploring the Whispering Woods!\nUse `/explore discover location:whispering_woods`',
+            flags: MessageFlags.Ephemeral
+          });
+        }
 
-    const dailyCheck = checkDailyLimit(userId);
-    const sessionCheck = checkSessionXpCap(userId);
+        const dailyCheck = checkDailyLimit(userId);
+        const sessionCheck = checkSessionXpCap(userId);
 
-    const embed = new EmbedBuilder()
-      .setTitle('🗺️ Available Locations')
-      .setColor(0x0099FF)
-      .setDescription('Choose your adventure!');
-
-    availableLocations.forEach(location => {
-      embed.addFields({
-        name: `${location.emoji} ${location.name} (Level ${location.level})`,
-        value: `**Type:** ${location.type}\n**Description:** ${location.description}\n**Rewards:** ${location.rewards.xp} XP, ${location.rewards.gold} gold`,
-        inline: false
-      });
-    });
-
-    // Add usage info
-    embed.addFields({
-      name: '📊 Daily Usage',
-      value: dailyCheck.allowed ? `Explorations: ${dailyCheck.remaining} remaining` : `Explorations: ${dailyCheck.used}/${dailyCheck.max} (limit reached)`,
-      inline: true
-    });
-
-    embed.addFields({
-      name: '⭐ Session XP',
-      value: sessionCheck.allowed ? `XP: ${sessionCheck.remaining} remaining` : `XP: ${sessionCheck.used}/${sessionCheck.max} (cap reached)`,
-      inline: true
-    });
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`explore_unlock:${userId}`).setLabel('🔓 Discover More').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`explore_map:${userId}`).setLabel('🗺️ View Map').setStyle(ButtonStyle.Secondary)
-    );
-
-    await interaction.reply({ embeds: [embed], components: [row] });
-
-    } else if (sub === 'discover') {
-    const locationName = interaction.options.getString('location');
-
-    validateNotEmpty(locationName, 'location name');
-
-    const result = discoverLocation(userId, locationName);
-
-    if (!result.success) {
-      throw new CommandError(result.reason, 'COMMAND_ERROR');
-    }
-
-    const { location, requirements, canUnlock } = result;
-
-    if (canUnlock) {
-      const unlockResult = unlockLocation(userId, locationName);
-      if (unlockResult.success) {
         const embed = new EmbedBuilder()
-          .setTitle('🎉 Location Discovered!')
-          .setColor(location.color)
-          .setDescription(unlockResult.message)
-          .addFields(
-            { name: '📍 Location', value: location.name, inline: true },
-            { name: '🏆 Level', value: location.level, inline: true },
-            { name: '🎯 Type', value: location.type, inline: true }
-          );
+          .setTitle('🗺️ Available Locations')
+          .setColor(0x00_99_FF)
+          .setDescription('Choose your adventure!');
 
-        await interaction.reply({ embeds: [embed] });
-      } else {
-        throw new CommandError(unlockResult.reason || 'Failed to unlock location', 'COMMAND_ERROR');
-      }
-    } else {
-      const embed = new EmbedBuilder()
-        .setTitle('🔒 Location Locked')
-        .setColor(0xFFA500)
-        .setDescription(`**${location.name}** is not yet available.`)
-        .addFields({
-          name: 'Requirements',
-          value: `🏆 **Level ${requirements.level || 'Any'}**\n⭐ **Achievement: ${requirements.achievements?.join(', ') || 'None'}**`,
-          inline: false
+        for (const location of availableLocations) {
+          embed.addFields({
+            name: `${location.emoji} ${location.name} (Level ${location.level})`,
+            value: `**Type:** ${location.type}\n**Description:** ${location.description}\n**Rewards:** ${location.rewards.xp} XP, ${location.rewards.gold} gold`,
+            inline: false
+          });
+        }
+
+        // Add usage info
+        embed.addFields({
+          name: '📊 Daily Usage',
+          value: dailyCheck.allowed ? `Explorations: ${dailyCheck.remaining} remaining` : `Explorations: ${dailyCheck.used}/${dailyCheck.max} (limit reached)`,
+          inline: true
         });
 
-      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-    }
+        embed.addFields({
+          name: '⭐ Session XP',
+          value: sessionCheck.allowed ? `XP: ${sessionCheck.remaining} remaining` : `XP: ${sessionCheck.used}/${sessionCheck.max} (cap reached)`,
+          inline: true
+        });
 
-  } else if (sub === 'enter') {
-    const locationName = interaction.options.getString('location');
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`explore_unlock:${userId}`).setLabel('🔓 Discover More').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`explore_map:${userId}`).setLabel('🗺️ View Map').setStyle(ButtonStyle.Secondary)
+        );
 
-    validateNotEmpty(locationName, 'location name');
+        await interaction.reply({ embeds: [embed], components: [row] });
 
-    // Check daily limit
-    const dailyCheck = checkDailyLimit(userId);
-    if (!dailyCheck.allowed) {
-      const resetHours = Math.ceil((24 - (Date.now() - (dailyCheck.resetTime || Date.now())) / 3600000));
-      throw new CommandError(`Daily exploration limit reached! You have used ${dailyCheck.used}/${dailyCheck.max} explorations today. Reset in ${resetHours} hours.`, 'COMMAND_ERROR');
-    }
+        break;
+      }
+      case 'discover': {
+        const locationName = interaction.options.getString('location');
 
-    // Check session XP cap
-    const sessionCheck = checkSessionXpCap(userId);
-    if (!sessionCheck.allowed) {
-      const resetHours = Math.ceil((24 - (Date.now() - (sessionCheck.resetTime || Date.now())) / 3600000));
-      throw new CommandError(`Session XP cap reached! You have gained ${sessionCheck.used}/${sessionCheck.max} XP this session. Reset in ${resetHours} hours.`, 'COMMAND_ERROR');
-    }
+        validateNotEmpty(locationName, 'location name');
 
-    const result = exploreLocation(userId, locationName);
+        const result = discoverLocation(userId, locationName);
 
-    if (!result.success) {
-      throw new CommandError(result.reason, 'COMMAND_ERROR');
-    }
+        if (!result.success) {
+          throw new CommandError(result.reason, 'COMMAND_ERROR');
+        }
 
-    // Increment daily exploration count
-    const incrementResult = incrementDailyExploration(userId);
-    if (!incrementResult.success) {
-      throw new CommandError(incrementResult.reason || 'Failed to update exploration count', 'COMMAND_ERROR');
-    }
+        const { location, requirements, canUnlock } = result;
 
-    const { location, encounter, narrative } = result;
+        if (canUnlock) {
+          const unlockResult = unlockLocation(userId, locationName);
+          if (unlockResult.success) {
+            const embed = new EmbedBuilder()
+              .setTitle('🎉 Location Discovered!')
+              .setColor(location.color)
+              .setDescription(unlockResult.message)
+              .addFields(
+                { name: '📍 Location', value: location.name, inline: true },
+                { name: '🏆 Level', value: location.level, inline: true },
+                { name: '🎯 Type', value: location.type, inline: true }
+              );
 
-    // Generate AI narrative for the location entry
-    let locationNarrative;
-    try {
-      locationNarrative = await narrate(
-        interaction.guildId,
-        `${location.ai_prompt} An adventurer enters this mystical place.`,
-        `You enter ${location.name}. ${narrative.entry}`
-      );
-    } catch (narrativeError) {
-      console.warn('[EXPLORE] AI narrative generation failed, using fallback:', narrativeError.message);
-      locationNarrative = `You enter ${location.name}. ${narrative.entry}`;
-    }
+            await interaction.reply({ embeds: [embed] });
+          }
+          else {
+            throw new CommandError(unlockResult.reason || 'Failed to unlock location', 'COMMAND_ERROR');
+          }
+        }
+        else {
+          const embed = new EmbedBuilder()
+            .setTitle('🔒 Location Locked')
+            .setColor(0xFF_A5_00)
+            .setDescription(`**${location.name}** is not yet available.`)
+            .addFields({
+              name: 'Requirements',
+              value: `🏆 **Level ${requirements.level || 'Any'}**\n⭐ **Achievement: ${requirements.achievements?.join(', ') || 'None'}**`,
+              inline: false
+            });
 
-    const embed = new EmbedBuilder()
-      .setTitle(`${location.emoji} ${location.name}`)
-      .setColor(location.color)
-      .setDescription(locationNarrative)
-      .addFields(
-        { name: '🎯 Encounter Type', value: encounter.type.replace('_', ' ').toUpperCase(), inline: true },
-        { name: '⚔️ Difficulty', value: `Level ${encounter.difficulty}`, inline: true },
-        { name: '💎 Potential Rewards', value: `${encounter.rewards.xp} XP, ${encounter.rewards.gold} gold`, inline: true },
-        { name: '📊 Daily Explorations', value: `${dailyCheck.remaining - 1} remaining`, inline: true },
-        { name: '⭐ Session XP', value: `${sessionCheck.remaining} remaining`, inline: true }
-      );
+          await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        }
 
-    // Add exploration action buttons
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`explore_continue:${locationName}:${userId}`).setLabel('⚔️ Continue Adventure').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`explore_leave:${locationName}:${userId}`).setLabel('🏃 Leave Location').setStyle(ButtonStyle.Secondary)
-    );
+        break;
+      }
+      case 'enter': {
+        const locationName = interaction.options.getString('location');
 
-    await interaction.reply({ embeds: [embed], components: [row] });
+        validateNotEmpty(locationName, 'location name');
+
+        // Check daily limit
+        const dailyCheck = checkDailyLimit(userId);
+        if (!dailyCheck.allowed) {
+          const resetHours = Math.ceil((24 - (Date.now() - (dailyCheck.resetTime || Date.now())) / 3_600_000));
+          throw new CommandError(`Daily exploration limit reached! You have used ${dailyCheck.used}/${dailyCheck.max} explorations today. Reset in ${resetHours} hours.`, 'COMMAND_ERROR');
+        }
+
+        // Check session XP cap
+        const sessionCheck = checkSessionXpCap(userId);
+        if (!sessionCheck.allowed) {
+          const resetHours = Math.ceil((24 - (Date.now() - (sessionCheck.resetTime || Date.now())) / 3_600_000));
+          throw new CommandError(`Session XP cap reached! You have gained ${sessionCheck.used}/${sessionCheck.max} XP this session. Reset in ${resetHours} hours.`, 'COMMAND_ERROR');
+        }
+
+        const result = exploreLocation(userId, locationName);
+
+        if (!result.success) {
+          throw new CommandError(result.reason, 'COMMAND_ERROR');
+        }
+
+        // Increment daily exploration count
+        const incrementResult = incrementDailyExploration(userId);
+        if (!incrementResult.success) {
+          throw new CommandError(incrementResult.reason || 'Failed to update exploration count', 'COMMAND_ERROR');
+        }
+
+        const { location, encounter, narrative } = result;
+
+        // Generate AI narrative for the location entry
+        let locationNarrative;
+        try {
+          locationNarrative = await narrate(
+            interaction.guildId,
+            `${location.ai_prompt} An adventurer enters this mystical place.`,
+            `You enter ${location.name}. ${narrative.entry}`
+          );
+        }
+        catch (narrativeError) {
+          console.warn('[EXPLORE] AI narrative generation failed, using fallback:', narrativeError.message);
+          locationNarrative = `You enter ${location.name}. ${narrative.entry}`;
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle(`${location.emoji} ${location.name}`)
+          .setColor(location.color)
+          .setDescription(locationNarrative)
+          .addFields(
+            { name: '🎯 Encounter Type', value: encounter.type.replace('_', ' ').toUpperCase(), inline: true },
+            { name: '⚔️ Difficulty', value: `Level ${encounter.difficulty}`, inline: true },
+            { name: '💎 Potential Rewards', value: `${encounter.rewards.xp} XP, ${encounter.rewards.gold} gold`, inline: true },
+            { name: '📊 Daily Explorations', value: `${dailyCheck.remaining - 1} remaining`, inline: true },
+            { name: '⭐ Session XP', value: `${sessionCheck.remaining} remaining`, inline: true }
+          );
+
+        // Add exploration action buttons
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`explore_continue:${locationName}:${userId}`).setLabel('⚔️ Continue Adventure').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`explore_leave:${locationName}:${userId}`).setLabel('🏃 Leave Location').setStyle(ButtonStyle.Secondary)
+        );
+
+        await interaction.reply({ embeds: [embed], components: [row] });
+
+        break;
+      }
+    // No default
     }
   }, {
     command: 'explore'

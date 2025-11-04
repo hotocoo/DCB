@@ -1,5 +1,6 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { getCharacter, addItemToInventory, removeItemFromInventory } from './rpg.js';
 import { getBalance, subtractBalance, transferBalance, addBalance } from './economy.js';
 
@@ -25,10 +26,11 @@ class TradingManager {
 
   loadTrades() {
     try {
-      const data = JSON.parse(fs.readFileSync(TRADES_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(TRADES_FILE));
       this.completedTrades = data.completed || [];
       this.tradeStats = data.stats || {};
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to load trades:', error);
       this.completedTrades = [];
       this.tradeStats = {};
@@ -42,14 +44,15 @@ class TradingManager {
         stats: this.tradeStats
       };
       fs.writeFileSync(TRADES_FILE, JSON.stringify(data, null, 2));
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Failed to save trades:', error);
     }
   }
 
   // Trade Creation and Management
   createTradeRequest(initiatorId, targetUserId, offeredItems, requestedItems, offeredGold = 0, requestedGold = 0) {
-    const tradeId = `trade_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const tradeId = `trade_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const trade = {
       id: tradeId,
@@ -226,7 +229,7 @@ class TradingManager {
 
   // Auction House System
   createAuction(itemId, startingBid, durationHours = 24, sellerId) {
-    const auctionId = `auction_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const auctionId = `auction_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const auction = {
       id: auctionId,
@@ -291,7 +294,7 @@ class TradingManager {
     if (!this.auctions) return [];
 
     const now = Date.now();
-    return Array.from(this.auctions.values())
+    return [...this.auctions.values()]
       .filter(auction => auction.status === 'active' && auction.ends > now)
       .sort((a, b) => b.currentBid - a.currentBid)
       .slice(0, limit);

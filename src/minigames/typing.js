@@ -15,7 +15,9 @@ export function startTypingGameWithSentence(userId, sentence, durationSec = 6) {
 export function checkTypingAttempt(userId, text) {
   const s = sessions.get(userId);
   if (!s) return null;
-  if (Date.now() > s.endAt) { sessions.delete(userId); return { ok: false, reason: 'timeout' }; }
+  if (Date.now() > s.endAt) {
+    sessions.delete(userId); return { ok: false, reason: 'timeout' };
+  }
   const success = text.trim().toLowerCase() === s.sentence.toLowerCase();
   sessions.delete(userId);
   return { ok: success, expected: s.sentence };
