@@ -10,7 +10,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/watchandnotlearn/ultra-discord-bot/pulls)
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-black.svg)](https://github.com/watchandnotlearn/ultra-discord-bot)
 
-A comprehensive, feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, AI-powered interactions, and now powered by SQLite database for enhanced performance and reliability.
+A comprehensive, feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, AI-powered interactions, with JSON-based data storage as the current primary method and ongoing SQLite migration for enhanced performance and reliability.
 
 **✨ Features:**
 - **RPG System**: Character progression with classes, inventory, quests, and boss battles
@@ -20,7 +20,7 @@ A comprehensive, feature-rich Discord bot built with Node.js and Discord.js, off
 - **AI Assistant**: Multiple AI models with personality profiles and memory
 - **Mini-Games**: Trivia, Wordle, Connect Four, Tic-Tac-Toe, and more
 - **Guild Management**: Multiplayer guilds with economies and leaderboards
-- **SQLite Database**: ACID-compliant data storage with migration support
+- **JSON Storage**: Current primary data storage with SQLite migration in progress
 - **Docker Support**: Containerized deployment with health checks
 
 ## 🌟 Overview
@@ -33,7 +33,7 @@ Whether you're looking to engage your community with games, manage your server e
 
 ### 🎮 Gaming & Entertainment
 - **RPG System**: Complete character progression with 4 unique classes, inventory management, quests, and epic boss battles
-- **Mini-Games**: Trivia, Hangman, Memory, Tic-Tac-Toe, Connect Four, Wordle, Number Guessing, Coin Flip
+- **Mini-Games**: Trivia, Hangman, Memory, Tic-Tac-Toe, Connect Four, Wordle, Number Guessing, Coin Flip, 8-Ball, Rock-Paper-Scissors
 - **Interactive Polls**: Real-time voting with customizable options
 - **Fun Commands**: 8-Ball, Rock-Paper-Scissors, Dice Rolling, Joke generation
 
@@ -60,7 +60,7 @@ Whether you're looking to engage your community with games, manage your server e
 ### 👥 Social & Community
 - **Profile System**: Customizable user profiles with statistics and achievements
 - **Guild System**: Multiplayer guilds with parties, economies, and leaderboards
-- **Trading Platform**: Player-to-player trades and auction house
+- **Trading Platform**: Player-to-player trades, auction house, and marketplace
 - **Achievement System**: 12+ unique achievements with progression tracking
 
 ### 🤖 AI Integration
@@ -72,13 +72,13 @@ Whether you're looking to engage your community with games, manage your server e
 ### ⏰ Utilities & Scheduling
 - **Smart Scheduling**: Natural language reminders and events
 - **Weather Integration**: Real-time weather information with forecasts
-- **Custom Commands**: Server-specific custom command creation
+- **Custom Commands**: Server-specific custom command creation and AI model switching
 - **Integration APIs**: News, jokes, facts, quotes, and more
 
 ## 🚀 Installation
 
 ### Database Migration Note (v3.0.0)
-⚠️ **Important**: This version introduces SQLite database migration. Existing JSON data will be automatically migrated on first run. Backup your `data/` folder before upgrading.
+⚠️ **Important**: SQLite migration is in progress. Currently using JSON files as primary storage. Backup your `data/` folder before upgrading.
 
 ### Prerequisites
 - **Node.js** 18.0.0 or higher
@@ -158,9 +158,14 @@ npm run format
 |---------|-------------|---------|
 | `/rpg start` | Create and customize your RPG character | `/rpg start name:Hero class:warrior` |
 | `/rpg fight` | Battle monsters and gain experience | `/rpg fight` |
+| `/rpg explore` | Explore new areas and discover items | `/rpg explore` |
 | `/trivia` | Interactive trivia quiz with scoring | `/trivia questions:5 category:general` |
 | `/tictactoe` | Play Tic-Tac-Toe against AI or players | `/tictactoe opponent:@user` |
+| `/connect4` | Play Connect Four against AI or players | `/connect4 opponent:@user` |
+| `/hangman` | Classic Hangman word guessing game | `/hangman` |
+| `/memory` | Memory matching game | `/memory` |
 | `/wordle` | Daily word guessing game | `/wordle` |
+| `/guess` | Number guessing game | `/guess` |
 
 ### 🎵 Music Commands
 
@@ -197,7 +202,17 @@ npm run format
 | `/guild create` | Create a new guild | `/guild create name:MyGuild description:A great guild` |
 | `/guild join` | Join an existing guild | `/guild join name:OtherGuild` |
 | `/profile view` | View user profiles and statistics | `/profile view user:@user` |
+| `/trade` | Trade items with other players | `/trade user:@user offer:item1 request:item2` |
+| `/poll` | Create interactive polls | `/poll question:What's your favorite color? options:red,blue,green` |
 | `/achievements view` | Browse your earned achievements | `/achievements view` |
+
+### 🤖 AI & Novel Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/ai` | Chat with AI using various personalities | `/ai message:"Tell me a joke" personality:funny` |
+| `/novel` | Generate stories with AI | `/novel prompt:"A fantasy adventure" length:short` |
+| `/setmodel` | Switch between different AI models | `/setmodel model:gpt-4` |
 
 ### ⏰ Utility Commands
 
@@ -206,7 +221,6 @@ npm run format
 | `/remind me` | Set personal reminders | `/remind me when:"in 30 minutes" what:"Team meeting"` |
 | `/weather` | Get current weather and forecasts | `/weather location:"New York"` |
 | `/roll` | Roll dice with custom configurations | `/roll dice:2d6` |
-| `/ai` | Chat with AI using various personalities | `/ai message:"Tell me a joke" personality:funny` |
 
 ## 🔧 Configuration
 
@@ -265,13 +279,12 @@ ultra-discord-bot/
 │   ├── commands/        # Slash command implementations
 │   ├── minigames/       # Mini-game logic
 │   ├── *.js             # Core modules and managers
-├── data/                # SQLite database (bot.db) + legacy JSON files
-│   ├── players/         # Individual player script files
-│   ├── bot.db           # SQLite database file
+├── data/                # JSON data files (primary storage) + SQLite database (migration in progress)
+│   ├── players/         # Individual player data files
+│   ├── bot.db           # SQLite database file (migration)
 ├── logs/                # Application logs
-├── scripts/             # Utility scripts
+├── scripts/             # Utility scripts and data management
 ├── tests/               # Test suites and results
-├── migrations/          # Database migration scripts
 └── root-level-files/    # Main project files (package.json, README, etc.)
 ```
 
@@ -283,7 +296,7 @@ ultra-discord-bot/
 - **Moderation Tools**: User management and auto-moderation with audit logging
 - **AI Assistant**: Multi-model conversational AI with memory persistence
 - **Scheduler**: Event and reminder management with database-backed storage
-- **Database Layer**: SQLite connection management with migration support
+- **Database Layer**: JSON-based storage with ongoing SQLite migration support
 
 ## 🤝 Contributing
 
@@ -322,12 +335,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔄 Recent Updates & Fixes
 
-### Database Migration (v3.0.0)
-- **SQLite Database Integration**: Migrated from JSON-based storage to SQLite for improved performance and reliability
-- **ACID Compliance**: Database transactions ensure data consistency and prevent corruption
-- **Foreign Key Constraints**: Enhanced data integrity across all modules
-- **Migration Scripts**: Automated migration from JSON to SQLite with rollback capability
-- **Backup System**: Automatic database backups and recovery procedures
+### Ongoing Database Migration
+- **JSON Storage Active**: Currently using JSON files as primary data storage method
+- **SQLite Migration**: Migration to SQLite database is underway for improved performance and reliability
+- **Data Integrity**: Ensuring safe data transfer with backup and rollback capabilities
+- **Migration Scripts**: Automated scripts for gradual migration from JSON to SQLite
+- **Backup System**: Comprehensive backup procedures during migration process
 
 ### Music System Improvements
 - **Enhanced Error Handling**: Improved resilience against API failures and network issues

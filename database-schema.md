@@ -1,7 +1,7 @@
 # Bot Database Schema
 
 ## Overview
-This document outlines the SQLite database schema for migrating from JSON-based storage to a proper relational database system.
+This document outlines the SQLite database schema for migrating from JSON-based storage to a proper relational database system. Currently, JSON files serve as the primary storage mechanism while SQLite migration is in progress.
 
 ## Database Choice: SQLite
 - Lightweight, file-based database
@@ -258,25 +258,95 @@ CREATE TABLE schedules_reminders (
 );
 ```
 
+#### 17. polls
+Interactive polls and voting data.
+
+```sql
+CREATE TABLE polls (
+    id TEXT PRIMARY KEY,
+    creator_id TEXT NOT NULL REFERENCES users(user_id),
+    guild_id TEXT NOT NULL,
+    question TEXT NOT NULL,
+    options TEXT NOT NULL, -- JSON array of options
+    votes TEXT, -- JSON object of user_id -> option_index
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME
+);
+```
+
+#### 18. novels
+AI-generated stories and creative writing.
+
+```sql
+CREATE TABLE novels (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(user_id),
+    title TEXT,
+    prompt TEXT NOT NULL,
+    content TEXT NOT NULL,
+    length TEXT NOT NULL, -- short, medium, long
+    genre TEXT,
+    tags TEXT, -- JSON array
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### 19. trades
+Player-to-player trading system.
+
+```sql
+CREATE TABLE trades (
+    id TEXT PRIMARY KEY,
+    initiator_id TEXT NOT NULL REFERENCES users(user_id),
+    recipient_id TEXT NOT NULL REFERENCES users(user_id),
+    offer_items TEXT NOT NULL, -- JSON array of {item_id, quantity}
+    request_items TEXT NOT NULL, -- JSON array of {item_id, quantity}
+    status TEXT NOT NULL DEFAULT 'pending', -- pending, accepted, declined, completed
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed_at DATETIME
+);
+```
+
+#### 20. locations
+RPG exploration locations and areas.
+
+```sql
+CREATE TABLE locations (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    type TEXT NOT NULL, -- town, dungeon, forest, etc.
+    level_requirement INTEGER DEFAULT 1,
+    difficulty TEXT DEFAULT 'easy', -- easy, medium, hard, expert
+    coordinates TEXT, -- JSON {x, y} for mapping
+    connections TEXT, -- JSON array of connected location IDs
+    resources TEXT, -- JSON array of available resources
+    npcs TEXT, -- JSON array of NPC data
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 ## Migration Strategy
 
 ### Phase 1: Initial Migration
-1. Create database schema
-2. Export existing JSON data
-3. Transform and import data
-4. Validate data integrity
+1. Create database schema including new tables for polls, novels, trades, and locations
+2. Export existing JSON data from rpg.json, economy.json, guilds.json, etc.
+3. Transform and import data, accounting for new features and relationships
+4. Validate data integrity across all current JSON files and new schema
 
 ### Phase 2: Application Updates
-1. Update storage layer to use database
-2. Implement database connection pooling
-3. Add database backup system
-4. Update configuration
+1. Update storage layer to use database while maintaining JSON fallback
+2. Implement database connection pooling for concurrent operations
+3. Add database backup system with automated JSON snapshots
+4. Update configuration to support ongoing migration state
 
 ### Phase 3: Testing and Validation
-1. Run comprehensive tests
-2. Validate all data relationships
-3. Performance testing
-4. Rollback procedures
+1. Run comprehensive tests including new features (polls, novels, trades)
+2. Validate all data relationships including cross-feature dependencies
+3. Performance testing with current JSON data volumes
+4. Rollback procedures with dual-storage compatibility
 
 ## Indexes for Performance
 
