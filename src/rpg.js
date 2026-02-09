@@ -2,7 +2,7 @@ import path from 'node:path';
 
 import { generate } from './model-client.js';
 import { logger } from './logger.js';
-import { CommandError } from './errorHandler';
+import { CommandError } from './errorHandler.ts';
 import { readJSON, writeJSON, listJSONFiles } from './utils/fileStorage.js';
 import { Cache } from './utils/cache.js';
 import { validateString, validateNumber, validateUserId, sanitizeInput } from './utils/validators.js';
@@ -240,10 +240,10 @@ export async function getCharacter(userId) {
     // Try cache first
     const cached = characterCache.get(`char_${userId}`);
     if (cached) {
-      metrics.recordCacheAccess('rpg-characters', true);
+      metrics.collector.recordCacheAccess('rpg-characters', true);
       return cached;
     }
-    metrics.recordCacheAccess('rpg-characters', false);
+    metrics.collector.recordCacheAccess('rpg-characters', false);
 
     // Otherwise read from file
     const filePath = path.join(PLAYERS_DIR, `${userId}.json`);

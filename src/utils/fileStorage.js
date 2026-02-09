@@ -144,8 +144,28 @@ export async function listJSONFiles(dirPath) {
   }
 }
 
+/**
+ * Creates a backup of a JSON file
+ * @param {string} filePath - Path to JSON file
+ * @returns {Promise<string|null>} Backup file path or null on failure
+ */
+export async function backupJSON(filePath) {
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = `${filePath}.backup-${timestamp}`;
+    const fsPromises = await import('fs/promises');
+    await fsPromises.copyFile(filePath, backupPath);
+    logger.info(`Created backup: ${backupPath}`);
+    return backupPath;
+  } catch (error) {
+    logger.error(`Failed to backup JSON file: ${filePath}`, error);
+    return null;
+  }
+}
+
 export default {
   readJSON,
   writeJSON,
-  listJSONFiles
+  listJSONFiles,
+  backupJSON
 };

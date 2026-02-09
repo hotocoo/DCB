@@ -51,7 +51,7 @@ function createControls() {
 function createGameEmbed(game) {
   const embed = new EmbedBuilder()
     .setTitle('🐍 Snake Game')
-    .setDescription(\`\${game.render()}\\n\${game.getStatus()}\`)
+    .setDescription(`${game.render()}\n${game.getStatus()}`)
     .setColor(game.gameOver ? 0xFF_00_00 : 0x00_FF_00)
     .setFooter({ text: '🟢 = Head | 🟩 = Body | 🍎 = Food' })
     .setTimestamp();
@@ -93,7 +93,7 @@ export async function execute(interaction) {
   } catch (error) {
     logger.error('Failed to start snake game', error);
     await interaction.reply({
-      content: \`❌ Failed to start game: \${error.message}\`,
+      content: `❌ Failed to start game: ${error.message}`,
       ephemeral: true
     });
   }
@@ -174,7 +174,7 @@ export async function handleButton(interaction) {
   } catch (error) {
     logger.error('Failed to handle snake button', error);
     await interaction.reply({
-      content: \`❌ Error: \${error.message}\`,
+      content: `❌ Error: ${error.message}`,
       ephemeral: true
     });
   }

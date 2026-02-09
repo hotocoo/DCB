@@ -118,7 +118,7 @@ class SnakeGame {
           board += '⬛';
         }
       }
-      board += '\\n';
+      board += '\n';
     }
 
     return board;
@@ -130,9 +130,9 @@ class SnakeGame {
    */
   getStatus() {
     if (this.gameOver) {
-      return \`Game Over! Final Score: \${this.score}\\nSnake Length: \${this.snake.length}\`;
+      return `Game Over! Final Score: ${this.score}\nSnake Length: ${this.snake.length}`;
     }
-    return \`Score: \${this.score} | Length: \${this.snake.length}\\n\\nUse arrow buttons to move!\`;
+    return `Score: ${this.score} | Length: ${this.snake.length}\n\nUse arrow buttons to move!`;
   }
 }
 

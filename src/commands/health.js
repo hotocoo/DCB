@@ -35,21 +35,21 @@ export async function execute(interaction) {
     };
 
     const embed = new EmbedBuilder()
-      .setTitle(\`\${statusEmoji[results.status]} Bot Health Status\`)
+      .setTitle(`${statusEmoji[results.status]} Bot Health Status`)
       .setColor(statusColor[results.status])
-      .setDescription(\`Overall Status: **\${results.status.toUpperCase()}**\`)
+      .setDescription(`Overall Status: **${results.status.toUpperCase()}**`)
       .setTimestamp();
 
     // Add individual check results
     for (const check of results.checks) {
       const emoji = statusEmoji[check.status];
-      let fieldValue = \`\${emoji} \${check.message}\`;
+      let fieldValue = `${emoji} ${check.message}`;
       
       if (check.details && Object.keys(check.details).length > 0) {
         const detailsStr = Object.entries(check.details)
-          .map(([key, value]) => \`• \${key}: \${value}\`)
-          .join('\\n');
-        fieldValue += \`\\n\${detailsStr}\`;
+          .map(([key, value]) => `• ${key}: ${value}`)
+          .join('\n');
+        fieldValue += `\n${detailsStr}`;
       }
 
       embed.addFields({
@@ -60,7 +60,7 @@ export async function execute(interaction) {
     }
 
     // Add footer with check duration
-    embed.setFooter({ text: \`Health check completed in \${results.duration}ms\` });
+    embed.setFooter({ text: `Health check completed in ${results.duration}ms` });
 
     await interaction.editReply({ embeds: [embed] });
 

@@ -160,14 +160,14 @@ export function createBotHealthChecks(client) {
     const usagePercent = (heapUsedMB / heapTotalMB) * 100;
 
     let status = 'healthy';
-    let message = \`Memory usage: \${heapUsedMB}MB / \${heapTotalMB}MB\`;
+    let message = `Memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB`;
 
     if (usagePercent > 90) {
       status = 'unhealthy';
-      message = \`High memory usage: \${usagePercent.toFixed(1)}%\`;
+      message = `High memory usage: ${usagePercent.toFixed(1)}%`;
     } else if (usagePercent > 75) {
       status = 'degraded';
-      message = \`Elevated memory usage: \${usagePercent.toFixed(1)}%\`;
+      message = `Elevated memory usage: ${usagePercent.toFixed(1)}%`;
     }
 
     return {
@@ -189,7 +189,7 @@ export function createBotHealthChecks(client) {
 
     return {
       status: 'healthy',
-      message: \`Uptime: \${uptimeHours.toFixed(2)} hours\`,
+      message: `Uptime: ${uptimeHours.toFixed(2)} hours`,
       details: {
         seconds: Math.floor(uptimeSeconds),
         hours: uptimeHours.toFixed(2)

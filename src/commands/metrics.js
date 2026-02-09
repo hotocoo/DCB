@@ -28,10 +28,10 @@ export const data = new SlashCommandBuilder()
  */
 function formatNumber(value) {
   if (value >= 1_000_000) {
-    return \`\${(value / 1_000_000).toFixed(2)}M\`;
+    return `${(value / 1_000_000).toFixed(2)}M`;
   }
   if (value >= 1000) {
-    return \`\${(value / 1000).toFixed(2)}K\`;
+    return `${(value / 1000).toFixed(2)}K`;
   }
   return value.toString();
 }
@@ -43,9 +43,9 @@ function formatNumber(value) {
  */
 function formatDuration(ms) {
   if (ms >= 1000) {
-    return \`\${(ms / 1000).toFixed(2)}s\`;
+    return `${(ms / 1000).toFixed(2)}s`;
   }
-  return \`\${ms.toFixed(2)}ms\`;
+  return `${ms.toFixed(2)}ms`;
 }
 
 /**
@@ -60,7 +60,7 @@ function createSummaryEmbed(allMetrics) {
   const embed = new EmbedBuilder()
     .setTitle('📊 Bot Metrics Summary')
     .setColor(0x00_AA_FF)
-    .setDescription(\`Bot uptime: **\${uptime}**\`)
+    .setDescription(`Bot uptime: **${uptime}**`)
     .addFields(
       { name: 'Total Commands', value: formatNumber(summary.totalCommands), inline: true },
       { name: 'Total API Calls', value: formatNumber(summary.totalAPICalls), inline: true },
@@ -98,8 +98,8 @@ function createCommandsEmbed(allMetrics) {
     const status = statusMatch ? statusMatch[1] : 'unknown';
     
     embed.addFields({
-      name: \`/\${commandName}\`,
-      value: \`\${status}: \${formatNumber(value)}\`,
+      name: `/${commandName}`,
+      value: `${status}: ${formatNumber(value)}`,
       inline: true
     });
   }
@@ -135,7 +135,7 @@ function createAPIEmbed(allMetrics) {
     
     embed.addFields({
       name: service,
-      value: \`\${status}: \${formatNumber(value)}\`,
+      value: `${status}: ${formatNumber(value)}`,
       inline: true
     });
   }
@@ -150,8 +150,8 @@ function createAPIEmbed(allMetrics) {
       const service = match ? match[1] : 'unknown';
       
       embed.addFields({
-        name: \`\${service} Response Time\`,
-        value: \`Avg: \${formatDuration(stats.avg)} | P95: \${formatDuration(stats.p95)}\`,
+        name: `${service} Response Time`,
+        value: `Avg: ${formatDuration(stats.avg)} | P95: ${formatDuration(stats.p95)}`,
         inline: true
       });
     }
@@ -188,7 +188,7 @@ function createDatabaseEmbed(allMetrics) {
     
     embed.addFields({
       name: operation,
-      value: \`\${status}: \${formatNumber(value)}\`,
+      value: `${status}: ${formatNumber(value)}`,
       inline: true
     });
   }
@@ -203,8 +203,8 @@ function createDatabaseEmbed(allMetrics) {
       const operation = match ? match[1] : 'unknown';
       
       embed.addFields({
-        name: \`\${operation} Duration\`,
-        value: \`Avg: \${formatDuration(stats.avg)} | P95: \${formatDuration(stats.p95)}\`,
+        name: `${operation} Duration`,
+        value: `Avg: ${formatDuration(stats.avg)} | P95: ${formatDuration(stats.p95)}`,
         inline: true
       });
     }
@@ -251,7 +251,7 @@ function createCacheEmbed(allMetrics) {
     
     embed.addFields({
       name: cache,
-      value: \`Hit Rate: \${hitRate}%\\nHits: \${formatNumber(stats.hit)} | Misses: \${formatNumber(stats.miss)}\`,
+      value: `Hit Rate: ${hitRate}%\nHits: ${formatNumber(stats.hit)} | Misses: ${formatNumber(stats.miss)}`,
       inline: true
     });
   }

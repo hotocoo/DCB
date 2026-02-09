@@ -30,6 +30,8 @@ export class Cache {
     this.defaultTTL = options.ttl || 3_600_000; // 1 hour default
     this.maxSize = options.maxSize || 1000;
     this.cleanupInterval = options.cleanupInterval || 300_000; // 5 minutes
+    this.hits = 0;
+    this.misses = 0;
 
     // Start cleanup timer
     this.startCleanup();
@@ -61,14 +63,17 @@ export class Cache {
     const entry = this.store.get(key);
 
     if (!entry) {
+      this.misses++;
       return;
     }
 
     if (entry.isExpired()) {
       this.store.delete(key);
+      this.misses++;
       return;
     }
 
+    this.hits++;
     return entry.value;
   }
 

@@ -284,7 +284,7 @@ export async function handleMessage(message) {
     const prompt = raw;
 
     // Check cooldown system
-    const COOLDOWN_MS = config.performance.cacheExpiry ? DEFAULT_CHAT_COOLDOWN_MS : Number(process.env.CHAT_COOLDOWN_MS || DEFAULT_CHAT_COOLDOWN_MS);
+    const COOLDOWN_MS = Number(process.env.CHAT_COOLDOWN_MS || DEFAULT_CHAT_COOLDOWN_MS);
     const lastInteraction = cooldownMap.get(message.author.id) || 0;
     const now = Date.now();
 
