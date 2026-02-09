@@ -211,13 +211,18 @@ export function sanitizeInput(input) {
   }
 
   // Remove potential XSS patterns more thoroughly
-  return input
+  let sanitized = input
     .replaceAll(/[<>]/g, '')
     .replaceAll(/javascript:/gi, '')
     .replaceAll(/data:/gi, '')
-    .replaceAll(/vbscript:/gi, '')
-    .replaceAll(/on\w+\s*=/gi, '') // Remove all event handlers with optional spaces
-    .trim();
+    .replaceAll(/vbscript:/gi, '');
+  
+  // Remove event handlers more thoroughly
+  sanitized = sanitized.replace(/on\w+\s*=/gi, '');
+  // Second pass to catch any remaining
+  sanitized = sanitized.replace(/on\w+\s*=/gi, '');
+  
+  return sanitized.trim();
 }
 
 /**
