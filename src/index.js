@@ -28,6 +28,7 @@ import { performanceMonitor, startMemoryTracking, stopMemoryTracking } from './u
 import { registerDefaultHealthChecks, healthCheckManager } from './utils/healthCheck.js';
 import { startLogCleanup, stopLogCleanup, enhancedLogger } from './utils/enhancedLogger.js';
 import { destroyAllCaches } from './utils/cacheManager.js';
+import { startAutomaticBackups, stopAutomaticBackups } from './utils/backupSystem.js';
 
 /**
  * @typedef {Object} Command
@@ -171,6 +172,9 @@ client.once('ready', () => {
     // Start log cleanup (check daily, keep 7 days)
     startLogCleanup(24, 7);
     
+    // Start automatic backups (every 6 hours)
+    startAutomaticBackups(6);
+    
     enhancedLogger.info('Monitoring systems initialized successfully');
   } catch (error) {
     logger.error('Failed to initialize monitoring systems', error instanceof Error ? error : new Error(String(error)));
@@ -311,6 +315,7 @@ async function gracefulShutdown(client, signal) {
     stopMemoryTracking();
     healthCheckManager.stopPeriodicChecks();
     stopLogCleanup();
+    stopAutomaticBackups();
     
     // Destroy caches
     destroyAllCaches();
