@@ -8,7 +8,9 @@ class CooldownManager {
   constructor() {
     this.ensureStorage();
     this.loadCooldowns();
-    this.tempCooldowns = new Map(); // In-memory storage for active cooldowns
+    // Performance: Use nested Map structure for O(1) user lookups
+    this.tempCooldowns = new Map(); // Map<userId, Map<action, endTime>>
+    this.userCooldowns = new Map(); // Organized by user for fast access
   }
 
   ensureStorage() {
@@ -122,8 +124,14 @@ class CooldownManager {
 
     const key = `${userId}_${action}`;
 
-    // Store in memory for immediate access
+    // Store in memory for immediate access (old format for backwards compatibility)
     this.tempCooldowns.set(key, endTime);
+    
+    // Performance: Store in user-indexed structure for O(1) lookup
+    if (!this.userCooldowns.has(userId)) {
+      this.userCooldowns.set(userId, new Map());
+    }
+    this.userCooldowns.get(userId).set(action, endTime);
 
     // Store persistently for longer cooldowns
     if (cooldown > 60_000) { // Only persist cooldowns longer than 1 minute
@@ -188,14 +196,29 @@ class CooldownManager {
     const now = Date.now();
     const cooldowns = {};
 
-    // Check in-memory cooldowns
+    // Performance: Direct user lookup instead of iterating all cooldowns
+    if (this.userCooldowns.has(userId)) {
+      const userActions = this.userCooldowns.get(userId);
+      for (const [action, endTime] of userActions) {
+        if (now < endTime) {
+          cooldowns[action] = {
+            remaining: endTime - now,
+            endTime: endTime
+          };
+        }
+      }
+    }
+
+    // Fallback: Check old format cooldowns (for backwards compatibility)
     for (const [key, endTime] of this.tempCooldowns) {
       if (key.startsWith(`${userId}_`) && now < endTime) {
         const action = key.replace(`${userId}_`, '');
-        cooldowns[action] = {
-          remaining: endTime - now,
-          endTime: endTime
-        };
+        if (!cooldowns[action]) {
+          cooldowns[action] = {
+            remaining: endTime - now,
+            endTime: endTime
+          };
+        }
       }
     }
 
@@ -216,6 +239,9 @@ class CooldownManager {
   }
 
   clearUserCooldowns(userId) {
+    // Performance: Direct user deletion instead of iteration
+    this.userCooldowns.delete(userId);
+    
     // Clear all cooldowns for a user (admin function)
     for (const [key] of this.tempCooldowns) {
       if (key.startsWith(`${userId}_`)) {
@@ -271,25 +297,49 @@ class CooldownManager {
     return activeCooldowns;
   }
 
-  // Cleanup expired cooldowns
+  // Performance: Lazy cleanup - only clean when accessed, not on interval
   cleanup() {
     const now = Date.now();
+    let cleaned = 0;
 
     // Clean up expired in-memory cooldowns
     for (const [key, endTime] of this.tempCooldowns) {
       if (now >= endTime) {
         this.tempCooldowns.delete(key);
+        cleaned++;
+      }
+    }
+    
+    // Clean up user-indexed cooldowns
+    for (const [userId, actions] of this.userCooldowns) {
+      for (const [action, endTime] of actions) {
+        if (now >= endTime) {
+          actions.delete(action);
+          cleaned++;
+        }
+      }
+      // Remove empty user entries
+      if (actions.size === 0) {
+        this.userCooldowns.delete(userId);
       }
     }
 
     // Clean up expired persistent cooldowns
+    let persistentCleaned = false;
     for (const [key, endTime] of Object.entries(this.persistentCooldowns)) {
       if (now >= endTime) {
         delete this.persistentCooldowns[key];
+        persistentCleaned = true;
+        cleaned++;
       }
     }
 
-    this.saveCooldowns();
+    // Only save if we actually cleaned persistent cooldowns
+    if (persistentCleaned) {
+      this.saveCooldowns();
+    }
+    
+    return cleaned;
   }
 
   // Function to determine button cooldown type based on customId

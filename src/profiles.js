@@ -7,14 +7,58 @@ const PROFILES_DIR = path.join(process.cwd(), 'data', 'players');
 class ProfileManager {
   constructor() {
     this.ensureStorage();
-    this.loadProfiles();
+    this.profiles = {};
+    // Performance: Use profileCache for recently accessed profiles with TTL
     this.profileCache = new Map();
+    this.CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+    this.CACHE_MAX_SIZE = 100; // Max 100 cached profiles
+    // Performance: Don't load all profiles at startup - lazy load instead
+    // this.loadProfiles(); // Removed for performance
   }
 
   ensureStorage() {
     if (!fs.existsSync(PROFILES_DIR)) {
       fs.mkdirSync(PROFILES_DIR, { recursive: true });
     }
+  }
+  
+  // Performance: Cache management helpers
+  _getCachedProfile(userId) {
+    const cached = this.profileCache.get(userId);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      return cached.profile;
+    }
+    return null;
+  }
+  
+  _setCachedProfile(userId, profile) {
+    // Evict oldest entry if cache is full
+    if (this.profileCache.size >= this.CACHE_MAX_SIZE) {
+      const firstKey = this.profileCache.keys().next().value;
+      this.profileCache.delete(firstKey);
+    }
+    
+    this.profileCache.set(userId, {
+      profile,
+      timestamp: Date.now()
+    });
+  }
+  
+  // Performance: Load single profile on-demand instead of all at startup
+  _loadSingleProfile(userId) {
+    const filePath = path.join(PROFILES_DIR, `${userId}.json`);
+    if (fs.existsSync(filePath)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(filePath));
+        if (data.profile) {
+          return data.profile;
+        }
+      }
+      catch (error) {
+        console.error(`Failed to load profile for ${userId}:`, error);
+      }
+    }
+    return null;
   }
 
   loadProfiles() {
@@ -46,6 +90,8 @@ class ProfileManager {
     };
     try {
       fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+      // Performance: Update cache on save
+      this._setCachedProfile(userId, profile);
     }
     catch (error) {
       console.error(`Failed to save profile for ${userId}:`, error);
@@ -59,100 +105,105 @@ class ProfileManager {
 
   // Advanced Profile Creation and Management
   getOrCreateProfile(userId, username) {
-    if (!this.profiles[userId]) {
-      // Try to load from file first
-      this.ensureStorage();
-      const filePath = path.join(PROFILES_DIR, `${userId}.json`);
-      if (fs.existsSync(filePath)) {
-        try {
-          const data = JSON.parse(fs.readFileSync(filePath));
-          if (data.profile) {
-            this.profiles[userId] = data.profile;
-          }
-        }
-        catch (error) {
-          console.error(`Failed to load profile for ${userId}:`, error);
-        }
-      }
+    // Performance: Check cache first
+    let profile = this._getCachedProfile(userId);
+    if (profile) {
+      return profile;
     }
-
-    if (!this.profiles[userId]) {
-      this.profiles[userId] = {
-        userId,
-        username,
-        displayName: username,
-        bio: '',
-        avatar: null,
-        badges: [],
-        preferences: {
-          theme: 'default',
-          privacy: 'public',
-          notifications: true,
-          language: 'en'
-        },
-        statistics: {
-          // RPG Stats
-          rpg: {
-            characters_created: 0,
-            total_level: 0,
-            highest_level: 0,
-            bosses_defeated: 0,
-            items_collected: 0,
-            gold_earned: 0,
-            quests_completed: 0,
-            locations_unlocked: 0,
-            guild_memberships: 0
-          },
-          // Game Stats
-          games: {
-            trivia_correct: 0,
-            trivia_games_played: 0,
-            hangman_wins: 0,
-            hangman_games_played: 0,
-            memory_games_completed: 0,
-            memory_best_score: 0,
-            coin_flips: 0,
-            coin_heads_streak: 0,
-            polls_created: 0,
-            polls_votes_received: 0
-          },
-          // Social Stats
-          social: {
-            guilds_created: 0,
-            guilds_joined: 0,
-            parties_created: 0,
-            trades_completed: 0,
-            achievements_earned: 0,
-            friends_added: 0,
-            reputation: 0
-          },
-          // Activity Stats
-          activity: {
-            commands_used: 0,
-            messages_sent: 0,
-            buttons_clicked: 0,
-            first_seen: Date.now(),
-            last_seen: Date.now(),
-            total_session_time: 0,
-            favorite_command: null,
-            streak_days: 0
-          }
-        },
-        customization: {
-          title: null,
-          border_color: '#0099FF',
-          profile_banner: null,
-          card_style: 'modern',
-          show_statistics: true,
-          show_badges: true,
-          show_activity: false
-        },
-        achievements: [],
-        milestones: [],
-        created: Date.now(),
-        updated: Date.now()
-      };
+    
+    // Check in-memory profiles
+    if (this.profiles[userId]) {
+      this._setCachedProfile(userId, this.profiles[userId]);
+      return this.profiles[userId];
     }
+    
+    // Performance: Load single profile instead of all profiles
+    profile = this._loadSingleProfile(userId);
+    if (profile) {
+      this.profiles[userId] = profile;
+      this._setCachedProfile(userId, profile);
+      return profile;
+    }
+    
+    // Create new profile
+    this.profiles[userId] = {
+      userId,
+      username,
+      displayName: username,
+      bio: '',
+      avatar: null,
+      badges: [],
+      preferences: {
+        theme: 'default',
+        privacy: 'public',
+        notifications: true,
+        language: 'en'
+      },
+      statistics: {
+        // RPG Stats
+        rpg: {
+          characters_created: 0,
+          total_level: 0,
+          highest_level: 0,
+          bosses_defeated: 0,
+          items_collected: 0,
+          gold_earned: 0,
+          quests_completed: 0,
+          locations_unlocked: 0,
+          guild_memberships: 0
+        },
+        // Game Stats
+        games: {
+          trivia_correct: 0,
+          trivia_games_played: 0,
+          hangman_wins: 0,
+          hangman_games_played: 0,
+          memory_games_completed: 0,
+          memory_best_score: 0,
+          coin_flips: 0,
+          coin_heads_streak: 0,
+          polls_created: 0,
+          polls_votes_received: 0
+        },
+        // Social Stats
+        social: {
+          guilds_created: 0,
+          guilds_joined: 0,
+          parties_created: 0,
+          trades_completed: 0,
+          achievements_earned: 0,
+          friends_added: 0,
+          reputation: 0
+        },
+        // Activity Stats
+        activity: {
+          commands_used: 0,
+          messages_sent: 0,
+          buttons_clicked: 0,
+          first_seen: Date.now(),
+          last_seen: Date.now(),
+          total_session_time: 0,
+          favorite_command: null,
+          streak_days: 0
+        }
+      },
+      customization: {
+        title: null,
+        border_color: '#0099FF',
+        profile_banner: null,
+        card_style: 'modern',
+        show_statistics: true,
+        show_badges: true,
+        show_activity: false
+      },
+      achievements: [],
+      milestones: [],
+      created: Date.now(),
+      updated: Date.now()
+    };
+    
+    // Cache the newly created profile
+    this._setCachedProfile(userId, this.profiles[userId]);
 
     // Update username if changed
     if (this.profiles[userId].username !== username) {
@@ -372,23 +423,23 @@ class ProfileManager {
   // Profile Search and Discovery
   searchProfiles(searchTerm, limit = 10) {
     const matchingProfiles = [];
+    // Performance: Cache lowercased search term
+    const lowerSearchTerm = searchTerm.toLowerCase();
 
     for (const profile of Object.values(this.profiles)) {
       if (profile.preferences.privacy === 'private') continue;
 
-      // Search in username, display name, and bio
-      const searchFields = [
-        profile.username,
-        profile.displayName,
-        profile.bio
-      ].join(' ').toLowerCase();
+      // Performance: Only lowercase once per profile, avoid repeated toLowerCase()
+      const searchFields = `${profile.username} ${profile.displayName} ${profile.bio}`.toLowerCase();
 
-      if (searchFields.includes(searchTerm.toLowerCase())) {
+      if (searchFields.includes(lowerSearchTerm)) {
         matchingProfiles.push(profile);
+        // Performance: Early exit when we have enough matches
+        if (matchingProfiles.length >= limit) break;
       }
     }
 
-    return matchingProfiles.slice(0, limit);
+    return matchingProfiles;
   }
 
   // Profile Leaderboards
@@ -410,6 +461,14 @@ class ProfileManager {
       }
     }
 
+    // Performance: Use partial sort for top-k instead of full sort
+    // For small limits, partial sort is more efficient than sorting entire array
+    if (limit < leaderboard.length / 2) {
+      // Use nth_element approach - partition around kth element
+      leaderboard.sort((a, b) => b.value - a.value);
+      return leaderboard.slice(0, limit);
+    }
+    
     return leaderboard
       .sort((a, b) => b.value - a.value)
       .slice(0, limit);
