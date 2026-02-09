@@ -23,6 +23,13 @@ import { isOnCooldown, setCooldown } from './cooldowns.js';
 import { initializeDatabase } from './storage.js';
 import { schedulerManager } from './scheduler.js';
 
+// Enhanced utilities
+import { performanceMonitor, startMemoryTracking, stopMemoryTracking } from './utils/performanceMonitor.js';
+import { registerDefaultHealthChecks, healthCheckManager } from './utils/healthCheck.js';
+import { startLogCleanup, stopLogCleanup, enhancedLogger } from './utils/enhancedLogger.js';
+import { destroyAllCaches } from './utils/cacheManager.js';
+import { startAutomaticBackups, stopAutomaticBackups } from './utils/backupSystem.js';
+
 /**
  * @typedef {Object} Command
  * @property {import('discord.js').SlashCommandBuilder} data - The command data structure.
@@ -148,6 +155,30 @@ client.once('ready', () => {
   };
 
   logger.success(`Bot started successfully as ${user.tag}`, stats);
+  
+  // Initialize monitoring systems
+  try {
+    enhancedLogger.info('Initializing monitoring systems...');
+    
+    // Start memory tracking (every minute)
+    startMemoryTracking(60000);
+    
+    // Register health checks
+    registerDefaultHealthChecks(client);
+    
+    // Start periodic health checks (every 5 minutes)
+    healthCheckManager.startPeriodicChecks(300000);
+    
+    // Start log cleanup (check daily, keep 7 days)
+    startLogCleanup(24, 7);
+    
+    // Start automatic backups (every 6 hours)
+    startAutomaticBackups(6);
+    
+    enhancedLogger.info('Monitoring systems initialized successfully');
+  } catch (error) {
+    logger.error('Failed to initialize monitoring systems', error instanceof Error ? error : new Error(String(error)));
+  }
 
   // Set up graceful shutdown handlers
   process.on('SIGINT', () => gracefulShutdown(client, 'SIGINT'));
@@ -173,7 +204,25 @@ client.once('ready', () => {
 
 client.on('interactionCreate', async interaction => {
   if (interaction.isChatInputCommand() || interaction.isButton() || interaction.isModalSubmit()) {
-    await handleInteraction(interaction, client);
+    const startTime = Date.now();
+    
+    try {
+      await handleInteraction(interaction, client);
+      
+      // Record command execution
+      if (interaction.isChatInputCommand()) {
+        const duration = Date.now() - startTime;
+        performanceMonitor.recordCommand(interaction.commandName, duration, true);
+      }
+    } catch (error) {
+      // Record error
+      if (interaction.isChatInputCommand()) {
+        const duration = Date.now() - startTime;
+        performanceMonitor.recordCommand(interaction.commandName, duration, false);
+        performanceMonitor.recordError('command_execution', error instanceof Error ? error : new Error(String(error)));
+      }
+      throw error;
+    }
   }
 });
 /**
@@ -260,6 +309,20 @@ async function gracefulShutdown(client, signal) {
         status: 'dnd'
       });
     }
+    
+    // Stop monitoring systems
+    logger.info('Stopping monitoring systems...');
+    stopMemoryTracking();
+    healthCheckManager.stopPeriodicChecks();
+    stopLogCleanup();
+    stopAutomaticBackups();
+    
+    // Destroy caches
+    destroyAllCaches();
+    
+    // Generate final performance report
+    const report = performanceMonitor.generateReport();
+    logger.info('Final performance report', report);
 
     // Close database connections if applicable
     // Note: Database cleanup would be handled by the storage module
