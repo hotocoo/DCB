@@ -13,7 +13,7 @@
 export function validateString(value, options = {}) {
   const {
     minLength = 0,
-    maxLength = Infinity,
+    maxLength = Number.POSITIVE_INFINITY,
     allowEmpty = false,
     pattern = null,
     trim = true
@@ -52,8 +52,8 @@ export function validateString(value, options = {}) {
  */
 export function validateNumber(value, options = {}) {
   const {
-    min = -Infinity,
-    max = Infinity,
+    min = Number.NEGATIVE_INFINITY,
+    max = Number.POSITIVE_INFINITY,
     integer = false,
     positive = false
   } = options;
@@ -122,16 +122,17 @@ export function validateURL(url, options = {}) {
 
   try {
     const parsed = new URL(url);
-    
+
     if (!allowedProtocols.includes(parsed.protocol)) {
-      return { 
-        valid: false, 
-        error: `Protocol must be one of: ${allowedProtocols.join(', ')}` 
+      return {
+        valid: false,
+        error: `Protocol must be one of: ${allowedProtocols.join(', ')}`
       };
     }
 
     return { valid: true, value: url };
-  } catch {
+  }
+  catch {
     return { valid: false, error: 'Invalid URL format' };
   }
 }
@@ -143,22 +144,22 @@ export function validateURL(url, options = {}) {
  * @returns {Promise<Object>} Validation result
  */
 export async function validateFilePath(filePath, baseDir) {
-  const path = await import('path');
-  
+  const path = await import('node:path');
+
   // Normalize paths
   const normalized = path.normalize(filePath);
   const base = path.normalize(baseDir);
-  
+
   // Check for path traversal
   if (!normalized.startsWith(base)) {
     return { valid: false, error: 'Path traversal detected' };
   }
-  
+
   // Check for suspicious patterns
   if (/\.\.|[\0\n\r]/.test(filePath)) {
     return { valid: false, error: 'Invalid characters in path' };
   }
-  
+
   return { valid: true, value: normalized };
 }
 
@@ -184,7 +185,8 @@ export function validateJSON(jsonString) {
   try {
     const parsed = JSON.parse(jsonString);
     return { valid: true, value: parsed };
-  } catch (error) {
+  }
+  catch {
     return { valid: false, error: 'Invalid JSON format' };
   }
 }
@@ -198,12 +200,12 @@ export function sanitizeInput(input) {
   if (typeof input !== 'string') {
     return '';
   }
-  
+
   // Remove potential XSS patterns
   return input
-    .replace(/[<>]/g, '')
-    .replace(/javascript:/gi, '')
-    .replace(/on\w+=/gi, '')
+    .replaceAll(/[<>]/g, '')
+    .replaceAll(/javascript:/gi, '')
+    .replaceAll(/on\w+=/gi, '')
     .trim();
 }
 
@@ -216,7 +218,7 @@ export function sanitizeInput(input) {
 export function validateArray(value, options = {}) {
   const {
     minLength = 0,
-    maxLength = Infinity,
+    maxLength = Number.POSITIVE_INFINITY,
     itemValidator = null
   } = options;
 
@@ -233,8 +235,8 @@ export function validateArray(value, options = {}) {
   }
 
   if (itemValidator) {
-    for (let i = 0; i < value.length; i++) {
-      const result = itemValidator(value[i]);
+    for (const [i, element] of value.entries()) {
+      const result = itemValidator(element);
       if (!result.valid) {
         return { valid: false, error: `Item ${i}: ${result.error}` };
       }
@@ -260,7 +262,7 @@ export function validateObject(obj, schema) {
   for (const [key, validator] of Object.entries(schema)) {
     const value = obj[key];
     const result = validator(value);
-    
+
     if (!result.valid) {
       errors[key] = result.error;
     }

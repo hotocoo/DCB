@@ -27,9 +27,9 @@ export class Cache {
   constructor(name, options = {}) {
     this.name = name;
     this.store = new Map();
-    this.defaultTTL = options.ttl || 3600000; // 1 hour default
+    this.defaultTTL = options.ttl || 3_600_000; // 1 hour default
     this.maxSize = options.maxSize || 1000;
-    this.cleanupInterval = options.cleanupInterval || 300000; // 5 minutes
+    this.cleanupInterval = options.cleanupInterval || 300_000; // 5 minutes
 
     // Start cleanup timer
     this.startCleanup();
@@ -59,14 +59,14 @@ export class Cache {
    */
   get(key) {
     const entry = this.store.get(key);
-    
+
     if (!entry) {
-      return undefined;
+      return;
     }
 
     if (entry.isExpired()) {
       this.store.delete(key);
-      return undefined;
+      return;
     }
 
     return entry.value;
@@ -79,7 +79,7 @@ export class Cache {
    */
   has(key) {
     const entry = this.store.get(key);
-    
+
     if (!entry) {
       return false;
     }
@@ -152,7 +152,7 @@ export class Cache {
    */
   cleanup() {
     const before = this.store.size;
-    
+
     for (const [key, entry] of this.store.entries()) {
       if (entry.isExpired()) {
         this.store.delete(key);
@@ -234,7 +234,7 @@ class CacheManager {
    * @returns {Object[]} Array of cache statistics
    */
   stats() {
-    return Array.from(this.caches.values()).map(cache => cache.stats());
+    return [...this.caches.values()].map(cache => cache.stats());
   }
 
   /**

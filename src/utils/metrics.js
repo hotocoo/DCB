@@ -68,7 +68,8 @@ class MetricsCollector {
       this.histogram(`${name}_duration_ms`, Date.now() - start, labels);
       this.increment(`${name}_total`, 1, { ...labels, status: 'success' });
       return result;
-    } catch (error) {
+    }
+    catch (error) {
       this.increment(`${name}_total`, 1, { ...labels, status: 'error' });
       throw error;
     }
@@ -125,7 +126,7 @@ class MetricsCollector {
     return {
       count: values.length,
       min: sorted[0],
-      max: sorted[sorted.length - 1],
+      max: sorted.at(-1),
       avg: sum / values.length,
       p50: sorted[Math.floor(values.length * 0.5)],
       p95: sorted[Math.floor(values.length * 0.95)],
@@ -167,9 +168,9 @@ class CommandMetrics {
    */
   recordCommand(commandName, duration, success) {
     this.collector.histogram('command_duration_ms', duration, { command: commandName });
-    this.collector.increment('command_total', 1, { 
-      command: commandName, 
-      status: success ? 'success' : 'error' 
+    this.collector.increment('command_total', 1, {
+      command: commandName,
+      status: success ? 'success' : 'error'
     });
   }
 
@@ -181,9 +182,9 @@ class CommandMetrics {
    */
   recordAPICall(service, duration, statusCode) {
     this.collector.histogram('api_call_duration_ms', duration, { service });
-    this.collector.increment('api_call_total', 1, { 
-      service, 
-      status: statusCode >= 200 && statusCode < 300 ? 'success' : 'error' 
+    this.collector.increment('api_call_total', 1, {
+      service,
+      status: statusCode >= 200 && statusCode < 300 ? 'success' : 'error'
     });
   }
 
@@ -193,9 +194,9 @@ class CommandMetrics {
    * @param {boolean} hit - Whether it was a hit
    */
   recordCacheAccess(cacheName, hit) {
-    this.collector.increment('cache_access_total', 1, { 
-      cache: cacheName, 
-      result: hit ? 'hit' : 'miss' 
+    this.collector.increment('cache_access_total', 1, {
+      cache: cacheName,
+      result: hit ? 'hit' : 'miss'
     });
   }
 
@@ -207,9 +208,9 @@ class CommandMetrics {
    */
   recordDBOperation(operation, duration, success) {
     this.collector.histogram('db_operation_duration_ms', duration, { operation });
-    this.collector.increment('db_operation_total', 1, { 
-      operation, 
-      status: success ? 'success' : 'error' 
+    this.collector.increment('db_operation_total', 1, {
+      operation,
+      status: success ? 'success' : 'error'
     });
   }
 

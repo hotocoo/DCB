@@ -159,7 +159,7 @@ export function validateConfig() {
   }
 
   if (errors.length > 0) {
-    throw new Error(\`Configuration validation failed:\\n\${errors.join('\\n')}\`);
+    throw new Error(`Configuration validation failed:\n${errors.join('\n')}`);
   }
 }
 

@@ -4,9 +4,10 @@
  * @module utils/fileStorage
  */
 
-import fs from 'fs/promises';
-import fsSync from 'fs';
-import path from 'path';
+import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
+import path from 'node:path';
+
 import { logger } from '../logger.js';
 
 /**
@@ -28,9 +29,9 @@ async function acquireLock(filePath) {
   while (fileLocks.has(filePath)) {
     await new Promise(resolve => setTimeout(resolve, 10));
   }
-  
+
   fileLocks.set(filePath, true);
-  
+
   return () => {
     fileLocks.delete(filePath);
   };
@@ -44,12 +45,13 @@ async function acquireLock(filePath) {
  */
 export async function readJSON(filePath, defaultValue = null) {
   const release = await acquireLock(filePath);
-  
+
   try {
     // Check if file exists
     try {
       await fs.access(filePath);
-    } catch {
+    }
+    catch {
       logger.debug(`File not found, returning default: ${filePath}`);
       return defaultValue;
     }
@@ -62,13 +64,15 @@ export async function readJSON(filePath, defaultValue = null) {
     }
 
     // Read and parse file
-    const data = await fs.readFile(filePath, 'utf8');
+    const data = await fs.readFile(filePath);
     return JSON.parse(data);
-    
-  } catch (error) {
+
+  }
+  catch (error) {
     logger.error(`Failed to read JSON file: ${filePath}`, error);
     return defaultValue;
-  } finally {
+  }
+  finally {
     release();
   }
 }
@@ -83,7 +87,7 @@ export async function readJSON(filePath, defaultValue = null) {
  */
 export async function writeJSON(filePath, data, options = { pretty: true }) {
   const release = await acquireLock(filePath);
-  
+
   try {
     // Ensure directory exists
     const dir = path.dirname(filePath);
@@ -91,29 +95,32 @@ export async function writeJSON(filePath, data, options = { pretty: true }) {
 
     // Write to temporary file first (atomic write)
     const tempPath = `${filePath}.tmp`;
-    const jsonString = options.pretty 
-      ? JSON.stringify(data, null, 2) 
+    const jsonString = options.pretty
+      ? JSON.stringify(data, null, 2)
       : JSON.stringify(data);
-    
+
     await fs.writeFile(tempPath, jsonString, 'utf8');
-    
+
     // Rename temp file to actual file (atomic operation)
     await fs.rename(tempPath, filePath);
-    
+
     return true;
-    
-  } catch (error) {
+
+  }
+  catch (error) {
     logger.error(`Failed to write JSON file: ${filePath}`, error);
-    
+
     // Clean up temp file if it exists
     try {
       await fs.unlink(`${filePath}.tmp`);
-    } catch {
+    }
+    catch {
       // Ignore cleanup errors
     }
-    
+
     return false;
-  } finally {
+  }
+  finally {
     release();
   }
 }
@@ -130,7 +137,8 @@ export async function listJSONFiles(dirPath) {
     return files
       .filter(file => file.endsWith('.json'))
       .map(file => path.join(dirPath, file));
-  } catch (error) {
+  }
+  catch (error) {
     logger.error(`Failed to list JSON files in: ${dirPath}`, error);
     return [];
   }

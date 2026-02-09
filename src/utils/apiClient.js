@@ -40,7 +40,7 @@ export async function fetchWithRetry(url, options = {}, config = {}) {
       clearTimeout(timeoutId);
 
       if (!response.ok && response.status >= 500) {
-        throw new Error(\`Server error: \${response.status} \${response.statusText}\`);
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
       }
 
       return response;
@@ -49,9 +49,9 @@ export async function fetchWithRetry(url, options = {}, config = {}) {
       lastError = error;
       
       if (error.name === 'AbortError') {
-        logger.warn(\`Request timeout for \${url} (attempt \${attempt + 1}/\${finalConfig.retries})\`);
+        logger.warn(`Request timeout for ${url} (attempt ${attempt + 1}/${finalConfig.retries})`);
       } else {
-        logger.warn(\`Request failed for \${url} (attempt \${attempt + 1}/\${finalConfig.retries}): \${error.message}\`);
+        logger.warn(`Request failed for ${url} (attempt ${attempt + 1}/${finalConfig.retries}): ${error.message}`);
       }
 
       // Don't retry on client errors (4xx)
@@ -82,12 +82,12 @@ export async function getJSON(url, options = {}, config = {}) {
     const response = await fetchWithRetry(url, { ...options, method: 'GET' }, config);
     
     if (!response.ok) {
-      throw new Error(\`HTTP error! status: \${response.status}\`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
     
     return await response.json();
   } catch (error) {
-    logger.error(\`GET JSON request failed for \${url}\`, error);
+    logger.error(`GET JSON request failed for ${url}`, error);
     throw error;
   }
 }
@@ -113,12 +113,12 @@ export async function postJSON(url, body, options = {}, config = {}) {
     }, config);
     
     if (!response.ok) {
-      throw new Error(\`HTTP error! status: \${response.status}\`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
     
     return await response.json();
   } catch (error) {
-    logger.error(\`POST JSON request failed for \${url}\`, error);
+    logger.error(`POST JSON request failed for ${url}`, error);
     throw error;
   }
 }
