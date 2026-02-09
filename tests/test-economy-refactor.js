@@ -8,6 +8,9 @@ import { economyManager } from '../src/economy.js';
 async function runTests() {
   console.log('🧪 Starting economy.js refactoring tests...\n');
   
+  // Wait for initialization
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
   let passed = 0;
   let failed = 0;
   

@@ -950,33 +950,47 @@ class EconomyManager {
 // Export singleton instance
 const economyManager = new EconomyManager();
 
-// Wait for initialization
-await economyManager.init();
+// Initialize on module load
+let initPromise = null;
+function ensureInitialized() {
+  if (!initPromise) {
+    initPromise = economyManager.init();
+  }
+  return initPromise;
+}
+
+// Start initialization immediately
+ensureInitialized();
 
 export { economyManager };
 
 // Convenience functions
-export async function getBalance(userId) {
+export function getBalance(userId) {
   return economyManager.getBalance(userId);
 }
 
 export async function addBalance(userId, amount) {
+  await ensureInitialized();
   return await economyManager.addBalance(userId, amount);
 }
 
 export async function subtractBalance(userId, amount) {
+  await ensureInitialized();
   return await economyManager.subtractBalance(userId, amount);
 }
 
 export async function transferBalance(fromUserId, toUserId, amount) {
+  await ensureInitialized();
   return await economyManager.transferBalance(fromUserId, toUserId, amount);
 }
 
 export async function createBusiness(userId, businessType, initialInvestment) {
+  await ensureInitialized();
   return await economyManager.createBusiness(userId, businessType, initialInvestment);
 }
 
 export async function collectBusinessIncome(userId) {
+  await ensureInitialized();
   return await economyManager.collectBusinessIncome(userId);
 }
 
@@ -985,10 +999,12 @@ export function getMarketPrice(itemId) {
 }
 
 export async function buyFromMarket(userId, itemId, quantity = 1) {
+  await ensureInitialized();
   return await economyManager.buyFromMarket(userId, itemId, quantity);
 }
 
 export async function sellToMarket(userId, itemId, quantity = 1) {
+  await ensureInitialized();
   return await economyManager.sellToMarket(userId, itemId, quantity);
 }
 
@@ -1001,6 +1017,7 @@ export function getTransactionHistory(userId, limit = 50) {
 }
 
 export async function createLottery(userId, ticketPrice, prizePool) {
+  await ensureInitialized();
   return await economyManager.createLottery(userId, ticketPrice, prizePool);
 }
 
@@ -1009,6 +1026,7 @@ export function getUserBusinesses(userId) {
 }
 
 export async function upgradeBusiness(userId, businessId) {
+  await ensureInitialized();
   return await economyManager.upgradeBusiness(userId, businessId);
 }
 
@@ -1017,10 +1035,12 @@ export function getInvestmentTypes() {
 }
 
 export async function claimDailyReward(userId) {
+  await ensureInitialized();
   return await economyManager.claimDailyReward(userId);
 }
 
 export async function createInvestment(userId, investmentType, amount) {
+  await ensureInitialized();
   return await economyManager.createInvestment(userId, investmentType, amount);
 }
 
