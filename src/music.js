@@ -18,6 +18,7 @@ import pkg from 'libsodium-wrappers';
 // Import validation utilities
 import { inputValidator, sanitizeInput, validateString } from './validation.js';
 import { CommandError, handleCommandError } from './errorHandler';
+import { caches } from './utils/cacheManager.js';
 
 // FFmpeg binary path resolution and validation
 let ffmpegPath = ffmpeg;
@@ -66,9 +67,9 @@ class MusicManager {
     this.audioPlayers = new Map(); // guildId -> audio player
     this.history = new Map(); // guildId -> history array
 
-    // Performance optimization caches
-    this.searchCache = new Map(); // Cache recent search results
-    this.validationCache = new Map(); // Cache URL validation results
+    // Use enhanced cache manager for search and validation
+    this.searchCache = caches.music;
+    this.validationCache = caches.music;
 
     // Start periodic cleanup to prevent memory leaks
     this.startPeriodicCleanup();
@@ -146,25 +147,7 @@ class MusicManager {
       }
     }
 
-    // Clean up search cache (remove entries older than 30 minutes)
-    if (this.searchCache) {
-      for (const [key, entry] of this.searchCache.entries()) {
-        if ((now - entry.timestamp) > 30 * 60 * 1000) { // 30 minutes
-          this.searchCache.delete(key);
-          cleanedCount++;
-        }
-      }
-    }
-
-    // Clean up validation cache (remove entries older than 15 minutes)
-    if (this.validationCache) {
-      for (const [key, entry] of this.validationCache.entries()) {
-        if ((now - entry.timestamp) > 15 * 60 * 1000) { // 15 minutes
-          this.validationCache.delete(key);
-          cleanedCount++;
-        }
-      }
-    }
+    // Cache cleanup is now handled automatically by the CacheManager
 
     logger.info('Periodic cleanup completed', { itemsCleaned: cleanedCount });
   }
@@ -360,9 +343,9 @@ class MusicManager {
 
       // Check cache first (simple in-memory cache for recent searches)
       const cacheKey = `${sanitizedQuery}_${limit}`;
-      const cached = this.searchCache?.get(cacheKey);
-      if (cached && (Date.now() - cached.timestamp) < 300_000) { // 5 minute cache
-        return cached.results;
+      const cached = this.searchCache.get(cacheKey);
+      if (cached) {
+        return cached;
       }
 
       const results = [];
@@ -388,9 +371,8 @@ class MusicManager {
               preview: track.preview_url || null
             }];
 
-            // Cache the result
-            if (!this.searchCache) this.searchCache = new Map();
-            this.searchCache.set(cacheKey, { results: result, timestamp: Date.now() });
+            // Cache the result with 5 minute TTL
+            this.searchCache.set(cacheKey, result, 300000);
 
             return result;
           }
@@ -567,9 +549,8 @@ class MusicManager {
             results: validVideos.length
           });
 
-          // Cache the result
-          if (!this.searchCache) this.searchCache = new Map();
-          this.searchCache.set(cacheKey, { results: validVideos, timestamp: Date.now() });
+          // Cache the result with 5 minute TTL
+          this.searchCache.set(cacheKey, validVideos, 300000);
 
           return validVideos;
         }
@@ -606,9 +587,8 @@ class MusicManager {
               results: validVideos.length
             });
 
-            // Cache the result
-            if (!this.searchCache) this.searchCache = new Map();
-            this.searchCache.set(cacheKey, { results: validVideos, timestamp: Date.now() });
+            // Cache the result with 5 minute TTL
+            this.searchCache.set(cacheKey, validVideos, 300000);
 
             return validVideos;
           }
@@ -648,9 +628,8 @@ class MusicManager {
             results: results.length
           });
 
-          // Cache the result
-          if (!this.searchCache) this.searchCache = new Map();
-          this.searchCache.set(cacheKey, { results, timestamp: Date.now() });
+          // Cache the result with 5 minute TTL
+          this.searchCache.set(cacheKey, results, 300000);
 
           return results;
         }
@@ -684,9 +663,8 @@ class MusicManager {
             results: results.length
           });
 
-          // Cache the result
-          if (!this.searchCache) this.searchCache = new Map();
-          this.searchCache.set(cacheKey, { results, timestamp: Date.now() });
+          // Cache the result with 5 minute TTL
+          this.searchCache.set(cacheKey, results, 300000);
 
           return results;
         }
@@ -720,9 +698,9 @@ class MusicManager {
 
     // Check cache first
     const cacheKey = `validate_${url}`;
-    const cached = this.validationCache?.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp) < 600_000) { // 10 minute cache
-      return cached.result;
+    const cached = this.validationCache.get(cacheKey);
+    if (cached) {
+      return cached;
     }
 
     try {
@@ -738,9 +716,8 @@ class MusicManager {
                 valid: true,
                 hasPreview: !!data.body.preview_url
               };
-              // Cache the result
-              if (!this.validationCache) this.validationCache = new Map();
-              this.validationCache.set(cacheKey, { result, timestamp: Date.now() });
+              // Cache the result with 10 minute TTL
+              this.validationCache.set(cacheKey, result, 600000);
               return result;
             }
           }
@@ -763,9 +740,8 @@ class MusicManager {
             const response = await axios.get(`https://api.deezer.com/track/${trackId}`, { timeout: 5000 });
             if (response.data && response.data.title) {
               const result = { valid: true };
-              // Cache the result
-              if (!this.validationCache) this.validationCache = new Map();
-              this.validationCache.set(cacheKey, { result, timestamp: Date.now() });
+              // Cache the result with 10 minute TTL
+              this.validationCache.set(cacheKey, result, 600000);
               return result;
             }
           }
@@ -853,9 +829,8 @@ class MusicManager {
           }
 
           const result = { valid: true };
-          // Cache the result
-          if (!this.validationCache) this.validationCache = new Map();
-          this.validationCache.set(cacheKey, { result, timestamp: Date.now() });
+          // Cache the result with 10 minute TTL
+          this.validationCache.set(cacheKey, result, 600000);
           return result;
         }
         catch (error) {
@@ -870,9 +845,8 @@ class MusicManager {
 
       // Non-YouTube/Spotify/Deezer URLs are assumed valid (like radio streams)
       const result = { valid: true };
-      // Cache the result
-      if (!this.validationCache) this.validationCache = new Map();
-      this.validationCache.set(cacheKey, { result, timestamp: Date.now() });
+      // Cache the result with 10 minute TTL
+      this.validationCache.set(cacheKey, result, 600000);
       return result;
 
     }
