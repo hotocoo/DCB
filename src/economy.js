@@ -1,150 +1,273 @@
-import fs from 'node:fs';
 import path from 'node:path';
+import { readJSON, writeJSON } from './utils/fileStorage.js';
+import { Cache } from './utils/cache.js';
+import { validateNumber, validateUserId } from './utils/validators.js';
+import { metrics } from './utils/metrics.js';
+import { logger } from './logger.js';
 
 const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
 
 // Advanced Economy System with Banking and Marketplace
 class EconomyManager {
   constructor() {
-    this.ensureStorage();
-    this.loadEconomy();
+    this.economyData = null;
     this.marketPrices = new Map();
     this.priceHistory = new Map();
+    this.cache = new Cache('economy', { ttl: 300000, maxSize: 500 });
+    this.locks = new Map();
+    this.init();
+  }
+
+  async init() {
+    await this.loadEconomy();
     this.initializeMarket();
   }
 
-  ensureStorage() {
-    const dir = path.dirname(ECONOMY_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(ECONOMY_FILE)) {
-      fs.writeFileSync(ECONOMY_FILE, JSON.stringify({
+  async loadEconomy() {
+    try {
+      const data = await readJSON(ECONOMY_FILE, {
         userBalances: {},
         transactions: [],
         marketItems: {},
         businessData: {},
-        investments: {}
-      }));
-    }
-  }
-
-  loadEconomy() {
-    try {
-      const data = JSON.parse(fs.readFileSync(ECONOMY_FILE));
+        investments: {},
+        dailyRewards: {}
+      });
       this.economyData = data;
-    }
-    catch (error) {
-      console.error('Failed to load economy:', error);
+      logger.info('Economy data loaded successfully');
+    } catch (error) {
+      logger.error('Failed to load economy', error);
       this.economyData = {
         userBalances: {},
         transactions: [],
         marketItems: {},
         businessData: {},
-        investments: {}
+        investments: {},
+        dailyRewards: {}
       };
     }
   }
 
-  saveEconomy() {
-    try {
-      fs.writeFileSync(ECONOMY_FILE, JSON.stringify(this.economyData, null, 2));
+  async saveEconomy() {
+    return await metrics.collector.time('economy_save', async () => {
+      try {
+        const success = await writeJSON(ECONOMY_FILE, this.economyData);
+        if (!success) {
+          logger.error('Failed to save economy data');
+        }
+        return success;
+      } catch (error) {
+        logger.error('Failed to save economy', error);
+        return false;
+      }
+    });
+  }
+
+  async acquireLock(lockKey) {
+    while (this.locks.has(lockKey)) {
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
-    catch (error) {
-      console.error('Failed to save economy:', error);
-    }
+    this.locks.set(lockKey, true);
+    return () => this.locks.delete(lockKey);
   }
 
   // Advanced Banking System
   getBalance(userId) {
-    return this.economyData.userBalances[userId] || 0;
+    const validation = validateUserId(userId);
+    if (!validation.valid) {
+      logger.warn('Invalid userId for getBalance', { userId });
+      return 0;
+    }
+
+    const cacheKey = `balance:${userId}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const balance = this.economyData.userBalances[userId] || 0;
+    this.cache.set(cacheKey, balance, 60000);
+    return balance;
   }
 
-  setBalance(userId, amount) {
-    this.economyData.userBalances[userId] = Math.max(0, amount);
-    this.saveEconomy();
-    return this.economyData.userBalances[userId];
+  async setBalance(userId, amount) {
+    const validation = validateUserId(userId);
+    if (!validation.valid) {
+      logger.error('Invalid userId for setBalance', null, { userId });
+      return 0;
+    }
+
+    const amountValidation = validateNumber(amount, { min: 0 });
+    if (!amountValidation.valid) {
+      logger.error('Invalid amount for setBalance', null, { userId, amount });
+      return this.getBalance(userId);
+    }
+
+    const release = await this.acquireLock(`balance:${userId}`);
+    try {
+      this.economyData.userBalances[userId] = Math.max(0, amount);
+      this.cache.delete(`balance:${userId}`);
+      await this.saveEconomy();
+      metrics.increment('economy_balance_set', 1, { userId });
+      return this.economyData.userBalances[userId];
+    } finally {
+      release();
+    }
   }
 
-  addBalance(userId, amount) {
+  async addBalance(userId, amount) {
+    const amountValidation = validateNumber(amount, { min: 0 });
+    if (!amountValidation.valid) {
+      logger.error('Invalid amount for addBalance', null, { userId, amount });
+      return this.getBalance(userId);
+    }
+
     const current = this.getBalance(userId);
-    return this.setBalance(userId, current + amount);
+    return await this.setBalance(userId, current + amount);
   }
 
-  subtractBalance(userId, amount) {
+  async subtractBalance(userId, amount) {
+    const amountValidation = validateNumber(amount, { min: 0 });
+    if (!amountValidation.valid) {
+      logger.error('Invalid amount for subtractBalance', null, { userId, amount });
+      return this.getBalance(userId);
+    }
+
     const current = this.getBalance(userId);
-    return this.setBalance(userId, current - amount);
+    return await this.setBalance(userId, current - amount);
   }
 
-  transferBalance(fromUserId, toUserId, amount) {
-    if (amount <= 0) return { success: false, reason: 'invalid_amount' };
-    if (this.getBalance(fromUserId) < amount) return { success: false, reason: 'insufficient_funds' };
+  async transferBalance(fromUserId, toUserId, amount) {
+    return await metrics.collector.time('economy_transfer', async () => {
+      const amountValidation = validateNumber(amount, { positive: true });
+      if (!amountValidation.valid) {
+        logger.warn('Invalid transfer amount', { fromUserId, toUserId, amount });
+        return { success: false, reason: 'invalid_amount' };
+      }
 
-    this.subtractBalance(fromUserId, amount);
-    this.addBalance(toUserId, amount);
+      if (this.getBalance(fromUserId) < amount) {
+        return { success: false, reason: 'insufficient_funds' };
+      }
 
-    // Log transaction
-    this.logTransaction({
-      type: 'transfer',
-      from: fromUserId,
-      to: toUserId,
-      amount,
-      timestamp: Date.now()
+      const release = await this.acquireLock(`transfer:${fromUserId}:${toUserId}`);
+      try {
+        await this.subtractBalance(fromUserId, amount);
+        await this.addBalance(toUserId, amount);
+
+        await this.logTransaction({
+          type: 'transfer',
+          from: fromUserId,
+          to: toUserId,
+          amount,
+          timestamp: Date.now()
+        });
+
+        logger.info('Balance transfer completed', { fromUserId, toUserId, amount });
+        metrics.increment('economy_transfer_success', 1);
+        return { success: true };
+      } catch (error) {
+        logger.error('Transfer failed', error, { fromUserId, toUserId, amount });
+        metrics.increment('economy_transfer_error', 1);
+        return { success: false, reason: 'transfer_error' };
+      } finally {
+        release();
+      }
     });
-
-    return { success: true };
   }
 
   // Advanced Transaction System
-  logTransaction(transaction) {
-    transaction.id = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-    this.economyData.transactions.push(transaction);
+  async logTransaction(transaction) {
+    const release = await this.acquireLock('transactions');
+    try {
+      transaction.id = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      this.economyData.transactions.push(transaction);
 
-    // Keep only last 10000 transactions
-    if (this.economyData.transactions.length > 10_000) {
-      this.economyData.transactions = this.economyData.transactions.slice(-10_000);
+      // Keep only last 10000 transactions
+      if (this.economyData.transactions.length > 10_000) {
+        this.economyData.transactions = this.economyData.transactions.slice(-10_000);
+      }
+
+      await this.saveEconomy();
+      metrics.increment('economy_transaction_logged', 1, { type: transaction.type });
+      return transaction;
+    } finally {
+      release();
     }
-
-    this.saveEconomy();
-    return transaction;
   }
 
   getTransactionHistory(userId, limit = 50) {
-    return this.economyData.transactions
+    const validation = validateUserId(userId);
+    if (!validation.valid) {
+      logger.warn('Invalid userId for getTransactionHistory', { userId });
+      return [];
+    }
+
+    const limitValidation = validateNumber(limit, { min: 1, max: 1000, integer: true });
+    const validLimit = limitValidation.valid ? limitValidation.value : 50;
+
+    const cacheKey = `transactions:${userId}:${validLimit}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const transactions = this.economyData.transactions
       .filter(txn => txn.from === userId || txn.to === userId)
       .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, limit);
+      .slice(0, validLimit);
+
+    this.cache.set(cacheKey, transactions, 30000);
+    return transactions;
   }
 
   // Business and Investment System
-  createBusiness(userId, businessType, initialInvestment) {
-    if (this.getBalance(userId) < initialInvestment) {
-      return { success: false, reason: 'insufficient_funds' };
-    }
+  async createBusiness(userId, businessType, initialInvestment) {
+    return await metrics.collector.time('economy_create_business', async () => {
+      const validation = validateUserId(userId);
+      if (!validation.valid) {
+        return { success: false, reason: 'invalid_user_id' };
+      }
 
-    const businessId = `business_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      const investmentValidation = validateNumber(initialInvestment, { positive: true });
+      if (!investmentValidation.valid) {
+        return { success: false, reason: 'invalid_investment' };
+      }
 
-    const business = {
-      id: businessId,
-      owner: userId,
-      type: businessType,
-      level: 1,
-      income: this.getBusinessIncome(businessType, 1),
-      lastCollected: Date.now(),
-      created: Date.now(),
-      upgrades: 0,
-      employees: 1
-    };
+      if (this.getBalance(userId) < initialInvestment) {
+        return { success: false, reason: 'insufficient_funds' };
+      }
 
-    if (!this.economyData.businessData[userId]) {
-      this.economyData.businessData[userId] = [];
-    }
+      const release = await this.acquireLock(`business:${userId}`);
+      try {
+        const businessId = `business_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
-    this.economyData.businessData[userId].push(business);
-    this.subtractBalance(userId, initialInvestment);
-    this.saveEconomy();
+        const business = {
+          id: businessId,
+          owner: userId,
+          type: businessType,
+          level: 1,
+          income: this.getBusinessIncome(businessType, 1),
+          lastCollected: Date.now(),
+          created: Date.now(),
+          upgrades: 0,
+          employees: 1
+        };
 
-    return { success: true, business };
+        if (!this.economyData.businessData[userId]) {
+          this.economyData.businessData[userId] = [];
+        }
+
+        this.economyData.businessData[userId].push(business);
+        await this.subtractBalance(userId, initialInvestment);
+        await this.saveEconomy();
+
+        logger.info('Business created', { userId, businessType, businessId });
+        metrics.increment('economy_business_created', 1, { type: businessType });
+        return { success: true, business };
+      } finally {
+        release();
+      }
+    });
   }
 
   getBusinessIncome(businessType, level) {
@@ -162,111 +285,168 @@ class EconomyManager {
   }
 
   getUserBusinesses(userId) {
+    const validation = validateUserId(userId);
+    if (!validation.valid) {
+      logger.warn('Invalid userId for getUserBusinesses', { userId });
+      return [];
+    }
     return this.economyData.businessData[userId] || [];
   }
 
-  upgradeBusiness(userId, businessId) {
-    if (!this.economyData.businessData[userId]) {
-      return { success: false, reason: 'no_businesses' };
-    }
+  async upgradeBusiness(userId, businessId) {
+    return await metrics.collector.time('economy_upgrade_business', async () => {
+      const validation = validateUserId(userId);
+      if (!validation.valid) {
+        return { success: false, reason: 'invalid_user_id' };
+      }
 
-    const business = this.economyData.businessData[userId].find(b => b.id === businessId);
-    if (!business) {
-      return { success: false, reason: 'business_not_found' };
-    }
+      if (!this.economyData.businessData[userId]) {
+        return { success: false, reason: 'no_businesses' };
+      }
 
-    const upgradeCost = business.level * 500; // Cost increases with level
-    if (this.getBalance(userId) < upgradeCost) {
-      return { success: false, reason: 'insufficient_funds' };
-    }
+      const release = await this.acquireLock(`business:${userId}:${businessId}`);
+      try {
+        const business = this.economyData.businessData[userId].find(b => b.id === businessId);
+        if (!business) {
+          return { success: false, reason: 'business_not_found' };
+        }
 
-    this.subtractBalance(userId, upgradeCost);
-    business.level++;
-    business.income = this.getBusinessIncome(business.type, business.level);
-    business.upgrades++;
+        const upgradeCost = business.level * 500;
+        if (this.getBalance(userId) < upgradeCost) {
+          return { success: false, reason: 'insufficient_funds' };
+        }
 
-    this.logTransaction({
-      type: 'business_upgrade',
-      user: userId,
-      businessId,
-      amount: upgradeCost,
-      newLevel: business.level,
-      timestamp: Date.now()
+        await this.subtractBalance(userId, upgradeCost);
+        business.level++;
+        business.income = this.getBusinessIncome(business.type, business.level);
+        business.upgrades++;
+
+        await this.logTransaction({
+          type: 'business_upgrade',
+          user: userId,
+          businessId,
+          amount: upgradeCost,
+          newLevel: business.level,
+          timestamp: Date.now()
+        });
+
+        await this.saveEconomy();
+        logger.info('Business upgraded', { userId, businessId, newLevel: business.level });
+        metrics.increment('economy_business_upgraded', 1);
+        return { success: true, business };
+      } finally {
+        release();
+      }
     });
-
-    this.saveEconomy();
-    return { success: true, business };
   }
 
-  collectBusinessIncome(userId) {
-    if (!this.economyData.businessData[userId]) {
-      return { success: false, reason: 'no_businesses' };
-    }
-
-    let totalIncome = 0;
-    const now = Date.now();
-
-    for (const business of this.economyData.businessData[userId]) {
-      const hoursSinceCollection = (now - business.lastCollected) / (1000 * 60 * 60);
-      const income = Math.floor(business.income * hoursSinceCollection);
-
-      if (income > 0) {
-        totalIncome += income;
-        business.lastCollected = now;
+  async collectBusinessIncome(userId) {
+    return await metrics.collector.time('economy_collect_business_income', async () => {
+      const validation = validateUserId(userId);
+      if (!validation.valid) {
+        return { success: false, reason: 'invalid_user_id' };
       }
-    }
 
-    if (totalIncome > 0) {
-      this.addBalance(userId, totalIncome);
+      if (!this.economyData.businessData[userId]) {
+        return { success: false, reason: 'no_businesses' };
+      }
 
-      this.logTransaction({
-        type: 'business_income',
-        user: userId,
-        amount: totalIncome,
-        timestamp: Date.now()
-      });
+      const release = await this.acquireLock(`business_income:${userId}`);
+      try {
+        let totalIncome = 0;
+        const now = Date.now();
 
-      this.saveEconomy();
-    }
+        for (const business of this.economyData.businessData[userId]) {
+          const hoursSinceCollection = (now - business.lastCollected) / (1000 * 60 * 60);
+          const income = Math.floor(business.income * hoursSinceCollection);
 
-    return {
-      success: true,
-      income: totalIncome,
-      businesses: this.economyData.businessData[userId].length
-    };
+          if (income > 0) {
+            totalIncome += income;
+            business.lastCollected = now;
+          }
+        }
+
+        if (totalIncome > 0) {
+          await this.addBalance(userId, totalIncome);
+
+          await this.logTransaction({
+            type: 'business_income',
+            user: userId,
+            amount: totalIncome,
+            timestamp: Date.now()
+          });
+
+          await this.saveEconomy();
+          logger.info('Business income collected', { userId, totalIncome });
+          metrics.increment('economy_business_income_collected', 1);
+        }
+
+        return {
+          success: true,
+          income: totalIncome,
+          businesses: this.economyData.businessData[userId].length
+        };
+      } finally {
+        release();
+      }
+    });
   }
 
   // Investment System
-  createInvestment(userId, investmentType, amount) {
-    if (this.getBalance(userId) < amount) {
-      return { success: false, reason: 'insufficient_funds' };
-    }
+  async createInvestment(userId, investmentType, amount) {
+    return await metrics.collector.time('economy_create_investment', async () => {
+      const validation = validateUserId(userId);
+      if (!validation.valid) {
+        return { success: false, reason: 'invalid_user_id' };
+      }
 
-    const investmentId = `investment_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      const amountValidation = validateNumber(amount, { positive: true });
+      if (!amountValidation.valid) {
+        return { success: false, reason: 'invalid_amount' };
+      }
 
-    const investment = {
-      id: investmentId,
-      user: userId,
-      type: investmentType,
-      amount,
-      created: Date.now(),
-      maturity: Date.now() + (investmentType.duration * 24 * 60 * 60 * 1000),
-      rate: investmentType.rate,
-      status: 'active'
-    };
+      if (this.getBalance(userId) < amount) {
+        return { success: false, reason: 'insufficient_funds' };
+      }
 
-    if (!this.economyData.investments[userId]) {
-      this.economyData.investments[userId] = [];
-    }
+      const release = await this.acquireLock(`investment:${userId}`);
+      try {
+        const investmentId = `investment_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
-    this.economyData.investments[userId].push(investment);
-    this.subtractBalance(userId, amount);
-    this.saveEconomy();
+        const investment = {
+          id: investmentId,
+          user: userId,
+          type: investmentType,
+          amount,
+          created: Date.now(),
+          maturity: Date.now() + (investmentType.duration * 24 * 60 * 60 * 1000),
+          rate: investmentType.rate,
+          status: 'active'
+        };
 
-    return { success: true, investment };
+        if (!this.economyData.investments[userId]) {
+          this.economyData.investments[userId] = [];
+        }
+
+        this.economyData.investments[userId].push(investment);
+        await this.subtractBalance(userId, amount);
+        await this.saveEconomy();
+
+        logger.info('Investment created', { userId, investmentId, amount });
+        metrics.increment('economy_investment_created', 1, { type: investmentType.name });
+        return { success: true, investment };
+      } finally {
+        release();
+      }
+    });
   }
 
   getUserInvestments(userId) {
+    const validation = validateUserId(userId);
+    if (!validation.valid) {
+      logger.warn('Invalid userId for getUserInvestments', { userId });
+      return [];
+    }
     return this.economyData.investments[userId] || [];
   }
 
@@ -282,35 +462,44 @@ class EconomyManager {
     };
   }
 
-  processMatureInvestments() {
-    const now = Date.now();
+  async processMatureInvestments() {
+    return await metrics.collector.time('economy_process_investments', async () => {
+      const now = Date.now();
+      let processedCount = 0;
 
-    for (const userId in this.economyData.investments) {
-      const userInvestments = this.economyData.investments[userId];
+      for (const userId in this.economyData.investments) {
+        const userInvestments = this.economyData.investments[userId];
 
-      for (let i = userInvestments.length - 1; i >= 0; i--) {
-        const investment = userInvestments[i];
+        for (let i = userInvestments.length - 1; i >= 0; i--) {
+          const investment = userInvestments[i];
 
-        if (investment.status === 'active' && now >= investment.maturity) {
-          const returnAmount = Math.floor(investment.amount * (1 + investment.rate));
-          this.addBalance(userId, returnAmount);
+          if (investment.status === 'active' && now >= investment.maturity) {
+            const returnAmount = Math.floor(investment.amount * (1 + investment.rate));
+            await this.addBalance(userId, returnAmount);
 
-          investment.status = 'matured';
-          investment.returned = returnAmount;
-          investment.maturedAt = now;
+            investment.status = 'matured';
+            investment.returned = returnAmount;
+            investment.maturedAt = now;
 
-          this.logTransaction({
-            type: 'investment_return',
-            user: userId,
-            amount: returnAmount,
-            investmentType: investment.type.name,
-            timestamp: now
-          });
+            await this.logTransaction({
+              type: 'investment_return',
+              user: userId,
+              amount: returnAmount,
+              investmentType: investment.type.name,
+              timestamp: now
+            });
+
+            processedCount++;
+          }
         }
       }
-    }
 
-    this.saveEconomy();
+      if (processedCount > 0) {
+        await this.saveEconomy();
+        logger.info('Processed mature investments', { count: processedCount });
+        metrics.increment('economy_investments_matured', processedCount);
+      }
+    });
   }
 
   // Advanced Marketplace
@@ -342,7 +531,6 @@ class EconomyManager {
 
         this.marketPrices.set(itemId, newPrice);
 
-        // Store price history
         if (!this.priceHistory.has(itemId)) {
           this.priceHistory.set(itemId, []);
         }
@@ -350,12 +538,13 @@ class EconomyManager {
         const history = this.priceHistory.get(itemId);
         history.push({ price: newPrice, timestamp: Date.now() });
 
-        // Keep only last 100 price points
         if (history.length > 100) {
           history.shift();
         }
       }
     }
+    logger.debug('Market prices updated');
+    metrics.increment('economy_market_price_update', 1);
   }
 
   getMarketPrice(itemId) {
@@ -369,73 +558,122 @@ class EconomyManager {
     return history.filter(h => h.timestamp >= cutoffTime);
   }
 
-  buyFromMarket(userId, itemId, quantity = 1) {
-    const price = this.getMarketPrice(itemId);
-    const totalCost = price * quantity;
+  async buyFromMarket(userId, itemId, quantity = 1) {
+    return await metrics.collector.time('economy_market_buy', async () => {
+      const validation = validateUserId(userId);
+      if (!validation.valid) {
+        return { success: false, reason: 'invalid_user_id' };
+      }
 
-    if (this.getBalance(userId) < totalCost) {
-      return { success: false, reason: 'insufficient_funds' };
-    }
+      const quantityValidation = validateNumber(quantity, { positive: true, integer: true });
+      if (!quantityValidation.valid) {
+        return { success: false, reason: 'invalid_quantity' };
+      }
 
-    this.subtractBalance(userId, totalCost);
+      const price = this.getMarketPrice(itemId);
+      const totalCost = price * quantity;
 
-    this.logTransaction({
-      type: 'market_purchase',
-      user: userId,
-      item: itemId,
-      quantity,
-      amount: totalCost,
-      timestamp: Date.now()
+      if (this.getBalance(userId) < totalCost) {
+        return { success: false, reason: 'insufficient_funds' };
+      }
+
+      const release = await this.acquireLock(`market:${userId}`);
+      try {
+        await this.subtractBalance(userId, totalCost);
+
+        await this.logTransaction({
+          type: 'market_purchase',
+          user: userId,
+          item: itemId,
+          quantity,
+          amount: totalCost,
+          timestamp: Date.now()
+        });
+
+        logger.info('Market purchase', { userId, itemId, quantity, totalCost });
+        metrics.increment('economy_market_purchase', 1, { item: itemId });
+        return {
+          success: true,
+          item: itemId,
+          quantity,
+          totalCost,
+          pricePerUnit: price
+        };
+      } finally {
+        release();
+      }
     });
-
-    return {
-      success: true,
-      item: itemId,
-      quantity,
-      totalCost,
-      pricePerUnit: price
-    };
   }
 
-  sellToMarket(userId, itemId, quantity = 1) {
-    const price = Math.floor(this.getMarketPrice(itemId) * 0.8); // Sell for 80% of market price
-    const totalEarnings = price * quantity;
+  async sellToMarket(userId, itemId, quantity = 1) {
+    return await metrics.collector.time('economy_market_sell', async () => {
+      const validation = validateUserId(userId);
+      if (!validation.valid) {
+        return { success: false, reason: 'invalid_user_id' };
+      }
 
-    this.addBalance(userId, totalEarnings);
+      const quantityValidation = validateNumber(quantity, { positive: true, integer: true });
+      if (!quantityValidation.valid) {
+        return { success: false, reason: 'invalid_quantity' };
+      }
 
-    this.logTransaction({
-      type: 'market_sale',
-      user: userId,
-      item: itemId,
-      quantity,
-      amount: totalEarnings,
-      timestamp: Date.now()
+      const price = Math.floor(this.getMarketPrice(itemId) * 0.8);
+      const totalEarnings = price * quantity;
+
+      const release = await this.acquireLock(`market:${userId}`);
+      try {
+        await this.addBalance(userId, totalEarnings);
+
+        await this.logTransaction({
+          type: 'market_sale',
+          user: userId,
+          item: itemId,
+          quantity,
+          amount: totalEarnings,
+          timestamp: Date.now()
+        });
+
+        logger.info('Market sale', { userId, itemId, quantity, totalEarnings });
+        metrics.increment('economy_market_sale', 1, { item: itemId });
+        return {
+          success: true,
+          item: itemId,
+          quantity,
+          totalEarnings,
+          pricePerUnit: price
+        };
+      } finally {
+        release();
+      }
     });
-
-    return {
-      success: true,
-      item: itemId,
-      quantity,
-      totalEarnings,
-      pricePerUnit: price
-    };
   }
 
   // User Economy Statistics
   getUserEconomyStats(userId) {
+    const validation = validateUserId(userId);
+    if (!validation.valid) {
+      logger.warn('Invalid userId for getUserEconomyStats', { userId });
+      return null;
+    }
+
+    const cacheKey = `stats:${userId}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
     const balance = this.getBalance(userId);
     const transactions = this.getTransactionHistory(userId, 100);
     const businesses = this.economyData.businessData[userId] || [];
     const investments = this.economyData.investments[userId] || [];
 
-    // Calculate statistics
     const incomeTransactions = transactions.filter(t => t.type === 'business_income' || t.type === 'investment_return');
     const expenseTransactions = transactions.filter(t => t.type === 'market_purchase' || t.type === 'transfer' && t.from === userId);
 
     const totalIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
     const totalExpenses = expenseTransactions.reduce((sum, t) => sum + t.amount, 0);
 
-    return {
+    const stats = {
       balance,
       totalIncome,
       totalExpenses,
@@ -445,44 +683,65 @@ class EconomyManager {
       transactionCount: transactions.length,
       averageTransaction: transactions.length > 0 ? Math.round((totalIncome + totalExpenses) / transactions.length) : 0
     };
+
+    this.cache.set(cacheKey, stats, 60000);
+    return stats;
   }
 
   // Advanced Features
-  createLottery(userId, ticketPrice, prizePool) {
-    if (this.getBalance(userId) < ticketPrice) {
-      return { success: false, reason: 'insufficient_funds' };
-    }
+  async createLottery(userId, ticketPrice, prizePool) {
+    return await metrics.collector.time('economy_lottery', async () => {
+      const validation = validateUserId(userId);
+      if (!validation.valid) {
+        return { success: false, reason: 'invalid_user_id' };
+      }
 
-    this.subtractBalance(userId, ticketPrice);
+      const priceValidation = validateNumber(ticketPrice, { positive: true });
+      if (!priceValidation.valid) {
+        return { success: false, reason: 'invalid_ticket_price' };
+      }
 
-    // Simple lottery system
-    const lotteryNumber = Math.floor(Math.random() * 1000);
-    const winningNumber = Math.floor(Math.random() * 1000);
+      if (this.getBalance(userId) < ticketPrice) {
+        return { success: false, reason: 'insufficient_funds' };
+      }
 
-    const isWinner = lotteryNumber === winningNumber;
-    let winnings = 0;
+      const release = await this.acquireLock(`lottery:${userId}`);
+      try {
+        await this.subtractBalance(userId, ticketPrice);
 
-    if (isWinner) {
-      winnings = prizePool;
-      this.addBalance(userId, winnings);
-    }
+        const lotteryNumber = Math.floor(Math.random() * 1000);
+        const winningNumber = Math.floor(Math.random() * 1000);
 
-    this.logTransaction({
-      type: 'lottery',
-      user: userId,
-      amount: isWinner ? winnings - ticketPrice : -ticketPrice,
-      ticketPrice,
-      isWinner,
-      timestamp: Date.now()
+        const isWinner = lotteryNumber === winningNumber;
+        let winnings = 0;
+
+        if (isWinner) {
+          winnings = prizePool;
+          await this.addBalance(userId, winnings);
+        }
+
+        await this.logTransaction({
+          type: 'lottery',
+          user: userId,
+          amount: isWinner ? winnings - ticketPrice : -ticketPrice,
+          ticketPrice,
+          isWinner,
+          timestamp: Date.now()
+        });
+
+        logger.info('Lottery played', { userId, isWinner, winnings });
+        metrics.increment('economy_lottery_played', 1, { result: isWinner ? 'win' : 'lose' });
+        return {
+          success: true,
+          isWinner,
+          winnings,
+          lotteryNumber,
+          winningNumber
+        };
+      } finally {
+        release();
+      }
     });
-
-    return {
-      success: true,
-      isWinner,
-      winnings,
-      lotteryNumber,
-      winningNumber
-    };
   }
 
   // Economy Analytics
@@ -564,142 +823,173 @@ class EconomyManager {
   }
 
   // Tax System (for server economy balance)
-  collectTaxes(guildId, taxRate = 0.05) {
-    let totalTaxed = 0;
-
-    for (const userId in this.economyData.userBalances) {
-      const balance = this.economyData.userBalances[userId];
-      if (balance > 1000) { // Only tax users with significant balance
-        const tax = Math.floor(balance * taxRate);
-        this.subtractBalance(userId, tax);
-        totalTaxed += tax;
+  async collectTaxes(guildId, taxRate = 0.05) {
+    return await metrics.collector.time('economy_collect_taxes', async () => {
+      const taxRateValidation = validateNumber(taxRate, { min: 0, max: 1 });
+      if (!taxRateValidation.valid) {
+        logger.error('Invalid tax rate', null, { guildId, taxRate });
+        return 0;
       }
-    }
 
-    if (totalTaxed > 0) {
-      this.logTransaction({
-        type: 'tax_collection',
-        guild: guildId,
-        amount: totalTaxed,
-        timestamp: Date.now()
-      });
-    }
+      let totalTaxed = 0;
+      const release = await this.acquireLock('taxes');
+      
+      try {
+        for (const userId in this.economyData.userBalances) {
+          const balance = this.economyData.userBalances[userId];
+          if (balance > 1000) {
+            const tax = Math.floor(balance * taxRate);
+            await this.subtractBalance(userId, tax);
+            totalTaxed += tax;
+          }
+        }
 
-    return totalTaxed;
+        if (totalTaxed > 0) {
+          await this.logTransaction({
+            type: 'tax_collection',
+            guild: guildId,
+            amount: totalTaxed,
+            timestamp: Date.now()
+          });
+          logger.info('Taxes collected', { guildId, totalTaxed });
+          metrics.increment('economy_taxes_collected', 1);
+        }
+
+        return totalTaxed;
+      } finally {
+        release();
+      }
+    });
   }
 
   // Daily Rewards System
-  claimDailyReward(userId) {
-    const now = Date.now();
-    const lastClaim = this.economyData.dailyRewards?.[userId]?.lastClaim || 0;
-    const oneDay = 24 * 60 * 60 * 1000;
+  async claimDailyReward(userId) {
+    return await metrics.collector.time('economy_daily_reward', async () => {
+      const validation = validateUserId(userId);
+      if (!validation.valid) {
+        return { success: false, reason: 'invalid_user_id' };
+      }
 
-    if (now - lastClaim < oneDay) {
-      const hoursLeft = Math.ceil((oneDay - (now - lastClaim)) / (60 * 60 * 1000));
-      return { success: false, reason: 'daily_cooldown', hoursLeft };
-    }
+      const now = Date.now();
+      const lastClaim = this.economyData.dailyRewards?.[userId]?.lastClaim || 0;
+      const oneDay = 24 * 60 * 60 * 1000;
 
-    // Calculate reward based on streak
-    const streak = this.economyData.dailyRewards?.[userId]?.streak || 0;
-    const baseReward = 50;
-    const streakBonus = Math.min(streak * 10, 100);
-    const reward = baseReward + streakBonus;
+      if (now - lastClaim < oneDay) {
+        const hoursLeft = Math.ceil((oneDay - (now - lastClaim)) / (60 * 60 * 1000));
+        return { success: false, reason: 'daily_cooldown', hoursLeft };
+      }
 
-    this.addBalance(userId, reward);
+      const release = await this.acquireLock(`daily:${userId}`);
+      try {
+        const streak = this.economyData.dailyRewards?.[userId]?.streak || 0;
+        const baseReward = 50;
+        const streakBonus = Math.min(streak * 10, 100);
+        const reward = baseReward + streakBonus;
 
-    // Update streak
-    if (!this.economyData.dailyRewards) this.economyData.dailyRewards = {};
-    this.economyData.dailyRewards[userId] = {
-      lastClaim: now,
-      streak: streak + 1
-    };
+        await this.addBalance(userId, reward);
 
-    this.logTransaction({
-      type: 'daily_reward',
-      user: userId,
-      amount: reward,
-      streak: streak + 1,
-      timestamp: now
+        if (!this.economyData.dailyRewards) this.economyData.dailyRewards = {};
+        this.economyData.dailyRewards[userId] = {
+          lastClaim: now,
+          streak: streak + 1
+        };
+
+        await this.logTransaction({
+          type: 'daily_reward',
+          user: userId,
+          amount: reward,
+          streak: streak + 1,
+          timestamp: now
+        });
+
+        await this.saveEconomy();
+        logger.info('Daily reward claimed', { userId, reward, streak: streak + 1 });
+        metrics.increment('economy_daily_reward_claimed', 1);
+        return { success: true, reward, streak: streak + 1 };
+      } finally {
+        release();
+      }
     });
-
-    this.saveEconomy();
-
-    return { success: true, reward, streak: streak + 1 };
   }
 
   // Cleanup and Maintenance
-  cleanup() {
-    // Process mature investments
-    this.processMatureInvestments();
+  async cleanup() {
+    return await metrics.collector.time('economy_cleanup', async () => {
+      await this.processMatureInvestments();
 
-    // Clean up old transaction history
-    const cutoffTime = Date.now() - (30 * 24 * 60 * 60 * 1000); // 30 days
-    this.economyData.transactions = this.economyData.transactions.filter(t => t.timestamp > cutoffTime);
+      const cutoffTime = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      this.economyData.transactions = this.economyData.transactions.filter(t => t.timestamp > cutoffTime);
 
-    // Clean up price history maps (keep only last 50 entries per item)
-    for (const [itemId, history] of this.priceHistory.entries()) {
-      if (history.length > 50) {
-        this.priceHistory.set(itemId, history.slice(-50));
-        console.log(`[ECONOMY] Cleaned up price history for ${itemId}: ${history.length} -> 50 entries`);
+      for (const [itemId, history] of this.priceHistory.entries()) {
+        if (history.length > 50) {
+          this.priceHistory.set(itemId, history.slice(-50));
+          logger.debug('Cleaned up price history', { itemId, oldLength: history.length, newLength: 50 });
+        }
       }
-    }
 
-    // Clean up stale market prices (remove items with no recent activity)
-    const recentTransactions = this.economyData.transactions.filter(t =>
-      t.type === 'market_purchase' || t.type === 'market_sale'
-    );
-    const activeItems = new Set(recentTransactions.map(t => t.item).filter(Boolean));
+      const recentTransactions = this.economyData.transactions.filter(t =>
+        t.type === 'market_purchase' || t.type === 'market_sale'
+      );
+      const activeItems = new Set(recentTransactions.map(t => t.item).filter(Boolean));
 
-    for (const [itemId] of this.marketPrices.entries()) {
-      if (!activeItems.has(itemId)) {
-        this.marketPrices.delete(itemId);
-        this.priceHistory.delete(itemId);
-        console.log(`[ECONOMY] Cleaned up stale market data for ${itemId}`);
+      for (const [itemId] of this.marketPrices.entries()) {
+        if (!activeItems.has(itemId)) {
+          this.marketPrices.delete(itemId);
+          this.priceHistory.delete(itemId);
+          logger.debug('Cleaned up stale market data', { itemId });
+        }
       }
-    }
 
-    this.saveEconomy();
+      await this.saveEconomy();
+      logger.info('Economy cleanup completed');
+      metrics.increment('economy_cleanup_completed', 1);
+    });
   }
 }
 
 // Export singleton instance
-export const economyManager = new EconomyManager();
+const economyManager = new EconomyManager();
+
+// Wait for initialization
+await economyManager.init();
+
+export { economyManager };
 
 // Convenience functions
-export function getBalance(userId) {
+export async function getBalance(userId) {
   return economyManager.getBalance(userId);
 }
 
-export function addBalance(userId, amount) {
-  return economyManager.addBalance(userId, amount);
+export async function addBalance(userId, amount) {
+  return await economyManager.addBalance(userId, amount);
 }
 
-export function subtractBalance(userId, amount) {
-  return economyManager.subtractBalance(userId, amount);
+export async function subtractBalance(userId, amount) {
+  return await economyManager.subtractBalance(userId, amount);
 }
 
-export function transferBalance(fromUserId, toUserId, amount) {
-  return economyManager.transferBalance(fromUserId, toUserId, amount);
+export async function transferBalance(fromUserId, toUserId, amount) {
+  return await economyManager.transferBalance(fromUserId, toUserId, amount);
 }
 
-export function createBusiness(userId, businessType, initialInvestment) {
-  return economyManager.createBusiness(userId, businessType, initialInvestment);
+export async function createBusiness(userId, businessType, initialInvestment) {
+  return await economyManager.createBusiness(userId, businessType, initialInvestment);
 }
 
-export function collectBusinessIncome(userId) {
-  return economyManager.collectBusinessIncome(userId);
+export async function collectBusinessIncome(userId) {
+  return await economyManager.collectBusinessIncome(userId);
 }
 
 export function getMarketPrice(itemId) {
   return economyManager.getMarketPrice(itemId);
 }
 
-export function buyFromMarket(userId, itemId, quantity = 1) {
-  return economyManager.buyFromMarket(userId, itemId, quantity);
+export async function buyFromMarket(userId, itemId, quantity = 1) {
+  return await economyManager.buyFromMarket(userId, itemId, quantity);
 }
 
-export function sellToMarket(userId, itemId, quantity = 1) {
-  return economyManager.sellToMarket(userId, itemId, quantity);
+export async function sellToMarket(userId, itemId, quantity = 1) {
+  return await economyManager.sellToMarket(userId, itemId, quantity);
 }
 
 export function getUserEconomyStats(userId) {
@@ -710,28 +1000,28 @@ export function getTransactionHistory(userId, limit = 50) {
   return economyManager.getTransactionHistory(userId, limit);
 }
 
-export function createLottery(userId, ticketPrice, prizePool) {
-  return economyManager.createLottery(userId, ticketPrice, prizePool);
+export async function createLottery(userId, ticketPrice, prizePool) {
+  return await economyManager.createLottery(userId, ticketPrice, prizePool);
 }
 
 export function getUserBusinesses(userId) {
   return economyManager.getUserBusinesses(userId);
 }
 
-export function upgradeBusiness(userId, businessId) {
-  return economyManager.upgradeBusiness(userId, businessId);
+export async function upgradeBusiness(userId, businessId) {
+  return await economyManager.upgradeBusiness(userId, businessId);
 }
 
 export function getInvestmentTypes() {
   return economyManager.getInvestmentTypes();
 }
 
-export function claimDailyReward(userId) {
-  return economyManager.claimDailyReward(userId);
+export async function claimDailyReward(userId) {
+  return await economyManager.claimDailyReward(userId);
 }
 
-export function createInvestment(userId, investmentType, amount) {
-  return economyManager.createInvestment(userId, investmentType, amount);
+export async function createInvestment(userId, investmentType, amount) {
+  return await economyManager.createInvestment(userId, investmentType, amount);
 }
 
 export function getUserInvestments(userId) {
