@@ -11,13 +11,17 @@
 import 'dotenv/config';
 import { getGuild } from './storage.js';
 import { logger, logError } from './logger.js';
+import { postJSON } from './utils/apiClient.js';
+import { Cache } from './utils/cache.js';
+import { config } from './utils/config.js';
+import { metrics } from './utils/metrics.js';
 
 /**
  * Configuration constants for chat functionality.
  */
-const OPENAI_KEY = process.env.OPENAI_API_KEY;
-const LOCAL_MODEL_URL = process.env.LOCAL_MODEL_URL;
-const LOCAL_MODEL_API = process.env.LOCAL_MODEL_API || 'openai-compatible';
+const OPENAI_KEY = config.ai.openaiApiKey;
+const LOCAL_MODEL_URL = config.ai.localModelUrl;
+const LOCAL_MODEL_API = config.ai.localModelApi;
 const OPENWEBUI_BASE = process.env.OPENWEBUI_BASE;
 const OPENWEBUI_PATH = process.env.OPENWEBUI_PATH || '/api/chat';
 
@@ -26,8 +30,14 @@ const DEFAULT_CHAT_COOLDOWN_MS = Number.parseInt(process.env.CHAT_COOLDOWN_MS ||
 const DEFAULT_MAX_HISTORY = Number.parseInt(process.env.CHAT_MAX_HISTORY || '8', 10);
 const MAX_RESPONSE_LENGTH = Number.parseInt(process.env.MAX_RESPONSE_LENGTH || '2000', 10);
 const MAX_PROMPT_LENGTH = Number.parseInt(process.env.MAX_PROMPT_LENGTH || '1000', 10);
-const AI_MAX_TOKENS = Number.parseInt(process.env.AI_MAX_TOKENS || '512', 10);
-const AI_TEMPERATURE = Number.parseFloat(process.env.AI_TEMPERATURE || '0.8');
+const AI_MAX_TOKENS = config.ai.maxTokens || 512;
+const AI_TEMPERATURE = config.ai.temperature;
+
+// Initialize response cache with 1 hour TTL
+const responseCache = new Cache('chatResponses', {
+  ttl: 3_600_000, // 1 hour
+  maxSize: 500
+});
 
 // Performance limits
 const MAX_CONVERSATION_MEMORY_MB = 50; // Limit memory usage
@@ -45,36 +55,35 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
     throw new Error('Local model URL not configured');
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000); // 30 second timeout
+  const startTime = Date.now();
 
   try {
-    let response;
+    let endpoint, body, data;
 
     if (api === 'openai-compatible') {
-      const res = await fetch(`${url.replace(/\/$/, '')}/v1/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Pulse-Bot/3.0.1'
-        },
-        body: JSON.stringify({
-          model: 'gpt-oss-20b',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: AI_MAX_TOKENS,
-          temperature: AI_TEMPERATURE
-        }),
-        signal: controller.signal
+      endpoint = `${url.replace(/\/$/, '')}/v1/chat/completions`;
+      body = {
+        model: 'gpt-oss-20b',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: AI_MAX_TOKENS,
+        temperature: AI_TEMPERATURE
+      };
+
+      data = await postJSON(endpoint, body, {
+        headers: { 'User-Agent': 'Pulse-Bot/3.0.1' }
+      }, {
+        timeout: 30_000,
+        retries: 2
       });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Local model API error ${res.status}: ${errorText}`);
+      const response = data.choices?.[0]?.message?.content ?? data.result ?? null;
+
+      if (!response || typeof response !== 'string') {
+        throw new Error('Invalid or empty response from local model');
       }
 
-      const data = await res.json();
-      response = data.choices?.[0]?.message?.content ?? data.result ?? null;
-
+      metrics.recordAPICall('local_model', Date.now() - startTime, 200);
+      return response.trim();
     }
     else if (api === 'openwebui') {
       const base = OPENWEBUI_BASE || url;
@@ -82,64 +91,48 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
         throw new Error('OpenWebUI base URL not configured');
       }
 
-      const fullUrl = `${base.replace(/\/$/, '')}${OPENWEBUI_PATH}`;
-      const res = await fetch(fullUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Pulse-Bot/3.0.1'
-        },
-        body: JSON.stringify({ prompt }),
-        signal: controller.signal
+      endpoint = `${base.replace(/\/$/, '')}${OPENWEBUI_PATH}`;
+      body = { prompt };
+
+      data = await postJSON(endpoint, body, {
+        headers: { 'User-Agent': 'Pulse-Bot/3.0.1' }
+      }, {
+        timeout: 30_000,
+        retries: 2
       });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`OpenWebUI API error ${res.status}: ${errorText}`);
+      const response = data.response ?? data.output ?? data.result ?? null;
+
+      if (!response || typeof response !== 'string') {
+        throw new Error('Invalid or empty response from OpenWebUI');
       }
 
-      const data = await res.json();
-      response = data.response ?? data.output ?? data.result ?? null;
-
+      metrics.recordAPICall('openwebui', Date.now() - startTime, 200);
+      return response.trim();
     }
     else {
       // Generic endpoint fallback
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Pulse-Bot/3.0.1'
-        },
-        body: JSON.stringify({ prompt }),
-        signal: controller.signal
+      body = { prompt };
+
+      data = await postJSON(url, body, {
+        headers: { 'User-Agent': 'Pulse-Bot/3.0.1' }
+      }, {
+        timeout: 30_000,
+        retries: 2
       });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Generic model API error ${res.status}: ${errorText}`);
+      const response = data.result ?? data.output ?? null;
+
+      if (!response || typeof response !== 'string') {
+        throw new Error('Invalid or empty response from generic model');
       }
 
-      const data = await res.json();
-      response = data.result ?? data.output ?? null;
+      metrics.recordAPICall('generic_model', Date.now() - startTime, 200);
+      return response.trim();
     }
-
-    clearTimeout(timeoutId);
-
-    if (!response || typeof response !== 'string') {
-      throw new Error('Invalid or empty response from local model');
-    }
-
-    return response.trim();
-
   }
   catch (error) {
-    clearTimeout(timeoutId);
-
-    if (error.name === 'AbortError') {
-      logger.warn('Local model request timed out');
-      throw new Error('Local model request timed out after 30 seconds');
-    }
-
+    metrics.recordAPICall('local_model', Date.now() - startTime, 500);
     logger.error('Local model error', error instanceof Error ? error : new Error(String(error)));
     throw error instanceof Error ? error : new Error(String(error));
   }
@@ -198,52 +191,54 @@ export async function respondWithOpenAI(messages) {
 
   logger.debug('Calling OpenAI API', { messageCount: messageArray.length });
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60_000); // 60 second timeout for OpenAI
+  // Check cache first
+  const cacheKey = `openai:${JSON.stringify(messageArray)}`;
+  const cached = responseCache.get(cacheKey);
+  if (cached) {
+    logger.debug('OpenAI cache hit', { cacheKey: cacheKey.slice(0, 50) });
+    metrics.recordCacheAccess('openai_responses', true);
+    return cached;
+  }
+  metrics.recordCacheAccess('openai_responses', false);
+
+  const startTime = Date.now();
 
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+    const requestBody = {
+      model: config.ai.defaultModel || 'gpt-4o-mini',
+      messages: messageArray,
+      max_tokens: AI_MAX_TOKENS,
+      temperature: AI_TEMPERATURE,
+    };
+
+    const data = await postJSON('https://api.openai.com/v1/chat/completions', requestBody, {
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${OPENAI_KEY}`,
         'User-Agent': 'Pulse-Bot/3.0.1'
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        messages: messageArray,
-        max_tokens: AI_MAX_TOKENS,
-        temperature: AI_TEMPERATURE,
-      }),
-      signal: controller.signal
+      }
+    }, {
+      timeout: 60_000,
+      retries: 2
     });
 
-    clearTimeout(timeoutId);
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`OpenAI API error ${res.status}: ${text}`);
-    }
-
-    const data = await res.json();
     const content = data.choices?.[0]?.message?.content?.trim();
 
     if (!content) {
       throw new Error('OpenAI returned empty response');
     }
 
-    logger.debug('OpenAI response received', { contentLength: content.length });
-    return content;
+    // Cache successful response
+    responseCache.set(cacheKey, content, 1_800_000); // 30 minutes
 
+    const duration = Date.now() - startTime;
+    metrics.recordAPICall('openai', duration, 200);
+    logger.debug('OpenAI response received', { contentLength: content.length, duration });
+
+    return content;
   }
   catch (error) {
-    clearTimeout(timeoutId);
-
-    if (error.name === 'AbortError') {
-      logger.warn('OpenAI request timed out');
-      throw new Error('OpenAI request timed out after 60 seconds');
-    }
-
+    const duration = Date.now() - startTime;
+    metrics.recordAPICall('openai', duration, 500);
     logger.error('OpenAI API error', error instanceof Error ? error : new Error(String(error)));
     throw error instanceof Error ? error : new Error(String(error));
   }
@@ -324,12 +319,14 @@ export async function handleMessage(message) {
       history = history.slice(-MAX_HISTORY);
     }
 
-    // Generate AI response
+    // Generate AI response with metrics tracking
+    const chatStartTime = Date.now();
     const response = await generateChatResponse(prompt, message, history, {
       useLocalUrl,
       useLocalApi,
       isDM
     });
+    metrics.collector.histogram('chat_response_time_ms', Date.now() - chatStartTime);
 
     // Update conversation history with response
     if (response) {
@@ -421,6 +418,16 @@ User's message: ${prompt}
 
 Respond naturally and helpfully. If they're asking about bot features, mention relevant commands. Keep responses engaging but not too long.`;
 
+  // Check cache for similar prompts
+  const promptCacheKey = `prompt:${message.author.id}:${prompt.slice(0, 100)}`;
+  const cachedPromptResponse = responseCache.get(promptCacheKey);
+  if (cachedPromptResponse) {
+    logger.debug('Using cached chat response', { userId: message.author.id });
+    metrics.recordCacheAccess('chat_prompts', true);
+    return cachedPromptResponse;
+  }
+  metrics.recordCacheAccess('chat_prompts', false);
+
   // Try local model first if configured
   if (useLocalUrl) {
     try {
@@ -428,6 +435,10 @@ Respond naturally and helpfully. If they're asking about bot features, mention r
       const response = await callLocalModel(contextPrompt, useLocalUrl, useLocalApi);
       if (response) {
         const cleanResponse = response.trim().slice(0, Math.max(0, MAX_RESPONSE_LENGTH));
+
+        // Cache the response
+        responseCache.set(promptCacheKey, cleanResponse, 600_000); // 10 minutes
+
         logger.info('Local model chat response generated', {
           userId: message.author.id,
           responseLength: cleanResponse.length,
@@ -459,6 +470,10 @@ Respond naturally and helpfully. If they're asking about bot features, mention r
       const reply = await respondWithOpenAI(messages);
       if (reply) {
         const cleanReply = reply.trim().slice(0, Math.max(0, MAX_RESPONSE_LENGTH));
+
+        // Cache the response
+        responseCache.set(promptCacheKey, cleanReply, 600_000); // 10 minutes
+
         logger.info('OpenAI chat response generated', {
           userId: message.author.id,
           responseLength: cleanReply.length

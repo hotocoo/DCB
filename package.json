@@ -33,7 +33,7 @@
     "docker:run": "docker run -d --name pulse-bot --env-file .env pulsebot"
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=18.0.0 <24.0.0",
     "npm": ">=8.0.0"
   },
   "keywords": [
@@ -57,7 +57,7 @@
     "@discordjs/voice": "^0.16.1",
     "@distube/ytdl-core": "^4.16.12",
     "axios": "^1.6.0",
-    "better-sqlite3": "^9.4.3",
+    "better-sqlite3": "^11.8.0",
     "discord.js": "^14.16.0",
     "dotenv": "^16.3.1",
     "ffmpeg-static": "^5.2.0",

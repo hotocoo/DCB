@@ -112,7 +112,7 @@ async function sendConnect4Board(interaction, gameState) {
       gameState.status = 'completed';
 
       if (winner !== 'tie') {
-        const winnerPlayer = winner === 'red' ? players.red : winner === 'yellow' ? players.yellow : null;
+        const winnerPlayer = winner === 'red' ? players.red : (winner === 'yellow' ? players.yellow : null);
         if (winnerPlayer && winnerPlayer.id !== 'ai' && winnerPlayer.id) {
           try {
             updateUserStats(winnerPlayer.id, { connect4_wins: 1 });
@@ -129,7 +129,7 @@ async function sendConnect4Board(interaction, gameState) {
       const resultEmbed = new EmbedBuilder()
         .setTitle('🎯 Connect Four - Game Over!')
         .setColor(winner === 'tie' ? 0xFF_A5_00 : 0x00_FF_00)
-        .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${(winner === 'red' ? players.red : winner === 'yellow' ? players.yellow : { name: 'Unknown' }).name} wins!**`)
+        .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${(winner === 'red' ? players.red : (winner === 'yellow' ? players.yellow : { name: 'Unknown' })).name} wins!**`)
         .addFields({
           name: 'Final Board',
           value: formatConnect4Board(board),
@@ -181,10 +181,10 @@ async function sendConnect4Board(interaction, gameState) {
       setTimeout(async() => {
         try {
           const aiMove = getConnect4AIMove(board, difficulty);
-         if (aiMove !== null && aiMove !== undefined) {
-           await makeConnect4Move(gameState, aiMove);
-           await sendConnect4Board(interaction, gameState);
-         }
+          if (aiMove !== null && aiMove !== undefined) {
+            await makeConnect4Move(gameState, aiMove);
+            await sendConnect4Board(interaction, gameState);
+          }
         }
         catch (aiError) {
           console.error('AI move error:', aiError);
@@ -417,10 +417,10 @@ function getConnect4BestMove(board, player) {
 
     for (let col = 0; col < 7; col++) {
       if (board[0] && board[0][col] !== null) continue;
-  
+
       const testBoard = board.map(/** @param {(null|'red'|'yellow')[]} row */ row => [...row]);
       let moveValid = false;
-  
+
       for (let row = 5; row >= 0; row--) {
         const testRow = testBoard[row];
         if (testRow && testRow[col] === null) {
@@ -466,7 +466,7 @@ function evaluateConnect4Position(board, depth, player) {
     const boardRow = board[row];
     if (!boardRow) continue;
     for (let col = 0; col < 4; col++) {
-      const window = [boardRow[col], boardRow[col + 1], boardRow[col + 2], boardRow[col + 3]].filter(cell => cell != null);
+      const window = [boardRow[col], boardRow[col + 1], boardRow[col + 2], boardRow[col + 3]].filter(cell => cell != undefined);
       score += evaluateWindow(window, player);
     }
   }
@@ -479,7 +479,7 @@ function evaluateConnect4Position(board, depth, player) {
     const boardRow3 = board[row + 3];
     if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 0; col < 7; col++) {
-      const window = [boardRow0[col], boardRow1[col], boardRow2[col], boardRow3[col]].filter(cell => cell != null);
+      const window = [boardRow0[col], boardRow1[col], boardRow2[col], boardRow3[col]].filter(cell => cell != undefined);
       score += evaluateWindow(window, player);
     }
   }
