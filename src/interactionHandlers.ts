@@ -42,6 +42,8 @@ import { getActiveAuctions, createAuction } from './trading.js';
 import { updateProfile } from './profiles.js';
 import { updateUserStats } from './achievements.js';
 // Import missing functions from other modules - these are not exported, so we need to use them directly
+// Import snake game handler
+import { handleButton as handleSnakeButton } from './commands/snake.js';
 // getPerformanceRating from memory.js, makeConnect4Move/sendConnect4Board from connect4.js, etc.
 
 // Constants for rate limiting and configuration
@@ -960,6 +962,12 @@ export async function handleButtonInteraction(interaction: ButtonInteraction, cl
       return;
     }
     // Music button handlers
+    // Snake game button handlers
+    if (action.startsWith('snake_')) {
+      await handleSnakeButton(interaction);
+      return;
+    }
+
     if (action === 'music_pause') {
       if (!interaction.guild) {
         return await safeInteractionReply(interaction, { content: '❌ **Music commands are only available in servers.**', flags: MessageFlags.Ephemeral });
