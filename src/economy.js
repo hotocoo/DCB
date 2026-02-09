@@ -419,8 +419,10 @@ class EconomyManager {
         const history = this.priceHistory.get(itemId);
         
         // Remove oldest entry when at capacity to maintain fixed size
+        // Note: shift() is O(n) but acceptable here because MAX_HISTORY is small (100)
+        // For larger histories (>1000), a circular buffer would be more efficient
         if (history.length >= MAX_HISTORY) {
-          history.shift(); // O(n) but necessary for array-based approach
+          history.shift();
         }
         
         history.push({ price: newPrice, timestamp: Date.now() });

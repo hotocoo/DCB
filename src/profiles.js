@@ -12,8 +12,7 @@ class ProfileManager {
     this.profileCache = new Map();
     this.CACHE_TTL = 5 * 60 * 1000; // 5 minutes
     this.CACHE_MAX_SIZE = 100; // Max 100 cached profiles
-    // Performance: Don't load all profiles at startup - lazy load instead
-    // this.loadProfiles(); // Removed for performance
+    // Performance: Lazy load profiles on-demand instead of loading all at startup
   }
 
   ensureStorage() {
