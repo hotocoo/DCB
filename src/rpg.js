@@ -1,16 +1,18 @@
-import fs from 'node:fs';
 import path from 'node:path';
 
 import { generate } from './model-client.js';
 import { logger } from './logger.js';
-import { inputValidator, sanitizeInput, validateString, validateNumber } from './validation.js';
 import { CommandError } from './errorHandler';
+import { readJSON, writeJSON, listJSONFiles } from './utils/fileStorage.js';
+import { Cache } from './utils/cache.js';
+import { validateString, validateNumber, validateUserId, sanitizeInput } from './utils/validators.js';
+import { metrics } from './utils/metrics.js';
 
 const PLAYERS_DIR = path.join(process.cwd(), 'data', 'players');
 
-// in-memory cache to reduce fs reads/writes
-let cache = null;
-// simple per-user locks to avoid concurrent writes
+// Cache for character data
+const characterCache = new Cache('rpg-characters', { ttl: 300000, maxSize: 1000 });
+// Per-user locks to avoid concurrent writes
 const locks = new Set();
 
 // Character classes with unique abilities and stat bonuses
@@ -49,185 +51,150 @@ const CHARACTER_CLASSES = {
   }
 };
 
-function ensureDir() {
-  if (!fs.existsSync(PLAYERS_DIR)) fs.mkdirSync(PLAYERS_DIR, { recursive: true });
+function ensureDefaults(char) {
+  if (char.xp === undefined) char.xp = 0;
+  if (char.lvl === undefined) char.lvl = levelFromXp(char.xp);
+  if (char.skillPoints === undefined) char.skillPoints = 0;
+  if (char.hp === undefined) char.hp = 20;
+  if (char.maxHp === undefined) char.maxHp = 20;
+  if (char.mp === undefined) char.mp = 10;
+  if (char.maxMp === undefined) char.maxMp = 10;
+  if (char.atk === undefined) char.atk = 5;
+  if (char.def === undefined) char.def = 2;
+  if (char.spd === undefined) char.spd = 2;
+  if (char.class === undefined) char.class = 'warrior';
+  if (char.abilities === undefined) char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
+  if (char.color === undefined) char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+  if (char.inventory === undefined) char.inventory = {};
+  if (char.equipped_weapon === undefined) char.equipped_weapon = null;
+  if (char.equipped_armor === undefined) char.equipped_armor = null;
+  if (char.gold === undefined) char.gold = 0;
+  if (char.dailyExplorations === undefined) char.dailyExplorations = 0;
+  if (char.lastDailyReset === undefined) char.lastDailyReset = Date.now();
+  if (char.sessionXpGained === undefined) char.sessionXpGained = 0;
+  if (char.lastSessionReset === undefined) char.lastSessionReset = Date.now();
+  if (char.createdAt === undefined) char.createdAt = Date.now();
 }
 
-function readAll() {
-  ensureDir();
-  const all = {};
+async function readAll() {
+  return await metrics.collector.time('rpg_read_all', async () => {
+    const all = {};
 
-  // Migrate from old data/rpg.json if it exists
-  const oldFile = path.join(process.cwd(), 'data', 'rpg.json');
-  if (fs.existsSync(oldFile)) {
-    try {
-      const oldData = JSON.parse(fs.readFileSync(oldFile)) || {};
-      console.log(`[RPG DEBUG] Migrating ${Object.keys(oldData).length} characters from old rpg.json`);
+    // Migrate from old data/rpg.json if it exists
+    const oldFile = path.join(process.cwd(), 'data', 'rpg.json');
+    const oldData = await readJSON(oldFile);
+    if (oldData) {
+      logger.info(`Migrating ${Object.keys(oldData).length} characters from old rpg.json`);
       for (const [userId, char] of Object.entries(oldData)) {
-        // Ensure defaults
-        if (char.xp === undefined) char.xp = 0;
-        if (char.lvl === undefined) char.lvl = levelFromXp(char.xp);
-        if (char.skillPoints === undefined) char.skillPoints = 0;
-        if (char.hp === undefined) char.hp = 20;
-        if (char.maxHp === undefined) char.maxHp = 20;
-        if (char.mp === undefined) char.mp = 10;
-        if (char.maxMp === undefined) char.maxMp = 10;
-        if (char.atk === undefined) char.atk = 5;
-        if (char.def === undefined) char.def = 2;
-        if (char.spd === undefined) char.spd = 2;
-        if (char.class === undefined) char.class = 'warrior';
-        if (char.abilities === undefined) char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
-        if (char.color === undefined) char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
-        if (char.inventory === undefined) char.inventory = {};
-        if (char.equipped_weapon === undefined) char.equipped_weapon = null;
-        if (char.equipped_armor === undefined) char.equipped_armor = null;
-        if (char.gold === undefined) char.gold = 0;
-        if (char.dailyExplorations === undefined) char.dailyExplorations = 0;
-        if (char.lastDailyReset === undefined) char.lastDailyReset = Date.now();
-        if (char.sessionXpGained === undefined) char.sessionXpGained = 0;
-        if (char.lastSessionReset === undefined) char.lastSessionReset = Date.now();
-        if (char.createdAt === undefined) char.createdAt = Date.now();
+        ensureDefaults(char);
         all[userId] = char;
-        // Save to individual file
         const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
-        const tmp = `${filePath}.tmp`;
-        fs.writeFileSync(tmp, JSON.stringify(char, null, 2), 'utf8');
-        fs.renameSync(tmp, filePath);
+        await writeJSON(filePath, char);
       }
-      // Backup and remove old file
-      fs.copyFileSync(oldFile, `${oldFile}.bak`);
-      fs.unlinkSync(oldFile);
-      console.log('[RPG DEBUG] Migration completed, old file backed up');
-    }
-    catch (error) {
-      console.error('Failed to migrate old RPG data:', error);
-    }
-  }
-
-  // Read all player files from data/players/
-  if (fs.existsSync(PLAYERS_DIR)) {
-    const files = fs.readdirSync(PLAYERS_DIR).filter(f => f.endsWith('.json'));
-    for (const file of files) {
-      const userId = path.basename(file, '.json');
+      // Backup and remove old file - use sync for backup operations
+      const fs = await import('node:fs');
       try {
-        const char = JSON.parse(fs.readFileSync(path.join(PLAYERS_DIR, file))) || {};
-        // migrate / ensure defaults for older characters
-        if (char.xp === undefined) char.xp = 0;
-        if (char.lvl === undefined) char.lvl = levelFromXp(char.xp);
-        if (char.skillPoints === undefined) char.skillPoints = 0;
-        if (char.hp === undefined) char.hp = 20;
-        if (char.maxHp === undefined) char.maxHp = 20;
-        if (char.mp === undefined) char.mp = 10;
-        if (char.maxMp === undefined) char.maxMp = 10;
-        if (char.atk === undefined) char.atk = 5;
-        if (char.def === undefined) char.def = 2;
-        if (char.spd === undefined) char.spd = 2;
-        if (char.class === undefined) char.class = 'warrior';
-        if (char.abilities === undefined) char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
-        if (char.color === undefined) char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
-        if (char.inventory === undefined) char.inventory = {};
-        if (char.equipped_weapon === undefined) char.equipped_weapon = null;
-        if (char.equipped_armor === undefined) char.equipped_armor = null;
-        if (char.gold === undefined) char.gold = 0;
-        if (char.dailyExplorations === undefined) char.dailyExplorations = 0;
-        if (char.lastDailyReset === undefined) char.lastDailyReset = Date.now();
-        if (char.sessionXpGained === undefined) char.sessionXpGained = 0;
-        if (char.lastSessionReset === undefined) char.lastSessionReset = Date.now();
+        fs.copyFileSync(oldFile, `${oldFile}.bak`);
+        fs.unlinkSync(oldFile);
+        logger.info('Migration completed, old file backed up');
+      } catch (error) {
+        logger.error('Failed to backup old file', error);
+      }
+    }
+
+    // Read all player files from data/players/
+    const files = await listJSONFiles(PLAYERS_DIR);
+    for (const filePath of files) {
+      const userId = path.basename(filePath, '.json');
+      const char = await readJSON(filePath);
+      if (char) {
+        ensureDefaults(char);
         all[userId] = char;
       }
-      catch (error) {
-        console.error(`Failed to read player data for ${userId}`, error);
-      }
     }
-  }
 
-  cache = all;
-  return all;
+    return all;
+  });
 }
 
-function writeAll(obj) {
-  ensureDir();
-  try {
-    // Save each user's data to individual files
-    for (const [userId, char] of Object.entries(obj)) {
-      const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
-      const tmp = `${filePath}.tmp`;
-      console.log(`[RPG DEBUG] Writing player data: ${filePath}`);
-      fs.writeFileSync(tmp, JSON.stringify(char, null, 2), 'utf8');
-      fs.renameSync(tmp, filePath);
-    }
-    cache = obj;
-  }
-  catch (error) {
-    console.error('Failed to write RPG data:', error);
-    // Attempt to restore from cache if available
-    if (cache) {
-      console.log('Restoring from cache after write failure');
-    }
-    else {
+async function writeAll(obj) {
+  return await metrics.collector.time('rpg_write_all', async () => {
+    try {
+      for (const [userId, char] of Object.entries(obj)) {
+        const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
+        logger.debug(`Writing player data: ${filePath}`);
+        await writeJSON(filePath, char);
+      }
+    } catch (error) {
+      logger.error('Failed to write RPG data', error);
       throw new Error(`Failed to save RPG data: ${error.message}`);
     }
-  }
+  });
 }
 
-export function createCharacter(userId, name, charClass = 'warrior') {
-  // Validate inputs
-  if (!userId || typeof userId !== 'string') {
-    throw new CommandError('Invalid user ID', 'INVALID_ARGUMENT');
-  }
-
-  const sanitizedName = sanitizeInput(name || `Player${userId.slice(0,4)}`);
-  const nameValidation = validateString(sanitizedName, { minLength: 2, maxLength: 32 });
-  if (!nameValidation.valid) {
-    throw new CommandError(nameValidation.reason, 'INVALID_ARGUMENT');
-  }
-
-  // Validate character class
-  if (!charClass || typeof charClass !== 'string') {
-    throw new CommandError('Invalid character class', 'INVALID_ARGUMENT');
-  }
-
-  const classData = CHARACTER_CLASSES[charClass];
-  if (!classData) {
-    throw new CommandError(`Invalid character class: ${charClass}. Available classes: warrior, mage, rogue, paladin`, 'INVALID_ARGUMENT');
-  }
-
-  if (locks.has(userId)) {
-    throw new CommandError('Character creation already in progress', 'RATE_LIMITED');
-  }
-
-  locks.add(userId);
-  try {
-    const all = cache || readAll();
-    if (all[userId]) {
-      throw new CommandError('Character already exists for this user', 'ALREADY_EXISTS');
+export async function createCharacter(userId, name, charClass = 'warrior') {
+  return await metrics.collector.time('rpg_create_character', async () => {
+    // Validate inputs
+    const userValidation = validateUserId(userId);
+    if (!userValidation.valid) {
+      throw new CommandError(userValidation.error, 'INVALID_ARGUMENT');
     }
 
-    const char = {
-      name: sanitizedName,
-      class: charClass,
-      ...classData.baseStats,
-      lvl: 1,
-      xp: 0,
-      skillPoints: 0,
-      abilities: [...classData.abilities],
-      color: classData.color,
-      inventory: {},
-      equipped_weapon: null,
-      equipped_armor: null,
-      gold: 0,
-      createdAt: Date.now()
-    };
+    const sanitizedName = sanitizeInput(name || `Player${userId.slice(0,4)}`);
+    const nameValidation = validateString(sanitizedName, { minLength: 2, maxLength: 32 });
+    if (!nameValidation.valid) {
+      throw new CommandError(nameValidation.error, 'INVALID_ARGUMENT');
+    }
 
-    all[userId] = char;
-    writeAll(all);
+    // Validate character class
+    if (!charClass || typeof charClass !== 'string') {
+      throw new CommandError('Invalid character class', 'INVALID_ARGUMENT');
+    }
 
-    logger.info('Character created', { userId, name: sanitizedName, class: charClass });
-    return char;
-  }
-  finally {
-    locks.delete(userId);
-  }
+    const classData = CHARACTER_CLASSES[charClass];
+    if (!classData) {
+      throw new CommandError(`Invalid character class: ${charClass}. Available classes: warrior, mage, rogue, paladin`, 'INVALID_ARGUMENT');
+    }
+
+    if (locks.has(userId)) {
+      throw new CommandError('Character creation already in progress', 'RATE_LIMITED');
+    }
+
+    locks.add(userId);
+    try {
+      const all = await characterCache.getOrSet('all_characters', async () => await readAll());
+      if (all[userId]) {
+        throw new CommandError('Character already exists for this user', 'ALREADY_EXISTS');
+      }
+
+      const char = {
+        name: sanitizedName,
+        class: charClass,
+        ...classData.baseStats,
+        lvl: 1,
+        xp: 0,
+        skillPoints: 0,
+        abilities: [...classData.abilities],
+        color: classData.color,
+        inventory: {},
+        equipped_weapon: null,
+        equipped_armor: null,
+        gold: 0,
+        createdAt: Date.now()
+      };
+
+      all[userId] = char;
+      await writeAll(all);
+      characterCache.set('all_characters', all);
+      characterCache.set(`char_${userId}`, char);
+
+      logger.info('Character created', { userId, name: sanitizedName, class: charClass });
+      metrics.increment('rpg_character_created', 1, { class: charClass });
+      return char;
+    } finally {
+      locks.delete(userId);
+    }
+  });
 }
 
 export function levelFromXp(xp) {
@@ -262,136 +229,125 @@ export function applyXp(userId, char, amount = 0) {
   return { char, oldLvl, newLvl, gained };
 }
 
-export function getCharacter(userId) {
-  // Try cache first
-  if (cache && cache[userId]) {
-    return cache[userId];
-  }
+export async function getCharacter(userId) {
+  return await metrics.collector.time('rpg_get_character', async () => {
+    const userValidation = validateUserId(userId);
+    if (!userValidation.valid) {
+      logger.warn('Invalid user ID for getCharacter', { userId });
+      return null;
+    }
 
-  // Otherwise read from file
-  ensureDir();
-  const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
-  if (!fs.existsSync(filePath)) return null;
+    // Try cache first
+    const cached = characterCache.get(`char_${userId}`);
+    if (cached) {
+      metrics.recordCacheAccess('rpg-characters', true);
+      return cached;
+    }
+    metrics.recordCacheAccess('rpg-characters', false);
 
-  try {
-    const char = JSON.parse(fs.readFileSync(filePath)) || {};
-    // migrate / ensure defaults for older characters
-    if (char.xp === undefined) char.xp = 0;
-    if (char.lvl === undefined) char.lvl = levelFromXp(char.xp);
-    if (char.skillPoints === undefined) char.skillPoints = 0;
-    if (char.hp === undefined) char.hp = 20;
-    if (char.maxHp === undefined) char.maxHp = 20;
-    if (char.mp === undefined) char.mp = 10;
-    if (char.maxMp === undefined) char.maxMp = 10;
-    if (char.atk === undefined) char.atk = 5;
-    if (char.def === undefined) char.def = 2;
-    if (char.spd === undefined) char.spd = 2;
-    if (char.class === undefined) char.class = 'warrior';
-    if (char.abilities === undefined) char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
-    if (char.color === undefined) char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
-    if (char.inventory === undefined) char.inventory = {};
-    if (char.equipped_weapon === undefined) char.equipped_weapon = null;
-    if (char.equipped_armor === undefined) char.equipped_armor = null;
-    if (char.gold === undefined) char.gold = 0;
-    if (char.dailyExplorations === undefined) char.dailyExplorations = 0;
-    if (char.lastDailyReset === undefined) char.lastDailyReset = Date.now();
-    if (char.sessionXpGained === undefined) char.sessionXpGained = 0;
-    if (char.lastSessionReset === undefined) char.lastSessionReset = Date.now();
+    // Otherwise read from file
+    const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
+    const char = await readJSON(filePath);
+    
+    if (!char) return null;
+
+    ensureDefaults(char);
 
     // Update cache
-    if (cache) {
-      cache[userId] = char;
-    }
-    else {
-      cache = { [userId]: char };
-    }
+    characterCache.set(`char_${userId}`, char);
 
     return char;
-  }
-  catch (error) {
-    console.error(`Failed to read character data for ${userId}`, error);
-    return null;
-  }
+  });
 }
 
-export function saveCharacter(userId, char) {
-  if (locks.has(userId)) {
-    console.warn(`Save operation blocked for user ${userId} - already locked`);
-    return false;
-  }
-  locks.add(userId);
-  try {
-    // Save directly to individual file
-    ensureDir();
-    const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
-    const tmp = `${filePath}.tmp`;
-    console.log(`[RPG DEBUG] Writing character data: ${filePath}`);
-    fs.writeFileSync(tmp, JSON.stringify(char, null, 2), 'utf8');
-    fs.renameSync(tmp, filePath);
-
-    // Update cache if it exists
-    if (cache) {
-      cache[userId] = char;
+export async function saveCharacter(userId, char) {
+  return await metrics.collector.time('rpg_save_character', async () => {
+    if (locks.has(userId)) {
+      logger.warn(`Save operation blocked for user ${userId} - already locked`);
+      return false;
     }
-    return true;
-  }
-  finally {
-    locks.delete(userId);
-  }
+    locks.add(userId);
+    try {
+      const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
+      logger.debug(`Writing character data: ${filePath}`);
+      const success = await writeJSON(filePath, char);
+
+      if (success) {
+        characterCache.set(`char_${userId}`, char);
+        characterCache.delete('all_characters');
+      }
+      return success;
+    } finally {
+      locks.delete(userId);
+    }
+  });
 }
 
-export function getAllCharacters() {
-  return cache || readAll();
+export async function getAllCharacters() {
+  return await characterCache.getOrSet('all_characters', async () => await readAll());
 }
 
-export function resetCharacter(userId, charClass = 'warrior') {
-  if (locks.has(userId)) return null;
+export async function resetCharacter(userId, charClass = 'warrior') {
+  return await metrics.collector.time('rpg_reset_character', async () => {
+    if (locks.has(userId)) return null;
 
-  locks.add(userId);
-  try {
-    const all = cache || readAll();
-    const classData = CHARACTER_CLASSES[charClass];
-    const def = {
-      name: `Player${userId.slice(0,4)}`,
-      class: charClass,
-      ...classData.baseStats,
-      lvl: 1,
-      xp: 0,
-      skillPoints: 0,
-      abilities: [...classData.abilities],
-      color: classData.color,
-      inventory: {},
-      equipped_weapon: null,
-      equipped_armor: null,
-      gold: 0
-    };
-    all[userId] = def;
-    writeAll(all);
-    return def;
-  }
-  finally {
-    locks.delete(userId);
-  }
+    locks.add(userId);
+    try {
+      const all = await characterCache.getOrSet('all_characters', async () => await readAll());
+      const classData = CHARACTER_CLASSES[charClass];
+      const def = {
+        name: `Player${userId.slice(0,4)}`,
+        class: charClass,
+        ...classData.baseStats,
+        lvl: 1,
+        xp: 0,
+        skillPoints: 0,
+        abilities: [...classData.abilities],
+        color: classData.color,
+        inventory: {},
+        equipped_weapon: null,
+        equipped_armor: null,
+        gold: 0
+      };
+      all[userId] = def;
+      await writeAll(all);
+      characterCache.set('all_characters', all);
+      characterCache.set(`char_${userId}`, def);
+      
+      logger.info('Character reset', { userId, class: charClass });
+      metrics.increment('rpg_character_reset', 1);
+      return def;
+    } finally {
+      locks.delete(userId);
+    }
+  });
 }
 
-export function deleteCharacter(userId) {
-  if (locks.has(userId)) return false;
+export async function deleteCharacter(userId) {
+  return await metrics.collector.time('rpg_delete_character', async () => {
+    if (locks.has(userId)) return false;
 
-  locks.add(userId);
-  try {
-    const all = cache || readAll();
-    if (!all[userId]) return false;
-    delete all[userId];
-    writeAll(all);
-    return true;
-  }
-  finally {
-    locks.delete(userId);
-  }
+    locks.add(userId);
+    try {
+      const all = await characterCache.getOrSet('all_characters', async () => await readAll());
+      if (!all[userId]) return false;
+
+      delete all[userId];
+      await writeAll(all);
+      characterCache.set('all_characters', all);
+      characterCache.delete(`char_${userId}`);
+      
+      logger.info('Character deleted', { userId });
+      metrics.increment('rpg_character_deleted', 1);
+      return true;
+    } finally {
+      locks.delete(userId);
+    }
+  });
 }
 
-export function getLeaderboard(limit = 10, offset = 0) {
-  const all = cache || readAll();
+export async function getLeaderboard(limit = 10, offset = 0) {
+  const all = await characterCache.getOrSet('all_characters', async () => await readAll());
   const arr = Object.entries(all).map(([id, c]) => ({ id, name: c.name, lvl: c.lvl || 1, xp: c.xp || 0, atk: c.atk || 0 }));
   arr.sort((a, b) => {
     if (b.lvl !== a.lvl) return b.lvl - a.lvl; if (b.xp !== a.xp) return b.xp - a.xp; return b.atk - a.atk;
@@ -399,8 +355,8 @@ export function getLeaderboard(limit = 10, offset = 0) {
   return arr.slice(offset, offset + limit);
 }
 
-export function getLeaderboardCount() {
-  const all = cache || readAll();
+export async function getLeaderboardCount() {
+  const all = await characterCache.getOrSet('all_characters', async () => await readAll());
   return Object.keys(all).length;
 }
 
@@ -437,7 +393,7 @@ export async function narrate(guildId, prompt, fallback) {
     return out || fallback || '';
   }
   catch (error) {
-    console.error('Narration failed', error);
+    logger.error('Narration failed', error);
     return fallback || '';
   }
 }
@@ -589,38 +545,55 @@ export function getItemRarityInfo(rarity) {
 }
 
 // Inventory Management Functions
-export function addItemToInventory(userId, itemId, quantity = 1) {
-  const all = cache || readAll();
-  const char = all[userId];
+export async function addItemToInventory(userId, itemId, quantity = 1) {
+  return await metrics.collector.time('rpg_add_item', async () => {
+    const qtyValidation = validateNumber(quantity, { integer: true, positive: true });
+    if (!qtyValidation.valid) {
+      return { success: false, reason: 'invalid_quantity' };
+    }
 
-  if (!char) return { success: false, reason: 'no_character' };
+    const all = await characterCache.getOrSet('all_characters', async () => await readAll());
+    const char = all[userId];
 
-  char.inventory = char.inventory || {};
-  char.inventory[itemId] = (char.inventory[itemId] || 0) + quantity;
+    if (!char) return { success: false, reason: 'no_character' };
 
-  writeAll(all);
-  return { success: true, char };
+    char.inventory = char.inventory || {};
+    char.inventory[itemId] = (char.inventory[itemId] || 0) + quantity;
+
+    await writeAll(all);
+    characterCache.set('all_characters', all);
+    characterCache.set(`char_${userId}`, char);
+    
+    metrics.increment('rpg_item_added', 1, { itemId });
+    return { success: true, char };
+  });
 }
 
-export function removeItemFromInventory(userId, itemId, quantity = 1) {
-  const all = cache || readAll();
-  const char = all[userId];
+export async function removeItemFromInventory(userId, itemId, quantity = 1) {
+  return await metrics.collector.time('rpg_remove_item', async () => {
+    const all = await characterCache.getOrSet('all_characters', async () => await readAll());
+    const char = all[userId];
 
-  if (!char) return { success: false, reason: 'no_character' };
-  if (!char.inventory || !char.inventory[itemId]) return { success: false, reason: 'item_not_found' };
+    if (!char) return { success: false, reason: 'no_character' };
+    if (!char.inventory || !char.inventory[itemId]) return { success: false, reason: 'item_not_found' };
 
-  const currentQuantity = char.inventory[itemId];
-  if (currentQuantity < quantity) return { success: false, reason: 'insufficient_quantity' };
+    const currentQuantity = char.inventory[itemId];
+    if (currentQuantity < quantity) return { success: false, reason: 'insufficient_quantity' };
 
-  char.inventory[itemId] -= quantity;
-  if (char.inventory[itemId] <= 0) delete char.inventory[itemId];
+    char.inventory[itemId] -= quantity;
+    if (char.inventory[itemId] <= 0) delete char.inventory[itemId];
 
-  writeAll(all);
-  return { success: true, char };
+    await writeAll(all);
+    characterCache.set('all_characters', all);
+    characterCache.set(`char_${userId}`, char);
+    
+    metrics.increment('rpg_item_removed', 1, { itemId });
+    return { success: true, char };
+  });
 }
 
-export function getInventory(userId) {
-  const all = cache || readAll();
+export async function getInventory(userId) {
+  const all = await characterCache.getOrSet('all_characters', async () => await readAll());
   const char = all[userId];
 
   if (!char || !char.inventory) return {};
@@ -628,8 +601,8 @@ export function getInventory(userId) {
   return char.inventory;
 }
 
-export function getInventoryValue(userId) {
-  const inventory = getInventory(userId);
+export async function getInventoryValue(userId) {
+  const inventory = await getInventory(userId);
   let totalValue = 0;
 
   for (const [itemId, quantity] of Object.entries(inventory)) {
@@ -642,137 +615,155 @@ export function getInventoryValue(userId) {
   return totalValue;
 }
 
-export function useConsumableItem(userId, itemId) {
-  const item = ITEMS[itemId];
-  if (!item || item.type !== 'consumable') {
-    return { success: false, reason: 'not_consumable' };
-  }
+export async function useConsumableItem(userId, itemId) {
+  return await metrics.collector.time('rpg_use_consumable', async () => {
+    const item = ITEMS[itemId];
+    if (!item || item.type !== 'consumable') {
+      return { success: false, reason: 'not_consumable' };
+    }
 
-  const all = cache || readAll();
-  const char = all[userId];
+    const all = await characterCache.getOrSet('all_characters', async () => await readAll());
+    const char = all[userId];
 
-  if (!char) return { success: false, reason: 'no_character' };
+    if (!char) return { success: false, reason: 'no_character' };
 
-  // Check if item is in inventory
-  if (!char.inventory || !char.inventory[itemId]) {
-    return { success: false, reason: 'item_not_in_inventory' };
-  }
+    // Check if item is in inventory
+    if (!char.inventory || !char.inventory[itemId]) {
+      return { success: false, reason: 'item_not_in_inventory' };
+    }
 
-  // Apply item effects
-  let effects = {};
-  if (item.hp_restore) {
-    const oldHp = char.hp;
-    char.hp = Math.min(char.maxHp, char.hp + item.hp_restore);
-    effects.hp_restored = char.hp - oldHp;
-  }
+    // Apply item effects
+    let effects = {};
+    if (item.hp_restore) {
+      const oldHp = char.hp;
+      char.hp = Math.min(char.maxHp, char.hp + item.hp_restore);
+      effects.hp_restored = char.hp - oldHp;
+    }
 
-  if (item.mp_restore) {
-    const oldMp = char.mp;
-    char.mp = Math.min(char.maxMp, char.mp + item.mp_restore);
-    effects.mp_restored = char.mp - oldMp;
-  }
+    if (item.mp_restore) {
+      const oldMp = char.mp;
+      char.mp = Math.min(char.maxMp, char.mp + item.mp_restore);
+      effects.mp_restored = char.mp - oldMp;
+    }
 
-  if (item.revive) {
-    char.hp = char.maxHp;
-    effects.revive = true;
-  }
+    if (item.revive) {
+      char.hp = char.maxHp;
+      effects.revive = true;
+    }
 
-  // Remove item from inventory
-  char.inventory[itemId]--;
-  if (char.inventory[itemId] <= 0) delete char.inventory[itemId];
+    // Remove item from inventory
+    char.inventory[itemId]--;
+    if (char.inventory[itemId] <= 0) delete char.inventory[itemId];
 
-  writeAll(all);
-  return { success: true, char, effects };
+    await writeAll(all);
+    characterCache.set('all_characters', all);
+    characterCache.set(`char_${userId}`, char);
+    
+    metrics.increment('rpg_consumable_used', 1, { itemId });
+    return { success: true, char, effects };
+  });
 }
 
-export function equipItem(userId, itemId) {
-  const item = ITEMS[itemId];
-  if (!item || (item.type !== 'weapon' && item.type !== 'armor')) {
-    return { success: false, reason: 'not_equippable' };
-  }
-
-  const all = cache || readAll();
-  const char = all[userId];
-
-  if (!char) return { success: false, reason: 'no_character' };
-  if (!char.inventory || !char.inventory[itemId]) {
-    return { success: false, reason: 'item_not_in_inventory' };
-  }
-
-  // Unequip current item of same type
-  if (item.type === 'weapon' && char.equipped_weapon) {
-    addItemToInventory(userId, char.equipped_weapon, 1);
-    if (ITEMS[char.equipped_weapon]) {
-      char.atk -= ITEMS[char.equipped_weapon].atk || 0;
+export async function equipItem(userId, itemId) {
+  return await metrics.collector.time('rpg_equip_item', async () => {
+    const item = ITEMS[itemId];
+    if (!item || (item.type !== 'weapon' && item.type !== 'armor')) {
+      return { success: false, reason: 'not_equippable' };
     }
-  }
 
-  if (item.type === 'armor' && char.equipped_armor) {
-    addItemToInventory(userId, char.equipped_armor, 1);
-    if (ITEMS[char.equipped_armor]) {
-      char.def -= ITEMS[char.equipped_armor].def || 0;
+    const all = await characterCache.getOrSet('all_characters', async () => await readAll());
+    const char = all[userId];
+
+    if (!char) return { success: false, reason: 'no_character' };
+    if (!char.inventory || !char.inventory[itemId]) {
+      return { success: false, reason: 'item_not_in_inventory' };
     }
-  }
 
-  // Equip new item
-  if (item.type === 'weapon') {
-    char.equipped_weapon = itemId;
-    char.atk += item.atk || 0;
-  }
-
-  if (item.type === 'armor') {
-    char.equipped_armor = itemId;
-    char.def += item.def || 0;
-  }
-
-  // Remove from inventory
-  const removeResult = removeItemFromInventory(userId, itemId, 1);
-  if (!removeResult.success) {
-    logger.error('Failed to remove item from inventory during equip', { userId, itemId });
-    return { success: false, reason: 'inventory_error' };
-  }
-
-  writeAll(all);
-  logger.info('Item equipped', { userId, itemId, type: item.type });
-  return { success: true, char };
-}
-
-export function unequipItem(userId, slot) {
-  const all = cache || readAll();
-  const char = all[userId];
-
-  if (!char) return { success: false, reason: 'no_character' };
-
-  let itemId = null;
-  if (slot === 'weapon' && char.equipped_weapon) {
-    itemId = char.equipped_weapon;
-    if (ITEMS[itemId]) {
-      char.atk -= ITEMS[itemId].atk || 0;
+    // Unequip current item of same type
+    if (item.type === 'weapon' && char.equipped_weapon) {
+      await addItemToInventory(userId, char.equipped_weapon, 1);
+      if (ITEMS[char.equipped_weapon]) {
+        char.atk -= ITEMS[char.equipped_weapon].atk || 0;
+      }
     }
-    char.equipped_weapon = null;
-  }
-  else if (slot === 'armor' && char.equipped_armor) {
-    itemId = char.equipped_armor;
-    if (ITEMS[itemId]) {
-      char.def -= ITEMS[itemId].def || 0;
-    }
-    char.equipped_armor = null;
-  }
-  else {
-    return { success: false, reason: 'no_item_equipped' };
-  }
 
-  if (itemId) {
-    const addResult = addItemToInventory(userId, itemId, 1);
-    if (!addResult.success) {
-      logger.error('Failed to add item to inventory during unequip', { userId, itemId });
+    if (item.type === 'armor' && char.equipped_armor) {
+      await addItemToInventory(userId, char.equipped_armor, 1);
+      if (ITEMS[char.equipped_armor]) {
+        char.def -= ITEMS[char.equipped_armor].def || 0;
+      }
+    }
+
+    // Equip new item
+    if (item.type === 'weapon') {
+      char.equipped_weapon = itemId;
+      char.atk += item.atk || 0;
+    }
+
+    if (item.type === 'armor') {
+      char.equipped_armor = itemId;
+      char.def += item.def || 0;
+    }
+
+    // Remove from inventory
+    const removeResult = await removeItemFromInventory(userId, itemId, 1);
+    if (!removeResult.success) {
+      logger.error('Failed to remove item from inventory during equip', { userId, itemId });
       return { success: false, reason: 'inventory_error' };
     }
-  }
 
-  writeAll(all);
-  logger.info('Item unequipped', { userId, slot, itemId });
-  return { success: true, char };
+    await writeAll(all);
+    characterCache.set('all_characters', all);
+    characterCache.set(`char_${userId}`, char);
+    
+    logger.info('Item equipped', { userId, itemId, type: item.type });
+    metrics.increment('rpg_item_equipped', 1, { itemId, type: item.type });
+    return { success: true, char };
+  });
+}
+
+export async function unequipItem(userId, slot) {
+  return await metrics.collector.time('rpg_unequip_item', async () => {
+    const all = await characterCache.getOrSet('all_characters', async () => await readAll());
+    const char = all[userId];
+
+    if (!char) return { success: false, reason: 'no_character' };
+
+    let itemId = null;
+    if (slot === 'weapon' && char.equipped_weapon) {
+      itemId = char.equipped_weapon;
+      if (ITEMS[itemId]) {
+        char.atk -= ITEMS[itemId].atk || 0;
+      }
+      char.equipped_weapon = null;
+    }
+    else if (slot === 'armor' && char.equipped_armor) {
+      itemId = char.equipped_armor;
+      if (ITEMS[itemId]) {
+        char.def -= ITEMS[itemId].def || 0;
+      }
+      char.equipped_armor = null;
+    }
+    else {
+      return { success: false, reason: 'no_item_equipped' };
+    }
+
+    if (itemId) {
+      const addResult = await addItemToInventory(userId, itemId, 1);
+      if (!addResult.success) {
+        logger.error('Failed to add item to inventory during unequip', { userId, itemId });
+        return { success: false, reason: 'inventory_error' };
+      }
+    }
+
+    await writeAll(all);
+    characterCache.set('all_characters', all);
+    characterCache.set(`char_${userId}`, char);
+    
+    logger.info('Item unequipped', { userId, slot, itemId });
+    metrics.increment('rpg_item_unequipped', 1, { slot });
+    return { success: true, char };
+  });
 }
 
 // Crafting System
@@ -780,17 +771,17 @@ export function getCraftingRecipes() {
   return CRAFTING_RECIPES;
 }
 
-export function canCraftItem(userId, itemId) {
+export async function canCraftItem(userId, itemId) {
   const recipe = CRAFTING_RECIPES[itemId];
   if (!recipe) return { success: false, reason: 'not_craftable' };
 
-  const character = getCharacter(userId);
+  const character = await getCharacter(userId);
   if (!character) return { success: false, reason: 'no_character' };
   if (character.lvl < recipe.required_level) {
     return { success: false, reason: 'level_too_low', required: recipe.required_level };
   }
 
-  const inventory = getInventory(userId);
+  const inventory = await getInventory(userId);
 
   // Check if all required materials are available
   for (const [materialId, requiredQuantity] of Object.entries(recipe.materials)) {
@@ -802,43 +793,46 @@ export function canCraftItem(userId, itemId) {
   return { success: true };
 }
 
-export function craftItem(userId, itemId) {
-  const canCraft = canCraftItem(userId, itemId);
-  if (!canCraft.success) return canCraft;
+export async function craftItem(userId, itemId) {
+  return await metrics.collector.time('rpg_craft_item', async () => {
+    const canCraft = await canCraftItem(userId, itemId);
+    if (!canCraft.success) return canCraft;
 
-  const recipe = CRAFTING_RECIPES[itemId];
-  const character = getCharacter(userId);
-  if (!character) return { success: false, reason: 'no_character' };
+    const recipe = CRAFTING_RECIPES[itemId];
+    const character = await getCharacter(userId);
+    if (!character) return { success: false, reason: 'no_character' };
 
-  const inventory = getInventory(userId);
+    const inventory = await getInventory(userId);
 
-  // Remove materials
-  for (const [materialId, requiredQuantity] of Object.entries(recipe.materials)) {
-    const removeResult = removeItemFromInventory(userId, materialId, requiredQuantity);
-    if (!removeResult.success) {
-      logger.error('Failed to remove material during crafting', { userId, itemId, materialId, required: requiredQuantity });
-      return { success: false, reason: 'material_removal_failed' };
+    // Remove materials
+    for (const [materialId, requiredQuantity] of Object.entries(recipe.materials)) {
+      const removeResult = await removeItemFromInventory(userId, materialId, requiredQuantity);
+      if (!removeResult.success) {
+        logger.error('Failed to remove material during crafting', { userId, itemId, materialId, required: requiredQuantity });
+        return { success: false, reason: 'material_removal_failed' };
+      }
     }
-  }
 
-  // Add crafted item
-  const addResult = addItemToInventory(userId, itemId, 1);
-  if (!addResult.success) {
-    logger.error('Failed to add crafted item to inventory', { userId, itemId });
-    return { success: false, reason: 'item_add_failed' };
-  }
+    // Add crafted item
+    const addResult = await addItemToInventory(userId, itemId, 1);
+    if (!addResult.success) {
+      logger.error('Failed to add crafted item to inventory', { userId, itemId });
+      return { success: false, reason: 'item_add_failed' };
+    }
 
-  // Award XP for crafting
-  const xpReward = Math.floor(character.lvl * 2);
-  const xpResult = applyXp(userId, character, xpReward);
+    // Award XP for crafting
+    const xpReward = Math.floor(character.lvl * 2);
+    const xpResult = applyXp(userId, character, xpReward);
 
-  logger.info('Item crafted successfully', { userId, itemId, xpGained: xpReward });
-  return {
-    success: true,
-    char: character,
-    xpGained: xpReward,
-    item: ITEMS[itemId]
-  };
+    logger.info('Item crafted successfully', { userId, itemId, xpGained: xpReward });
+    metrics.increment('rpg_item_crafted', 1, { itemId });
+    return {
+      success: true,
+      char: character,
+      xpGained: xpReward,
+      item: ITEMS[itemId]
+    };
+  });
 }
 
 export function bossEncounter(lvl = 5) {
@@ -846,33 +840,26 @@ export function bossEncounter(lvl = 5) {
 }
 
 // simple quest storage inside RPG file
-function readQuests() {
+async function readQuests() {
   const p = path.join(process.cwd(), 'data', 'quests.json');
-  if (!fs.existsSync(p)) return {};
-  try {
-    return JSON.parse(fs.readFileSync(p)) || {};
-  }
-  catch {
-    return {};
-  }
+  return await readJSON(p, {});
 }
 
-function writeQuests(q) {
+async function writeQuests(q) {
   const p = path.join(process.cwd(), 'data', 'quests.json');
-  if (!fs.existsSync(path.dirname(p))) fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(q, null, 2), 'utf8');
+  await writeJSON(p, q);
 }
 
-export function createQuest(userId, title, desc) {
-  const all = readQuests();
+export async function createQuest(userId, title, desc) {
+  const all = await readQuests();
   all[userId] = all[userId] || [];
   const q = { id: Date.now(), title, desc, status: 'open' };
   all[userId].push(q);
-  writeQuests(all);
+  await writeQuests(all);
   return q;
 }
 
-export function generateRandomQuest(userId, level = 1) {
+export async function generateRandomQuest(userId, level = 1) {
   const questTypes = [
     { title: `Slay ${5 + level * 2} Goblins`, desc: `Defeat ${5 + level * 2} goblins in combat.`, requirement: 'goblins_defeated', amount: 5 + level * 2 },
     { title: `Collect ${3 + level} Health Potions`, desc: `Gather ${3 + level} health potions from exploration.`, requirement: 'potions_collected', amount: 3 + level },
@@ -883,7 +870,7 @@ export function generateRandomQuest(userId, level = 1) {
   ];
 
   const randomType = questTypes[Math.floor(Math.random() * questTypes.length)];
-  const quest = createQuest(userId, randomType.title, randomType.desc);
+  const quest = await createQuest(userId, randomType.title, randomType.desc);
   quest.requirement = randomType.requirement;
   quest.amount = randomType.amount;
 
@@ -900,8 +887,8 @@ export function generateRandomQuest(userId, level = 1) {
   return quest;
 }
 
-export function listQuests(userId) {
-  const all = readQuests();
+export async function listQuests(userId) {
+  const all = await readQuests();
   return all[userId] || [];
 }
 
@@ -939,24 +926,24 @@ function calculateQuestGoldReward(quest) {
   return Math.floor(baseGold * multiplier + levelBonus * 5);
 }
 
-export function completeQuest(userId, questId) {
-  const all = readQuests();
+export async function completeQuest(userId, questId) {
+  const all = await readQuests();
   const arr = all[userId] || [];
   const q = arr.find(x => x.id === Number(questId));
   if (!q) return null;
   q.status = 'completed';
-  writeQuests(all);
+  await writeQuests(all);
 
   // Award XP based on quest type and level
   const xpReward = calculateQuestXpReward(q);
   const goldReward = calculateQuestGoldReward(q);
 
   // Apply XP and gold rewards
-  const char = getCharacter(userId);
+  const char = await getCharacter(userId);
   if (char) {
     applyXp(userId, char, xpReward);
     char.gold = (char.gold || 0) + goldReward;
-    saveCharacter(userId, char);
+    await saveCharacter(userId, char);
   }
 
   return { ...q, xpReward, goldReward };
@@ -965,106 +952,111 @@ export function completeQuest(userId, questId) {
 // Removed duplicate function
 
 // Spend skill points for a character and persist change
-export function spendSkillPoints(userId, stat, amount = 1) {
-  // Validate inputs
-  if (!userId || typeof userId !== 'string') {
-    throw new CommandError('Invalid user ID', 'INVALID_ARGUMENT');
-  }
-
-  if (!stat || typeof stat !== 'string') {
-    throw new CommandError('Invalid stat specified', 'INVALID_ARGUMENT');
-  }
-
-  const amountValidation = validateNumber(amount, { min: 1, max: 100, integer: true, positive: true });
-  if (!amountValidation.valid) {
-    throw new CommandError(amountValidation.reason, 'INVALID_ARGUMENT');
-  }
-
-  // Validate stat type
-  const validStats = ['hp', 'maxhp', 'mp', 'maxmp', 'atk', 'def', 'spd'];
-  if (!validStats.includes(stat)) {
-    throw new CommandError(`Invalid stat. Must be one of: ${validStats.join(', ')}`, 'INVALID_ARGUMENT');
-  }
-
-  if (locks.has(userId)) {
-    throw new CommandError('Character update already in progress', 'RATE_LIMITED');
-  }
-
-  locks.add(userId);
-  try {
-    const all = cache || readAll();
-    const char = all[userId];
-
-    if (!char) {
-      throw new CommandError('Character not found', 'NOT_FOUND');
+export async function spendSkillPoints(userId, stat, amount = 1) {
+  return await metrics.collector.time('rpg_spend_skill_points', async () => {
+    // Validate inputs
+    const userValidation = validateUserId(userId);
+    if (!userValidation.valid) {
+      throw new CommandError(userValidation.error, 'INVALID_ARGUMENT');
     }
 
-    const pts = char.skillPoints || 0;
-    if (pts < amount) {
-      throw new CommandError(`Not enough skill points. Have: ${pts}, Need: ${amount}`, 'INSUFFICIENT_FUNDS');
+    if (!stat || typeof stat !== 'string') {
+      throw new CommandError('Invalid stat specified', 'INVALID_ARGUMENT');
     }
 
-    // Apply stat changes with validation
-    switch (stat) {
-      case 'hp': {
-        const currentHp = char.hp || 0;
-        const maxHp = char.maxHp || 20;
-        char.hp = Math.min(currentHp + amount * 2, maxHp);
-
-        break;
-      }
-      case 'maxhp': {
-        char.maxHp = (char.maxHp || 20) + amount * 5;
-        char.hp = Math.min((char.hp || 0) + amount * 2, char.maxHp);
-
-        break;
-      }
-      case 'mp': {
-        const currentMp = char.mp || 0;
-        const maxMp = char.maxMp || 10;
-        char.mp = Math.min(currentMp + amount * 3, maxMp);
-
-        break;
-      }
-      case 'maxmp': {
-        char.maxMp = (char.maxMp || 10) + amount * 5;
-        char.mp = Math.min((char.mp || 0) + amount * 3, char.maxMp);
-
-        break;
-      }
-      case 'atk': {
-        char.atk = (char.atk || 5) + amount;
-
-        break;
-      }
-      case 'def': {
-        char.def = (char.def || 2) + amount;
-
-        break;
-      }
-      case 'spd': {
-        char.spd = (char.spd || 2) + amount;
-
-        break;
-      }
-    // No default
+    const amountValidation = validateNumber(amount, { min: 1, max: 100, integer: true, positive: true });
+    if (!amountValidation.valid) {
+      throw new CommandError(amountValidation.error, 'INVALID_ARGUMENT');
     }
 
-    char.skillPoints = pts - amount;
-    all[userId] = char;
-    writeAll(all);
+    // Validate stat type
+    const validStats = ['hp', 'maxhp', 'mp', 'maxmp', 'atk', 'def', 'spd'];
+    if (!validStats.includes(stat)) {
+      throw new CommandError(`Invalid stat. Must be one of: ${validStats.join(', ')}`, 'INVALID_ARGUMENT');
+    }
 
-    logger.info('Skill points spent', { userId, stat, amount, newValue: char[stat] });
-    return { success: true, char };
-  }
-  finally {
-    locks.delete(userId);
-  }
+    if (locks.has(userId)) {
+      throw new CommandError('Character update already in progress', 'RATE_LIMITED');
+    }
+
+    locks.add(userId);
+    try {
+      const all = await characterCache.getOrSet('all_characters', async () => await readAll());
+      const char = all[userId];
+
+      if (!char) {
+        throw new CommandError('Character not found', 'NOT_FOUND');
+      }
+
+      const pts = char.skillPoints || 0;
+      if (pts < amount) {
+        throw new CommandError(`Not enough skill points. Have: ${pts}, Need: ${amount}`, 'INSUFFICIENT_FUNDS');
+      }
+
+      // Apply stat changes with validation
+      switch (stat) {
+        case 'hp': {
+          const currentHp = char.hp || 0;
+          const maxHp = char.maxHp || 20;
+          char.hp = Math.min(currentHp + amount * 2, maxHp);
+
+          break;
+        }
+        case 'maxhp': {
+          char.maxHp = (char.maxHp || 20) + amount * 5;
+          char.hp = Math.min((char.hp || 0) + amount * 2, char.maxHp);
+
+          break;
+        }
+        case 'mp': {
+          const currentMp = char.mp || 0;
+          const maxMp = char.maxMp || 10;
+          char.mp = Math.min(currentMp + amount * 3, maxMp);
+
+          break;
+        }
+        case 'maxmp': {
+          char.maxMp = (char.maxMp || 10) + amount * 5;
+          char.mp = Math.min((char.mp || 0) + amount * 3, char.maxMp);
+
+          break;
+        }
+        case 'atk': {
+          char.atk = (char.atk || 5) + amount;
+
+          break;
+        }
+        case 'def': {
+          char.def = (char.def || 2) + amount;
+
+          break;
+        }
+        case 'spd': {
+          char.spd = (char.spd || 2) + amount;
+
+          break;
+        }
+      // No default
+      }
+
+      char.skillPoints = pts - amount;
+      all[userId] = char;
+      await writeAll(all);
+      characterCache.set('all_characters', all);
+      characterCache.set(`char_${userId}`, char);
+
+      logger.info('Skill points spent', { userId, stat, amount, newValue: char[stat] });
+      metrics.increment('rpg_skill_points_spent', amount, { stat });
+      return { success: true, char };
+    } finally {
+      locks.delete(userId);
+    }
+  });
 }
 
 // Function to check daily exploration limit
-export function checkDailyLimit(userId) {
-  const all = cache || readAll();
+export async function checkDailyLimit(userId) {
+  const all = await characterCache.getOrSet('all_characters', async () => await readAll());
   const char = all[userId];
   if (!char) return { allowed: false, reason: 'no_character' };
 
@@ -1075,7 +1067,9 @@ export function checkDailyLimit(userId) {
   if (now - (char.lastDailyReset || 0) >= dayInMs) {
     char.dailyExplorations = 0;
     char.lastDailyReset = now;
-    writeAll(all);
+    await writeAll(all);
+    characterCache.set('all_characters', all);
+    characterCache.set(`char_${userId}`, char);
   }
 
   const maxDaily = 10; // 10 explorations per day
@@ -1092,26 +1086,28 @@ export function checkDailyLimit(userId) {
 }
 
 // Function to increment daily exploration count
-export function incrementDailyExploration(userId) {
-  const all = cache || readAll();
+export async function incrementDailyExploration(userId) {
+  const all = await characterCache.getOrSet('all_characters', async () => await readAll());
   const char = all[userId];
   if (!char) return { success: false, reason: 'no_character' };
 
   // Check daily limit first
-  const check = checkDailyLimit(userId);
+  const check = await checkDailyLimit(userId);
   if (!check.allowed) {
     return { success: false, reason: 'daily_limit_reached' };
   }
 
   char.dailyExplorations = (char.dailyExplorations || 0) + 1;
-  writeAll(all);
+  await writeAll(all);
+  characterCache.set('all_characters', all);
+  characterCache.set(`char_${userId}`, char);
 
   return { success: true, newCount: char.dailyExplorations };
 }
 
 // Function to check session XP cap
-export function checkSessionXpCap(userId) {
-  const all = cache || readAll();
+export async function checkSessionXpCap(userId) {
+  const all = await characterCache.getOrSet('all_characters', async () => await readAll());
   const char = all[userId];
   if (!char) return { allowed: false, reason: 'no_character' };
 
@@ -1122,7 +1118,9 @@ export function checkSessionXpCap(userId) {
   if (now - (char.lastSessionReset || 0) >= sessionDurationMs) {
     char.sessionXpGained = 0;
     char.lastSessionReset = now;
-    writeAll(all);
+    await writeAll(all);
+    characterCache.set('all_characters', all);
+    characterCache.set(`char_${userId}`, char);
   }
 
   const maxSessionXp = 1000; // 1000 XP per session
