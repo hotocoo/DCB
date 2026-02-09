@@ -21,13 +21,10 @@ class ProfileManager {
     }
   }
   
-  // Performance: Cache management helpers with proper LRU behavior
+  // Performance: Cache management helpers with simplified LRU behavior
   _getCachedProfile(userId) {
     const cached = this.profileCache.get(userId);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-      // Move to end for LRU behavior
-      this.profileCache.delete(userId);
-      this.profileCache.set(userId, cached);
       return cached.profile;
     }
     // Clean expired entry
@@ -38,17 +35,15 @@ class ProfileManager {
   }
   
   _setCachedProfile(userId, profile) {
-    // Evict oldest entry (first in Map) if cache is full - true LRU behavior
+    // Simple LRU: evict oldest entry (first in Map) when full
+    // Note: Not moving entries to end on access for performance reasons
+    // The TTL provides cache freshness; eviction happens naturally at capacity
     if (this.profileCache.size >= this.CACHE_MAX_SIZE && !this.profileCache.has(userId)) {
       const firstKey = this.profileCache.keys().next().value;
       this.profileCache.delete(firstKey);
     }
     
-    // Remove and re-add to move to end (most recently used)
-    if (this.profileCache.has(userId)) {
-      this.profileCache.delete(userId);
-    }
-    
+    // Update or add entry
     this.profileCache.set(userId, {
       profile,
       timestamp: Date.now()

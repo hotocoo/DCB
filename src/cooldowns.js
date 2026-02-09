@@ -196,7 +196,7 @@ class CooldownManager {
     const now = Date.now();
     const cooldowns = {};
 
-    // Performance: Direct user lookup instead of iterating all cooldowns
+    // Performance: Direct user lookup for O(1) access
     if (this.userCooldowns.has(userId)) {
       const userActions = this.userCooldowns.get(userId);
       for (const [action, endTime] of userActions) {
@@ -207,15 +207,12 @@ class CooldownManager {
           };
         }
       }
-    }
-
-    // Check old format cooldowns for backwards compatibility during migration
-    // Note: This checks all cooldowns regardless of new structure to ensure no cooldowns are missed
-    // Once migration is complete, this fallback can be removed
-    for (const [key, endTime] of this.tempCooldowns) {
-      if (key.startsWith(`${userId}_`) && now < endTime) {
-        const action = key.replace(`${userId}_`, '');
-        if (!cooldowns[action]) {
+    } else {
+      // Fallback: Only check old format if user not found in new structure
+      // This ensures backwards compatibility during migration
+      for (const [key, endTime] of this.tempCooldowns) {
+        if (key.startsWith(`${userId}_`) && now < endTime) {
+          const action = key.replace(`${userId}_`, '');
           cooldowns[action] = {
             remaining: endTime - now,
             endTime: endTime
@@ -224,7 +221,7 @@ class CooldownManager {
       }
     }
 
-    // Check persistent cooldowns
+    // Check persistent cooldowns (these can coexist with in-memory cooldowns)
     for (const [key, endTime] of Object.entries(this.persistentCooldowns)) {
       if (key.startsWith(`${userId}_`) && now < endTime) {
         const action = key.replace(`${userId}_`, '');
@@ -305,25 +302,39 @@ class CooldownManager {
     let cleaned = 0;
 
     // Clean up expired in-memory cooldowns
+    // Collect keys to delete to avoid modifying Map during iteration
+    const keysToDelete = [];
     for (const [key, endTime] of this.tempCooldowns) {
       if (now >= endTime) {
-        this.tempCooldowns.delete(key);
-        cleaned++;
+        keysToDelete.push(key);
       }
+    }
+    for (const key of keysToDelete) {
+      this.tempCooldowns.delete(key);
+      cleaned++;
     }
     
     // Clean up user-indexed cooldowns
+    const usersToClean = [];
     for (const [userId, actions] of this.userCooldowns) {
+      const actionsToDelete = [];
       for (const [action, endTime] of actions) {
         if (now >= endTime) {
-          actions.delete(action);
-          cleaned++;
+          actionsToDelete.push(action);
         }
       }
-      // Remove empty user entries
-      if (actions.size === 0) {
-        this.userCooldowns.delete(userId);
+      for (const action of actionsToDelete) {
+        actions.delete(action);
+        cleaned++;
       }
+      // Mark empty user entries for removal
+      if (actions.size === 0) {
+        usersToClean.push(userId);
+      }
+    }
+    // Remove empty user entries
+    for (const userId of usersToClean) {
+      this.userCooldowns.delete(userId);
     }
 
     // Clean up expired persistent cooldowns
