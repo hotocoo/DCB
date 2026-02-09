@@ -123,6 +123,15 @@ export function validateURL(url, options = {}) {
   try {
     const parsed = new URL(url);
 
+    // Block dangerous protocols
+    const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+    if (dangerousProtocols.includes(parsed.protocol.toLowerCase())) {
+      return {
+        valid: false,
+        error: 'Dangerous protocol detected'
+      };
+    }
+
     if (!allowedProtocols.includes(parsed.protocol)) {
       return {
         valid: false,
@@ -201,11 +210,13 @@ export function sanitizeInput(input) {
     return '';
   }
 
-  // Remove potential XSS patterns
+  // Remove potential XSS patterns more thoroughly
   return input
     .replaceAll(/[<>]/g, '')
     .replaceAll(/javascript:/gi, '')
-    .replaceAll(/on\w+=/gi, '')
+    .replaceAll(/data:/gi, '')
+    .replaceAll(/vbscript:/gi, '')
+    .replaceAll(/on\w+\s*=/gi, '') // Remove all event handlers with optional spaces
     .trim();
 }
 
