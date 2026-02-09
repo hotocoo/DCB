@@ -108,7 +108,7 @@ class EconomyManager {
       this.economyData.userBalances[userId] = Math.max(0, amount);
       this.cache.delete(`balance:${userId}`);
       await this.saveEconomy();
-      metrics.increment('economy_balance_set', 1, { userId });
+      metrics.collector.increment('economy_balance_set', 1, { userId });
       return this.economyData.userBalances[userId];
     } finally {
       release();
@@ -163,11 +163,11 @@ class EconomyManager {
         });
 
         logger.info('Balance transfer completed', { fromUserId, toUserId, amount });
-        metrics.increment('economy_transfer_success', 1);
+        metrics.collector.increment('economy_transfer_success', 1);
         return { success: true };
       } catch (error) {
         logger.error('Transfer failed', error, { fromUserId, toUserId, amount });
-        metrics.increment('economy_transfer_error', 1);
+        metrics.collector.increment('economy_transfer_error', 1);
         return { success: false, reason: 'transfer_error' };
       } finally {
         release();
@@ -188,7 +188,7 @@ class EconomyManager {
       }
 
       await this.saveEconomy();
-      metrics.increment('economy_transaction_logged', 1, { type: transaction.type });
+      metrics.collector.increment('economy_transaction_logged', 1, { type: transaction.type });
       return transaction;
     } finally {
       release();
@@ -262,7 +262,7 @@ class EconomyManager {
         await this.saveEconomy();
 
         logger.info('Business created', { userId, businessType, businessId });
-        metrics.increment('economy_business_created', 1, { type: businessType });
+        metrics.collector.increment('economy_business_created', 1, { type: businessType });
         return { success: true, business };
       } finally {
         release();
@@ -332,7 +332,7 @@ class EconomyManager {
 
         await this.saveEconomy();
         logger.info('Business upgraded', { userId, businessId, newLevel: business.level });
-        metrics.increment('economy_business_upgraded', 1);
+        metrics.collector.increment('economy_business_upgraded', 1);
         return { success: true, business };
       } finally {
         release();
@@ -378,7 +378,7 @@ class EconomyManager {
 
           await this.saveEconomy();
           logger.info('Business income collected', { userId, totalIncome });
-          metrics.increment('economy_business_income_collected', 1);
+          metrics.collector.increment('economy_business_income_collected', 1);
         }
 
         return {
@@ -433,7 +433,7 @@ class EconomyManager {
         await this.saveEconomy();
 
         logger.info('Investment created', { userId, investmentId, amount });
-        metrics.increment('economy_investment_created', 1, { type: investmentType.name });
+        metrics.collector.increment('economy_investment_created', 1, { type: investmentType.name });
         return { success: true, investment };
       } finally {
         release();
@@ -497,7 +497,7 @@ class EconomyManager {
       if (processedCount > 0) {
         await this.saveEconomy();
         logger.info('Processed mature investments', { count: processedCount });
-        metrics.increment('economy_investments_matured', processedCount);
+        metrics.collector.increment('economy_investments_matured', processedCount);
       }
     });
   }
@@ -544,7 +544,7 @@ class EconomyManager {
       }
     }
     logger.debug('Market prices updated');
-    metrics.increment('economy_market_price_update', 1);
+    metrics.collector.increment('economy_market_price_update', 1);
   }
 
   getMarketPrice(itemId) {
@@ -591,7 +591,7 @@ class EconomyManager {
         });
 
         logger.info('Market purchase', { userId, itemId, quantity, totalCost });
-        metrics.increment('economy_market_purchase', 1, { item: itemId });
+        metrics.collector.increment('economy_market_purchase', 1, { item: itemId });
         return {
           success: true,
           item: itemId,
@@ -634,7 +634,7 @@ class EconomyManager {
         });
 
         logger.info('Market sale', { userId, itemId, quantity, totalEarnings });
-        metrics.increment('economy_market_sale', 1, { item: itemId });
+        metrics.collector.increment('economy_market_sale', 1, { item: itemId });
         return {
           success: true,
           item: itemId,
@@ -730,7 +730,7 @@ class EconomyManager {
         });
 
         logger.info('Lottery played', { userId, isWinner, winnings });
-        metrics.increment('economy_lottery_played', 1, { result: isWinner ? 'win' : 'lose' });
+        metrics.collector.increment('economy_lottery_played', 1, { result: isWinner ? 'win' : 'lose' });
         return {
           success: true,
           isWinner,
@@ -852,7 +852,7 @@ class EconomyManager {
             timestamp: Date.now()
           });
           logger.info('Taxes collected', { guildId, totalTaxed });
-          metrics.increment('economy_taxes_collected', 1);
+          metrics.collector.increment('economy_taxes_collected', 1);
         }
 
         return totalTaxed;
@@ -904,7 +904,7 @@ class EconomyManager {
 
         await this.saveEconomy();
         logger.info('Daily reward claimed', { userId, reward, streak: streak + 1 });
-        metrics.increment('economy_daily_reward_claimed', 1);
+        metrics.collector.increment('economy_daily_reward_claimed', 1);
         return { success: true, reward, streak: streak + 1 };
       } finally {
         release();
@@ -942,7 +942,7 @@ class EconomyManager {
 
       await this.saveEconomy();
       logger.info('Economy cleanup completed');
-      metrics.increment('economy_cleanup_completed', 1);
+      metrics.collector.increment('economy_cleanup_completed', 1);
     });
   }
 }

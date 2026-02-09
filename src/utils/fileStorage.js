@@ -50,14 +50,14 @@ export async function readJSON(filePath, defaultValue = null) {
     try {
       await fs.access(filePath);
     } catch {
-      logger.debug(\`File not found, returning default: \${filePath}\`);
+      logger.debug(`File not found, returning default: ${filePath}`);
       return defaultValue;
     }
 
     // Check file size
     const stats = await fs.stat(filePath);
     if (stats.size > MAX_FILE_SIZE) {
-      logger.error(\`File too large: \${filePath} (\${stats.size} bytes)\`);
+      logger.error(`File too large: ${filePath} (${stats.size} bytes)`);
       return defaultValue;
     }
 
@@ -66,7 +66,7 @@ export async function readJSON(filePath, defaultValue = null) {
     return JSON.parse(data);
     
   } catch (error) {
-    logger.error(\`Failed to read JSON file: \${filePath}\`, error);
+    logger.error(`Failed to read JSON file: ${filePath}`, error);
     return defaultValue;
   } finally {
     release();
@@ -90,7 +90,7 @@ export async function writeJSON(filePath, data, options = { pretty: true }) {
     await fs.mkdir(dir, { recursive: true });
 
     // Write to temporary file first (atomic write)
-    const tempPath = \`\${filePath}.tmp\`;
+    const tempPath = `${filePath}.tmp`;
     const jsonString = options.pretty 
       ? JSON.stringify(data, null, 2) 
       : JSON.stringify(data);
@@ -103,11 +103,11 @@ export async function writeJSON(filePath, data, options = { pretty: true }) {
     return true;
     
   } catch (error) {
-    logger.error(\`Failed to write JSON file: \${filePath}\`, error);
+    logger.error(`Failed to write JSON file: ${filePath}`, error);
     
     // Clean up temp file if it exists
     try {
-      await fs.unlink(\`\${filePath}.tmp\`);
+      await fs.unlink(`${filePath}.tmp`);
     } catch {
       // Ignore cleanup errors
     }
@@ -131,7 +131,7 @@ export async function listJSONFiles(dirPath) {
       .filter(file => file.endsWith('.json'))
       .map(file => path.join(dirPath, file));
   } catch (error) {
-    logger.error(\`Failed to list JSON files in: \${dirPath}\`, error);
+    logger.error(`Failed to list JSON files in: ${dirPath}`, error);
     return [];
   }
 }

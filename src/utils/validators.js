@@ -30,11 +30,11 @@ export function validateString(value, options = {}) {
   }
 
   if (str.length < minLength) {
-    return { valid: false, error: \`Value must be at least \${minLength} characters\` };
+    return { valid: false, error: `Value must be at least ${minLength} characters` };
   }
 
   if (str.length > maxLength) {
-    return { valid: false, error: \`Value must be at most \${maxLength} characters\` };
+    return { valid: false, error: `Value must be at most ${maxLength} characters` };
   }
 
   if (pattern && !pattern.test(str)) {
@@ -73,11 +73,11 @@ export function validateNumber(value, options = {}) {
   }
 
   if (num < min) {
-    return { valid: false, error: \`Value must be at least \${min}\` };
+    return { valid: false, error: `Value must be at least ${min}` };
   }
 
   if (num > max) {
-    return { valid: false, error: \`Value must be at most \${max}\` };
+    return { valid: false, error: `Value must be at most ${max}` };
   }
 
   return { valid: true, value: num };
@@ -92,7 +92,7 @@ export function validateUserId(userId) {
   const result = validateString(userId, {
     minLength: 17,
     maxLength: 20,
-    pattern: /^\\d+$/
+    pattern: /^\d+$/
   });
 
   if (!result.valid) {
@@ -126,7 +126,7 @@ export function validateURL(url, options = {}) {
     if (!allowedProtocols.includes(parsed.protocol)) {
       return { 
         valid: false, 
-        error: \`Protocol must be one of: \${allowedProtocols.join(', ')}\` 
+        error: `Protocol must be one of: ${allowedProtocols.join(', ')}` 
       };
     }
 
@@ -140,9 +140,9 @@ export function validateURL(url, options = {}) {
  * Validates a file path (prevents path traversal)
  * @param {string} filePath - File path to validate
  * @param {string} baseDir - Base directory to restrict to
- * @returns {Object} Validation result
+ * @returns {Promise<Object>} Validation result
  */
-export function validateFilePath(filePath, baseDir) {
+export async function validateFilePath(filePath, baseDir) {
   const path = await import('path');
   
   // Normalize paths
@@ -155,7 +155,7 @@ export function validateFilePath(filePath, baseDir) {
   }
   
   // Check for suspicious patterns
-  if (/\\.\\.|\\0|\\n|\\r/.test(filePath)) {
+  if (/\.\.|[\0\n\r]/.test(filePath)) {
     return { valid: false, error: 'Invalid characters in path' };
   }
   
@@ -168,7 +168,7 @@ export function validateFilePath(filePath, baseDir) {
  * @returns {Object} Validation result
  */
 export function validateEmail(email) {
-  const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return validateString(email, {
     maxLength: 254,
     pattern: emailPattern
@@ -203,7 +203,7 @@ export function sanitizeInput(input) {
   return input
     .replace(/[<>]/g, '')
     .replace(/javascript:/gi, '')
-    .replace(/on\\w+=/gi, '')
+    .replace(/on\w+=/gi, '')
     .trim();
 }
 
@@ -225,18 +225,18 @@ export function validateArray(value, options = {}) {
   }
 
   if (value.length < minLength) {
-    return { valid: false, error: \`Array must have at least \${minLength} items\` };
+    return { valid: false, error: `Array must have at least ${minLength} items` };
   }
 
   if (value.length > maxLength) {
-    return { valid: false, error: \`Array must have at most \${maxLength} items\` };
+    return { valid: false, error: `Array must have at most ${maxLength} items` };
   }
 
   if (itemValidator) {
     for (let i = 0; i < value.length; i++) {
       const result = itemValidator(value[i]);
       if (!result.valid) {
-        return { valid: false, error: \`Item \${i}: \${result.error}\` };
+        return { valid: false, error: `Item ${i}: ${result.error}` };
       }
     }
   }

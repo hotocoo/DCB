@@ -65,11 +65,11 @@ class MetricsCollector {
     const start = Date.now();
     try {
       const result = await fn();
-      this.histogram(\`\${name}_duration_ms\`, Date.now() - start, labels);
-      this.increment(\`\${name}_total\`, 1, { ...labels, status: 'success' });
+      this.histogram(`${name}_duration_ms`, Date.now() - start, labels);
+      this.increment(`${name}_total`, 1, { ...labels, status: 'success' });
       return result;
     } catch (error) {
-      this.increment(\`\${name}_total\`, 1, { ...labels, status: 'error' });
+      this.increment(`${name}_total`, 1, { ...labels, status: 'error' });
       throw error;
     }
   }
@@ -86,9 +86,9 @@ class MetricsCollector {
     }
     const labelStr = Object.entries(labels)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => \`\${k}="\${v}"\`)
+      .map(([k, v]) => `${k}="${v}"`)
       .join(',');
-    return \`\${name}{\${labelStr}}\`;
+    return `${name}{${labelStr}}`;
   }
 
   /**

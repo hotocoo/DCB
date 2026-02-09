@@ -161,7 +161,7 @@ export class Cache {
 
     const removed = before - this.store.size;
     if (removed > 0) {
-      logger.debug(\`Cache [\${this.name}] cleanup: removed \${removed} expired entries\`);
+      logger.debug(`Cache [${this.name}] cleanup: removed ${removed} expired entries`);
     }
   }
 
