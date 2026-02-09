@@ -209,11 +209,12 @@ class CooldownManager {
       }
     }
 
-    // Fallback: Check old format cooldowns (for backwards compatibility)
-    for (const [key, endTime] of this.tempCooldowns) {
-      if (key.startsWith(`${userId}_`) && now < endTime) {
-        const action = key.replace(`${userId}_`, '');
-        if (!cooldowns[action]) {
+    // Fallback: Check old format cooldowns for backwards compatibility during migration
+    // This can be removed once all cooldowns are migrated to new structure
+    if (Object.keys(cooldowns).length === 0) {
+      for (const [key, endTime] of this.tempCooldowns) {
+        if (key.startsWith(`${userId}_`) && now < endTime) {
+          const action = key.replace(`${userId}_`, '');
           cooldowns[action] = {
             remaining: endTime - now,
             endTime: endTime

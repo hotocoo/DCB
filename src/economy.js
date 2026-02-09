@@ -335,7 +335,8 @@ class EconomyManager {
     }
   }
 
-  // Performance: Optimized O(log n) investment processing instead of O(n²)
+  // Performance: Optimized investment processing - O(m) where m = mature investments
+  // Previously O(n²) where n = total users × investments per user
   processMatureInvestments() {
     const now = Date.now();
     let processed = 0;
@@ -398,7 +399,7 @@ class EconomyManager {
     setInterval(() => this.updateMarketPrices(), 300_000); // Every 5 minutes
   }
 
-  // Performance: Optimized price history using circular buffer
+  // Performance: Optimized price history management
   updateMarketPrices() {
     const MAX_HISTORY = 100;
     
@@ -410,17 +411,16 @@ class EconomyManager {
 
         this.marketPrices.set(itemId, newPrice);
 
-        // Store price history with circular buffer approach
+        // Store price history with efficient array management
         if (!this.priceHistory.has(itemId)) {
           this.priceHistory.set(itemId, []);
         }
 
         const history = this.priceHistory.get(itemId);
         
-        // Performance: Use circular buffer instead of shift()
+        // Remove oldest entry when at capacity to maintain fixed size
         if (history.length >= MAX_HISTORY) {
-          // Remove oldest entry efficiently
-          history.splice(0, 1);
+          history.shift(); // O(n) but necessary for array-based approach
         }
         
         history.push({ price: newPrice, timestamp: Date.now() });

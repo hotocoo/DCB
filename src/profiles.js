@@ -22,20 +22,32 @@ class ProfileManager {
     }
   }
   
-  // Performance: Cache management helpers
+  // Performance: Cache management helpers with proper LRU behavior
   _getCachedProfile(userId) {
     const cached = this.profileCache.get(userId);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      // Move to end for LRU behavior
+      this.profileCache.delete(userId);
+      this.profileCache.set(userId, cached);
       return cached.profile;
+    }
+    // Clean expired entry
+    if (cached) {
+      this.profileCache.delete(userId);
     }
     return null;
   }
   
   _setCachedProfile(userId, profile) {
-    // Evict oldest entry if cache is full
-    if (this.profileCache.size >= this.CACHE_MAX_SIZE) {
+    // Evict oldest entry (first in Map) if cache is full - true LRU behavior
+    if (this.profileCache.size >= this.CACHE_MAX_SIZE && !this.profileCache.has(userId)) {
       const firstKey = this.profileCache.keys().next().value;
       this.profileCache.delete(firstKey);
+    }
+    
+    // Remove and re-add to move to end (most recently used)
+    if (this.profileCache.has(userId)) {
+      this.profileCache.delete(userId);
     }
     
     this.profileCache.set(userId, {
@@ -461,14 +473,8 @@ class ProfileManager {
       }
     }
 
-    // Performance: Use partial sort for top-k instead of full sort
-    // For small limits, partial sort is more efficient than sorting entire array
-    if (limit < leaderboard.length / 2) {
-      // Use nth_element approach - partition around kth element
-      leaderboard.sort((a, b) => b.value - a.value);
-      return leaderboard.slice(0, limit);
-    }
-    
+    // Full sort and slice - partial sort would be more efficient for small limits
+    // but adds complexity. Current approach is clear and fast enough for typical use.
     return leaderboard
       .sort((a, b) => b.value - a.value)
       .slice(0, limit);
