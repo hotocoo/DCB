@@ -41,6 +41,7 @@ import { getLocations } from './locations.js';
 import { getActiveAuctions } from './trading.js';
 import { updateProfile } from './profiles.js';
 import { updateUserStats } from './achievements.js';
+import { handleGiveawayButton } from './commands/giveaway.js';
 // Import missing functions from other modules - these are not exported, so we need to use them directly
 // getPerformanceRating from memory.js, makeConnect4Move/sendConnect4Board from connect4.js, etc.
 
@@ -1798,7 +1799,6 @@ export async function handleButtonInteraction(interaction, client) {
               }
             }
             result = `⚔️ You search aggressively and fight a **${monster.name}**!\n💥 You take **${damage}** damage. HP: ${char.hp}/${char.maxHp}`;
-            xpGain = 8;
             xpGain = 8;
             break;
           }
@@ -3590,6 +3590,12 @@ export async function handleButtonInteraction(interaction, client) {
             });
           }, 2000);
         }
+        return;
+      }
+
+      // Giveaway button handler
+      if (action === 'giveaway_enter') {
+        await handleGiveawayButton(interaction);
         return;
       }
 

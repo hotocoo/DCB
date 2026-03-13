@@ -738,4 +738,12 @@ export function getUserInvestments(userId) {
   return economyManager.getUserInvestments(userId);
 }
 
+export function getEconomyLeaderboard(limit = 10) {
+  const balances = economyManager.economyData.userBalances;
+  return Object.entries(balances)
+    .map(([userId, balance]) => ({ userId, balance }))
+    .sort((a, b) => b.balance - a.balance)
+    .slice(0, limit);
+}
+
 // End of file
