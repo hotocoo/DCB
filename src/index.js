@@ -13,8 +13,9 @@ import { Client, Collection, GatewayIntentBits, Partials, ActivityType } from 'd
 
 // Core bot modules
 import { loadCommands } from './commandLoader.js';
-import { handleInteraction } from './interactionHandlers';
+import { handleInteraction } from './interactionHandlers.js';
 import { handleMessage } from './chat.js';
+import { clearAfkStatus } from './commands/afk.js';
 import { logger, logError } from './logger.js';
 
 // Feature modules
@@ -212,6 +213,11 @@ client.on('messageCreate', async message => {
           : 'Invalid typing attempt.');
       await message.reply({ content: response });
       return;
+    }
+
+    // Clear AFK status if user sends a message
+    if (clearAfkStatus(message.author.id)) {
+      await message.reply({ content: '👋 Welcome back! Your AFK status has been removed.' }).catch(() => null);
     }
 
     // Handle general message processing

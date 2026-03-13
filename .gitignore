@@ -137,6 +137,16 @@ test-results/
 test-results.json
 tests/*.result.json
 tests/comprehensive-test-results.json
+comprehensive-test-results.json
+
+# Test-generated player data files
+data/players/testuser*.json
+data/players/333133024520568833.json
+data/players/testuser1234.json
+data/players/testuser1.json
+
+# Null files (Windows artifact)
+nul
 
 # Migration files (temporary)
 migrations/temp/
