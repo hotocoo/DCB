@@ -33,6 +33,9 @@ export const data = new SlashCommandBuilder()
   .setName('help')
   .setDescription('Shows comprehensive help about all bot features')
   .addStringOption(option =>
+    option.setName('command')
+      .setDescription('Specific command to show detailed help for'))
+  .addStringOption(option =>
     option.setName('category')
       .setDescription('Specific category to show help for')
       .addChoices(
@@ -44,9 +47,53 @@ export const data = new SlashCommandBuilder()
         { name: 'Admin & Moderation', value: 'admin' }
       ));
 
-export async function execute(interaction) {
-  const category = interaction.options.getString('category') || 'all';
-  const commands = await getAllCommands();
+function getCommandCategory(name) {
+  if (name === 'rpg') return 'rpg';
+  if (['8ball', 'roll', 'rps', 'minigame', 'novel', 'connect4', 'guess', 'hangman', 'memory', 'tictactoe', 'trivia', 'wordle', 'fun', 'coinflip'].includes(name)) return 'games';
+  if (['ping', 'echo', 'help', 'setmodel', 'togglechat', 'toggleplay', 'remind', 'poll', 'weather', 'music', 'profile'].includes(name)) return 'utility';
+  if (['chat', 'ai', 'api'].includes(name)) return 'chat';
+  if (['admin', 'guild', 'achievements', 'economy', 'inventory', 'trade', 'explore'].includes(name)) return 'admin';
+  return 'utility';
+}
+
+function getCommandOptions(command) {
+  if (!command || typeof command.toJSON !== 'function') return 'No options';
+  const { options = [] } = command.toJSON();
+  if (options.length === 0) return 'No options';
+  return options.map(option => `• \`${option.name}\` - ${option.description || 'No description'}`).join('\n');
+}
+
+export function buildHelpEmbed(commands, category = 'all', commandName = null) {
+  const requestedCommand = commandName?.trim().toLowerCase() || null;
+
+  for (const cmd of commands) {
+    const name = cmd.name;
+    if (requestedCommand && name === requestedCommand) {
+      const detailedEmbed = new EmbedBuilder()
+        .setTitle(`📘 /${name} command`)
+        .setDescription(cmd.description || 'No description available')
+        .setColor(0x00_99_FF)
+        .addFields(
+          { name: 'Category', value: getCommandCategory(name), inline: true },
+          { name: 'Options', value: getCommandOptions(cmd), inline: false }
+        )
+        .setTimestamp();
+      return detailedEmbed;
+    }
+  }
+
+  if (requestedCommand) {
+    const available = commands
+      .map(cmd => `\`/${cmd.name}\``)
+      .sort((first, second) => first.localeCompare(second))
+      .join(', ');
+    return new EmbedBuilder()
+      .setTitle('❓ Command not found')
+      .setDescription(`No command named \`/${requestedCommand}\` was found.`)
+      .addFields({ name: 'Available Commands', value: available || 'No commands available', inline: false })
+      .setColor(0xFF9900)
+      .setTimestamp();
+  }
 
   // Organize commands by category
   const commandCategories = {
@@ -61,12 +108,7 @@ export async function execute(interaction) {
     const name = cmd.name;
     const description = cmd.description || 'No description available';
 
-    if (name === 'rpg') commandCategories.rpg.push(`\`/${name}\` - ${description}`);
-    else if (['8ball', 'roll', 'rps', 'minigame', 'novel', 'connect4', 'guess', 'hangman', 'memory', 'tictactoe', 'trivia', 'wordle', 'fun', 'coinflip'].includes(name)) commandCategories.games.push(`\`/${name}\` - ${description}`);
-    else if (['ping', 'echo', 'help', 'setmodel', 'togglechat', 'toggleplay', 'remind', 'poll', 'weather', 'music', 'profile'].includes(name)) commandCategories.utility.push(`\`/${name}\` - ${description}`);
-    else if (['chat', 'ai', 'api'].includes(name)) commandCategories.chat.push(`\`/${name}\` - ${description}`);
-    else if (['admin', 'guild', 'achievements', 'economy', 'inventory', 'trade', 'explore'].includes(name)) commandCategories.admin.push(`\`/${name}\` - ${description}`);
-    else commandCategories.utility.push(`\`/${name}\` - ${description}`);
+    commandCategories[getCommandCategory(name)].push(`\`/${name}\` - ${description}`);
   }
 
   const embed = new EmbedBuilder()
@@ -147,7 +189,15 @@ export async function execute(interaction) {
     }
   }
 
+  return embed;
+}
+
+export async function execute(interaction) {
+  const category = interaction.options.getString('category') || 'all';
+  const commandName = interaction.options.getString('command');
+  const commands = await getAllCommands();
+  const embed = buildHelpEmbed(commands, category, commandName);
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-export { getAllCommands };
+export { getAllCommands, getCommandCategory, getCommandOptions };
