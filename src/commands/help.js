@@ -4,6 +4,11 @@ import { pathToFileURL } from 'node:url';
 
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 
+const GAMES_COMMANDS = new Set(['8ball', 'roll', 'rps', 'minigame', 'novel', 'connect4', 'guess', 'hangman', 'memory', 'tictactoe', 'trivia', 'wordle', 'fun', 'coinflip']);
+const UTILITY_COMMANDS = new Set(['ping', 'echo', 'help', 'setmodel', 'togglechat', 'toggleplay', 'remind', 'poll', 'weather', 'music', 'profile']);
+const CHAT_COMMANDS = new Set(['chat', 'ai', 'api']);
+const ADMIN_COMMANDS = new Set(['admin', 'guild', 'achievements', 'economy', 'inventory', 'trade', 'explore']);
+
 async function getAllCommands() {
   const commandsPath = path.join(process.cwd(), 'src', 'commands');
   const commands = [];
@@ -49,10 +54,10 @@ export const data = new SlashCommandBuilder()
 
 function getCommandCategory(name) {
   if (name === 'rpg') return 'rpg';
-  if (['8ball', 'roll', 'rps', 'minigame', 'novel', 'connect4', 'guess', 'hangman', 'memory', 'tictactoe', 'trivia', 'wordle', 'fun', 'coinflip'].includes(name)) return 'games';
-  if (['ping', 'echo', 'help', 'setmodel', 'togglechat', 'toggleplay', 'remind', 'poll', 'weather', 'music', 'profile'].includes(name)) return 'utility';
-  if (['chat', 'ai', 'api'].includes(name)) return 'chat';
-  if (['admin', 'guild', 'achievements', 'economy', 'inventory', 'trade', 'explore'].includes(name)) return 'admin';
+  if (GAMES_COMMANDS.has(name)) return 'games';
+  if (UTILITY_COMMANDS.has(name)) return 'utility';
+  if (CHAT_COMMANDS.has(name)) return 'chat';
+  if (ADMIN_COMMANDS.has(name)) return 'admin';
   return 'utility';
 }
 
@@ -60,7 +65,7 @@ function getCommandOptions(command) {
   if (!command || typeof command.toJSON !== 'function') return 'No options';
   const { options = [] } = command.toJSON();
   if (options.length === 0) return 'No options';
-  return options.map(option => `• \`${option.name}\` - ${option.description || 'No description'}`).join('\n');
+  return options.map(option => `\`${option.name}\` — ${option.description || 'No description'}`).join('\n');
 }
 
 export function buildHelpEmbed(commands, category = 'all', commandName = null) {
@@ -85,7 +90,7 @@ export function buildHelpEmbed(commands, category = 'all', commandName = null) {
   if (requestedCommand) {
     const available = commands
       .map(cmd => `\`/${cmd.name}\``)
-      .sort((first, second) => first.localeCompare(second))
+      .sort((a, b) => a.localeCompare(b))
       .join(', ');
     return new EmbedBuilder()
       .setTitle('❓ Command not found')
@@ -113,7 +118,7 @@ export function buildHelpEmbed(commands, category = 'all', commandName = null) {
 
   const embed = new EmbedBuilder()
     .setTitle('🤖 Discord Bot Help')
-    .setColor(0x00_99_FF)
+    .setColor(0x0099FF)
     .setTimestamp();
 
   switch (category) {
