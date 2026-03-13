@@ -13,7 +13,7 @@ import { Client, Collection, GatewayIntentBits, Partials, ActivityType } from 'd
 
 // Core bot modules
 import { loadCommands } from './commandLoader.js';
-import { handleInteraction } from './interactionHandlers';
+import { handleInteraction } from './interactionHandlers.js';
 import { handleMessage } from './chat.js';
 import { logger, logError } from './logger.js';
 
