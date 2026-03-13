@@ -24,6 +24,7 @@ function runTests() {
     { name: 'verbose', description: 'Show extra diagnostics', required: false }
   ]);
   const basicCommand = createCommand('help', 'Show help');
+  const chatCommand = createCommand('ai', 'Chat with AI');
 
   assert.strictEqual(getCommandCategory('ping'), 'utility');
   assert.ok(getCommandOptions(commandWithOptions).includes('`verbose`'));
@@ -39,6 +40,17 @@ function runTests() {
 
   const categoryEmbed = buildHelpEmbed([commandWithOptions, basicCommand], 'utility', null);
   assert.ok(categoryEmbed.data.description.includes('/ping'));
+
+  const allEmbed = buildHelpEmbed([commandWithOptions, basicCommand, chatCommand], 'all', null);
+  assert.ok(allEmbed.data.description.includes('**RPG System**'));
+  assert.ok(allEmbed.data.description.includes('**Admin & Moderation**'));
+  assert.ok(allEmbed.data.description.includes('**Games & Fun**'));
+  assert.ok(allEmbed.data.description.includes('**Utilities**'));
+  assert.ok(allEmbed.data.description.includes('**Chat & AI**'));
+  assert.ok(allEmbed.data.description.includes('/ai'));
+  const moreInfoField = allEmbed.data.fields.find(field => field.name === '📚 More Info');
+  assert.ok(moreInfoField);
+  assert.ok(moreInfoField.value.includes('/help category:chat'));
 
   console.log('help-command tests passed');
 }

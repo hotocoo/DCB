@@ -77,7 +77,7 @@ export function buildHelpEmbed(commands, category = 'all', commandName = null) {
       const detailedEmbed = new EmbedBuilder()
         .setTitle(`📘 /${name} command`)
         .setDescription(cmd.description || 'No description available')
-        .setColor(0x00_99_FF)
+        .setColor(0x0099FF)
         .addFields(
           { name: 'Category', value: getCommandCategory(name), inline: true },
           { name: 'Options', value: getCommandOptions(cmd), inline: false }
@@ -177,17 +177,18 @@ export function buildHelpEmbed(commands, category = 'all', commandName = null) {
         '🏆 **RPG System**\n' + commandCategories.rpg.join('\n') + '\n\n' +
         '🛡️ **Admin & Moderation**\n' + commandCategories.admin.join('\n') + '\n\n' +
         '🎮 **Games & Fun**\n' + commandCategories.games.join('\n') + '\n\n' +
+        '💬 **Chat & AI**\n' + commandCategories.chat.join('\n') + '\n\n' +
         '🔧 **Utilities**\n' + commandCategories.utility.join('\n'));
 
       embed.addFields(
         {
           name: '💬 Chat & AI',
-          value: 'DM the bot or mention it to chat!\nSupports OpenAI and local models.',
+          value: 'DM the bot or mention it to chat!\nSupports OpenAI and local models.\nAvailable chat commands are listed in the command listing above.',
           inline: true
         },
         {
           name: '📚 More Info',
-          value: 'Use `/help category:rpg`, `/help category:admin`, `/help category:games`, or `/help category:utility` for more details',
+          value: 'Use `/help category:rpg`, `/help category:admin`, `/help category:games`, `/help category:chat`, or `/help category:utility` for more details',
           inline: true
         }
       );
