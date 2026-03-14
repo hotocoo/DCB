@@ -24,5 +24,8 @@
   "equipped_armor": null,
   "gold": 0,
   "createdAt": 1773470258348,
-  "sessionXpGained": 100
+  "sessionXpGained": 100,
+  "dailyExplorations": 0,
+  "lastDailyReset": 1773470384258,
+  "lastSessionReset": 1773470384258
 }
