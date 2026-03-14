@@ -2,8 +2,8 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 
 import { updateUserStats } from '../achievements.js';
 import { guessGames } from '../game-states.js';
-import { CommandError, handleCommandError } from '../errorHandler';
-import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers';
+import { CommandError, handleCommandError } from '../errorHandler.js';
+import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers.js';
 /** @typedef {import('../types.d').Guess} Guess */
 /** @typedef {import('../types.d').GuessGameState} GuessGameState */
 

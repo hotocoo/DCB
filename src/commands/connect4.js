@@ -27,8 +27,8 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 
 import { updateUserStats } from '../achievements.js';
 import { connect4Games } from '../game-states.js';
-import { CommandError, handleCommandError } from '../errorHandler';
-import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers';
+import { CommandError, handleCommandError } from '../errorHandler.js';
+import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers.js';
 
 export const data = new SlashCommandBuilder()
   .setName('connect4')

@@ -1,6 +1,6 @@
 /**
  * Storage utilities for Discord bot data persistence.
- * Provides JSON file-based storage with error handling and validation.
+ * Provides JSON file-based storage with error handling, validation, and in-memory caching.
  */
 
 import fs from 'node:fs';
@@ -17,6 +17,13 @@ const DEFAULT_ENCODING = 'utf8';
 const JSON_INDENT = 2;
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB max file size
 const BACKUP_SUFFIX = '.backup';
+const CACHE_TTL_MS = 5_000; // Cache guilds data for 5 seconds
+
+/**
+ * Simple in-memory cache for the guilds file.
+ */
+let guildsCache = null;
+let guildsCacheTime = 0;
 
 /**
  * Ensures the data directory exists.
@@ -95,14 +102,22 @@ function validateData(data) {
 
 /**
  * Reads all data from the guilds storage file.
+ * Uses an in-memory cache with a short TTL to avoid redundant disk reads.
  * @returns {object} The stored data object
  */
 export function readAll() {
+  // Return cached data if still fresh
+  if (guildsCache !== null && (Date.now() - guildsCacheTime) < CACHE_TTL_MS) {
+    return guildsCache;
+  }
+
   ensureDataDirectory();
   const filePath = getFilePath(GUILDS_FILE);
 
   if (!fs.existsSync(filePath)) {
     logger.debug('Storage file does not exist, returning empty object', { filePath });
+    guildsCache = {};
+    guildsCacheTime = Date.now();
     return {};
   }
 
@@ -116,6 +131,8 @@ export function readAll() {
     const data = fs.readFileSync(filePath, DEFAULT_ENCODING);
     if (!data || data.trim() === '') {
       logger.warn('Storage file is empty', { filePath });
+      guildsCache = {};
+      guildsCacheTime = Date.now();
       return {};
     }
 
@@ -125,7 +142,9 @@ export function readAll() {
       return {};
     }
 
-    return parsed || {};
+    guildsCache = parsed || {};
+    guildsCacheTime = Date.now();
+    return guildsCache;
   }
   catch (error) {
     logger.error('Failed to read storage file', error, { filePath });
@@ -137,7 +156,9 @@ export function readAll() {
         const backupData = fs.readFileSync(backupPath);
         const parsedBackup = JSON.parse(backupData);
         fs.copyFileSync(backupPath, filePath); // Restore backup
-        return parsedBackup || {};
+        guildsCache = parsedBackup || {};
+        guildsCacheTime = Date.now();
+        return guildsCache;
       }
       catch (backupError) {
         logger.error('Failed to restore from backup', backupError, { backupPath });
@@ -171,9 +192,12 @@ export function writeAll(data) {
 
     // Write to temporary file first, then rename for atomicity
     const tempPath = filePath + '.tmp';
-    console.log(`[STORAGE DEBUG] Writing to storage file: ${filePath}`);
     fs.writeFileSync(tempPath, jsonString, DEFAULT_ENCODING);
     fs.renameSync(tempPath, filePath);
+
+    // Update cache with newly written data
+    guildsCache = validatedData;
+    guildsCacheTime = Date.now();
 
     logger.debug('Successfully wrote to storage file', { filePath, size: jsonString.length });
   }

@@ -1881,6 +1881,7 @@ export async function handleButtonInteraction(interaction: ButtonInteraction, cl
         });
         return safeInteractionReply(interaction, { content: '❌ **Failed to rest!** Please try again later.', flags: MessageFlags.Ephemeral });
       }
+    }
 
     if (action === 'explore_continue') {
       const [, locationName, targetUserId] = interaction.customId.split(':');
