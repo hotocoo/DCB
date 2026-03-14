@@ -13,7 +13,7 @@ export async function execute(interaction) {
   try {
     const targetUser = interaction.options.getUser('user') ?? interaction.user;
     const member = interaction.guild?.members.cache.get(targetUser.id)
-      ?? await interaction.guild?.members.fetch(targetUser.id).catch(() => null);
+      ?? await interaction.guild?.members.fetch(targetUser.id).catch(() => undefined);
 
     const createdAt = `<t:${Math.floor(targetUser.createdTimestamp / 1000)}:F>`;
     const joinedAt = member?.joinedTimestamp
@@ -33,7 +33,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setTitle(`${displayName}'s Info`)
-      .setColor(0x57F287)
+      .setColor(0x57_F2_87)
       .setThumbnail(targetUser.displayAvatarURL({ size: 256 }))
       .addFields(
         { name: '🏷️ Username', value: targetUser.tag, inline: true },
@@ -44,13 +44,14 @@ export async function execute(interaction) {
         { name: '💎 Nitro', value: isNitro ? 'Likely (animated avatar)' : 'Unknown', inline: true },
         { name: `🎭 Roles (${roles?.length ?? 0})`, value: rolesDisplay, inline: false },
       )
-      .setFooter({ text: `User Info` })
+      .setFooter({ text: 'User Info' })
       .setTimestamp();
 
     return interaction.reply({ embeds: [embed] });
-  } catch (error) {
+  }
+  catch (error) {
     const errEmbed = new EmbedBuilder()
-      .setColor(0xFF0000)
+      .setColor(0xFF_00_00)
       .setTitle('Error')
       .setDescription(`Failed to fetch user info: ${error.message}`);
     return interaction.reply({ embeds: [errEmbed], ephemeral: true });

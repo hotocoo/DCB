@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 
 // --- Safe math evaluator (no eval) ---
-const TOKENS = /\s*(\*\*|[+\-*/%(),]|[A-Za-z_]\w*|\d+(?:\.\d+)?)\s*/g;
+const TOKENS = /\s*(\*\*|[%()*+,/\-]|[A-Z_a-z]\w*|\d+(?:\.\d+)?)\s*/g;
 
 const FUNCTIONS = {
   sqrt: Math.sqrt, abs: Math.abs, floor: Math.floor, ceil: Math.ceil,
@@ -42,7 +42,8 @@ function parseTerm(tokens, pos) {
     else if (op === '/') {
       if (right === 0) throw new Error('Division by zero');
       left /= right;
-    } else left %= right;
+    }
+    else left %= right;
   }
   return [left, p];
 }
@@ -71,7 +72,7 @@ function parsePrimary(tokens, pos) {
   const tok = tokens[pos];
   if (tok === undefined) throw new Error('Unexpected end of expression');
 
-  if (/^\d+(\.\d+)?$/.test(tok)) return [parseFloat(tok), pos + 1];
+  if (/^\d+(\.\d+)?$/.test(tok)) return [Number.parseFloat(tok), pos + 1];
 
   if (tok in CONSTANTS) return [CONSTANTS[tok], pos + 1];
 
@@ -112,15 +113,27 @@ function safeEval(expr) {
 // --- Unit conversion ---
 const CONVERSIONS = {
   length: { m: 1, km: 1000, cm: 0.01, ft: 0.3048, mi: 1609.344, in: 0.0254 },
-  weight: { kg: 1, g: 0.001, lb: 0.453592, oz: 0.0283495 },
+  weight: { kg: 1, g: 0.001, lb: 0.453_592, oz: 0.028_349_5 },
 };
 
 function convertTemp(value, from, to) {
   let celsius;
-  if (from === 'c') celsius = value;
-  else if (from === 'f') celsius = (value - 32) * 5 / 9;
-  else if (from === 'k') celsius = value - 273.15;
-  else throw new Error(`Unknown temperature unit: ${from}`);
+  switch (from) {
+    case 'c': {
+      celsius = value;
+      break;
+    }
+    case 'f': {
+      celsius = (value - 32) * 5 / 9;
+      break;
+    }
+    case 'k': {
+      celsius = value - 273.15;
+      break;
+    }
+    default: { throw new Error(`Unknown temperature unit: ${from}`);
+    }
+  }
 
   if (to === 'c') return celsius;
   if (to === 'f') return celsius * 9 / 5 + 32;
@@ -159,7 +172,7 @@ function statistics(numbers) {
   const maxFreq = Math.max(...Object.values(freq));
   const mode = Object.keys(freq).filter(k => freq[k] === maxFreq).map(Number);
 
-  return { mean, median, mode, min: sorted[0], max: sorted[sorted.length - 1], sum, count: numbers.length };
+  return { mean, median, mode, min: sorted[0], max: sorted.at(-1), sum, count: numbers.length };
 }
 
 // --- Command definition ---
@@ -202,7 +215,7 @@ export async function execute(interaction) {
       const result = safeEval(expr);
       if (!isFinite(result)) throw new Error('Result is not a finite number');
       const embed = new EmbedBuilder()
-        .setColor(0x5865F2)
+        .setColor(0x58_65_F2)
         .setTitle('🧮 Calculator')
         .addFields(
           { name: 'Expression', value: `\`${expr}\``, inline: false },
@@ -217,11 +230,11 @@ export async function execute(interaction) {
       const to = interaction.options.getString('to_unit', true);
       const result = convertUnit(value, from, to);
       const embed = new EmbedBuilder()
-        .setColor(0x5865F2)
+        .setColor(0x58_65_F2)
         .setTitle('📐 Unit Converter')
         .addFields(
           { name: 'Input', value: `\`${value} ${from}\``, inline: true },
-          { name: 'Result', value: `\`${parseFloat(result.toFixed(6))} ${to}\``, inline: true },
+          { name: 'Result', value: `\`${Number.parseFloat(result.toFixed(6))} ${to}\``, inline: true },
         );
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
@@ -232,7 +245,7 @@ export async function execute(interaction) {
       if (min >= max) throw new Error('`min` must be less than `max`');
       const result = Math.floor(Math.random() * (max - min + 1)) + min;
       const embed = new EmbedBuilder()
-        .setColor(0x5865F2)
+        .setColor(0x58_65_F2)
         .setTitle('🎲 Random Number')
         .setDescription(`Between **${min}** and **${max}**: **${result}**`);
       return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -240,11 +253,11 @@ export async function execute(interaction) {
 
     if (sub === 'stats') {
       const raw = interaction.options.getString('numbers', true);
-      const numbers = raw.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+      const numbers = raw.split(',').map(s => Number.parseFloat(s.trim())).filter(n => !isNaN(n));
       if (numbers.length === 0) throw new Error('No valid numbers found');
       const s = statistics(numbers);
       const embed = new EmbedBuilder()
-        .setColor(0x5865F2)
+        .setColor(0x58_65_F2)
         .setTitle('📊 Statistics')
         .addFields(
           { name: 'Count', value: `${s.count}`, inline: true },
@@ -257,9 +270,10 @@ export async function execute(interaction) {
         );
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
-  } catch (error) {
+  }
+  catch (error) {
     const errEmbed = new EmbedBuilder()
-      .setColor(0xFF0000)
+      .setColor(0xFF_00_00)
       .setTitle('Math Error')
       .setDescription(error.message);
     if (interaction.replied || interaction.deferred) {

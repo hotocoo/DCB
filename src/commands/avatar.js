@@ -29,7 +29,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setTitle(`${targetUser.username}'s Avatar`)
-      .setColor(0x5865F2)
+      .setColor(0x58_65_F2)
       .setImage(globalAvatar)
       .addFields({ name: '🔗 Links', value: links.join(' | '), inline: false });
 
@@ -42,9 +42,10 @@ export async function execute(interaction) {
     embed.setFooter({ text: `Avatar${isAnimated ? ' · Animated' : ''}` }).setTimestamp();
 
     return interaction.reply({ embeds: [embed] });
-  } catch (error) {
+  }
+  catch (error) {
     const errEmbed = new EmbedBuilder()
-      .setColor(0xFF0000)
+      .setColor(0xFF_00_00)
       .setTitle('Error')
       .setDescription(`Failed to fetch avatar: ${error.message}`);
     return interaction.reply({ embeds: [errEmbed], ephemeral: true });

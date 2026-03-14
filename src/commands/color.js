@@ -3,11 +3,11 @@ import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 // --- Color helpers ---
 function parseHex(hex) {
   const cleaned = hex.replace(/^#/, '');
-  if (!/^[0-9A-Fa-f]{6}$/.test(cleaned)) throw new Error(`Invalid hex color: \`#${cleaned}\``);
-  const r = parseInt(cleaned.slice(0, 2), 16);
-  const g = parseInt(cleaned.slice(2, 4), 16);
-  const b = parseInt(cleaned.slice(4, 6), 16);
-  return { r, g, b, hex: `#${cleaned.toUpperCase()}`, int: parseInt(cleaned, 16) };
+  if (!/^[\dA-Fa-f]{6}$/.test(cleaned)) throw new Error(`Invalid hex color: \`#${cleaned}\``);
+  const r = Number.parseInt(cleaned.slice(0, 2), 16);
+  const g = Number.parseInt(cleaned.slice(2, 4), 16);
+  const b = Number.parseInt(cleaned.slice(4, 6), 16);
+  return { r, g, b, hex: `#${cleaned.toUpperCase()}`, int: Number.parseInt(cleaned, 16) };
 }
 
 function rgbToHsl(r, g, b) {
@@ -17,13 +17,17 @@ function rgbToHsl(r, g, b) {
   const l = (max + min) / 2;
   if (max === min) {
     h = s = 0;
-  } else {
+  }
+  else {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-      case g: h = ((b - r) / d + 2) / 6; break;
-      default: h = ((r - g) / d + 4) / 6;
+      case r: { h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      }
+      case g: { h = ((b - r) / d + 2) / 6; break;
+      }
+      default: { h = ((r - g) / d + 4) / 6;
+      }
     }
   }
   return {
@@ -43,7 +47,7 @@ function mixColors(c1, c2) {
   const g = Math.round((c1.g + c2.g) / 2);
   const b = Math.round((c1.b + c2.b) / 2);
   const hex = `#${[r, g, b].map(v => v.toString(16).padStart(2, '0').toUpperCase()).join('')}`;
-  const int = parseInt(hex.slice(1), 16);
+  const int = Number.parseInt(hex.slice(1), 16);
   return { r, g, b, hex, int };
 }
 
@@ -96,7 +100,7 @@ export async function execute(interaction) {
     }
 
     if (sub === 'random') {
-      const int = Math.floor(Math.random() * 0xFFFFFF);
+      const int = Math.floor(Math.random() * 0xFF_FF_FF);
       const hex = int.toString(16).padStart(6, '0').toUpperCase();
       const color = parseHex(hex);
       return interaction.reply({ embeds: [colorEmbed(color).setTitle(`🎲 Random Color: ${color.hex}`)] });
@@ -111,9 +115,10 @@ export async function execute(interaction) {
         .setDescription(`**${c1.hex}** mixed with **${c2.hex}**`);
       return interaction.reply({ embeds: [embed] });
     }
-  } catch (error) {
+  }
+  catch (error) {
     const errEmbed = new EmbedBuilder()
-      .setColor(0xFF0000)
+      .setColor(0xFF_00_00)
       .setTitle('Color Error')
       .setDescription(error.message);
     if (interaction.replied || interaction.deferred) {

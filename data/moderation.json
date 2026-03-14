@@ -44,6 +44,28 @@
           "timestamp": 1773470391888,
           "active": true
         }
+      ],
+      "testuser_1773470716838_1": [
+        {
+          "id": "warn_1773470716842_o8hheq78e",
+          "userId": "testuser_1773470716838_1",
+          "moderatorId": "testuser_1773470716838_2",
+          "reason": "Test warning",
+          "severity": "low",
+          "timestamp": 1773470716842,
+          "active": true
+        }
+      ],
+      "testuser_1773470820181_1": [
+        {
+          "id": "warn_1773470820185_22dmxmzyt",
+          "userId": "testuser_1773470820181_1",
+          "moderatorId": "testuser_1773470820181_2",
+          "reason": "Test warning",
+          "severity": "low",
+          "timestamp": 1773470820185,
+          "active": true
+        }
       ]
     }
   },
@@ -88,6 +110,26 @@
         "duration": 60000,
         "startTime": 1773470391888,
         "endTime": 1773470451888,
+        "active": true
+      },
+      "testuser_1773470716838_1": {
+        "id": "mute_1773470716843_ov33g3z5q",
+        "userId": "testuser_1773470716838_1",
+        "moderatorId": "testuser_1773470716838_2",
+        "reason": "Test mute",
+        "duration": 60000,
+        "startTime": 1773470716843,
+        "endTime": 1773470776843,
+        "active": true
+      },
+      "testuser_1773470820181_1": {
+        "id": "mute_1773470820188_eh4kexo3v",
+        "userId": "testuser_1773470820181_1",
+        "moderatorId": "testuser_1773470820181_2",
+        "reason": "Test mute",
+        "duration": 60000,
+        "startTime": 1773470820188,
+        "endTime": 1773470880188,
         "active": true
       }
     }
@@ -186,6 +228,42 @@
       "moderatorId": "testuser_1773470391884_2",
       "reason": "Test mute (1m)",
       "timestamp": 1773470391888
+    },
+    {
+      "id": "mod_1773470716842_9gkv9x88h",
+      "guildId": "testguild1",
+      "action": "warn",
+      "targetUserId": "testuser_1773470716838_1",
+      "moderatorId": "testuser_1773470716838_2",
+      "reason": "Test warning",
+      "timestamp": 1773470716842
+    },
+    {
+      "id": "mod_1773470716843_gg0a269nc",
+      "guildId": "testguild1",
+      "action": "mute",
+      "targetUserId": "testuser_1773470716838_1",
+      "moderatorId": "testuser_1773470716838_2",
+      "reason": "Test mute (1m)",
+      "timestamp": 1773470716843
+    },
+    {
+      "id": "mod_1773470820185_6thll4mbl",
+      "guildId": "testguild1",
+      "action": "warn",
+      "targetUserId": "testuser_1773470820181_1",
+      "moderatorId": "testuser_1773470820181_2",
+      "reason": "Test warning",
+      "timestamp": 1773470820185
+    },
+    {
+      "id": "mod_1773470820188_x2repuf3p",
+      "guildId": "testguild1",
+      "action": "mute",
+      "targetUserId": "testuser_1773470820181_1",
+      "moderatorId": "testuser_1773470820181_2",
+      "reason": "Test mute (1m)",
+      "timestamp": 1773470820188
     }
   ],
   "auto_mod": {

@@ -26,7 +26,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setTitle(guild.name)
-      .setColor(0x0099FF)
+      .setColor(0x00_99_FF)
       .setThumbnail(guild.iconURL({ size: 256 }))
       .addFields(
         { name: '🆔 Server ID', value: guild.id, inline: true },
@@ -39,13 +39,14 @@ export async function execute(interaction) {
         { name: '🚀 Boost Level', value: `Level **${guild.premiumTier}** (${guild.premiumSubscriptionCount} boosts)`, inline: true },
         { name: '✨ Features', value: features, inline: false },
       )
-      .setFooter({ text: `Server Info` })
+      .setFooter({ text: 'Server Info' })
       .setTimestamp();
 
     return interaction.reply({ embeds: [embed] });
-  } catch (error) {
+  }
+  catch (error) {
     const errEmbed = new EmbedBuilder()
-      .setColor(0xFF0000)
+      .setColor(0xFF_00_00)
       .setTitle('Error')
       .setDescription(`Failed to fetch server info: ${error.message}`);
     return interaction.reply({ embeds: [errEmbed], ephemeral: true });
