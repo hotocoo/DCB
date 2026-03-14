@@ -33,8 +33,11 @@ export async function execute(interaction) {
     const text = sanitizeInput(rawText);
 
     if (!text || text.trim().length === 0) {
+      const wasStripped = rawText.trim().length > 0;
       return interaction.reply({
-        content: '❌ Cannot echo empty or invalid content.',
+        content: wasStripped
+          ? '❌ Your message was entirely removed by content filters (contained HTML tags, scripts, or unsafe content).'
+          : '❌ Cannot echo empty content.',
         flags: MessageFlags.Ephemeral
       });
     }

@@ -1588,1435 +1588,1439 @@ export async function handleButtonInteraction(interaction, client) {
                 });
                 return safeInteractionReply(interaction, { content: '❌ **Failed to rest!** Please try again later.', flags: MessageFlags.Ephemeral });
             }
-            if (action === 'explore_continue') {
-                const [, locationName, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot continue adventure for another user.', flags: MessageFlags.Ephemeral });
-                }
-                const char = getCharacter(interaction.user.id);
-                if (!char) {
-                    return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
-                }
-                // Simulate continuing adventure
-                const event = randomEventType();
-                let result, xpGain = 0;
-                switch (event) {
-                    case 'monster': {
-                        const monster = encounterMonster(char.lvl);
-                        const damage = fightTurn(char, monster);
-                        if (damage > 0) {
-                            char.hp -= damage;
-                            if (char.hp <= 0) {
-                                char.hp = 1;
-                            }
-                        }
-                        result = `🏃 You continue your adventure and encounter a **${monster.name}**!\n⚔️ You take **${damage}** damage. HP: ${char.hp}/${char.maxHp}`;
-                        xpGain = 6;
-                        break;
-                    }
-                    case 'treasure': {
-                        const gold = Math.floor(Math.random() * 30) + 10;
-                        char.gold += gold;
-                        result = `🏃 You discover treasure along the way!\n💰 You find **${gold}** gold!`;
-                        xpGain = 4;
-                        break;
-                    }
-                    case 'trap': {
-                        const damage = Math.floor(Math.random() * 10) + 3;
+        }
+        if (action === 'explore_continue') {
+            const [, locationName, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot continue adventure for another user.', flags: MessageFlags.Ephemeral });
+            }
+            const char = getCharacter(interaction.user.id);
+            if (!char) {
+                return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
+            }
+            // Simulate continuing adventure
+            const event = randomEventType();
+            let result, xpGain = 0;
+            switch (event) {
+                case 'monster': {
+                    const monster = encounterMonster(char.lvl);
+                    const damage = fightTurn(char, monster);
+                    if (damage > 0) {
                         char.hp -= damage;
                         if (char.hp <= 0) {
                             char.hp = 1;
                         }
-                        result = `🏃 You trigger a trap while exploring!\n💥 You take **${damage}** damage. HP: ${char.hp}/${char.maxHp}`;
-                        xpGain = 2;
-                        break;
                     }
-                    default: {
-                        result = '🏃 You meet helpful travelers who guide you safely!\n📖 You learn from their stories.';
-                        xpGain = 3;
+                    result = `🏃 You continue your adventure and encounter a **${monster.name}**!\n⚔️ You take **${damage}** damage. HP: ${char.hp}/${char.maxHp}`;
+                    xpGain = 6;
+                    break;
+                }
+                case 'treasure': {
+                    const gold = Math.floor(Math.random() * 30) + 10;
+                    char.gold += gold;
+                    result = `🏃 You discover treasure along the way!\n💰 You find **${gold}** gold!`;
+                    xpGain = 4;
+                    break;
+                }
+                case 'trap': {
+                    const damage = Math.floor(Math.random() * 10) + 3;
+                    char.hp -= damage;
+                    if (char.hp <= 0) {
+                        char.hp = 1;
                     }
+                    result = `🏃 You trigger a trap while exploring!\n💥 You take **${damage}** damage. HP: ${char.hp}/${char.maxHp}`;
+                    xpGain = 2;
+                    break;
                 }
-                applyXp(interaction.user.id, char, xpGain);
-                saveCharacter(interaction.user.id, char);
-                const embed = new EmbedBuilder()
-                    .setTitle('🏃 Continue Adventure')
-                    .setColor(0x21_96_F3)
-                    .setDescription(result)
-                    .addFields({ name: '📊 Stats', value: `Level ${char.lvl} • XP ${char.xp} • Gold ${char.gold}`, inline: true });
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+                default: {
+                    result = '🏃 You meet helpful travelers who guide you safely!\n📖 You learn from their stories.';
+                    xpGain = 3;
+                }
+            }
+            applyXp(interaction.user.id, char, xpGain);
+            saveCharacter(interaction.user.id, char);
+            const embed = new EmbedBuilder()
+                .setTitle('🏃 Continue Adventure')
+                .setColor(0x21_96_F3)
+                .setDescription(result)
+                .addFields({ name: '📊 Stats', value: `Level ${char.lvl} • XP ${char.xp} • Gold ${char.gold}`, inline: true });
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        if (action === 'explore_leave') {
+            const [, locationName, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot leave for another user.', flags: MessageFlags.Ephemeral });
+            }
+            const embed = new EmbedBuilder()
+                .setTitle('🏃 Leave Location')
+                .setColor(0xFF_98_00)
+                .setDescription(`You safely leave ${locationName} and return to town.\n\n*Your adventure continues another day!*`);
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        // Economy button handlers
+        if (action === 'economy_transfer') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot transfer for another user.', flags: MessageFlags.Ephemeral });
                 return;
             }
-            if (action === 'explore_leave') {
-                const [, locationName, targetUserId] = interaction.customId.split(':');
+            const modal = new ModalBuilder().setCustomId(`economy_transfer_modal:${interaction.user.id}`).setTitle('Transfer Gold');
+            const recipientInput = new TextInputBuilder().setCustomId('recipient').setLabel('Recipient (username)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('username');
+            const amountInput = new TextInputBuilder().setCustomId('amount').setLabel('Amount').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('100');
+            modal.addComponents(recipientInput, amountInput);
+            await interaction.showModal(modal);
+            return;
+        }
+        if (action === 'economy_market') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot access market for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const marketPrices = getMarketPrice();
+            const embed = new EmbedBuilder()
+                .setTitle('🛒 Market Prices')
+                .setColor(0x4C_AF_50)
+                .setDescription('Current market prices:');
+            for (const [item, price] of Object.entries(marketPrices)) {
+                embed.addFields({
+                    name: item.charAt(0).toUpperCase() + item.slice(1),
+                    value: `${price} gold`,
+                    inline: true
+                });
+            }
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`economy_buy:${interaction.user.id}`).setLabel('🛒 Buy').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`economy_sell:${interaction.user.id}`).setLabel('💸 Sell').setStyle(ButtonStyle.Success));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row.map((r) => r.toJSON ? r.toJSON() : r)] });
+            return;
+        }
+        if (action === 'economy_business') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot manage business for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const income = Math.floor(Math.random() * 50) + 10;
+            const balanceUpdate = addBalance(interaction.user.id, income);
+            const embed = new EmbedBuilder()
+                .setTitle('🏪 Business Income')
+                .setColor(0x4C_AF_50)
+                .setDescription(`Your business generated **${income}** gold today!\n💰 New balance: **${balanceUpdate}** gold`);
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        if (action === 'economy_invest') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot invest for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const currentBalance = getBalance(interaction.user.id);
+            if (currentBalance < 100) {
+                await safeInteractionReply(interaction, { content: '❌ You need at least 100 gold to invest.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const investment = 100;
+            const returns = Math.random() > 0.5 ? investment * 1.5 : investment * 0.8;
+            const profit = returns - investment;
+            if (profit > 0) {
+                addBalance(interaction.user.id, profit);
+            }
+            else {
+                addBalance(interaction.user.id, profit); // This will subtract
+            }
+            const embed = new EmbedBuilder()
+                .setTitle('📈 Investment Results')
+                .setColor(profit > 0 ? 0x4C_AF_50 : 0xFF_00_00)
+                .setDescription(`You invested **${investment}** gold.\n${profit > 0 ? '📈 Profit' : '📉 Loss'}: **${Math.abs(profit)}** gold\n💰 New balance: **${getBalance(interaction.user.id)}** gold`);
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        if (action === 'economy_buy') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot buy for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const marketPrices = getMarketPrice();
+            const embed = new EmbedBuilder()
+                .setTitle('🛒 Buy from Market')
+                .setColor(0x21_96_F3)
+                .setDescription('Select an item to buy:');
+            let description = '';
+            for (const [item, price] of Object.entries(marketPrices)) {
+                description += `• ${item.charAt(0).toUpperCase() + item.slice(1)}: ${price} gold\n`;
+            }
+            description += '\n*Use the modal to specify what you want to buy.*';
+            embed.setDescription(description);
+            const modal = new ModalBuilder().setCustomId(`economy_buy_modal:${interaction.user.id}`).setTitle('Buy Item');
+            const itemInput = new TextInputBuilder().setCustomId('item_name').setLabel('Item Name').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('health_potion');
+            const quantityInput = new TextInputBuilder().setCustomId('quantity').setLabel('Quantity').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1');
+            modal.addComponents(itemInput, quantityInput);
+            await interaction.showModal(modal);
+            return;
+        }
+        if (action === 'economy_sell') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot sell for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const char = getCharacter(interaction.user.id);
+            if (!char) {
+                await safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const inventory = getInventory(interaction.user.id);
+            if (Object.keys(inventory).length === 0) {
+                await safeInteractionReply(interaction, { content: '❌ Your inventory is empty!', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const embed = new EmbedBuilder()
+                .setTitle('💸 Sell Items')
+                .setColor(0xFF_98_00)
+                .setDescription('Select items to sell from your inventory:');
+            let description = '';
+            for (const [/** @type {string} */ itemId, /** @type {number} */ quantity] of Object.entries(inventory)) {
+                const item = getItemInfo(itemId);
+                if (item) {
+                    const sellPrice = Math.floor(item.value * 0.7); // 70% of buy price
+                    description += `• ${item.name}: ${quantity}x (${sellPrice} gold each)\n`;
+                }
+            }
+            description += '\n*Use the modal to specify what you want to sell.*';
+            embed.setDescription(description);
+            const modal = new ModalBuilder().setCustomId(`economy_sell_modal:${interaction.user.id}`).setTitle('Sell Item');
+            const itemInput = new TextInputBuilder().setCustomId('item_name').setLabel('Item Name').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('health_potion');
+            const quantityInput = new TextInputBuilder().setCustomId('quantity').setLabel('Quantity').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1');
+            modal.addComponents(itemInput, quantityInput);
+            await interaction.showModal(modal);
+            return;
+        }
+        // Other module button handlers
+        if (action === 'trade_create_auction') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot create auctions for another user.', flags: MessageFlags.Ephemeral });
+            }
+            const modal = new ModalBuilder().setCustomId(`trade_create_auction_modal:${interaction.user.id}`).setTitle('Create Auction');
+            const itemInput = new TextInputBuilder().setCustomId('item_name').setLabel('Item Name').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('health_potion');
+            const quantityInput = new TextInputBuilder().setCustomId('quantity').setLabel('Quantity').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1');
+            const priceInput = new TextInputBuilder().setCustomId('starting_price').setLabel('Starting Price (gold)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('50');
+            modal.addComponents({ type: 1, components: [itemInput] }, { type: 1, components: [quantityInput] }, { type: 1, components: [priceInput] });
+            await interaction.showModal(modal);
+            return;
+        }
+        if (action === 'trade_view_auctions') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot view auctions for another user.', flags: MessageFlags.Ephemeral });
+            }
+            const auctions = getActiveAuctions();
+            const embed = new EmbedBuilder()
+                .setTitle('🔍 Active Auctions')
+                .setColor(0x21_96_F3)
+                .setDescription(auctions.length > 0 ?
+                auctions.slice(0, 10).map(a => `• ${a.itemName} x${a.quantity} - Starting: ${a.startingPrice} gold - Seller: ${a.seller}`).join('\n') :
+                'No active auctions at the moment.');
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        if (action === 'profile_edit') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot edit another user\'s profile.', flags: MessageFlags.Ephemeral });
+            }
+            const modal = new ModalBuilder().setCustomId(`profile_edit_modal:${interaction.user.id}`).setTitle('Edit Profile');
+            const displayNameInput = new TextInputBuilder().setCustomId('display_name').setLabel('Display Name').setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder('Your display name');
+            modal.addComponents({ type: 1, components: [displayNameInput] });
+            await interaction.showModal(modal);
+            return;
+        }
+        if (action === 'profile_refresh') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot refresh another user\'s profile.', flags: MessageFlags.Ephemeral });
+            }
+            const profile = updateProfile(interaction.user.id, {});
+            const embed = new EmbedBuilder()
+                .setTitle('🔄 Profile Refreshed')
+                .setColor(0x4C_AF_50)
+                .setDescription('Profile data has been refreshed!');
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: interaction.message.components });
+            return;
+        }
+        if (action === 'profile_compare') {
+            const [, targetUserId, compareUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot compare profiles for another user.', flags: MessageFlags.Ephemeral });
+            }
+            validateUserId(compareUserId);
+            // Get both profiles
+            const targetProfile = updateProfile(interaction.user.id, {});
+            const compareProfile = updateProfile(compareUserId, {});
+            // Guild check for profile comparison
+            if (!interaction.guild) {
+                return await safeInteractionReply(interaction, { content: '❌ **Profile comparison is only available in servers.**', flags: MessageFlags.Ephemeral });
+            }
+            if (!compareUserId) {
+                return await safeInteractionReply(interaction, { content: '❌ **Invalid user ID for comparison.**', flags: MessageFlags.Ephemeral });
+            }
+            // Find the comparison user
+            const compareUser = interaction.guild.members.cache.get(compareUserId)?.user;
+            if (!compareUser) {
+                return safeInteractionReply(interaction, { content: '❌ Could not find the user to compare with.', flags: MessageFlags.Ephemeral });
+            }
+            // Create comparison embed
+            const embed = new EmbedBuilder()
+                .setTitle('⚖️ Profile Comparison')
+                .setColor(0x21_96_F3)
+                .setDescription(`Comparing **${interaction.user.username}** vs **${compareUser.username}**`);
+            // Add comparison fields
+            if (targetProfile.level !== undefined && compareProfile.level !== undefined) {
+                const levelDiff = targetProfile.level - compareProfile.level;
+                embed.addFields({
+                    name: '🏆 Level',
+                    value: `**${interaction.user.username}:** ${targetProfile.level}\n**${compareUser.username}:** ${compareProfile.level}\n${levelDiff > 0 ? `📈 You are ${levelDiff} levels ahead` : (levelDiff < 0 ? `📉 You are ${Math.abs(levelDiff)} levels behind` : '⚖️ Same level')}`,
+                    inline: true
+                });
+            }
+            if (targetProfile.xp !== undefined && compareProfile.xp !== undefined) {
+                const xpDiff = targetProfile.xp - compareProfile.xp;
+                embed.addFields({
+                    name: '⭐ Experience',
+                    value: `**${interaction.user.username}:** ${targetProfile.xp}\n**${compareUser.username}:** ${compareProfile.xp}\n${xpDiff > 0 ? `📈 You have ${xpDiff} more XP` : (xpDiff < 0 ? `📉 You have ${Math.abs(xpDiff)} less XP` : '⚖️ Same XP')}`,
+                    inline: true
+                });
+            }
+            if (targetProfile.gold !== undefined && compareProfile.gold !== undefined) {
+                const goldDiff = targetProfile.gold - compareProfile.gold;
+                embed.addFields({
+                    name: '💰 Gold',
+                    value: `**${interaction.user.username}:** ${targetProfile.gold}\n**${compareUser.username}:** ${compareProfile.gold}\n${goldDiff > 0 ? `📈 You have ${goldDiff} more gold` : (goldDiff < 0 ? `📉 You have ${Math.abs(goldDiff)} less gold` : '⚖️ Same gold amount')}`,
+                    inline: true
+                });
+            }
+            if (targetProfile.achievements !== undefined && compareProfile.achievements !== undefined) {
+                const achievementsDiff = targetProfile.achievements - compareProfile.achievements;
+                embed.addFields({
+                    name: '🏅 Achievements',
+                    value: `**${interaction.user.username}:** ${targetProfile.achievements}\n**${compareUser.username}:** ${compareProfile.achievements}\n${achievementsDiff > 0 ? `📈 You have ${achievementsDiff} more achievements` : (achievementsDiff < 0 ? `📉 You have ${Math.abs(achievementsDiff)} fewer achievements` : '⚖️ Same number of achievements')}`,
+                    inline: true
+                });
+            }
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        if (action === 'remind_upcoming') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot view reminders for another user.', flags: MessageFlags.Ephemeral });
+            }
+            const embed = new EmbedBuilder()
+                .setTitle('📅 Upcoming Reminders')
+                .setColor(0xFF_98_00)
+                .setDescription('No upcoming reminders set.');
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        // Memory game button handlers
+        if (action.startsWith('memory_')) {
+            const parts = interaction.customId.split('_');
+            const cardIndexStr = parts[1];
+            const messageId = interaction.message.id;
+            // Handle memory reset (existing implementation)
+            if (cardIndexStr === 'reset') {
+                const targetUserId = interaction.customId.split(':')[2];
                 if (targetUserId && targetUserId !== interaction.user.id) {
                     logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot leave for another user.', flags: MessageFlags.Ephemeral });
-                }
-                const embed = new EmbedBuilder()
-                    .setTitle('🏃 Leave Location')
-                    .setColor(0xFF_98_00)
-                    .setDescription(`You safely leave ${locationName} and return to town.\n\n*Your adventure continues another day!*`);
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                return;
-            }
-            // Economy button handlers
-            if (action === 'economy_transfer') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot transfer for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const modal = new ModalBuilder().setCustomId(`economy_transfer_modal:${interaction.user.id}`).setTitle('Transfer Gold');
-                const recipientInput = new TextInputBuilder().setCustomId('recipient').setLabel('Recipient (username)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('username');
-                const amountInput = new TextInputBuilder().setCustomId('amount').setLabel('Amount').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('100');
-                modal.addComponents(recipientInput, amountInput);
-                await interaction.showModal(modal);
-                return;
-            }
-            if (action === 'economy_market') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot access market for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const marketPrices = getMarketPrice();
-                const embed = new EmbedBuilder()
-                    .setTitle('🛒 Market Prices')
-                    .setColor(0x4C_AF_50)
-                    .setDescription('Current market prices:');
-                for (const [item, price] of Object.entries(marketPrices)) {
-                    embed.addFields({
-                        name: item.charAt(0).toUpperCase() + item.slice(1),
-                        value: `${price} gold`,
-                        inline: true
-                    });
-                }
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`economy_buy:${interaction.user.id}`).setLabel('🛒 Buy').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`economy_sell:${interaction.user.id}`).setLabel('💸 Sell').setStyle(ButtonStyle.Success));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row.map((r) => r.toJSON ? r.toJSON() : r)] });
-                return;
-            }
-            if (action === 'economy_business') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot manage business for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const income = Math.floor(Math.random() * 50) + 10;
-                const balanceUpdate = addBalance(interaction.user.id, income);
-                const embed = new EmbedBuilder()
-                    .setTitle('🏪 Business Income')
-                    .setColor(0x4C_AF_50)
-                    .setDescription(`Your business generated **${income}** gold today!\n💰 New balance: **${balanceUpdate}** gold`);
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                return;
-            }
-            if (action === 'economy_invest') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot invest for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const currentBalance = getBalance(interaction.user.id);
-                if (currentBalance < 100) {
-                    await safeInteractionReply(interaction, { content: '❌ You need at least 100 gold to invest.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const investment = 100;
-                const returns = Math.random() > 0.5 ? investment * 1.5 : investment * 0.8;
-                const profit = returns - investment;
-                if (profit > 0) {
-                    addBalance(interaction.user.id, profit);
-                }
-                else {
-                    addBalance(interaction.user.id, profit); // This will subtract
-                }
-                const embed = new EmbedBuilder()
-                    .setTitle('📈 Investment Results')
-                    .setColor(profit > 0 ? 0x4C_AF_50 : 0xFF_00_00)
-                    .setDescription(`You invested **${investment}** gold.\n${profit > 0 ? '📈 Profit' : '📉 Loss'}: **${Math.abs(profit)}** gold\n💰 New balance: **${getBalance(interaction.user.id)}** gold`);
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                return;
-            }
-            if (action === 'economy_buy') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot buy for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const marketPrices = getMarketPrice();
-                const embed = new EmbedBuilder()
-                    .setTitle('🛒 Buy from Market')
-                    .setColor(0x21_96_F3)
-                    .setDescription('Select an item to buy:');
-                let description = '';
-                for (const [item, price] of Object.entries(marketPrices)) {
-                    description += `• ${item.charAt(0).toUpperCase() + item.slice(1)}: ${price} gold\n`;
-                }
-                description += '\n*Use the modal to specify what you want to buy.*';
-                embed.setDescription(description);
-                const modal = new ModalBuilder().setCustomId(`economy_buy_modal:${interaction.user.id}`).setTitle('Buy Item');
-                const itemInput = new TextInputBuilder().setCustomId('item_name').setLabel('Item Name').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('health_potion');
-                const quantityInput = new TextInputBuilder().setCustomId('quantity').setLabel('Quantity').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1');
-                modal.addComponents(itemInput, quantityInput);
-                await interaction.showModal(modal);
-                return;
-            }
-            if (action === 'economy_sell') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot sell for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const char = getCharacter(interaction.user.id);
-                if (!char) {
-                    await safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const inventory = getInventory(interaction.user.id);
-                if (Object.keys(inventory).length === 0) {
-                    await safeInteractionReply(interaction, { content: '❌ Your inventory is empty!', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const embed = new EmbedBuilder()
-                    .setTitle('💸 Sell Items')
-                    .setColor(0xFF_98_00)
-                    .setDescription('Select items to sell from your inventory:');
-                let description = '';
-                for (const [/** @type {string} */ itemId, /** @type {number} */ quantity] of Object.entries(inventory)) {
-                    const item = getItemInfo(itemId);
-                    if (item) {
-                        const sellPrice = Math.floor(item.value * 0.7); // 70% of buy price
-                        description += `• ${item.name}: ${quantity}x (${sellPrice} gold each)\n`;
-                    }
-                }
-                description += '\n*Use the modal to specify what you want to sell.*';
-                embed.setDescription(description);
-                const modal = new ModalBuilder().setCustomId(`economy_sell_modal:${interaction.user.id}`).setTitle('Sell Item');
-                const itemInput = new TextInputBuilder().setCustomId('item_name').setLabel('Item Name').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('health_potion');
-                const quantityInput = new TextInputBuilder().setCustomId('quantity').setLabel('Quantity').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1');
-                modal.addComponents(itemInput, quantityInput);
-                await interaction.showModal(modal);
-                return;
-            }
-            // Other module button handlers
-            if (action === 'trade_create_auction') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot create auctions for another user.', flags: MessageFlags.Ephemeral });
-                }
-                const modal = new ModalBuilder().setCustomId(`trade_create_auction_modal:${interaction.user.id}`).setTitle('Create Auction');
-                const itemInput = new TextInputBuilder().setCustomId('item_name').setLabel('Item Name').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('health_potion');
-                const quantityInput = new TextInputBuilder().setCustomId('quantity').setLabel('Quantity').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('1');
-                const priceInput = new TextInputBuilder().setCustomId('starting_price').setLabel('Starting Price (gold)').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('50');
-                modal.addComponents({ type: 1, components: [itemInput] }, { type: 1, components: [quantityInput] }, { type: 1, components: [priceInput] });
-                await interaction.showModal(modal);
-                return;
-            }
-            if (action === 'trade_view_auctions') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot view auctions for another user.', flags: MessageFlags.Ephemeral });
-                }
-                const auctions = getActiveAuctions();
-                const embed = new EmbedBuilder()
-                    .setTitle('🔍 Active Auctions')
-                    .setColor(0x21_96_F3)
-                    .setDescription(auctions.length > 0 ?
-                    auctions.slice(0, 10).map(a => `• ${a.itemName} x${a.quantity} - Starting: ${a.startingPrice} gold - Seller: ${a.seller}`).join('\n') :
-                    'No active auctions at the moment.');
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                return;
-            }
-            if (action === 'profile_edit') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot edit another user\'s profile.', flags: MessageFlags.Ephemeral });
-                }
-                const modal = new ModalBuilder().setCustomId(`profile_edit_modal:${interaction.user.id}`).setTitle('Edit Profile');
-                const displayNameInput = new TextInputBuilder().setCustomId('display_name').setLabel('Display Name').setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder('Your display name');
-                modal.addComponents({ type: 1, components: [displayNameInput] });
-                await interaction.showModal(modal);
-                return;
-            }
-            if (action === 'profile_refresh') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot refresh another user\'s profile.', flags: MessageFlags.Ephemeral });
-                }
-                const profile = updateProfile(interaction.user.id, {});
-                const embed = new EmbedBuilder()
-                    .setTitle('🔄 Profile Refreshed')
-                    .setColor(0x4C_AF_50)
-                    .setDescription('Profile data has been refreshed!');
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: interaction.message.components });
-                return;
-            }
-            if (action === 'profile_compare') {
-                const [, targetUserId, compareUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot compare profiles for another user.', flags: MessageFlags.Ephemeral });
-                }
-                validateUserId(compareUserId);
-                // Get both profiles
-                const targetProfile = updateProfile(interaction.user.id, {});
-                const compareProfile = updateProfile(compareUserId, {});
-                // Guild check for profile comparison
-                if (!interaction.guild) {
-                    return await safeInteractionReply(interaction, { content: '❌ **Profile comparison is only available in servers.**', flags: MessageFlags.Ephemeral });
-                }
-                if (!compareUserId) {
-                    return await safeInteractionReply(interaction, { content: '❌ **Invalid user ID for comparison.**', flags: MessageFlags.Ephemeral });
-                }
-                // Find the comparison user
-                const compareUser = interaction.guild.members.cache.get(compareUserId)?.user;
-                if (!compareUser) {
-                    return safeInteractionReply(interaction, { content: '❌ Could not find the user to compare with.', flags: MessageFlags.Ephemeral });
-                }
-                // Create comparison embed
-                const embed = new EmbedBuilder()
-                    .setTitle('⚖️ Profile Comparison')
-                    .setColor(0x21_96_F3)
-                    .setDescription(`Comparing **${interaction.user.username}** vs **${compareUser.username}**`);
-                // Add comparison fields
-                if (targetProfile.level !== undefined && compareProfile.level !== undefined) {
-                    const levelDiff = targetProfile.level - compareProfile.level;
-                    embed.addFields({
-                        name: '🏆 Level',
-                        value: `**${interaction.user.username}:** ${targetProfile.level}\n**${compareUser.username}:** ${compareProfile.level}\n${levelDiff > 0 ? `📈 You are ${levelDiff} levels ahead` : (levelDiff < 0 ? `📉 You are ${Math.abs(levelDiff)} levels behind` : '⚖️ Same level')}`,
-                        inline: true
-                    });
-                }
-                if (targetProfile.xp !== undefined && compareProfile.xp !== undefined) {
-                    const xpDiff = targetProfile.xp - compareProfile.xp;
-                    embed.addFields({
-                        name: '⭐ Experience',
-                        value: `**${interaction.user.username}:** ${targetProfile.xp}\n**${compareUser.username}:** ${compareProfile.xp}\n${xpDiff > 0 ? `📈 You have ${xpDiff} more XP` : (xpDiff < 0 ? `📉 You have ${Math.abs(xpDiff)} less XP` : '⚖️ Same XP')}`,
-                        inline: true
-                    });
-                }
-                if (targetProfile.gold !== undefined && compareProfile.gold !== undefined) {
-                    const goldDiff = targetProfile.gold - compareProfile.gold;
-                    embed.addFields({
-                        name: '💰 Gold',
-                        value: `**${interaction.user.username}:** ${targetProfile.gold}\n**${compareUser.username}:** ${compareProfile.gold}\n${goldDiff > 0 ? `📈 You have ${goldDiff} more gold` : (goldDiff < 0 ? `📉 You have ${Math.abs(goldDiff)} less gold` : '⚖️ Same gold amount')}`,
-                        inline: true
-                    });
-                }
-                if (targetProfile.achievements !== undefined && compareProfile.achievements !== undefined) {
-                    const achievementsDiff = targetProfile.achievements - compareProfile.achievements;
-                    embed.addFields({
-                        name: '🏅 Achievements',
-                        value: `**${interaction.user.username}:** ${targetProfile.achievements}\n**${compareUser.username}:** ${compareProfile.achievements}\n${achievementsDiff > 0 ? `📈 You have ${achievementsDiff} more achievements` : (achievementsDiff < 0 ? `📉 You have ${Math.abs(achievementsDiff)} fewer achievements` : '⚖️ Same number of achievements')}`,
-                        inline: true
-                    });
-                }
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                return;
-            }
-            if (action === 'remind_upcoming') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot view reminders for another user.', flags: MessageFlags.Ephemeral });
-                }
-                const embed = new EmbedBuilder()
-                    .setTitle('📅 Upcoming Reminders')
-                    .setColor(0xFF_98_00)
-                    .setDescription('No upcoming reminders set.');
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                return;
-            }
-            // Memory game button handlers
-            if (action.startsWith('memory_')) {
-                const parts = interaction.customId.split('_');
-                const cardIndexStr = parts[1];
-                const messageId = interaction.message.id;
-                // Handle memory reset (existing implementation)
-                if (cardIndexStr === 'reset') {
-                    const targetUserId = interaction.customId.split(':')[2];
-                    if (targetUserId && targetUserId !== interaction.user.id) {
-                        logCommandExecution(interaction, false, new Error('Wrong user'));
-                        return safeInteractionReply(interaction, { content: 'You cannot reset memory for another user.', flags: MessageFlags.Ephemeral });
-                    }
-                    const gameState = memoryGames.get(messageId);
-                    if (!gameState) {
-                        return safeInteractionReply(interaction, { content: '❌ **Memory game not found!**', flags: MessageFlags.Ephemeral });
-                    }
-                    // Reset flipped cards
-                    gameState.flippedCards = [];
-                    gameState.moves++;
-                    // Update the board display
-                    await sendMemoryBoard(interaction, gameState);
-                    return;
-                }
-                // Handle card flip
-                const cardIndex = Number.parseInt(cardIndexStr || '0');
-                if (isNaN(cardIndex) || cardIndex < 0 || cardIndex >= 12) {
-                    return safeInteractionReply(interaction, { content: '❌ **Invalid card!**', flags: MessageFlags.Ephemeral });
+                    return safeInteractionReply(interaction, { content: 'You cannot reset memory for another user.', flags: MessageFlags.Ephemeral });
                 }
                 const gameState = memoryGames.get(messageId);
                 if (!gameState) {
                     return safeInteractionReply(interaction, { content: '❌ **Memory game not found!**', flags: MessageFlags.Ephemeral });
                 }
-                // Validate game state
-                if (!gameState.gameActive) {
-                    return safeInteractionReply(interaction, { content: '❌ **Game is already completed!**', flags: MessageFlags.Ephemeral });
-                }
-                const card = gameState.cards[cardIndex];
-                // Check if card is already matched or flipped
-                if (card.isMatched) {
-                    return safeInteractionReply(interaction, { content: '❌ **Card is already matched!**', flags: MessageFlags.Ephemeral });
-                }
-                if (gameState.flippedCards.includes(cardIndex)) {
-                    return safeInteractionReply(interaction, { content: '❌ **Card is already flipped!**', flags: MessageFlags.Ephemeral });
-                }
-                // Flip the card
-                gameState.flippedCards.push(cardIndex);
+                // Reset flipped cards
+                gameState.flippedCards = [];
                 gameState.moves++;
-                // Check for matches (if 2 cards are flipped)
-                if (gameState.flippedCards.length === 2) {
-                    const [firstIndex, secondIndex] = gameState.flippedCards;
-                    const firstCard = gameState.cards[firstIndex];
-                    const secondCard = gameState.cards[secondIndex];
-                    if (firstCard.emoji === secondCard.emoji) {
-                        // Match found!
-                        firstCard.isMatched = true;
-                        secondCard.isMatched = true;
-                        gameState.matchedPairs++;
-                        // Clear flipped cards immediately for matches
-                        gameState.flippedCards = [];
-                        // Check for win condition
-                        if (gameState.matchedPairs === gameState.totalPairs) {
-                            gameState.gameActive = false;
-                            const timeElapsed = Math.round((Date.now() - gameState.startTime) / 1000);
-                            const winEmbed = new EmbedBuilder()
-                                .setTitle('🎉 Memory Master!')
-                                .setDescription(`Congratulations! You matched all ${gameState.totalPairs} pairs in ${gameState.moves} moves and ${timeElapsed} seconds! 🏆`)
-                                .setColor(0x00_FF_00)
-                                .addFields({
-                                name: '📊 Stats',
-                                value: `**Moves:** ${gameState.moves}\n**Time:** ${timeElapsed}s\n**Efficiency:** ${((gameState.totalPairs / gameState.moves) * 100).toFixed(1)}%`,
-                                inline: true
-                            }, {
-                                name: '🏆 Rating',
-                                value: getPerformanceRating(gameState.moves, gameState.totalPairs, timeElapsed),
-                                inline: true
-                            });
-                            // Clean up game state
-                            memoryGames.delete(messageId);
-                            await safeInteractionUpdate(interaction, { embeds: [winEmbed], components: [] });
-                            return;
-                        }
-                    }
-                    else {
-                        // No match - cards will stay flipped temporarily, reset button will be shown
-                        // The reset button handler above will clear the flipped cards
-                    }
-                }
                 // Update the board display
                 await sendMemoryBoard(interaction, gameState);
                 return;
             }
-            if (action === 'inventory_refresh') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot refresh inventory for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const char = getCharacter(interaction.user.id);
-                if (!char) {
-                    await safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const inventory = getInventory(interaction.user.id);
-                const inventoryValue = getInventoryValue(interaction.user.id);
-                const embed = new EmbedBuilder()
-                    .setTitle('🎒 Inventory')
-                    .setColor(0x8B_45_13)
-                    .setDescription(`💰 Total Value: ${inventoryValue} gold`);
-                for (const [itemId, quantity] of Object.entries(inventory)) {
-                    const item = getItemInfo(itemId);
-                    if (item) {
-                        embed.addFields({
-                            name: `${item.name}`,
-                            value: `Quantity: ${quantity} (${item.value} gold each)`,
+            // Handle card flip
+            const cardIndex = Number.parseInt(cardIndexStr || '0');
+            if (isNaN(cardIndex) || cardIndex < 0 || cardIndex >= 12) {
+                return safeInteractionReply(interaction, { content: '❌ **Invalid card!**', flags: MessageFlags.Ephemeral });
+            }
+            const gameState = memoryGames.get(messageId);
+            if (!gameState) {
+                return safeInteractionReply(interaction, { content: '❌ **Memory game not found!**', flags: MessageFlags.Ephemeral });
+            }
+            // Validate game state
+            if (!gameState.gameActive) {
+                return safeInteractionReply(interaction, { content: '❌ **Game is already completed!**', flags: MessageFlags.Ephemeral });
+            }
+            const card = gameState.cards[cardIndex];
+            // Check if card is already matched or flipped
+            if (card.isMatched) {
+                return safeInteractionReply(interaction, { content: '❌ **Card is already matched!**', flags: MessageFlags.Ephemeral });
+            }
+            if (gameState.flippedCards.includes(cardIndex)) {
+                return safeInteractionReply(interaction, { content: '❌ **Card is already flipped!**', flags: MessageFlags.Ephemeral });
+            }
+            // Flip the card
+            gameState.flippedCards.push(cardIndex);
+            gameState.moves++;
+            // Check for matches (if 2 cards are flipped)
+            if (gameState.flippedCards.length === 2) {
+                const [firstIndex, secondIndex] = gameState.flippedCards;
+                const firstCard = gameState.cards[firstIndex];
+                const secondCard = gameState.cards[secondIndex];
+                if (firstCard.emoji === secondCard.emoji) {
+                    // Match found!
+                    firstCard.isMatched = true;
+                    secondCard.isMatched = true;
+                    gameState.matchedPairs++;
+                    // Clear flipped cards immediately for matches
+                    gameState.flippedCards = [];
+                    // Check for win condition
+                    if (gameState.matchedPairs === gameState.totalPairs) {
+                        gameState.gameActive = false;
+                        const timeElapsed = Math.round((Date.now() - gameState.startTime) / 1000);
+                        const winEmbed = new EmbedBuilder()
+                            .setTitle('🎉 Memory Master!')
+                            .setDescription(`Congratulations! You matched all ${gameState.totalPairs} pairs in ${gameState.moves} moves and ${timeElapsed} seconds! 🏆`)
+                            .setColor(0x00_FF_00)
+                            .addFields({
+                            name: '📊 Stats',
+                            value: `**Moves:** ${gameState.moves}\n**Time:** ${timeElapsed}s\n**Efficiency:** ${((gameState.totalPairs / gameState.moves) * 100).toFixed(1)}%`,
+                            inline: true
+                        }, {
+                            name: '🏆 Rating',
+                            value: getPerformanceRating(gameState.moves, gameState.totalPairs, timeElapsed),
                             inline: true
                         });
+                        // Clean up game state
+                        memoryGames.delete(messageId);
+                        await safeInteractionUpdate(interaction, { embeds: [winEmbed], components: [] });
+                        return;
                     }
                 }
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`inventory_random:${interaction.user.id}`).setLabel('🎲 Get Random Item').setStyle(ButtonStyle.Secondary), new ButtonBuilder().setCustomId(`inventory_sell_all:${interaction.user.id}`).setLabel('💰 Sell All Junk').setStyle(ButtonStyle.Success));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+                else {
+                    // No match - cards will stay flipped temporarily, reset button will be shown
+                    // The reset button handler above will clear the flipped cards
+                }
+            }
+            // Update the board display
+            await sendMemoryBoard(interaction, gameState);
+            return;
+        }
+        if (action === 'inventory_refresh') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot refresh inventory for another user.', flags: MessageFlags.Ephemeral });
                 return;
             }
-            if (action === 'inventory_random') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot get random items for another user.', flags: MessageFlags.Ephemeral });
-                }
-                const char = getCharacter(interaction.user.id);
-                if (!char) {
-                    return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
-                }
-                const randomItem = generateRandomItem(char.lvl);
-                addItemToInventory(interaction.user.id, randomItem.id, 1);
-                const embed = new EmbedBuilder()
-                    .setTitle('🎲 Random Item')
-                    .setColor(0xFF_D7_00)
-                    .setDescription(`You found a **${randomItem.name}**!\n\n${randomItem.description}`)
-                    .addFields({ name: '📊 Stats', value: `Rarity: ${randomItem.rarity} • Value: ${randomItem.value} gold`, inline: true });
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            const char = getCharacter(interaction.user.id);
+            if (!char) {
+                await safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
                 return;
             }
-            if (action === 'inventory_sell_all') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot sell items for another user.', flags: MessageFlags.Ephemeral });
+            const inventory = getInventory(interaction.user.id);
+            const inventoryValue = getInventoryValue(interaction.user.id);
+            const embed = new EmbedBuilder()
+                .setTitle('🎒 Inventory')
+                .setColor(0x8B_45_13)
+                .setDescription(`💰 Total Value: ${inventoryValue} gold`);
+            for (const [itemId, quantity] of Object.entries(inventory)) {
+                const item = getItemInfo(itemId);
+                if (item) {
+                    embed.addFields({
+                        name: `${item.name}`,
+                        value: `Quantity: ${quantity} (${item.value} gold each)`,
+                        inline: true
+                    });
                 }
-                const char = getCharacter(interaction.user.id);
-                if (!char) {
-                    return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
+            }
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`inventory_random:${interaction.user.id}`).setLabel('🎲 Get Random Item').setStyle(ButtonStyle.Secondary), new ButtonBuilder().setCustomId(`inventory_sell_all:${interaction.user.id}`).setLabel('💰 Sell All Junk').setStyle(ButtonStyle.Success));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'inventory_random') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot get random items for another user.', flags: MessageFlags.Ephemeral });
+            }
+            const char = getCharacter(interaction.user.id);
+            if (!char) {
+                return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
+            }
+            const randomItem = generateRandomItem(char.lvl);
+            addItemToInventory(interaction.user.id, randomItem.id, 1);
+            const embed = new EmbedBuilder()
+                .setTitle('🎲 Random Item')
+                .setColor(0xFF_D7_00)
+                .setDescription(`You found a **${randomItem.name}**!\n\n${randomItem.description}`)
+                .addFields({ name: '📊 Stats', value: `Rarity: ${randomItem.rarity} • Value: ${randomItem.value} gold`, inline: true });
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        if (action === 'inventory_sell_all') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot sell items for another user.', flags: MessageFlags.Ephemeral });
+            }
+            const char = getCharacter(interaction.user.id);
+            if (!char) {
+                return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
+            }
+            const inventory = getInventory(interaction.user.id);
+            let totalGold = 0;
+            let itemsSold = 0;
+            for (const [itemId, quantity] of Object.entries(inventory)) {
+                const item = getItemInfo(itemId);
+                if (item && item.rarity === 'common') { // Only sell common items as "junk"
+                    const sellPrice = Math.floor(item.value * 0.5); // 50% of value for junk
+                    totalGold += sellPrice * quantity;
+                    itemsSold += quantity;
+                    removeItemFromInventory(interaction.user.id, itemId, quantity);
                 }
-                const inventory = getInventory(interaction.user.id);
-                let totalGold = 0;
-                let itemsSold = 0;
-                for (const [itemId, quantity] of Object.entries(inventory)) {
-                    const item = getItemInfo(itemId);
-                    if (item && item.rarity === 'common') { // Only sell common items as "junk"
-                        const sellPrice = Math.floor(item.value * 0.5); // 50% of value for junk
-                        totalGold += sellPrice * quantity;
-                        itemsSold += quantity;
-                        removeItemFromInventory(interaction.user.id, itemId, quantity);
-                    }
+            }
+            char.gold += totalGold;
+            saveCharacter(interaction.user.id, char);
+            const embed = new EmbedBuilder()
+                .setTitle('💰 Sold Junk Items')
+                .setColor(0x4C_AF_50)
+                .setDescription(`Sold ${itemsSold} common items for ${totalGold} gold!\n💰 New balance: ${char.gold} gold`);
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        if (action === 'guild_contribute') {
+            const [, guildName, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot contribute to guild for another user.', flags: MessageFlags.Ephemeral });
+            }
+            const modal = new ModalBuilder().setCustomId(`guild_contribute_modal:${guildName}:${interaction.user.id}`).setTitle('Contribute to Guild');
+            const amountInput = new TextInputBuilder().setCustomId('amount').setLabel('Gold Amount').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('100');
+            modal.addComponents({ type: 1, components: [amountInput] });
+            await interaction.showModal(modal);
+            return;
+        }
+        if (action === 'guild_refresh') {
+            const [, guildName, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot refresh guild for another user.', flags: MessageFlags.Ephemeral });
+            }
+            const guildInfo = getUserGuild(interaction.user.id);
+            const embed = new EmbedBuilder()
+                .setTitle('🔄 Guild Refreshed')
+                .setColor(0x4C_AF_50)
+                .setDescription(`${guildName || guildInfo?.name || 'Guild'} data has been refreshed!`);
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: interaction.message.components });
+            return;
+        }
+        if (action === 'party_invite') {
+            const [, partyId, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot generate invites for another user.', flags: MessageFlags.Ephemeral });
+            }
+            const embed = new EmbedBuilder()
+                .setTitle('🔗 Party Invite Generated')
+                .setColor(0x21_96_F3)
+                .setDescription(`Invite link for party ${partyId}: \`/join ${partyId}\``);
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        if (action === 'guess_modal') {
+            const [, gameId, min, max] = interaction.customId.split(':');
+            const gameState = guessGames.get(gameId);
+            if (!gameState) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Game not found!** The game may have expired.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            if (!gameState.gameActive) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Game is no longer active!**',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            const modal = new ModalBuilder().setCustomId(`guess_submit:${gameId}`).setTitle('Make Your Guess');
+            const guessInput = new TextInputBuilder().setCustomId('guess_number').setLabel(`Guess a number between ${min} and ${max}`).setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder(`${min}-${max}`);
+            modal.addComponents(new ActionRowBuilder().addComponents(guessInput));
+            await interaction.showModal(modal);
+            return;
+        }
+        if (action === 'fun_joke') {
+            const [, category, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot get jokes for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const joke = getRandomJoke(category);
+            const embed = new EmbedBuilder()
+                .setTitle('😂 Joke')
+                .setColor(0xFF_D7_00)
+                .setDescription(String(joke || 'No joke available.'));
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_joke:${category}:${interaction.user.id}`).setLabel('😂 Another Joke').setStyle(ButtonStyle.Primary));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'fun_rate') {
+            const [, jokeId, ratingStr, targetUserId] = interaction.customId.split(':');
+            // Validate user ID
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot rate jokes for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            // Validate rating
+            const rating = Number.parseInt(ratingStr || '0');
+            if (isNaN(rating) || rating < 1 || rating > 5) {
+                await safeInteractionReply(interaction, { content: '❌ Invalid rating. Rating must be between 1 and 5 stars.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            // Validate joke ID format (basic check)
+            if (!jokeId || jokeId.length < 10) {
+                await safeInteractionReply(interaction, { content: '❌ Invalid joke reference.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            try {
+                // Attempt to rate the joke
+                const ratingResult = entertainmentManager.rateJoke(jokeId, rating);
+                if (ratingResult !== true) {
+                    return safeInteractionReply(interaction, { content: '❌ Failed to record your rating. Please try again.', flags: MessageFlags.Ephemeral });
                 }
-                char.gold += totalGold;
-                saveCharacter(interaction.user.id, char);
+                // Create success response embed
                 const embed = new EmbedBuilder()
-                    .setTitle('💰 Sold Junk Items')
+                    .setTitle('⭐ Thanks for your rating!')
                     .setColor(0x4C_AF_50)
-                    .setDescription(`Sold ${itemsSold} common items for ${totalGold} gold!\n💰 New balance: ${char.gold} gold`);
+                    .setDescription(`You rated this joke with **${rating} star${rating !== 1 ? 's' : ''}!** ⭐\n\nYour feedback helps improve our joke collection!`)
+                    .setFooter({ text: 'Rating recorded successfully' });
                 await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            }
+            catch (error) {
+                logger.error('Error rating joke', error instanceof Error ? error : new Error(String(error)), {
+                    userId: interaction.user.id,
+                    jokeId,
+                    rating
+                });
+                return safeInteractionReply(interaction, { content: '❌ An error occurred while recording your rating. Please try again.', flags: MessageFlags.Ephemeral });
+            }
+            return;
+        }
+        if (action === 'fun_story') {
+            const [, genre, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot get stories for another user.', flags: MessageFlags.Ephemeral });
                 return;
             }
-            if (action === 'guild_contribute') {
-                const [, guildName, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot contribute to guild for another user.', flags: MessageFlags.Ephemeral });
-                }
-                const modal = new ModalBuilder().setCustomId(`guild_contribute_modal:${guildName}:${interaction.user.id}`).setTitle('Contribute to Guild');
-                const amountInput = new TextInputBuilder().setCustomId('amount').setLabel('Gold Amount').setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder('100');
-                modal.addComponents({ type: 1, components: [amountInput] });
-                await interaction.showModal(modal);
+            const story = generateStory(genre);
+            const embed = new EmbedBuilder()
+                .setTitle('📖 Story')
+                .setColor(0x99_32_CC)
+                .setDescription(String(story || 'No story available.'));
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_story:${genre}:${interaction.user.id}`).setLabel('📖 Another Story').setStyle(ButtonStyle.Primary));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'fun_share') {
+            const [, contentId, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot share for another user.', flags: MessageFlags.Ephemeral });
                 return;
             }
-            if (action === 'guild_refresh') {
-                const [, guildName, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot refresh guild for another user.', flags: MessageFlags.Ephemeral });
+            // Validate user ID matches
+            if (targetUserId !== interaction.user.id) {
+                await safeInteractionReply(interaction, {
+                    content: '❌ **Sharing failed!** User ID mismatch.',
+                    flags: MessageFlags.Ephemeral
+                });
+                return;
+            }
+            // Import content retrieval function
+            const { getContentForSharing } = await import('./entertainment.js');
+            const content = getContentForSharing(contentId);
+            if (!content) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Content not found!** This content may have expired or is no longer available for sharing.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            // Create shareable message based on content type
+            let shareEmbed;
+            let shareContent = '';
+            try {
+                switch (content.type) {
+                    case 'story': {
+                        shareEmbed = new EmbedBuilder()
+                            .setTitle(`📖 ${content.genre.charAt(0).toUpperCase() + content.genre.slice(1)} Story`)
+                            .setColor(0x99_32_CC)
+                            .setDescription(content.story)
+                            .addFields({
+                            name: '🎯 Prompt',
+                            value: content.prompt,
+                            inline: false
+                        })
+                            .setFooter({
+                            text: `Shared by ${interaction.user.username} • Originally generated from /fun story`,
+                            iconURL: interaction.user.displayAvatarURL({ dynamic: true })
+                        });
+                        break;
+                    }
+                    case 'fact': {
+                        shareEmbed = new EmbedBuilder()
+                            .setTitle(`🧠 ${content.category === 'random' ? 'Random' : content.category.charAt(0).toUpperCase() + content.category.slice(1)} Fun Fact`)
+                            .setColor(0x4C_AF_50)
+                            .setDescription(content.fact)
+                            .setFooter({
+                            text: `Shared by ${interaction.user.username} • Originally generated from /fun fact`,
+                            iconURL: interaction.user.displayAvatarURL({ dynamic: true })
+                        });
+                        break;
+                    }
+                    case 'quote': {
+                        shareEmbed = new EmbedBuilder()
+                            .setTitle(`💬 ${content.category.charAt(0).toUpperCase() + content.category.slice(1)} Quote`)
+                            .setColor(0xE9_1E_63)
+                            .addFields({ name: 'Quote', value: `"${content.quote}"`, inline: false }, { name: 'Author', value: content.author, inline: true }, { name: 'Category', value: content.category, inline: true })
+                            .setFooter({
+                            text: `Shared by ${interaction.user.username} • Originally generated from /fun quote`,
+                            iconURL: interaction.user.displayAvatarURL({ dynamic: true })
+                        });
+                        break;
+                    }
+                    default: {
+                        throw new Error(`Unknown content type: ${content.type}`);
+                    }
                 }
-                const guildInfo = getUserGuild(interaction.user.id);
-                const embed = new EmbedBuilder()
-                    .setTitle('🔄 Guild Refreshed')
+                // Send the shared content to the channel
+                if (!interaction.channel) {
+                    return await safeInteractionUpdate(interaction, { embeds: [errorEmbed], components: [] });
+                }
+                await interaction.channel.send({
+                    content: `📤 **${interaction.user.username} shared some fun content!**`,
+                    embeds: [shareEmbed]
+                });
+                // Update the original interaction
+                const successEmbed = new EmbedBuilder()
+                    .setTitle('✅ Content Shared Successfully!')
                     .setColor(0x4C_AF_50)
-                    .setDescription(`${guildName || guildInfo?.name || 'Guild'} data has been refreshed!`);
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: interaction.message.components });
-                return;
+                    .setDescription('Your content has been shared with the channel!')
+                    .setFooter({ text: 'Thanks for spreading the fun!' });
+                await safeInteractionUpdate(interaction, { embeds: [successEmbed], components: [] });
             }
-            if (action === 'party_invite') {
-                const [, partyId, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot generate invites for another user.', flags: MessageFlags.Ephemeral });
-                }
-                const embed = new EmbedBuilder()
-                    .setTitle('🔗 Party Invite Generated')
-                    .setColor(0x21_96_F3)
-                    .setDescription(`Invite link for party ${partyId}: \`/join ${partyId}\``);
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                return;
-            }
-            if (action === 'guess_modal') {
-                const [, gameId, min, max] = interaction.customId.split(':');
-                const gameState = guessGames.get(gameId);
-                if (!gameState) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Game not found!** The game may have expired.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                if (!gameState.gameActive) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Game is no longer active!**',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                const modal = new ModalBuilder().setCustomId(`guess_submit:${gameId}`).setTitle('Make Your Guess');
-                const guessInput = new TextInputBuilder().setCustomId('guess_number').setLabel(`Guess a number between ${min} and ${max}`).setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder(`${min}-${max}`);
-                modal.addComponents(new ActionRowBuilder().addComponents(guessInput));
-                await interaction.showModal(modal);
-                return;
-            }
-            if (action === 'fun_joke') {
-                const [, category, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot get jokes for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const joke = getRandomJoke(category);
-                const embed = new EmbedBuilder()
-                    .setTitle('😂 Joke')
-                    .setColor(0xFF_D7_00)
-                    .setDescription(String(joke || 'No joke available.'));
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_joke:${category}:${interaction.user.id}`).setLabel('😂 Another Joke').setStyle(ButtonStyle.Primary));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-                return;
-            }
-            if (action === 'fun_rate') {
-                const [, jokeId, ratingStr, targetUserId] = interaction.customId.split(':');
-                // Validate user ID
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot rate jokes for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                // Validate rating
-                const rating = Number.parseInt(ratingStr || '0');
-                if (isNaN(rating) || rating < 1 || rating > 5) {
-                    await safeInteractionReply(interaction, { content: '❌ Invalid rating. Rating must be between 1 and 5 stars.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                // Validate joke ID format (basic check)
-                if (!jokeId || jokeId.length < 10) {
-                    await safeInteractionReply(interaction, { content: '❌ Invalid joke reference.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                try {
-                    // Attempt to rate the joke
-                    const ratingResult = entertainmentManager.rateJoke(jokeId, rating);
-                    if (ratingResult !== true) {
-                        return safeInteractionReply(interaction, { content: '❌ Failed to record your rating. Please try again.', flags: MessageFlags.Ephemeral });
-                    }
-                    // Create success response embed
-                    const embed = new EmbedBuilder()
-                        .setTitle('⭐ Thanks for your rating!')
-                        .setColor(0x4C_AF_50)
-                        .setDescription(`You rated this joke with **${rating} star${rating !== 1 ? 's' : ''}!** ⭐\n\nYour feedback helps improve our joke collection!`)
-                        .setFooter({ text: 'Rating recorded successfully' });
-                    await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                }
-                catch (error) {
-                    logger.error('Error rating joke', error instanceof Error ? error : new Error(String(error)), {
-                        userId: interaction.user.id,
-                        jokeId,
-                        rating
-                    });
-                    return safeInteractionReply(interaction, { content: '❌ An error occurred while recording your rating. Please try again.', flags: MessageFlags.Ephemeral });
-                }
-                return;
-            }
-            if (action === 'fun_story') {
-                const [, genre, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot get stories for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const story = generateStory(genre);
-                const embed = new EmbedBuilder()
-                    .setTitle('📖 Story')
-                    .setColor(0x99_32_CC)
-                    .setDescription(String(story || 'No story available.'));
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_story:${genre}:${interaction.user.id}`).setLabel('📖 Another Story').setStyle(ButtonStyle.Primary));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-                return;
-            }
-            if (action === 'fun_share') {
-                const [, contentId, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot share for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                // Validate user ID matches
-                if (targetUserId !== interaction.user.id) {
-                    await safeInteractionReply(interaction, {
-                        content: '❌ **Sharing failed!** User ID mismatch.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                    return;
-                }
-                // Import content retrieval function
-                const { getContentForSharing } = await import('./entertainment.js');
-                const content = getContentForSharing(contentId);
-                if (!content) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Content not found!** This content may have expired or is no longer available for sharing.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                // Create shareable message based on content type
-                let shareEmbed;
-                let shareContent = '';
-                try {
-                    switch (content.type) {
-                        case 'story': {
-                            shareEmbed = new EmbedBuilder()
-                                .setTitle(`📖 ${content.genre.charAt(0).toUpperCase() + content.genre.slice(1)} Story`)
-                                .setColor(0x99_32_CC)
-                                .setDescription(content.story)
-                                .addFields({
-                                name: '🎯 Prompt',
-                                value: content.prompt,
-                                inline: false
-                            })
-                                .setFooter({
-                                text: `Shared by ${interaction.user.username} • Originally generated from /fun story`,
-                                iconURL: interaction.user.displayAvatarURL({ dynamic: true })
-                            });
-                            break;
-                        }
-                        case 'fact': {
-                            shareEmbed = new EmbedBuilder()
-                                .setTitle(`🧠 ${content.category === 'random' ? 'Random' : content.category.charAt(0).toUpperCase() + content.category.slice(1)} Fun Fact`)
-                                .setColor(0x4C_AF_50)
-                                .setDescription(content.fact)
-                                .setFooter({
-                                text: `Shared by ${interaction.user.username} • Originally generated from /fun fact`,
-                                iconURL: interaction.user.displayAvatarURL({ dynamic: true })
-                            });
-                            break;
-                        }
-                        case 'quote': {
-                            shareEmbed = new EmbedBuilder()
-                                .setTitle(`💬 ${content.category.charAt(0).toUpperCase() + content.category.slice(1)} Quote`)
-                                .setColor(0xE9_1E_63)
-                                .addFields({ name: 'Quote', value: `"${content.quote}"`, inline: false }, { name: 'Author', value: content.author, inline: true }, { name: 'Category', value: content.category, inline: true })
-                                .setFooter({
-                                text: `Shared by ${interaction.user.username} • Originally generated from /fun quote`,
-                                iconURL: interaction.user.displayAvatarURL({ dynamic: true })
-                            });
-                            break;
-                        }
-                        default: {
-                            throw new Error(`Unknown content type: ${content.type}`);
-                        }
-                    }
-                    // Send the shared content to the channel
-                    if (!interaction.channel) {
-                        return await safeInteractionUpdate(interaction, { embeds: [errorEmbed], components: [] });
-                    }
-                    await interaction.channel.send({
-                        content: `📤 **${interaction.user.username} shared some fun content!**`,
-                        embeds: [shareEmbed]
-                    });
-                    // Update the original interaction
-                    const successEmbed = new EmbedBuilder()
-                        .setTitle('✅ Content Shared Successfully!')
-                        .setColor(0x4C_AF_50)
-                        .setDescription('Your content has been shared with the channel!')
-                        .setFooter({ text: 'Thanks for spreading the fun!' });
-                    await safeInteractionUpdate(interaction, { embeds: [successEmbed], components: [] });
-                }
-                catch (error) {
-                    logger.error('Error sharing fun content', error instanceof Error ? error : new Error(String(error)), {
-                        userId: interaction.user.id,
-                        contentId,
-                        contentType: content.type
-                    });
-                    // Handle sharing failure
-                    const errorEmbed = new EmbedBuilder()
-                        .setTitle('❌ Sharing Failed')
-                        .setColor(0xFF_00_00)
-                        .setDescription('Sorry, there was an error sharing your content. Please try again.')
-                        .setFooter({ text: 'If this persists, contact the bot administrator' });
-                    await safeInteractionUpdate(interaction, { embeds: [errorEmbed], components: [] });
-                }
-                return;
-            }
-            if (action === 'fun_riddle') {
-                const [, difficulty, riddleId, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot view riddles for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const riddle = getRiddle(difficulty);
-                const embed = new EmbedBuilder()
-                    .setTitle('💡 Riddle')
-                    .setColor(0xFF_98_00)
-                    .setDescription(`**${riddle.question}**\n\n${riddle.hint ? `*Hint: ${riddle.hint}*` : ''}`);
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_riddle:${difficulty}:${riddle.id}:${interaction.user.id}`).setLabel('💡 Show Answer').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_riddle_new:${difficulty}:${interaction.user.id}`).setLabel('🧩 New Riddle').setStyle(ButtonStyle.Secondary));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-                return;
-            }
-            if (action === 'fun_riddle_new') {
-                const [, difficulty, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot get new riddles for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const riddle = getRiddle(difficulty);
-                const embed = new EmbedBuilder()
-                    .setTitle('🧩 New Riddle')
-                    .setColor(0xFF_98_00)
-                    .setDescription(`**${riddle.question}**\n\n${riddle.hint ? `*Hint: ${riddle.hint}*` : ''}`);
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_riddle:${difficulty}:${riddle.id}:${interaction.user.id}`).setLabel('💡 Show Answer').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_riddle_new:${difficulty}:${interaction.user.id}`).setLabel('🧩 Another Riddle').setStyle(ButtonStyle.Secondary));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-                return;
-            }
-            if (action === 'fun_fact') {
-                const [, category, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot get facts for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const fact = getFunFact(category);
-                // Ensure fact is a valid string for EmbedBuilder.setDescription
-                const factText = typeof fact === 'object' && fact && fact.fact ? String(fact.fact) : String(fact || 'No fun fact available.');
-                const embed = new EmbedBuilder()
-                    .setTitle('🧠 Fun Fact')
-                    .setColor(0x4C_AF_50)
-                    .setDescription(`${factText}`);
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_fact:${category}:${interaction.user.id}`).setLabel('🧠 Another Fact').setStyle(ButtonStyle.Primary));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-                return;
-            }
-            if (action === 'fun_quote') {
-                const [, category, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot get quotes for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const quote = getRandomQuote(category);
-                const embed = new EmbedBuilder()
-                    .setTitle('💬 Quote')
-                    .setColor(0x99_32_CC)
-                    .setDescription(`"${quote.text || 'No quote text'}"\n\n— ${quote.author || 'Unknown'}`);
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_quote:${category}:${interaction.user.id}`).setLabel('💬 Another Quote').setStyle(ButtonStyle.Primary));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-                return;
-            }
-            if (action === 'fun_8ball') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot use 8ball for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const answer = magic8Ball();
-                const embed = new EmbedBuilder()
-                    .setTitle('🔮 Magic 8-Ball')
-                    .setColor(0x00_00_00)
-                    .setDescription(`🎱 ${answer}`);
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_8ball:${interaction.user.id}`).setLabel('🔮 Ask Again').setStyle(ButtonStyle.Primary));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-                return;
-            }
-            if (action === 'fun_name') {
-                const [, type, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot generate names for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const name = generateFunName(type);
-                const embed = new EmbedBuilder()
-                    .setTitle('🎭 Fun Name')
-                    .setColor(0xFF_69_B4)
-                    .setDescription(`**${String(name || 'No name available')}**`);
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_name:${type}:${interaction.user.id}`).setLabel('🎭 Another Name').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_name_random:${interaction.user.id}`).setLabel('🎲 Random Type').setStyle(ButtonStyle.Secondary));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-                return;
-            }
-            if (action === 'fun_name_random') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot generate names for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const types = ['hero', 'villain', 'animal', 'object'];
-                const randomType = types[Math.floor(Math.random() * types.length)];
-                const name = generateFunName(randomType);
-                const embed = new EmbedBuilder()
-                    .setTitle('🎲 Random Fun Name')
-                    .setColor(0xFF_69_B4)
-                    .setDescription(`**${name}** (${randomType})`);
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_name:${randomType}:${interaction.user.id}`).setLabel('🎭 Another Name').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_name_random:${interaction.user.id}`).setLabel('🎲 Random Type').setStyle(ButtonStyle.Secondary));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-                return;
-            }
-            if (action === 'fun_challenge') {
-                const [, type, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot get challenges for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const challenge = createFunChallenge(type);
-                const embed = new EmbedBuilder()
-                    .setTitle('🎯 Challenge')
-                    .setColor(0xFF_45_00)
-                    .setDescription(String(challenge || 'No challenge available.'));
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_challenge:${type}:${interaction.user.id}`).setLabel('🎯 Accept Challenge').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_challenge_new:${type}:${interaction.user.id}`).setLabel('🔄 New Challenge').setStyle(ButtonStyle.Secondary));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-                return;
-            }
-            if (action === 'fun_challenge_new') {
-                const [, type, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot get challenges for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const challenge = createFunChallenge(type);
-                const embed = new EmbedBuilder()
-                    .setTitle('🔄 New Challenge')
-                    .setColor(0xFF_45_00)
-                    .setDescription(String(challenge || 'No challenge available.'));
-                const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_challenge:${type}:${interaction.user.id}`).setLabel('🎯 Accept Challenge').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_challenge_new:${type}:${interaction.user.id}`).setLabel('🔄 Another Challenge').setStyle(ButtonStyle.Secondary));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-                return;
-            }
-            if (action === 'ai_chat') {
-                const [, model, personality, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot continue chat for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                // Show modal for continuing AI chat
-                const modal = new ModalBuilder().setCustomId(`ai_chat_continue_modal:${model}:${personality}:${interaction.user.id}`).setTitle('Continue AI Chat');
-                const messageInput = new TextInputBuilder().setCustomId('message').setLabel('Your message').setStyle(TextInputStyle.Paragraph).setRequired(true).setPlaceholder('What would you like to say next?');
-                modal.addComponents({ type: 1, components: [messageInput] });
-                await interaction.showModal(modal);
-                return;
-            }
-            if (action === 'ai_clear') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    await safeInteractionReply(interaction, { content: 'You cannot clear history for another user.', flags: MessageFlags.Ephemeral });
-                    return;
-                }
-                const embed = new EmbedBuilder()
-                    .setTitle('🗑️ AI History Cleared')
+            catch (error) {
+                logger.error('Error sharing fun content', error instanceof Error ? error : new Error(String(error)), {
+                    userId: interaction.user.id,
+                    contentId,
+                    contentType: content.type
+                });
+                // Handle sharing failure
+                const errorEmbed = new EmbedBuilder()
+                    .setTitle('❌ Sharing Failed')
                     .setColor(0xFF_00_00)
-                    .setDescription('Chat history has been cleared!');
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+                    .setDescription('Sorry, there was an error sharing your content. Please try again.')
+                    .setFooter({ text: 'If this persists, contact the bot administrator' });
+                await safeInteractionUpdate(interaction, { embeds: [errorEmbed], components: [] });
+            }
+            return;
+        }
+        if (action === 'fun_riddle') {
+            const [, difficulty, riddleId, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot view riddles for another user.', flags: MessageFlags.Ephemeral });
                 return;
             }
-            if (action === 'admin_warn') {
-                const [, targetUserId, guildId] = interaction.customId.split(':');
-                // Admin permission check would go here
+            const riddle = getRiddle(difficulty);
+            const embed = new EmbedBuilder()
+                .setTitle('💡 Riddle')
+                .setColor(0xFF_98_00)
+                .setDescription(`**${riddle.question}**\n\n${riddle.hint ? `*Hint: ${riddle.hint}*` : ''}`);
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_riddle:${difficulty}:${riddle.id}:${interaction.user.id}`).setLabel('💡 Show Answer').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_riddle_new:${difficulty}:${interaction.user.id}`).setLabel('🧩 New Riddle').setStyle(ButtonStyle.Secondary));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'fun_riddle_new') {
+            const [, difficulty, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot get new riddles for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const riddle = getRiddle(difficulty);
+            const embed = new EmbedBuilder()
+                .setTitle('🧩 New Riddle')
+                .setColor(0xFF_98_00)
+                .setDescription(`**${riddle.question}**\n\n${riddle.hint ? `*Hint: ${riddle.hint}*` : ''}`);
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_riddle:${difficulty}:${riddle.id}:${interaction.user.id}`).setLabel('💡 Show Answer').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_riddle_new:${difficulty}:${interaction.user.id}`).setLabel('🧩 Another Riddle').setStyle(ButtonStyle.Secondary));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'fun_fact') {
+            const [, category, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot get facts for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const fact = getFunFact(category);
+            // Ensure fact is a valid string for EmbedBuilder.setDescription
+            const factText = typeof fact === 'object' && fact && fact.fact ? String(fact.fact) : String(fact || 'No fun fact available.');
+            const embed = new EmbedBuilder()
+                .setTitle('🧠 Fun Fact')
+                .setColor(0x4C_AF_50)
+                .setDescription(`${factText}`);
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_fact:${category}:${interaction.user.id}`).setLabel('🧠 Another Fact').setStyle(ButtonStyle.Primary));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'fun_quote') {
+            const [, category, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot get quotes for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const quote = getRandomQuote(category);
+            const embed = new EmbedBuilder()
+                .setTitle('💬 Quote')
+                .setColor(0x99_32_CC)
+                .setDescription(`"${quote.text || 'No quote text'}"\n\n— ${quote.author || 'Unknown'}`);
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_quote:${category}:${interaction.user.id}`).setLabel('💬 Another Quote').setStyle(ButtonStyle.Primary));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'fun_8ball') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot use 8ball for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const answer = magic8Ball();
+            const embed = new EmbedBuilder()
+                .setTitle('🔮 Magic 8-Ball')
+                .setColor(0x00_00_00)
+                .setDescription(`🎱 ${answer}`);
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_8ball:${interaction.user.id}`).setLabel('🔮 Ask Again').setStyle(ButtonStyle.Primary));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'fun_name') {
+            const [, type, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot generate names for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const name = generateFunName(type);
+            const embed = new EmbedBuilder()
+                .setTitle('🎭 Fun Name')
+                .setColor(0xFF_69_B4)
+                .setDescription(`**${String(name || 'No name available')}**`);
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_name:${type}:${interaction.user.id}`).setLabel('🎭 Another Name').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_name_random:${interaction.user.id}`).setLabel('🎲 Random Type').setStyle(ButtonStyle.Secondary));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'fun_name_random') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot generate names for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const types = ['hero', 'villain', 'animal', 'object'];
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            const name = generateFunName(randomType);
+            const embed = new EmbedBuilder()
+                .setTitle('🎲 Random Fun Name')
+                .setColor(0xFF_69_B4)
+                .setDescription(`**${name}** (${randomType})`);
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_name:${randomType}:${interaction.user.id}`).setLabel('🎭 Another Name').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_name_random:${interaction.user.id}`).setLabel('🎲 Random Type').setStyle(ButtonStyle.Secondary));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'fun_challenge') {
+            const [, type, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot get challenges for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const challenge = createFunChallenge(type);
+            const embed = new EmbedBuilder()
+                .setTitle('🎯 Challenge')
+                .setColor(0xFF_45_00)
+                .setDescription(String(challenge || 'No challenge available.'));
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_challenge:${type}:${interaction.user.id}`).setLabel('🎯 Accept Challenge').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_challenge_new:${type}:${interaction.user.id}`).setLabel('🔄 New Challenge').setStyle(ButtonStyle.Secondary));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'fun_challenge_new') {
+            const [, type, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot get challenges for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const challenge = createFunChallenge(type);
+            const embed = new EmbedBuilder()
+                .setTitle('🔄 New Challenge')
+                .setColor(0xFF_45_00)
+                .setDescription(String(challenge || 'No challenge available.'));
+            const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`fun_challenge:${type}:${interaction.user.id}`).setLabel('🎯 Accept Challenge').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`fun_challenge_new:${type}:${interaction.user.id}`).setLabel('🔄 Another Challenge').setStyle(ButtonStyle.Secondary));
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+            return;
+        }
+        if (action === 'ai_chat') {
+            const [, model, personality, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot continue chat for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            // Show modal for continuing AI chat
+            const modal = new ModalBuilder().setCustomId(`ai_chat_continue_modal:${model}:${personality}:${interaction.user.id}`).setTitle('Continue AI Chat');
+            const messageInput = new TextInputBuilder().setCustomId('message').setLabel('Your message').setStyle(TextInputStyle.Paragraph).setRequired(true).setPlaceholder('What would you like to say next?');
+            modal.addComponents({ type: 1, components: [messageInput] });
+            await interaction.showModal(modal);
+            return;
+        }
+        if (action === 'ai_clear') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                await safeInteractionReply(interaction, { content: 'You cannot clear history for another user.', flags: MessageFlags.Ephemeral });
+                return;
+            }
+            const embed = new EmbedBuilder()
+                .setTitle('🗑️ AI History Cleared')
+                .setColor(0xFF_00_00)
+                .setDescription('Chat history has been cleared!');
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        if (action === 'admin_warn') {
+            const [, targetUserId, guildId] = interaction.customId.split(':');
+            // Admin permission check would go here
+            const embed = new EmbedBuilder()
+                .setTitle('⚠️ User Warned')
+                .setColor(0xFF_A5_00)
+                .setDescription(`User <@${targetUserId}> has been warned.`);
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        if (action === 'admin_mute') {
+            if (!interaction.guild) {
+                return await safeInteractionReply(interaction, { content: '❌ **Admin commands are only available in servers.**', flags: MessageFlags.Ephemeral });
+            }
+            const [, targetUserId, guildId] = interaction.customId.split(':');
+            // Admin permission check would go here
+            try {
+                await muteUser(interaction.guild.id, targetUserId);
                 const embed = new EmbedBuilder()
-                    .setTitle('⚠️ User Warned')
-                    .setColor(0xFF_A5_00)
-                    .setDescription(`User <@${targetUserId}> has been warned.`);
+                    .setTitle('🔇 User Muted')
+                    .setColor(0xFF_00_00)
+                    .setDescription(`User <@${targetUserId}> has been muted.`);
                 await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                return;
             }
-            if (action === 'admin_mute') {
-                if (!interaction.guild) {
-                    return await safeInteractionReply(interaction, { content: '❌ **Admin commands are only available in servers.**', flags: MessageFlags.Ephemeral });
-                }
-                const [, targetUserId, guildId] = interaction.customId.split(':');
-                // Admin permission check would go here
-                try {
-                    await muteUser(interaction.guild.id, targetUserId);
-                    const embed = new EmbedBuilder()
-                        .setTitle('🔇 User Muted')
-                        .setColor(0xFF_00_00)
-                        .setDescription(`User <@${targetUserId}> has been muted.`);
-                    await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                }
-                catch {
-                    await safeInteractionReply(interaction, { content: '❌ Failed to mute user.', flags: MessageFlags.Ephemeral });
-                }
-                return;
+            catch {
+                await safeInteractionReply(interaction, { content: '❌ Failed to mute user.', flags: MessageFlags.Ephemeral });
             }
-            if (action === 'admin_unmute') {
-                if (!interaction.guild) {
-                    return await safeInteractionReply(interaction, { content: '❌ **Admin commands are only available in servers.**', flags: MessageFlags.Ephemeral });
-                }
-                const [, targetUserId, guildId] = interaction.customId.split(':');
-                // Admin permission check would go here
-                try {
-                    await unmuteUser(interaction.guild.id, targetUserId);
-                    const embed = new EmbedBuilder()
-                        .setTitle('🔊 User Unmuted')
-                        .setColor(0x4C_AF_50)
-                        .setDescription(`User <@${targetUserId}> has been unmuted.`);
-                    await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                }
-                catch {
-                    await safeInteractionReply(interaction, { content: '❌ Failed to unmute user.', flags: MessageFlags.Ephemeral });
-                }
-                return;
+            return;
+        }
+        if (action === 'admin_unmute') {
+            if (!interaction.guild) {
+                return await safeInteractionReply(interaction, { content: '❌ **Admin commands are only available in servers.**', flags: MessageFlags.Ephemeral });
             }
-            if (action === 'admin_unban') {
-                if (!interaction.guild) {
-                    return await safeInteractionReply(interaction, { content: '❌ **Admin commands are only available in servers.**', flags: MessageFlags.Ephemeral });
-                }
-                const [, targetUserId, guildId] = interaction.customId.split(':');
-                // Admin permission check would go here
-                try {
-                    await unbanUser(interaction.guild.id, targetUserId);
-                    const embed = new EmbedBuilder()
-                        .setTitle('✅ User Unbanned')
-                        .setColor(0x4C_AF_50)
-                        .setDescription(`User <@${targetUserId}> has been unbanned.`);
-                    await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                }
-                catch {
-                    await safeInteractionReply(interaction, { content: '❌ Failed to unban user.', flags: MessageFlags.Ephemeral });
-                }
-                return;
-            }
-            if (action === 'achievements_refresh') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot refresh achievements for another user.', flags: MessageFlags.Ephemeral });
-                }
+            const [, targetUserId, guildId] = interaction.customId.split(':');
+            // Admin permission check would go here
+            try {
+                await unmuteUser(interaction.guild.id, targetUserId);
                 const embed = new EmbedBuilder()
-                    .setTitle('🔄 Achievements Refreshed')
+                    .setTitle('🔊 User Unmuted')
                     .setColor(0x4C_AF_50)
-                    .setDescription('Achievement data has been refreshed!');
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: interaction.message.components });
-                return;
+                    .setDescription(`User <@${targetUserId}> has been unmuted.`);
+                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
             }
-            if (action === 'achievements_leaderboard') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot view leaderboard for another user.', flags: MessageFlags.Ephemeral });
-                }
-                // Import achievement functions
-                const { getAchievementLeaderboard } = await import('./achievements.js');
-                const leaderboard = getAchievementLeaderboard(10);
-                if (!leaderboard || leaderboard.length === 0) {
-                    const embed = new EmbedBuilder()
-                        .setTitle('🏅 Achievement Leaderboard')
-                        .setColor(0xFF_D7_00)
-                        .setDescription('No achievement data available yet.\n\nComplete achievements to appear on the leaderboard!');
-                    await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                    return;
-                }
-                const description = leaderboard.map((/** @type {any} */ entry, /** @type {number} */ index) => {
-                    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `**${index + 1}.**`;
-                    return `${medal} **${entry.username || entry.userId}** - ${entry.totalAchievements || entry.achievements_count} achievements, ${entry.totalPoints || entry.total_points} points`;
-                }).join('\n');
+            catch {
+                await safeInteractionReply(interaction, { content: '❌ Failed to unmute user.', flags: MessageFlags.Ephemeral });
+            }
+            return;
+        }
+        if (action === 'admin_unban') {
+            if (!interaction.guild) {
+                return await safeInteractionReply(interaction, { content: '❌ **Admin commands are only available in servers.**', flags: MessageFlags.Ephemeral });
+            }
+            const [, targetUserId, guildId] = interaction.customId.split(':');
+            // Admin permission check would go here
+            try {
+                await unbanUser(interaction.guild.id, targetUserId);
+                const embed = new EmbedBuilder()
+                    .setTitle('✅ User Unbanned')
+                    .setColor(0x4C_AF_50)
+                    .setDescription(`User <@${targetUserId}> has been unbanned.`);
+                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            }
+            catch {
+                await safeInteractionReply(interaction, { content: '❌ Failed to unban user.', flags: MessageFlags.Ephemeral });
+            }
+            return;
+        }
+        if (action === 'achievements_refresh') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot refresh achievements for another user.', flags: MessageFlags.Ephemeral });
+            }
+            const embed = new EmbedBuilder()
+                .setTitle('🔄 Achievements Refreshed')
+                .setColor(0x4C_AF_50)
+                .setDescription('Achievement data has been refreshed!');
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: interaction.message.components });
+            return;
+        }
+        if (action === 'achievements_leaderboard') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot view leaderboard for another user.', flags: MessageFlags.Ephemeral });
+            }
+            // Import achievement functions
+            const { getAchievementLeaderboard } = await import('./achievements.js');
+            const leaderboard = getAchievementLeaderboard(10);
+            if (!leaderboard || leaderboard.length === 0) {
                 const embed = new EmbedBuilder()
                     .setTitle('🏅 Achievement Leaderboard')
                     .setColor(0xFF_D7_00)
-                    .setDescription(description)
-                    .setFooter({ text: 'Top achievers this month' });
+                    .setDescription('No achievement data available yet.\n\nComplete achievements to appear on the leaderboard!');
                 await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
                 return;
             }
-            if (action === 'wordle_guess') {
-                const [, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot guess for another user.', flags: MessageFlags.Ephemeral });
-                }
-                await sendWordleGuessModal(interaction, interaction.user.id);
-                return;
+            const description = leaderboard.map((/** @type {any} */ entry, /** @type {number} */ index) => {
+                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `**${index + 1}.**`;
+                return `${medal} **${entry.username || entry.userId}** - ${entry.totalAchievements || entry.achievements_count} achievements, ${entry.totalPoints || entry.total_points} points`;
+            }).join('\n');
+            const embed = new EmbedBuilder()
+                .setTitle('🏅 Achievement Leaderboard')
+                .setColor(0xFF_D7_00)
+                .setDescription(description)
+                .setFooter({ text: 'Top achievers this month' });
+            await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
+            return;
+        }
+        if (action === 'wordle_guess') {
+            const [, targetUserId] = interaction.customId.split(':');
+            if (targetUserId && targetUserId !== interaction.user.id) {
+                logCommandExecution(interaction, false, new Error('Wrong user'));
+                return safeInteractionReply(interaction, { content: 'You cannot guess for another user.', flags: MessageFlags.Ephemeral });
             }
-            // Connect4 button handler
-            if (action === 'c4') {
-                const [, colStr, gameId] = interaction.customId.split('_');
-                const gameState = connect4Games.get(gameId);
-                if (!gameState) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Game not found!** The game may have expired or been completed.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                // Validate user turn
-                if (interaction.user.id !== gameState.players[gameState.currentPlayer]?.id) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Not your turn!** Please wait for the other player.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                const column = Number.parseInt(colStr || '0');
-                if (isNaN(column) || column < 0 || column > 6) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Invalid column!** Please select a valid column (1-7).',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                // Make the move
-                const moveResult = await makeConnect4Move(gameState, column);
-                if (!moveResult) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Invalid move!** That column is full.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                await sendConnect4Board(interaction, gameState);
-                return;
-            }
-            // Tic-Tac-Toe button handler
-            if (action === 'ttt') {
-                const [, positionStr, gameId] = interaction.customId.split('_');
-                const gameState = tttGames.get(gameId);
-                if (!gameState) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Game not found!** The game may have expired or been completed.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                // Validate user turn
-                const currentPlayerId = gameState.players[gameState.currentPlayer]?.id;
-                if (interaction.user.id !== currentPlayerId) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Not your turn!** Please wait for the other player.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                const position = Number.parseInt(positionStr || '0');
-                if (isNaN(position) || position < 0 || position > 8) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Invalid position!** Please select a valid board position.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                // Check if position is empty
-                if (gameState.board[position] !== null) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Position already taken!** Please choose an empty square.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                // Make the move
-                gameState.board[position] = gameState.currentPlayer;
-                // Check for winner
-                const winner = checkWinner(gameState.board);
-                if (winner) {
-                    gameState.status = 'completed';
-                    if (winner !== 'tie') {
-                        const winnerPlayer = gameState.players[winner];
-                        if (winnerPlayer.id !== 'ai') {
-                            await updateUserStats(winnerPlayer.id, { games: { tictactoe_wins: 1 } });
-                        }
-                    }
-                    // Update statistics for both players
-                    if (gameState.players.X.id !== 'ai') {
-                        await updateUserStats(gameState.players.X.id, { games: { tictactoe_games: 1 } });
-                    }
-                    if (gameState.players.O.id !== 'ai') {
-                        await updateUserStats(gameState.players.O.id, { games: { tictactoe_games: 1 } });
-                    }
-                    const resultEmbed = new EmbedBuilder()
-                        .setTitle('⭕ Tic-Tac-Toe - Game Over!')
-                        .setColor(winner === 'tie' ? 0xFF_A5_00 : 0x00_FF_00)
-                        .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${gameState.players[winner].name} wins!**`)
-                        .addFields({
-                        name: 'Final Board',
-                        value: formatBoard(gameState.board),
-                        inline: false
-                    });
-                    // Clean up game state
-                    tttGames.delete(gameId);
-                    await safeInteractionUpdate(interaction, { embeds: [resultEmbed], components: [] });
-                    return;
-                }
-                // Switch turns if game continues
-                gameState.currentPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
-                // Handle AI move if playing against AI
-                if (gameState.isAI && gameState.currentPlayer === 'O' && gameState.status === 'active') {
-                    // Import AI move function
-                    const { getAIMove } = await import('./commands/tictactoe.js');
-                    const aiMove = getAIMove(gameState.board, gameState.difficulty);
-                    if (aiMove !== null) {
-                        gameState.board[aiMove] = 'O';
-                        gameState.currentPlayer = 'X';
-                        // Check for AI win
-                        const aiWinner = checkWinner(gameState.board);
-                        if (aiWinner) {
-                            gameState.status = 'completed';
-                            if (aiWinner !== 'tie') {
-                                const winnerPlayer = gameState.players[aiWinner];
-                                if (winnerPlayer.id !== 'ai') {
-                                    await updateUserStats(winnerPlayer.id, { games: { tictactoe_wins: 1 } });
-                                }
-                            }
-                            // Update statistics for both players
-                            if (gameState.players.X.id !== 'ai') {
-                                await updateUserStats(gameState.players.X.id, { games: { tictactoe_games: 1 } });
-                            }
-                            if (gameState.players.O.id !== 'ai') {
-                                await updateUserStats(gameState.players.O.id, { games: { tictactoe_games: 1 } });
-                            }
-                            const resultEmbed = new EmbedBuilder()
-                                .setTitle('⭕ Tic-Tac-Toe - Game Over!')
-                                .setColor(aiWinner === 'tie' ? 0xFF_A5_00 : 0x00_FF_00)
-                                .setDescription(aiWinner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${gameState.players[aiWinner].name} wins!**`)
-                                .addFields({
-                                name: 'Final Board',
-                                value: formatBoard(gameState.board),
-                                inline: false
-                            });
-                            // Clean up game state
-                            tttGames.delete(gameId);
-                            await safeInteractionUpdate(interaction, { embeds: [resultEmbed], components: [] });
-                            return;
-                        }
-                        gameState.currentPlayer = 'X';
-                    }
-                }
-                // Update the board display
-                await sendTicTacToeBoard(interaction, gameState);
-                return;
-            }
-            // Poll button handler
-            if (action === 'poll') {
-                const [, optionIndexStr] = interaction.customId.split('_');
-                const optionIndex = Number.parseInt(optionIndexStr || '0');
-                // Get message ID to find the poll data
-                const messageId = interaction.message.id;
-                const pollData = pollGames.get(messageId);
-                if (!pollData) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Poll not found!** This poll may have expired or been completed.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                // Check if poll has expired
-                if (Date.now() > pollData.endTime) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Poll has expired!** You can no longer vote on this poll.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                // Validate option index
-                if (isNaN(optionIndex) || optionIndex < 0 || optionIndex >= pollData.options.length) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Invalid poll option!**',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                const userId = interaction.user.id;
-                const previousVote = pollData.votes.get(userId);
-                // Handle vote based on poll type (currently only single choice)
-                if (pollData.pollType === 'single') {
-                    // Remove previous vote if exists
-                    if (previousVote !== undefined) {
-                        pollData.totalVotes--;
-                    }
-                    // Add new vote
-                    pollData.votes.set(userId, optionIndex);
-                    pollData.totalVotes++;
-                }
-                // Update embed with current results
-                const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
-                const updatedEmbed = new EmbedBuilder()
-                    .setTitle(`📊 ${pollData.question}`)
-                    .setColor(0x00_99_FF)
-                    .setDescription(pollData.options.map((/** @type {string} */ option, /** @type {number} */ index) => {
-                    const voteCount = [...pollData.votes.values()].filter(/** @type {number} */ /** @type {number} */ v => v === index).length;
-                    const percentage = pollData.totalVotes > 0 ? Math.round((voteCount / pollData.totalVotes) * 100) : 0;
-                    return emojis[index] + ' ' + option + '\n' + '█'.repeat(Math.max(1, percentage / 5)) + (voteCount > 0 ? ' **' + voteCount + '** (' + percentage + '%)' : '');
-                }).join('\n\n'))
-                    .setFooter({ text: `Total votes: ${pollData.totalVotes} • Poll ends` })
-                    .setTimestamp(pollData.endTime);
-                // Create updated button rows
-                const buttons = pollData.options.map((option, index) => new ButtonBuilder()
-                    .setCustomId(`poll_${index}`)
-                    .setLabel(`${emojis[index]} ${option.length > 15 ? option.slice(0, 15) + '...' : option}`)
-                    .setStyle(ButtonStyle.Primary));
-                const rows = [];
-                for (let i = 0; i < buttons.length; i += 2) {
-                    const row = new ActionRowBuilder().addComponents(buttons.slice(i, i + 2));
-                    rows.push(row);
-                }
-                await safeInteractionUpdate(interaction, { embeds: [updatedEmbed], components: rows });
-                return;
-            }
-            // Trivia button handler
-            if (action === 'trivia') {
-                const [, indexStr] = interaction.customId.split('_');
-                const selectedAnswer = Number.parseInt(indexStr || '0');
-                // Find the active trivia game for this user
-                let gameState = null;
-                let gameId = null;
-                for (const [id, state] of triviaGames.entries()) {
-                    if (state.userId === interaction.user.id && state.gameActive) {
-                        gameState = state;
-                        gameId = id;
-                        break;
-                    }
-                }
-                if (!gameState) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **No active trivia game found!** Please start a new game with `/trivia`.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                // Validate answer index
-                if (isNaN(selectedAnswer) || selectedAnswer < 0 || selectedAnswer >= 4) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Invalid answer selection!**',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                const currentQuestion = gameState.questions[gameState.currentQuestion];
-                if (!currentQuestion) {
-                    return safeInteractionReply(interaction, {
-                        content: '❌ **Game error!** No current question available.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-                const isCorrect = selectedAnswer === currentQuestion.correct;
-                if (isCorrect) {
-                    gameState.score++;
-                }
-                // Record the answer
-                gameState.answers.push({
-                    question: currentQuestion.question,
-                    selectedAnswer: selectedAnswer,
-                    correctAnswer: currentQuestion.correct,
-                    isCorrect: isCorrect,
-                    userChoice: currentQuestion.options[selectedAnswer],
-                    correctChoice: currentQuestion.options[currentQuestion.correct]
+            await sendWordleGuessModal(interaction, interaction.user.id);
+            return;
+        }
+        // Connect4 button handler
+        if (action === 'c4') {
+            const [, colStr, gameId] = interaction.customId.split('_');
+            const gameState = connect4Games.get(gameId);
+            if (!gameState) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Game not found!** The game may have expired or been completed.',
+                    flags: MessageFlags.Ephemeral
                 });
-                gameState.currentQuestion++;
-                // Send feedback
-                const feedbackEmbed = new EmbedBuilder()
-                    .setTitle(isCorrect ? '✅ Correct!' : '❌ Incorrect!')
-                    .setDescription(`**${currentQuestion.question}**\n\nYour answer: **${currentQuestion.options[selectedAnswer]}**\nCorrect answer: **${currentQuestion.options[currentQuestion.correct]}**`)
-                    .setColor(isCorrect ? 0x00_FF_00 : 0xFF_00_00)
-                    .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` });
-                await safeInteractionReply(interaction, { embeds: [feedbackEmbed], flags: MessageFlags.Ephemeral });
-                // Check if quiz is complete
-                if (gameState.currentQuestion >= gameState.questions.length) {
-                    // Send final results
-                    const totalTime = Math.round((Date.now() - gameState.startTime) / 1000);
-                    const percentage = Math.round((gameState.score / gameState.questions.length) * 100);
-                    let resultMessage = '';
-                    if (percentage >= 90)
-                        resultMessage = '🏆 Outstanding! You\'re a trivia master!';
-                    else if (percentage >= 70)
-                        resultMessage = '🥇 Great job! You know your stuff!';
-                    else if (percentage >= 50)
-                        resultMessage = '🥈 Not bad! Keep practicing!';
-                    else
-                        resultMessage = '📚 Keep learning and try again!';
-                    // Update achievements
-                    try {
-                        const correctAnswers = gameState.answers.filter((a) => a.isCorrect).length;
-                        updateUserStats(interaction.user.id, {
-                            trivia_correct: correctAnswers,
-                            features_tried: 1
-                        });
+            }
+            // Validate user turn
+            if (interaction.user.id !== gameState.players[gameState.currentPlayer]?.id) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Not your turn!** Please wait for the other player.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            const column = Number.parseInt(colStr || '0');
+            if (isNaN(column) || column < 0 || column > 6) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Invalid column!** Please select a valid column (1-7).',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            // Make the move
+            const moveResult = await makeConnect4Move(gameState, column);
+            if (!moveResult) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Invalid move!** That column is full.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            await sendConnect4Board(interaction, gameState);
+            return;
+        }
+        // Tic-Tac-Toe button handler
+        if (action === 'ttt') {
+            const [, positionStr, gameId] = interaction.customId.split('_');
+            const gameState = tttGames.get(gameId);
+            if (!gameState) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Game not found!** The game may have expired or been completed.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            // Validate user turn
+            const currentPlayerId = gameState.players[gameState.currentPlayer]?.id;
+            if (interaction.user.id !== currentPlayerId) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Not your turn!** Please wait for the other player.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            const position = Number.parseInt(positionStr || '0');
+            if (isNaN(position) || position < 0 || position > 8) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Invalid position!** Please select a valid board position.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            // Check if position is empty
+            if (gameState.board[position] !== null) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Position already taken!** Please choose an empty square.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            // Make the move
+            gameState.board[position] = gameState.currentPlayer;
+            // Check for winner
+            const winner = checkWinner(gameState.board);
+            if (winner) {
+                gameState.status = 'completed';
+                if (winner !== 'tie') {
+                    const winnerPlayer = gameState.players[winner];
+                    if (winnerPlayer.id !== 'ai') {
+                        await updateUserStats(winnerPlayer.id, { games: { tictactoe_wins: 1 } });
                     }
-                    catch (error) {
-                        console.warn('Failed to update trivia achievements:', error instanceof Error ? error.message : String(error));
-                    }
-                    const resultEmbed = new EmbedBuilder()
-                        .setTitle('🎯 Trivia Quiz Complete!')
-                        .setDescription(`${resultMessage}\n\n**Final Score: ${gameState.score}/${gameState.questions.length} (${percentage}%)**\n⏱️ Time: ${totalTime}s`)
-                        .setColor(percentage >= 70 ? 0x00_FF_00 : (percentage >= 50 ? 0xFF_A5_00 : 0xFF_00_00))
-                        .setTimestamp();
-                    // Add detailed results
-                    for (const [/** @type {number} */ index, /** @type {{question: string, selectedAnswer: number, correctAnswer: number, isCorrect: boolean, userChoice: string, correctChoice: string}} */ answer] of gameState.answers.entries()) {
-                        const emoji = answer.isCorrect ? '✅' : '❌';
-                        const status = answer.isCorrect ? 'Correct' : 'Incorrect';
-                        resultEmbed.addFields({
-                            name: `Q${index + 1}: ${status}`,
-                            value: `${emoji} **${answer.question}**\n${answer.isCorrect ? 'Your answer: ' + answer.userChoice : 'Your answer: ' + answer.userChoice + '\nCorrect: ' + answer.correctChoice}`,
+                }
+                // Update statistics for both players
+                if (gameState.players.X.id !== 'ai') {
+                    await updateUserStats(gameState.players.X.id, { games: { tictactoe_games: 1 } });
+                }
+                if (gameState.players.O.id !== 'ai') {
+                    await updateUserStats(gameState.players.O.id, { games: { tictactoe_games: 1 } });
+                }
+                const resultEmbed = new EmbedBuilder()
+                    .setTitle('⭕ Tic-Tac-Toe - Game Over!')
+                    .setColor(winner === 'tie' ? 0xFF_A5_00 : 0x00_FF_00)
+                    .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${gameState.players[winner].name} wins!**`)
+                    .addFields({
+                    name: 'Final Board',
+                    value: formatBoard(gameState.board),
+                    inline: false
+                });
+                // Clean up game state
+                tttGames.delete(gameId);
+                await safeInteractionUpdate(interaction, { embeds: [resultEmbed], components: [] });
+                return;
+            }
+            // Switch turns if game continues
+            gameState.currentPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
+            // Handle AI move if playing against AI
+            if (gameState.isAI && gameState.currentPlayer === 'O' && gameState.status === 'active') {
+                // Import AI move function
+                const { getAIMove } = await import('./commands/tictactoe.js');
+                const aiMove = getAIMove(gameState.board, gameState.difficulty);
+                if (aiMove !== null) {
+                    gameState.board[aiMove] = 'O';
+                    gameState.currentPlayer = 'X';
+                    // Check for AI win
+                    const aiWinner = checkWinner(gameState.board);
+                    if (aiWinner) {
+                        gameState.status = 'completed';
+                        if (aiWinner !== 'tie') {
+                            const winnerPlayer = gameState.players[aiWinner];
+                            if (winnerPlayer.id !== 'ai') {
+                                await updateUserStats(winnerPlayer.id, { games: { tictactoe_wins: 1 } });
+                            }
+                        }
+                        // Update statistics for both players
+                        if (gameState.players.X.id !== 'ai') {
+                            await updateUserStats(gameState.players.X.id, { games: { tictactoe_games: 1 } });
+                        }
+                        if (gameState.players.O.id !== 'ai') {
+                            await updateUserStats(gameState.players.O.id, { games: { tictactoe_games: 1 } });
+                        }
+                        const resultEmbed = new EmbedBuilder()
+                            .setTitle('⭕ Tic-Tac-Toe - Game Over!')
+                            .setColor(aiWinner === 'tie' ? 0xFF_A5_00 : 0x00_FF_00)
+                            .setDescription(aiWinner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${gameState.players[aiWinner].name} wins!**`)
+                            .addFields({
+                            name: 'Final Board',
+                            value: formatBoard(gameState.board),
                             inline: false
                         });
+                        // Clean up game state
+                        tttGames.delete(gameId);
+                        await safeInteractionUpdate(interaction, { embeds: [resultEmbed], components: [] });
+                        return;
                     }
-                    // Clean up game state
-                    triviaGames.delete(gameId);
-                    setTimeout(async () => {
-                        await safeInteractionReply(interaction, { embeds: [resultEmbed], flags: MessageFlags.Ephemeral });
-                    }, 2000);
+                    gameState.currentPlayer = 'X';
                 }
-                else {
-                    // Send next question after delay
-                    setTimeout(async () => {
-                        const nextQuestion = gameState.questions[gameState.currentQuestion];
-                        if (!nextQuestion) {
-                            return safeInteractionReply(interaction, {
-                                content: '❌ **Game error!** No next question available.',
-                                flags: MessageFlags.Ephemeral
-                            });
-                        }
-                        const embed = new EmbedBuilder()
-                            .setTitle(`🧠 Trivia Quiz - Question ${gameState.currentQuestion + 1}/${gameState.questions.length}`)
-                            .setDescription(`**${nextQuestion.question}**`)
-                            .setColor(0x00_99_FF)
-                            .addFields({
-                            name: 'Category',
-                            value: nextQuestion.category,
-                            inline: true
-                        })
-                            .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` })
-                            .setTimestamp();
-                        const buttons = nextQuestion.options.map((/** @type {string} */ option, /** @type {number} */ index) => new ButtonBuilder()
-                            .setCustomId(`trivia_${index}`)
-                            .setLabel(`${String.fromCharCode(65 + index)}) ${option}`)
-                            .setStyle(ButtonStyle.Primary));
-                        const rows = [];
-                        for (let i = 0; i < buttons.length; i += 2) {
-                            const row = new ActionRowBuilder().addComponents(buttons.slice(i, i + 2));
-                            rows.push(row);
-                        }
-                        await safeInteractionReply(interaction, { embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
-                    }, 2000);
-                }
-                return;
             }
-            // Unrecognized button action with comprehensive logging
-            logger.warn(`Unrecognized button action: ${action}`, {
-                userId: interaction.user.id,
-                username: interaction.user.username,
-                customId: interaction.customId,
-                guild: interaction.guild?.name || 'DM',
-                guildId: interaction.guild?.id || 'N/A'
-            });
-            logCommandExecution(interaction, false, new Error(`Unrecognized button action: ${action}`));
-            await safeInteractionReply(interaction, {
-                content: `❌ **Unknown button action: ${action}**\n\nThis button is not implemented yet. Please contact the bot administrator if this is unexpected.`,
-                flags: MessageFlags.Ephemeral
-            });
+            // Update the board display
+            await sendTicTacToeBoard(interaction, gameState);
+            return;
         }
-    }
-    catch (error) {
-        logger.error(`Error handling button action ${action}`, error instanceof Error ? error : new Error(String(error)), {
+        // Poll button handler
+        if (action === 'poll') {
+            const [, optionIndexStr] = interaction.customId.split('_');
+            const optionIndex = Number.parseInt(optionIndexStr || '0');
+            // Get message ID to find the poll data
+            const messageId = interaction.message.id;
+            const pollData = pollGames.get(messageId);
+            if (!pollData) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Poll not found!** This poll may have expired or been completed.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            // Check if poll has expired
+            if (Date.now() > pollData.endTime) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Poll has expired!** You can no longer vote on this poll.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            // Validate option index
+            if (isNaN(optionIndex) || optionIndex < 0 || optionIndex >= pollData.options.length) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Invalid poll option!**',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            const userId = interaction.user.id;
+            const previousVote = pollData.votes.get(userId);
+            // Handle vote based on poll type (currently only single choice)
+            if (pollData.pollType === 'single') {
+                // Remove previous vote if exists
+                if (previousVote !== undefined) {
+                    pollData.totalVotes--;
+                }
+                // Add new vote
+                pollData.votes.set(userId, optionIndex);
+                pollData.totalVotes++;
+            }
+            // Update embed with current results
+            const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+            const updatedEmbed = new EmbedBuilder()
+                .setTitle(`📊 ${pollData.question}`)
+                .setColor(0x00_99_FF)
+                .setDescription(pollData.options.map((/** @type {string} */ option, /** @type {number} */ index) => {
+                const voteCount = [...pollData.votes.values()].filter(/** @type {number} */ /** @type {number} */ v => v === index).length;
+                const percentage = pollData.totalVotes > 0 ? Math.round((voteCount / pollData.totalVotes) * 100) : 0;
+                return emojis[index] + ' ' + option + '\n' + '█'.repeat(Math.max(1, percentage / 5)) + (voteCount > 0 ? ' **' + voteCount + '** (' + percentage + '%)' : '');
+            }).join('\n\n'))
+                .setFooter({ text: `Total votes: ${pollData.totalVotes} • Poll ends` })
+                .setTimestamp(pollData.endTime);
+            // Create updated button rows
+            const buttons = pollData.options.map((option, index) => new ButtonBuilder()
+                .setCustomId(`poll_${index}`)
+                .setLabel(`${emojis[index]} ${option.length > 15 ? option.slice(0, 15) + '...' : option}`)
+                .setStyle(ButtonStyle.Primary));
+            const rows = [];
+            for (let i = 0; i < buttons.length; i += 2) {
+                const row = new ActionRowBuilder().addComponents(buttons.slice(i, i + 2));
+                rows.push(row);
+            }
+            await safeInteractionUpdate(interaction, { embeds: [updatedEmbed], components: rows });
+            return;
+        }
+        // Trivia button handler
+        if (action === 'trivia') {
+            const [, indexStr] = interaction.customId.split('_');
+            const selectedAnswer = Number.parseInt(indexStr || '0');
+            // Find the active trivia game for this user
+            let gameState = null;
+            let gameId = null;
+            for (const [id, state] of triviaGames.entries()) {
+                if (state.userId === interaction.user.id && state.gameActive) {
+                    gameState = state;
+                    gameId = id;
+                    break;
+                }
+            }
+            if (!gameState) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **No active trivia game found!** Please start a new game with `/trivia`.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            // Validate answer index
+            if (isNaN(selectedAnswer) || selectedAnswer < 0 || selectedAnswer >= 4) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Invalid answer selection!**',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            const currentQuestion = gameState.questions[gameState.currentQuestion];
+            if (!currentQuestion) {
+                return safeInteractionReply(interaction, {
+                    content: '❌ **Game error!** No current question available.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            const isCorrect = selectedAnswer === currentQuestion.correct;
+            if (isCorrect) {
+                gameState.score++;
+            }
+            // Record the answer
+            gameState.answers.push({
+                question: currentQuestion.question,
+                selectedAnswer: selectedAnswer,
+                correctAnswer: currentQuestion.correct,
+                isCorrect: isCorrect,
+                userChoice: currentQuestion.options[selectedAnswer],
+                correctChoice: currentQuestion.options[currentQuestion.correct]
+            });
+            gameState.currentQuestion++;
+            // Send feedback
+            const feedbackEmbed = new EmbedBuilder()
+                .setTitle(isCorrect ? '✅ Correct!' : '❌ Incorrect!')
+                .setDescription(`**${currentQuestion.question}**\n\nYour answer: **${currentQuestion.options[selectedAnswer]}**\nCorrect answer: **${currentQuestion.options[currentQuestion.correct]}**`)
+                .setColor(isCorrect ? 0x00_FF_00 : 0xFF_00_00)
+                .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` });
+            await safeInteractionReply(interaction, { embeds: [feedbackEmbed], flags: MessageFlags.Ephemeral });
+            // Check if quiz is complete
+            if (gameState.currentQuestion >= gameState.questions.length) {
+                // Send final results
+                const totalTime = Math.round((Date.now() - gameState.startTime) / 1000);
+                const percentage = Math.round((gameState.score / gameState.questions.length) * 100);
+                let resultMessage = '';
+                if (percentage >= 90)
+                    resultMessage = '🏆 Outstanding! You\'re a trivia master!';
+                else if (percentage >= 70)
+                    resultMessage = '🥇 Great job! You know your stuff!';
+                else if (percentage >= 50)
+                    resultMessage = '🥈 Not bad! Keep practicing!';
+                else
+                    resultMessage = '📚 Keep learning and try again!';
+                // Update achievements
+                try {
+                    const correctAnswers = gameState.answers.filter((a) => a.isCorrect).length;
+                    updateUserStats(interaction.user.id, {
+                        trivia_correct: correctAnswers,
+                        features_tried: 1
+                    });
+                }
+                catch (error) {
+                    console.warn('Failed to update trivia achievements:', error instanceof Error ? error.message : String(error));
+                }
+                const resultEmbed = new EmbedBuilder()
+                    .setTitle('🎯 Trivia Quiz Complete!')
+                    .setDescription(`${resultMessage}\n\n**Final Score: ${gameState.score}/${gameState.questions.length} (${percentage}%)**\n⏱️ Time: ${totalTime}s`)
+                    .setColor(percentage >= 70 ? 0x00_FF_00 : (percentage >= 50 ? 0xFF_A5_00 : 0xFF_00_00))
+                    .setTimestamp();
+                // Add detailed results
+                for (const [/** @type {number} */ index, /** @type {{question: string, selectedAnswer: number, correctAnswer: number, isCorrect: boolean, userChoice: string, correctChoice: string}} */ answer] of gameState.answers.entries()) {
+                    const emoji = answer.isCorrect ? '✅' : '❌';
+                    const status = answer.isCorrect ? 'Correct' : 'Incorrect';
+                    resultEmbed.addFields({
+                        name: `Q${index + 1}: ${status}`,
+                        value: `${emoji} **${answer.question}**\n${answer.isCorrect ? 'Your answer: ' + answer.userChoice : 'Your answer: ' + answer.userChoice + '\nCorrect: ' + answer.correctChoice}`,
+                        inline: false
+                    });
+                }
+                // Clean up game state
+                triviaGames.delete(gameId);
+                setTimeout(async () => {
+                    await safeInteractionReply(interaction, { embeds: [resultEmbed], flags: MessageFlags.Ephemeral });
+                }, 2000);
+            }
+            else {
+                // Send next question after delay
+                setTimeout(async () => {
+                    const nextQuestion = gameState.questions[gameState.currentQuestion];
+                    if (!nextQuestion) {
+                        return safeInteractionReply(interaction, {
+                            content: '❌ **Game error!** No next question available.',
+                            flags: MessageFlags.Ephemeral
+                        });
+                    }
+                    const embed = new EmbedBuilder()
+                        .setTitle(`🧠 Trivia Quiz - Question ${gameState.currentQuestion + 1}/${gameState.questions.length}`)
+                        .setDescription(`**${nextQuestion.question}**`)
+                        .setColor(0x00_99_FF)
+                        .addFields({
+                        name: 'Category',
+                        value: nextQuestion.category,
+                        inline: true
+                    })
+                        .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` })
+                        .setTimestamp();
+                    const buttons = nextQuestion.options.map((/** @type {string} */ option, /** @type {number} */ index) => new ButtonBuilder()
+                        .setCustomId(`trivia_${index}`)
+                        .setLabel(`${String.fromCharCode(65 + index)}) ${option}`)
+                        .setStyle(ButtonStyle.Primary));
+                    const rows = [];
+                    for (let i = 0; i < buttons.length; i += 2) {
+                        const row = new ActionRowBuilder().addComponents(buttons.slice(i, i + 2));
+                        rows.push(row);
+                    }
+                    await safeInteractionReply(interaction, { embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
+                }, 2000);
+            }
+            return;
+        }
+        // Unrecognized button action with comprehensive logging
+        logger.warn(`Unrecognized button action: ${action}`, {
             userId: interaction.user.id,
-            action,
-            customId: interaction.customId
+            username: interaction.user.username,
+            customId: interaction.customId,
+            guild: interaction.guild?.name || 'DM',
+            guildId: interaction.guild?.id || 'N/A'
         });
-        logCommandExecution(interaction, false, error instanceof Error ? error : new Error(String(error)));
+        logCommandExecution(interaction, false, new Error(`Unrecognized button action: ${action}`));
         await safeInteractionReply(interaction, {
-            content: '❌ **An error occurred while processing the button.**\n\nPlease try again later.',
+            content: `❌ **Unknown button action: ${action}**\n\nThis button is not implemented yet. Please contact the bot administrator if this is unexpected.`,
             flags: MessageFlags.Ephemeral
         });
     }
+    finally {
+    }
+}
+try {
+}
+catch (error) {
+    logger.error(`Error handling button action ${action}`, error instanceof Error ? error : new Error(String(error)), {
+        userId: interaction.user.id,
+        action,
+        customId: interaction.customId
+    });
+    logCommandExecution(interaction, false, error instanceof Error ? error : new Error(String(error)));
+    await safeInteractionReply(interaction, {
+        content: '❌ **An error occurred while processing the button.**\n\nPlease try again later.',
+        flags: MessageFlags.Ephemeral
+    });
 }
