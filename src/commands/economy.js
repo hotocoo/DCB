@@ -13,9 +13,13 @@ import {
   getTransactionHistory,
   createLottery,
   getUserBusinesses,
-  claimDailyReward
+  claimDailyReward,
+  workReward,
+  rob,
+  gamble,
+  getRichLeaderboard
 } from '../economy.js';
-import { safeExecuteCommand, CommandError, validateRange, validateNotEmpty, validateUser } from '../errorHandler';
+import { safeExecuteCommand, CommandError, validateRange, validateNotEmpty, validateUser } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('economy')
@@ -33,7 +37,13 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub => sub.setName('lottery').setDescription('Play the lottery').addIntegerOption(opt => opt.setName('ticket_price').setDescription('Ticket price').setRequired(true)))
   .addSubcommand(sub => sub.setName('history').setDescription('Transaction history').addIntegerOption(opt => opt.setName('limit').setDescription('Number of transactions')))
   .addSubcommand(sub => sub.setName('stats').setDescription('Economy statistics'))
-  .addSubcommand(sub => sub.setName('daily').setDescription('Claim your daily reward'));
+  .addSubcommand(sub => sub.setName('daily').setDescription('Claim your daily reward'))
+  .addSubcommand(sub => sub.setName('work').setDescription('Work to earn gold (1-hour cooldown)'))
+  .addSubcommand(sub => sub.setName('rob').setDescription('Attempt to rob another user (risky!)')
+    .addUserOption(opt => opt.setName('user').setDescription('User to rob').setRequired(true)))
+  .addSubcommand(sub => sub.setName('gamble').setDescription('Gamble your gold for a chance to win big')
+    .addIntegerOption(opt => opt.setName('amount').setDescription('Amount to gamble').setRequired(true).setMinValue(10)))
+  .addSubcommand(sub => sub.setName('leaderboard').setDescription('View the richest players'));
 
 export async function execute(interaction) {
   return safeExecuteCommand(interaction, async() => {
@@ -467,7 +477,128 @@ export async function execute(interaction) {
 
         break;
       }
-    // No default
+      case 'work': {
+        const result = workReward(interaction.user.id);
+
+        if (!result.success) {
+          const embed = new EmbedBuilder()
+            .setTitle('⏰ Already Working!')
+            .setColor(0xFF_A5_00)
+            .setDescription(`You can work again in **${result.minutesLeft}** minutes.`);
+          await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+          break;
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle(`${result.job.emoji} Work Complete!`)
+          .setColor(0x00_FF_00)
+          .setDescription(`You worked as a **${result.job.name}** and earned **${result.reward}** gold!`)
+          .addFields(
+            { name: '💰 Earned', value: `${result.reward} gold`, inline: true },
+            { name: '💼 Job', value: result.job.name, inline: true },
+            { name: '⏰ Next Work', value: 'In 1 hour', inline: true }
+          )
+          .setFooter({ text: 'Come back in 1 hour to work again!' });
+
+        await interaction.reply({ embeds: [embed] });
+        break;
+      }
+      case 'rob': {
+        const targetUser = interaction.options.getUser('user');
+
+        if (targetUser.id === interaction.user.id) {
+          throw new CommandError('You cannot rob yourself!', 'INVALID_ARGUMENT');
+        }
+        if (targetUser.bot) {
+          throw new CommandError('You cannot rob a bot!', 'INVALID_ARGUMENT');
+        }
+
+        const result = rob(interaction.user.id, targetUser.id);
+
+        if (!result.success) {
+          if (result.reason === 'rob_cooldown') {
+            const embed = new EmbedBuilder()
+              .setTitle('⏰ Rob Cooldown!')
+              .setColor(0xFF_A5_00)
+              .setDescription(`You attempted a robbery too recently. Wait **${result.minutesLeft}** more minutes.`);
+            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+          }
+          else if (result.reason === 'target_too_poor') {
+            await interaction.reply({ content: `❌ **${targetUser.username}** doesn't have enough gold to rob (needs at least 50 gold)!`, flags: MessageFlags.Ephemeral });
+          }
+          else {
+            // Failed robbery - paid a fine
+            const embed = new EmbedBuilder()
+              .setTitle('🚔 Caught Red-Handed!')
+              .setColor(0xFF_00_00)
+              .setDescription(`You tried to rob **${targetUser.username}** but got caught! You paid a fine of **${result.fine}** gold.`)
+              .addFields({ name: '💸 Fine Paid', value: `${result.fine} gold`, inline: true });
+            await interaction.reply({ embeds: [embed] });
+          }
+          break;
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle('🦹 Successful Heist!')
+          .setColor(0x00_FF_00)
+          .setDescription(`You successfully robbed **${targetUser.username}** and stole **${result.stolen}** gold!`)
+          .addFields({ name: '💰 Stolen', value: `${result.stolen} gold`, inline: true });
+
+        await interaction.reply({ embeds: [embed] });
+        break;
+      }
+      case 'gamble': {
+        const amount = interaction.options.getInteger('amount');
+        const balance = getBalance(interaction.user.id);
+
+        if (balance < amount) {
+          throw new CommandError(`Insufficient funds! You have ${balance} gold but need ${amount} gold.`, 'INSUFFICIENT_FUNDS');
+        }
+
+        const result = gamble(interaction.user.id, amount);
+
+        const outcomeEmojis = { jackpot: '🎰', big_win: '🎉', win: '✅', break_even: '🔄', loss: '❌' };
+        const outcomeLabels = { jackpot: 'JACKPOT!', big_win: 'Big Win!', win: 'Win!', break_even: 'Break Even', loss: 'Loss' };
+        const outcomeColors = { jackpot: 0xFF_D7_00, big_win: 0x00_FF_00, win: 0x32_CD_32, break_even: 0xFF_A5_00, loss: 0xFF_00_00 };
+
+        const embed = new EmbedBuilder()
+          .setTitle(`${outcomeEmojis[result.outcome]} ${outcomeLabels[result.outcome]}`)
+          .setColor(outcomeColors[result.outcome])
+          .setDescription(`You gambled **${result.bet}** gold!`)
+          .addFields(
+            { name: '🎲 Bet', value: `${result.bet} gold`, inline: true },
+            { name: '💰 Winnings', value: `${result.winnings} gold`, inline: true },
+            { name: '📊 Net', value: `${result.net >= 0 ? '+' : ''}${result.net} gold`, inline: true }
+          );
+
+        await interaction.reply({ embeds: [embed] });
+        break;
+      }
+      case 'leaderboard': {
+        const leaders = getRichLeaderboard(10);
+
+        if (leaders.length === 0) {
+          await interaction.reply({ content: '📊 No economy data yet!', flags: MessageFlags.Ephemeral });
+          break;
+        }
+
+        const medals = ['🥇', '🥈', '🥉'];
+        const description = leaders.map((entry, i) => {
+          const medal = medals[i] || `**${i + 1}.**`;
+          return `${medal} <@${entry.userId}> — **${entry.balance.toLocaleString()}** gold`;
+        }).join('\n');
+
+        const embed = new EmbedBuilder()
+          .setTitle('💰 Richest Players')
+          .setColor(0xFF_D7_00)
+          .setDescription(description)
+          .setFooter({ text: 'Economy Leaderboard' })
+          .setTimestamp();
+
+        await interaction.reply({ embeds: [embed] });
+        break;
+      }
+      // No default
     }
   }, {
     command: 'economy'
