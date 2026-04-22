@@ -30,7 +30,8 @@ export const data = new SlashCommandBuilder()
   )))
   .addSubcommand(sub => sub.setName('class').setDescription('View information about character classes'))
   .addSubcommand(sub => sub.setName('inventory').setDescription('View and manage your inventory'))
-  .addSubcommand(sub => sub.setName('craft').setDescription('Craft items using materials').addStringOption(opt => opt.setName('item').setDescription('Item to craft').setRequired(true)));
+  .addSubcommand(sub => sub.setName('craft').setDescription('Craft items using materials').addStringOption(opt => opt.setName('item').setDescription('Item to craft').setRequired(true)))
+  .addSubcommand(sub => sub.setName('heal').setDescription('Spend gold to restore HP (costs 50 gold per 10 HP)').addIntegerOption(opt => opt.setName('amount').setDescription('HP to restore (multiples of 10, max 100)').setRequired(false).setMinValue(10).setMaxValue(100)));
 
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
@@ -106,37 +107,67 @@ export async function execute(interaction) {
 
   if (sub === 'fight') {
     const monster = encounterMonster(char.lvl);
-    // simple fight: user attacks, monster attacks until one dies (short)
     let log = [];
+    let playerWon = false;
+
     while (char.hp > 0 && monster.hp > 0 && log.length < 10) {
       const dmg = fightTurn(char, monster);
-      log.push(`You hit ${monster.name} for ${dmg} dmg (hp ${Math.max(0, monster.hp)})`);
-      if (monster.hp <= 0) break;
+      log.push(`⚔️ You hit **${monster.name}** for **${dmg}** dmg (${Math.max(0, monster.hp)} HP left)`);
+      if (monster.hp <= 0) {
+        playerWon = true;
+        break;
+      }
       const mdmg = fightTurn(monster, char);
-      log.push(`${monster.name} hits you for ${mdmg} dmg (hp ${Math.max(0, char.hp)})`);
+      log.push(`🗡️ **${monster.name}** hits you for **${mdmg}** dmg (${Math.max(0, char.hp)} HP left)`);
     }
 
+    let resultTitle;
+    let resultColor;
+    let resultDescription = '';
+
     if (char.hp > 0 && monster.hp <= 0) {
+      playerWon = true;
       const res = applyXp(userId, char, monster.lvl * 5);
       char = res.char;
       char.hp = Math.min(char.maxHp, char.hp + 2);
       saveCharacter(userId, char);
 
-      // Track boss defeat achievements
       if (monster.name.includes('Dragon') || monster.name.includes('Boss')) {
         updateUserStats(userId, { bosses_defeated: 1 });
       }
 
-      log.push(`You defeated ${monster.name}! Gained ${monster.lvl * 5} XP.`);
-      if (res.gained > 0) log.push(`Level up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`);
+      resultTitle = `⚔️ Victory! You defeated ${monster.name}!`;
+      resultColor = 0x00_FF_00;
+      resultDescription = `Gained **${monster.lvl * 5} XP**!`;
+      if (res.gained > 0) resultDescription += `\n🎉 **Level Up!** ${res.oldLvl} → ${res.newLvl} (+${res.gained} skill point(s))`;
     }
     else if (char.hp <= 0) {
       char.hp = Math.max(1, Math.floor(char.maxHp / 2));
       saveCharacter(userId, char);
-      log.push('You were defeated and recover to half HP.');
+      resultTitle = `💀 Defeated by ${monster.name}!`;
+      resultColor = 0xFF_00_00;
+      resultDescription = 'You were defeated and recover to half HP.';
+    }
+    else {
+      resultTitle = `⚔️ Battle Ongoing - ${monster.name}`;
+      resultColor = 0xFF_A5_00;
+      resultDescription = 'The battle ended in a draw!';
     }
 
-    return interaction.reply(log.join('\n'));
+    const embed = new EmbedBuilder()
+      .setTitle(resultTitle)
+      .setColor(resultColor)
+      .setDescription(log.join('\n'))
+      .addFields(
+        { name: '🐉 Enemy', value: `${monster.name} (Lv.${monster.lvl})`, inline: true },
+        { name: '❤️ Your HP', value: `${char.hp}/${char.maxHp}`, inline: true }
+      );
+
+    if (resultDescription) {
+      embed.addFields({ name: playerWon ? '🏆 Result' : '💀 Result', value: resultDescription, inline: false });
+    }
+
+    return interaction.reply({ embeds: [embed] });
   }
 
   if (sub === 'explore') {
@@ -176,31 +207,53 @@ export async function execute(interaction) {
   if (sub === 'boss') {
     const boss = bossEncounter(Math.max(3, char.lvl + 2));
     const narr = await narrate(interaction.guildId, `A dire boss ${boss.name} appears. Give a short epic intro.`, 'A fearsome boss appears!');
-    let out = `${narr}`;
-    // exchange
+
     const dmg = fightTurn(char, boss);
-    out += `\nYou strike the ${boss.name} for ${dmg} damage.`;
+    let bossResult = '';
+
     if (boss.hp > 0) {
       const mdmg = fightTurn(boss, char);
-      out += `\n${boss.name} hits you for ${mdmg} damage.`;
+      bossResult = `You struck for **${dmg}** damage.\n${boss.name} hit back for **${mdmg}** damage!`;
     }
+    else {
+      bossResult = `You struck for **${dmg}** damage, slaying the boss!`;
+    }
+
+    let resultTitle;
+    let resultColor;
+    let xpText = '';
+
     if (char.hp <= 0) {
       char.hp = Math.max(1, Math.floor(char.maxHp / 2));
       saveCharacter(userId, char);
-      out += '\nYou were defeated but live to fight another day.';
+      resultTitle = `💀 Defeated by ${boss.name}!`;
+      resultColor = 0xFF_00_00;
     }
     else {
       const res = applyXp(userId, char, boss.lvl * 20);
       char = res.char;
       saveCharacter(userId, char);
-
-      // Track boss defeat
       updateUserStats(userId, { bosses_defeated: 1 });
-
-      out += `\nYou survived and earned ${boss.lvl * 20} XP!`;
-      if (res.gained > 0) out += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
+      resultTitle = `🏆 Survived the Boss Encounter!`;
+      resultColor = 0xFF_D7_00;
+      xpText = `Earned **${boss.lvl * 20} XP**!`;
+      if (res.gained > 0) xpText += `\n🎉 **Level Up!** ${res.oldLvl} → ${res.newLvl} (+${res.gained} skill point(s))`;
     }
-    return interaction.reply(out);
+
+    const embed = new EmbedBuilder()
+      .setTitle(resultTitle)
+      .setColor(resultColor)
+      .setDescription(`*${narr}*\n\n${bossResult}`)
+      .addFields(
+        { name: '👹 Boss', value: `${boss.name} (Lv.${boss.lvl})`, inline: true },
+        { name: '❤️ Your HP', value: `${char.hp}/${char.maxHp}`, inline: true }
+      );
+
+    if (xpText) {
+      embed.addFields({ name: '⭐ Rewards', value: xpText, inline: false });
+    }
+
+    return interaction.reply({ embeds: [embed] });
   }
 
   if (sub === 'levelup') {
@@ -304,7 +357,6 @@ export async function execute(interaction) {
     const result = craftItem(userId, itemId);
 
     if (result.success) {
-      const recipe = recipes[itemId];
       const embed = new EmbedBuilder()
         .setTitle('🔨 Item Crafted!')
         .setColor(0x00_FF_00)
@@ -323,5 +375,37 @@ export async function execute(interaction) {
     else {
       await interaction.reply({ content: `❌ Failed to craft item: ${result.reason}`, flags: MessageFlags.Ephemeral });
     }
+    return;
+  }
+
+  if (sub === 'heal') {
+    const { getBalance: getGold, subtractBalance } = await import('../economy.js');
+    const HEAL_AMOUNT = interaction.options.getInteger('amount') || 10;
+    const HEAL_COST = (HEAL_AMOUNT / 10) * 50;
+
+    if (char.hp >= char.maxHp) {
+      return interaction.reply({ content: '❤️ Your HP is already full!', flags: MessageFlags.Ephemeral });
+    }
+
+    const balance = getGold(userId);
+    if (balance < HEAL_COST) {
+      return interaction.reply({ content: `❌ You need **${HEAL_COST}** gold to heal ${HEAL_AMOUNT} HP but only have **${balance}** gold.`, flags: MessageFlags.Ephemeral });
+    }
+
+    subtractBalance(userId, HEAL_COST);
+    const oldHp = char.hp;
+    char.hp = Math.min(char.maxHp, char.hp + HEAL_AMOUNT);
+    saveCharacter(userId, char);
+
+    const embed = new EmbedBuilder()
+      .setTitle('💊 Healed!')
+      .setColor(0x00_FF_7F)
+      .setDescription(`You spent **${HEAL_COST}** gold to restore **${char.hp - oldHp}** HP!`)
+      .addFields(
+        { name: '❤️ HP', value: `${oldHp} → ${char.hp}/${char.maxHp}`, inline: true },
+        { name: '💰 Gold Spent', value: `${HEAL_COST} gold`, inline: true }
+      );
+
+    return interaction.reply({ embeds: [embed] });
   }
 }

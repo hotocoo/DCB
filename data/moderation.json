@@ -1,7 +1,55 @@
 {
-  "warnings": {},
+  "warnings": {
+    "testguild1": {
+      "testuser_1775278619302_1": [
+        {
+          "id": "warn_1775278619306_5cevico37",
+          "userId": "testuser_1775278619302_1",
+          "moderatorId": "testuser_1775278619302_2",
+          "reason": "Test warning",
+          "severity": "low",
+          "timestamp": 1775278619306,
+          "active": true
+        }
+      ],
+      "testuser_1775278653454_1": [
+        {
+          "id": "warn_1775278653458_iuyuiiie4",
+          "userId": "testuser_1775278653454_1",
+          "moderatorId": "testuser_1775278653454_2",
+          "reason": "Test warning",
+          "severity": "low",
+          "timestamp": 1775278653458,
+          "active": true
+        }
+      ]
+    }
+  },
   "bans": {},
-  "mutes": {},
+  "mutes": {
+    "testguild1": {
+      "testuser_1775278619302_1": {
+        "id": "mute_1775278619307_af08fsxe5",
+        "userId": "testuser_1775278619302_1",
+        "moderatorId": "testuser_1775278619302_2",
+        "reason": "Test mute",
+        "duration": 60000,
+        "startTime": 1775278619307,
+        "endTime": 1775278679307,
+        "active": true
+      },
+      "testuser_1775278653454_1": {
+        "id": "mute_1775278653458_h0vz8n2u8",
+        "userId": "testuser_1775278653454_1",
+        "moderatorId": "testuser_1775278653454_2",
+        "reason": "Test mute",
+        "duration": 60000,
+        "startTime": 1775278653458,
+        "endTime": 1775278713458,
+        "active": true
+      }
+    }
+  },
   "kicks": {
     "941715588269625444": {
       "941664598082355220": [
@@ -24,6 +72,42 @@
       "moderatorId": "333133024520568833",
       "reason": "nihha",
       "timestamp": 1761930154609
+    },
+    {
+      "id": "mod_1775278619306_0kd9h6uyg",
+      "guildId": "testguild1",
+      "action": "warn",
+      "targetUserId": "testuser_1775278619302_1",
+      "moderatorId": "testuser_1775278619302_2",
+      "reason": "Test warning",
+      "timestamp": 1775278619306
+    },
+    {
+      "id": "mod_1775278619307_k5tmwo173",
+      "guildId": "testguild1",
+      "action": "mute",
+      "targetUserId": "testuser_1775278619302_1",
+      "moderatorId": "testuser_1775278619302_2",
+      "reason": "Test mute (1m)",
+      "timestamp": 1775278619307
+    },
+    {
+      "id": "mod_1775278653458_6k5hqdkko",
+      "guildId": "testguild1",
+      "action": "warn",
+      "targetUserId": "testuser_1775278653454_1",
+      "moderatorId": "testuser_1775278653454_2",
+      "reason": "Test warning",
+      "timestamp": 1775278653458
+    },
+    {
+      "id": "mod_1775278653458_nxrxohyoe",
+      "guildId": "testguild1",
+      "action": "mute",
+      "targetUserId": "testuser_1775278653454_1",
+      "moderatorId": "testuser_1775278653454_2",
+      "reason": "Test mute (1m)",
+      "timestamp": 1775278653458
     }
   ],
   "auto_mod": {

@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { logger } from './logger.js';
+
 const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
 
 // Advanced Economy System with Banking and Marketplace
@@ -35,7 +37,7 @@ class EconomyManager {
       this.economyData = data;
     }
     catch (error) {
-      console.error('Failed to load economy:', error);
+      logger.error('Failed to load economy data', error instanceof Error ? error : new Error(String(error)));
       this.economyData = {
         userBalances: {},
         transactions: [],
@@ -51,7 +53,7 @@ class EconomyManager {
       fs.writeFileSync(ECONOMY_FILE, JSON.stringify(this.economyData, null, 2));
     }
     catch (error) {
-      console.error('Failed to save economy:', error);
+      logger.error('Failed to save economy data', error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -640,7 +642,7 @@ class EconomyManager {
     for (const [itemId, history] of this.priceHistory.entries()) {
       if (history.length > 50) {
         this.priceHistory.set(itemId, history.slice(-50));
-        console.log(`[ECONOMY] Cleaned up price history for ${itemId}: ${history.length} -> 50 entries`);
+        logger.debug(`Cleaned up price history for ${itemId}`, { from: history.length, to: 50 });
       }
     }
 
@@ -654,11 +656,183 @@ class EconomyManager {
       if (!activeItems.has(itemId)) {
         this.marketPrices.delete(itemId);
         this.priceHistory.delete(itemId);
-        console.log(`[ECONOMY] Cleaned up stale market data for ${itemId}`);
+        logger.debug(`Cleaned up stale market data for ${itemId}`);
       }
     }
 
     this.saveEconomy();
+  }
+
+  // Work System (hourly income)
+  workReward(userId) {
+    const now = Date.now();
+    const lastWork = this.economyData.workCooldowns?.[userId] || 0;
+    const cooldownMs = 60 * 60 * 1000; // 1 hour
+
+    if (now - lastWork < cooldownMs) {
+      const minutesLeft = Math.ceil((cooldownMs - (now - lastWork)) / 60_000);
+      return { success: false, reason: 'work_cooldown', minutesLeft };
+    }
+
+    const jobs = [
+      { name: 'Blacksmith', emoji: '⚒️', min: 80, max: 150 },
+      { name: 'Merchant', emoji: '🛒', min: 60, max: 200 },
+      { name: 'Farmer', emoji: '🌾', min: 50, max: 120 },
+      { name: 'Adventurer', emoji: '⚔️', min: 100, max: 180 },
+      { name: 'Healer', emoji: '💊', min: 70, max: 160 },
+      { name: 'Scholar', emoji: '📚', min: 90, max: 170 },
+      { name: 'Miner', emoji: '⛏️', min: 80, max: 140 },
+      { name: 'Chef', emoji: '🍳', min: 65, max: 130 }
+    ];
+
+    const job = jobs[Math.floor(Math.random() * jobs.length)];
+    const reward = Math.floor(Math.random() * (job.max - job.min + 1)) + job.min;
+
+    this.addBalance(userId, reward);
+
+    if (!this.economyData.workCooldowns) {
+      this.economyData.workCooldowns = {};
+    }
+    this.economyData.workCooldowns[userId] = now;
+
+    this.logTransaction({
+      type: 'work_reward',
+      user: userId,
+      amount: reward,
+      job: job.name,
+      timestamp: now
+    });
+
+    this.saveEconomy();
+
+    return { success: true, reward, job };
+  }
+
+  // Rob System
+  rob(attackerId, targetId) {
+    const now = Date.now();
+    const cooldownKey = `rob_${attackerId}`;
+    const lastRob = this.economyData.robCooldowns?.[cooldownKey] || 0;
+    const cooldownMs = 30 * 60 * 1000; // 30 minutes
+
+    if (now - lastRob < cooldownMs) {
+      const minutesLeft = Math.ceil((cooldownMs - (now - lastRob)) / 60_000);
+      return { success: false, reason: 'rob_cooldown', minutesLeft };
+    }
+
+    const targetBalance = this.getBalance(targetId);
+    if (targetBalance < 50) {
+      return { success: false, reason: 'target_too_poor' };
+    }
+
+    // Set cooldown regardless of outcome
+    if (!this.economyData.robCooldowns) {
+      this.economyData.robCooldowns = {};
+    }
+    this.economyData.robCooldowns[cooldownKey] = now;
+
+    // 45% success rate
+    const success = Math.random() < 0.45;
+
+    if (success) {
+      // Steal 10-30% of target's balance
+      const percentage = 0.1 + Math.random() * 0.2;
+      const stolen = Math.max(1, Math.floor(targetBalance * percentage));
+
+      this.subtractBalance(targetId, stolen);
+      this.addBalance(attackerId, stolen);
+
+      this.logTransaction({
+        type: 'rob_success',
+        from: targetId,
+        to: attackerId,
+        amount: stolen,
+        timestamp: now
+      });
+
+      this.saveEconomy();
+      return { success: true, stolen };
+    }
+    else {
+      // Failed rob - pay a fine
+      const fine = Math.min(100, Math.floor(this.getBalance(attackerId) * 0.1));
+      if (fine > 0) {
+        this.subtractBalance(attackerId, fine);
+        this.addBalance(targetId, fine);
+
+        this.logTransaction({
+          type: 'rob_failed',
+          from: attackerId,
+          to: targetId,
+          amount: fine,
+          timestamp: now
+        });
+      }
+
+      this.saveEconomy();
+      return { success: false, reason: 'rob_failed', fine };
+    }
+  }
+
+  // Gamble System
+  gamble(userId, amount) {
+    if (amount <= 0) return { success: false, reason: 'invalid_amount' };
+    const balance = this.getBalance(userId);
+    if (balance < amount) return { success: false, reason: 'insufficient_funds' };
+
+    this.subtractBalance(userId, amount);
+
+    // Weighted outcomes
+    const roll = Math.random();
+    let multiplier = 0;
+    let outcome = '';
+
+    if (roll < 0.05) {
+      multiplier = 5;
+      outcome = 'jackpot';
+    }
+    else if (roll < 0.15) {
+      multiplier = 3;
+      outcome = 'big_win';
+    }
+    else if (roll < 0.40) {
+      multiplier = 2;
+      outcome = 'win';
+    }
+    else if (roll < 0.55) {
+      multiplier = 1;
+      outcome = 'break_even';
+    }
+    else {
+      multiplier = 0;
+      outcome = 'loss';
+    }
+
+    const winnings = Math.floor(amount * multiplier);
+    if (winnings > 0) {
+      this.addBalance(userId, winnings);
+    }
+
+    this.logTransaction({
+      type: 'gamble',
+      user: userId,
+      amount: winnings - amount,
+      bet: amount,
+      outcome,
+      timestamp: Date.now()
+    });
+
+    this.saveEconomy();
+
+    return { success: true, outcome, bet: amount, winnings, net: winnings - amount };
+  }
+
+  // Rich leaderboard
+  getRichLeaderboard(limit = 10) {
+    return Object.entries(this.economyData.userBalances)
+      .map(([userId, balance]) => ({ userId, balance }))
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, limit);
   }
 }
 
@@ -736,6 +910,22 @@ export function createInvestment(userId, investmentType, amount) {
 
 export function getUserInvestments(userId) {
   return economyManager.getUserInvestments(userId);
+}
+
+export function workReward(userId) {
+  return economyManager.workReward(userId);
+}
+
+export function rob(attackerId, targetId) {
+  return economyManager.rob(attackerId, targetId);
+}
+
+export function gamble(userId, amount) {
+  return economyManager.gamble(userId, amount);
+}
+
+export function getRichLeaderboard(limit = 10) {
+  return economyManager.getRichLeaderboard(limit);
 }
 
 // End of file
