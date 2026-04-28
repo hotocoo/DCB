@@ -2,191 +2,191 @@
   {
     "message": "Initial balance: 0",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.467Z"
+    "timestamp": "2026-04-28T08:09:53.692Z"
   },
   {
     "message": "Balance after add: 1000",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.468Z"
+    "timestamp": "2026-04-28T08:09:53.692Z"
   },
   {
     "message": "Transfer successful: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.555Z"
+    "timestamp": "2026-04-28T08:09:53.693Z"
   },
   {
     "message": "Balance after transfer: 500, 500",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.555Z"
+    "timestamp": "2026-04-28T08:09:53.693Z"
   },
   {
-    "message": "Market price: 25",
+    "message": "Market price: 26",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.555Z"
+    "timestamp": "2026-04-28T08:09:53.693Z"
   },
   {
     "message": "Buy successful: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.556Z"
+    "timestamp": "2026-04-28T08:09:53.694Z"
   },
   {
     "message": "Sell successful: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.556Z"
+    "timestamp": "2026-04-28T08:09:53.694Z"
   },
   {
     "message": "Investment created: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.557Z"
+    "timestamp": "2026-04-28T08:09:53.695Z"
   },
   {
     "message": "Investments count: 1",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.557Z"
+    "timestamp": "2026-04-28T08:09:53.695Z"
   },
   {
-    "message": "Warning issued: warn_1777346429557_y07v7cy2s",
+    "message": "Warning issued: warn_1777363793696_odur58asl",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.558Z"
+    "timestamp": "2026-04-28T08:09:53.696Z"
   },
   {
-    "message": "Mute issued: mute_1777346429558_kkllnq844",
+    "message": "Mute issued: mute_1777363793696_yrtlqrq6c",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.558Z"
+    "timestamp": "2026-04-28T08:09:53.697Z"
   },
   {
     "message": "User is muted: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.558Z"
+    "timestamp": "2026-04-28T08:09:53.697Z"
   },
   {
     "message": "Auto mod triggered: false",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.558Z"
+    "timestamp": "2026-04-28T08:09:53.697Z"
   },
   {
     "message": "Auto mod spam detected: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.558Z"
+    "timestamp": "2026-04-28T08:09:53.697Z"
   },
   {
     "message": "User mod stats: warnings 1",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.559Z"
+    "timestamp": "2026-04-28T08:09:53.697Z"
   },
   {
-    "message": "Cleaned up character for testuser_1777346429467_1",
+    "message": "Cleaned up character for testuser_1777363793691_1",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.560Z"
+    "timestamp": "2026-04-28T08:09:53.698Z"
   },
   {
     "message": "Character created: TestHero",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.561Z"
+    "timestamp": "2026-04-28T08:09:53.700Z"
   },
   {
     "message": "XP applied: gained 5",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.561Z"
+    "timestamp": "2026-04-28T08:09:53.700Z"
   },
   {
     "message": "Item added: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.562Z"
+    "timestamp": "2026-04-28T08:09:53.701Z"
   },
   {
     "message": "Inventory count: 1",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.562Z"
+    "timestamp": "2026-04-28T08:09:53.701Z"
   },
   {
     "message": "Character retrieved: TestHero",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.562Z"
+    "timestamp": "2026-04-28T08:09:53.701Z"
   },
   {
     "message": "Character has required properties: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:29.562Z"
+    "timestamp": "2026-04-28T08:09:53.701Z"
   },
   {
     "message": "Search results: 0",
     "success": false,
-    "timestamp": "2026-04-28T03:20:32.927Z"
+    "timestamp": "2026-04-28T08:09:57.071Z"
   },
   {
     "message": "Queue length: 0",
     "success": true,
-    "timestamp": "2026-04-28T03:20:32.927Z"
+    "timestamp": "2026-04-28T08:09:57.071Z"
   },
   {
     "message": "Pause executed: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:32.928Z"
+    "timestamp": "2026-04-28T08:09:57.071Z"
   },
   {
     "message": "Stop executed: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:32.928Z"
+    "timestamp": "2026-04-28T08:09:57.071Z"
   },
   {
-    "message": "RPG-Economy integration: Balance decreased by 25",
+    "message": "RPG-Economy integration: Balance decreased by 26",
     "success": true,
-    "timestamp": "2026-04-28T03:20:33.050Z"
+    "timestamp": "2026-04-28T08:09:57.072Z"
   },
   {
     "message": "Inventory updated after purchase: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:33.051Z"
+    "timestamp": "2026-04-28T08:09:57.072Z"
   },
   {
     "message": "Cross-site scripting prevented: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:33.051Z"
+    "timestamp": "2026-04-28T08:09:57.073Z"
   },
   {
-    "message": "SQL injection attempt sanitized: true",
-    "success": true,
-    "timestamp": "2026-04-28T03:20:33.051Z"
+    "message": "SQL injection attempt sanitized: false",
+    "success": false,
+    "timestamp": "2026-04-28T08:09:57.073Z"
   },
   {
     "message": "String validation: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:33.051Z"
+    "timestamp": "2026-04-28T08:09:57.073Z"
   },
   {
     "message": "Number validation: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:33.051Z"
+    "timestamp": "2026-04-28T08:09:57.073Z"
   },
   {
     "message": "User ID validation: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:33.051Z"
+    "timestamp": "2026-04-28T08:09:57.073Z"
   },
   {
     "message": "Input sanitization: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:33.051Z"
+    "timestamp": "2026-04-28T08:09:57.073Z"
   },
   {
     "message": "Invalid transfer rejected: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:33.051Z"
+    "timestamp": "2026-04-28T08:09:57.073Z"
   },
   {
     "message": "Insufficient funds rejected: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:33.051Z"
+    "timestamp": "2026-04-28T08:09:57.073Z"
   },
   {
     "message": "Invalid character handled: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:33.051Z"
+    "timestamp": "2026-04-28T08:09:57.073Z"
   },
   {
     "message": "Rate limiter working: true",
     "success": true,
-    "timestamp": "2026-04-28T03:20:33.051Z"
+    "timestamp": "2026-04-28T08:09:57.073Z"
   }
 ]
