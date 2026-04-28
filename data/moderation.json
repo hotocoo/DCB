@@ -1,7 +1,76 @@
 {
-  "warnings": {},
+  "warnings": {
+    "testguild1": {
+      "testuser_1777346206959_1": [
+        {
+          "id": "warn_1777346206963_n6q8mh93p",
+          "userId": "testuser_1777346206959_1",
+          "moderatorId": "testuser_1777346206959_2",
+          "reason": "Test warning",
+          "severity": "low",
+          "timestamp": 1777346206963,
+          "active": true
+        }
+      ],
+      "testuser_1777346280492_1": [
+        {
+          "id": "warn_1777346280495_79y2vff5e",
+          "userId": "testuser_1777346280492_1",
+          "moderatorId": "testuser_1777346280492_2",
+          "reason": "Test warning",
+          "severity": "low",
+          "timestamp": 1777346280495,
+          "active": true
+        }
+      ],
+      "testuser_1777346429467_1": [
+        {
+          "id": "warn_1777346429557_y07v7cy2s",
+          "userId": "testuser_1777346429467_1",
+          "moderatorId": "testuser_1777346429467_2",
+          "reason": "Test warning",
+          "severity": "low",
+          "timestamp": 1777346429557,
+          "active": true
+        }
+      ]
+    }
+  },
   "bans": {},
-  "mutes": {},
+  "mutes": {
+    "testguild1": {
+      "testuser_1777346206959_1": {
+        "id": "mute_1777346206963_wuhrfpuid",
+        "userId": "testuser_1777346206959_1",
+        "moderatorId": "testuser_1777346206959_2",
+        "reason": "Test mute",
+        "duration": 60000,
+        "startTime": 1777346206963,
+        "endTime": 1777346266963,
+        "active": true
+      },
+      "testuser_1777346280492_1": {
+        "id": "mute_1777346280495_00yqz2uzm",
+        "userId": "testuser_1777346280492_1",
+        "moderatorId": "testuser_1777346280492_2",
+        "reason": "Test mute",
+        "duration": 60000,
+        "startTime": 1777346280495,
+        "endTime": 1777346340495,
+        "active": true
+      },
+      "testuser_1777346429467_1": {
+        "id": "mute_1777346429558_kkllnq844",
+        "userId": "testuser_1777346429467_1",
+        "moderatorId": "testuser_1777346429467_2",
+        "reason": "Test mute",
+        "duration": 60000,
+        "startTime": 1777346429558,
+        "endTime": 1777346489558,
+        "active": true
+      }
+    }
+  },
   "kicks": {
     "941715588269625444": {
       "941664598082355220": [
@@ -24,6 +93,60 @@
       "moderatorId": "333133024520568833",
       "reason": "nihha",
       "timestamp": 1761930154609
+    },
+    {
+      "id": "mod_1777346206963_k0l0ifmt2",
+      "guildId": "testguild1",
+      "action": "warn",
+      "targetUserId": "testuser_1777346206959_1",
+      "moderatorId": "testuser_1777346206959_2",
+      "reason": "Test warning",
+      "timestamp": 1777346206963
+    },
+    {
+      "id": "mod_1777346206963_blgan73ra",
+      "guildId": "testguild1",
+      "action": "mute",
+      "targetUserId": "testuser_1777346206959_1",
+      "moderatorId": "testuser_1777346206959_2",
+      "reason": "Test mute (1m)",
+      "timestamp": 1777346206963
+    },
+    {
+      "id": "mod_1777346280495_vw5ut3ta7",
+      "guildId": "testguild1",
+      "action": "warn",
+      "targetUserId": "testuser_1777346280492_1",
+      "moderatorId": "testuser_1777346280492_2",
+      "reason": "Test warning",
+      "timestamp": 1777346280495
+    },
+    {
+      "id": "mod_1777346280495_yl7odqiyr",
+      "guildId": "testguild1",
+      "action": "mute",
+      "targetUserId": "testuser_1777346280492_1",
+      "moderatorId": "testuser_1777346280492_2",
+      "reason": "Test mute (1m)",
+      "timestamp": 1777346280495
+    },
+    {
+      "id": "mod_1777346429557_vjak6f5pb",
+      "guildId": "testguild1",
+      "action": "warn",
+      "targetUserId": "testuser_1777346429467_1",
+      "moderatorId": "testuser_1777346429467_2",
+      "reason": "Test warning",
+      "timestamp": 1777346429557
+    },
+    {
+      "id": "mod_1777346429558_ffxi8t22x",
+      "guildId": "testguild1",
+      "action": "mute",
+      "targetUserId": "testuser_1777346429467_1",
+      "moderatorId": "testuser_1777346429467_2",
+      "reason": "Test mute (1m)",
+      "timestamp": 1777346429558
     }
   ],
   "auto_mod": {

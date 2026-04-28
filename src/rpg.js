@@ -4,7 +4,7 @@ import path from 'node:path';
 import { generate } from './model-client.js';
 import { logger } from './logger.js';
 import { inputValidator, sanitizeInput, validateString, validateNumber } from './validation.js';
-import { CommandError } from './errorHandler';
+import { CommandError } from './errorHandler.js';
 
 const PLAYERS_DIR = path.join(process.cwd(), 'data', 'players');
 
@@ -62,7 +62,7 @@ function readAll() {
   if (fs.existsSync(oldFile)) {
     try {
       const oldData = JSON.parse(fs.readFileSync(oldFile)) || {};
-      console.log(`[RPG DEBUG] Migrating ${Object.keys(oldData).length} characters from old rpg.json`);
+      logger.info(`Migrating ${Object.keys(oldData).length} characters from old rpg.json`);
       for (const [userId, char] of Object.entries(oldData)) {
         // Ensure defaults
         if (char.xp === undefined) char.xp = 0;
@@ -97,10 +97,10 @@ function readAll() {
       // Backup and remove old file
       fs.copyFileSync(oldFile, `${oldFile}.bak`);
       fs.unlinkSync(oldFile);
-      console.log('[RPG DEBUG] Migration completed, old file backed up');
+      logger.info('RPG data migration completed, old file backed up');
     }
     catch (error) {
-      console.error('Failed to migrate old RPG data:', error);
+      logger.error('Failed to migrate old RPG data', error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -136,7 +136,7 @@ function readAll() {
         all[userId] = char;
       }
       catch (error) {
-        console.error(`Failed to read player data for ${userId}`, error);
+        logger.error(`Failed to read player data for ${userId}`, error instanceof Error ? error : new Error(String(error)));
       }
     }
   }
@@ -152,19 +152,14 @@ function writeAll(obj) {
     for (const [userId, char] of Object.entries(obj)) {
       const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
       const tmp = `${filePath}.tmp`;
-      console.log(`[RPG DEBUG] Writing player data: ${filePath}`);
       fs.writeFileSync(tmp, JSON.stringify(char, null, 2), 'utf8');
       fs.renameSync(tmp, filePath);
     }
     cache = obj;
   }
   catch (error) {
-    console.error('Failed to write RPG data:', error);
-    // Attempt to restore from cache if available
-    if (cache) {
-      console.log('Restoring from cache after write failure');
-    }
-    else {
+    logger.error('Failed to write RPG data', error instanceof Error ? error : new Error(String(error)));
+    if (!cache) {
       throw new Error(`Failed to save RPG data: ${error.message}`);
     }
   }
@@ -309,14 +304,14 @@ export function getCharacter(userId) {
     return char;
   }
   catch (error) {
-    console.error(`Failed to read character data for ${userId}`, error);
+    logger.error(`Failed to read character data for ${userId}`, error instanceof Error ? error : new Error(String(error)));
     return null;
   }
 }
 
 export function saveCharacter(userId, char) {
   if (locks.has(userId)) {
-    console.warn(`Save operation blocked for user ${userId} - already locked`);
+    logger.warn(`Save operation blocked for user ${userId} - already locked`);
     return false;
   }
   locks.add(userId);
@@ -325,7 +320,6 @@ export function saveCharacter(userId, char) {
     ensureDir();
     const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
     const tmp = `${filePath}.tmp`;
-    console.log(`[RPG DEBUG] Writing character data: ${filePath}`);
     fs.writeFileSync(tmp, JSON.stringify(char, null, 2), 'utf8');
     fs.renameSync(tmp, filePath);
 
@@ -437,7 +431,7 @@ export async function narrate(guildId, prompt, fallback) {
     return out || fallback || '';
   }
   catch (error) {
-    console.error('Narration failed', error);
+    logger.error('Narration failed', error instanceof Error ? error : new Error(String(error)));
     return fallback || '';
   }
 }
@@ -560,7 +554,7 @@ export function generateRandomItem(level = 1) {
   );
 
   if (availableItems.length === 0) {
-    console.warn(`No items available for rarity ${selectedRarity} at level ${level}, falling back to health_potion`);
+    logger.warn(`No items available for rarity ${selectedRarity} at level ${level}, falling back to health_potion`);
     return { id: 'health_potion', ...ITEMS['health_potion'] };
   }
 
