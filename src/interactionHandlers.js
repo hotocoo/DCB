@@ -1491,7 +1491,6 @@ export async function handleButtonInteraction(interaction, client) {
                     }
                     result = `⚔️ You search aggressively and fight a **${monster.name}**!\n💥 You take **${damage}** damage. HP: ${char.hp}/${char.maxHp}`;
                     xpGain = 8;
-                    xpGain = 8;
                     break;
                 }
                 case 'treasure': {
@@ -1556,78 +1555,6 @@ export async function handleButtonInteraction(interaction, client) {
                 });
                 return safeInteractionReply(interaction, { content: '❌ **Failed to rest!** Please try again later.', flags: MessageFlags.Ephemeral });
             }
-            if (action === 'explore_continue') {
-                const [, locationName, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot continue adventure for another user.', flags: MessageFlags.Ephemeral });
-                }
-                const char = getCharacter(interaction.user.id);
-                if (!char) {
-                    return safeInteractionReply(interaction, { content: '❌ You need to create a character first!', flags: MessageFlags.Ephemeral });
-                }
-                // Simulate continuing adventure
-                const event = randomEventType();
-                let result, xpGain = 0;
-                switch (event) {
-                    case 'monster': {
-                        const monster = encounterMonster(char.lvl);
-                        const damage = fightTurn(char, monster);
-                        if (damage > 0) {
-                            char.hp -= damage;
-                            if (char.hp <= 0) {
-                                char.hp = 1;
-                            }
-                        }
-                        result = `🏃 You continue your adventure and encounter a **${monster.name}**!\n⚔️ You take **${damage}** damage. HP: ${char.hp}/${char.maxHp}`;
-                        xpGain = 6;
-                        break;
-                    }
-                    case 'treasure': {
-                        const gold = Math.floor(Math.random() * 30) + 10;
-                        char.gold += gold;
-                        result = `🏃 You discover treasure along the way!\n💰 You find **${gold}** gold!`;
-                        xpGain = 4;
-                        break;
-                    }
-                    case 'trap': {
-                        const damage = Math.floor(Math.random() * 10) + 3;
-                        char.hp -= damage;
-                        if (char.hp <= 0) {
-                            char.hp = 1;
-                        }
-                        result = `🏃 You trigger a trap while exploring!\n💥 You take **${damage}** damage. HP: ${char.hp}/${char.maxHp}`;
-                        xpGain = 2;
-                        break;
-                    }
-                    default: {
-                        result = '🏃 You meet helpful travelers who guide you safely!\n📖 You learn from their stories.';
-                        xpGain = 3;
-                    }
-                }
-                applyXp(interaction.user.id, char, xpGain);
-                saveCharacter(interaction.user.id, char);
-                const embed = new EmbedBuilder()
-                    .setTitle('🏃 Continue Adventure')
-                    .setColor(0x21_96_F3)
-                    .setDescription(result)
-                    .addFields({ name: '📊 Stats', value: `Level ${char.lvl} • XP ${char.xp} • Gold ${char.gold}`, inline: true });
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                return;
-            }
-            if (action === 'explore_leave') {
-                const [, locationName, targetUserId] = interaction.customId.split(':');
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    logCommandExecution(interaction, false, new Error('Wrong user'));
-                    return safeInteractionReply(interaction, { content: 'You cannot leave for another user.', flags: MessageFlags.Ephemeral });
-                }
-                const embed = new EmbedBuilder()
-                    .setTitle('🏃 Leave Location')
-                    .setColor(0xFF_98_00)
-                    .setDescription(`You safely leave ${locationName} and return to town.\n\n*Your adventure continues another day!*`);
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [] });
-                return;
-            }
             // Economy button handlers
             if (action === 'economy_transfer') {
                 const [, targetUserId] = interaction.customId.split(':');
@@ -1663,7 +1590,7 @@ export async function handleButtonInteraction(interaction, client) {
                     });
                 }
                 const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`economy_buy:${interaction.user.id}`).setLabel('🛒 Buy').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(`economy_sell:${interaction.user.id}`).setLabel('💸 Sell').setStyle(ButtonStyle.Success));
-                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row.map((r) => r.toJSON ? r.toJSON() : r)] });
+                await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
                 return;
             }
             if (action === 'economy_business') {

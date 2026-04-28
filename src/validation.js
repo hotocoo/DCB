@@ -19,7 +19,6 @@ const SANITIZATION_PATTERNS = [
   /<[^>]*>/g, // Strip HTML tags completely
   /javascript:/gi, // Remove javascript: protocol
   /on\w+=/gi, // Remove event handlers
-  /'/g, // Remove single quotes (SQL injection prevention)
   /[^\u0020-\u007E]/g // Remove non-printable characters
 ];
 

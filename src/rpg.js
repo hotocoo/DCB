@@ -158,9 +158,10 @@ function writeAll(obj) {
     cache = obj;
   }
   catch (error) {
-    logger.error('Failed to write RPG data', error instanceof Error ? error : new Error(String(error)));
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error('Failed to write RPG data', err);
     if (!cache) {
-      throw new Error(`Failed to save RPG data: ${error.message}`);
+      throw new Error(`Failed to save RPG data: ${err.message}`);
     }
   }
 }
