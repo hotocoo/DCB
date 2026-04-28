@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { logger } from './logger.js';
+
 const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
 
 // Advanced Economy System with Banking and Marketplace
@@ -35,7 +37,7 @@ class EconomyManager {
       this.economyData = data;
     }
     catch (error) {
-      console.error('Failed to load economy:', error);
+      logger.error('Failed to load economy', error instanceof Error ? error : new Error(String(error)));
       this.economyData = {
         userBalances: {},
         transactions: [],
@@ -53,7 +55,7 @@ class EconomyManager {
       fs.renameSync(tmpPath, ECONOMY_FILE);
     }
     catch (error) {
-      console.error('Failed to save economy:', error);
+      logger.error('Failed to save economy', error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -642,7 +644,7 @@ class EconomyManager {
     for (const [itemId, history] of this.priceHistory.entries()) {
       if (history.length > 50) {
         this.priceHistory.set(itemId, history.slice(-50));
-        console.log(`[ECONOMY] Cleaned up price history for ${itemId}: ${history.length} -> 50 entries`);
+        logger.debug(`Cleaned up price history for ${itemId}: ${history.length} -> 50 entries`);
       }
     }
 
@@ -656,7 +658,7 @@ class EconomyManager {
       if (!activeItems.has(itemId)) {
         this.marketPrices.delete(itemId);
         this.priceHistory.delete(itemId);
-        console.log(`[ECONOMY] Cleaned up stale market data for ${itemId}`);
+        logger.debug(`Cleaned up stale market data for ${itemId}`);
       }
     }
 

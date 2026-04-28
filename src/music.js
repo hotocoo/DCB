@@ -579,7 +579,7 @@ class MusicManager {
         // Try with different search options
         try {
           logger.debug('Retrying YouTube search with different options');
-          const searchResults = await yts(sanitizedQuery, { pages: 1 });
+          const searchResults = await yts({ query: sanitizedQuery });
           const videos = searchResults.videos.slice(0, limit);
 
           const validVideos = [];
