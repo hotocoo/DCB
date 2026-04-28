@@ -1,31 +1,29 @@
 {
-  "name": "TestHero",
-  "class": "warrior",
-  "hp": 25,
-  "maxHp": 25,
+  "name": "Tester",
+  "hp": 20,
+  "maxHp": 20,
+  "atk": 17,
+  "lvl": 16,
+  "xp": 300,
+  "skillPoints": 3,
   "mp": 10,
   "maxMp": 10,
-  "atk": 7,
-  "def": 3,
-  "spd": 1,
-  "lvl": 6,
-  "xp": 100,
-  "skillPoints": 5,
+  "def": 2,
+  "spd": 2,
+  "class": "warrior",
   "abilities": [
     "Power Strike",
     "Shield Block",
     "Battle Cry"
   ],
   "color": 16711680,
-  "inventory": {
-    "health_potion": 7
-  },
+  "inventory": {},
   "equipped_weapon": null,
   "equipped_armor": null,
   "gold": 0,
   "dailyExplorations": 0,
   "lastDailyReset": 1761995183231,
-  "sessionXpGained": 0,
+  "sessionXpGained": 75,
   "lastSessionReset": 1761995183231,
   "createdAt": 1777346429559
 }

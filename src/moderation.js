@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { logger } from './logger.js';
+
 const MODERATION_FILE = path.join(process.cwd(), 'data', 'moderation.json');
 
 // Advanced Moderation and Administration System
@@ -41,7 +43,7 @@ class ModerationManager {
       this.moderationData = data;
     }
     catch (error) {
-      console.error('Failed to load moderation data:', error);
+      logger.error('Failed to load moderation data', error instanceof Error ? error : new Error(String(error)));
       this.moderationData = {
         warnings: {},
         bans: {},
@@ -54,10 +56,12 @@ class ModerationManager {
 
   saveModerationData() {
     try {
-      fs.writeFileSync(MODERATION_FILE, JSON.stringify(this.moderationData, null, 2));
+      const tmpPath = MODERATION_FILE + '.tmp';
+      fs.writeFileSync(tmpPath, JSON.stringify(this.moderationData, null, 2));
+      fs.renameSync(tmpPath, MODERATION_FILE);
     }
     catch (error) {
-      console.error('Failed to save moderation data:', error);
+      logger.error('Failed to save moderation data', error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -463,7 +467,7 @@ class ModerationManager {
       const recentMessages = messages.filter(msg => now - msg.timestamp < cleanupThreshold);
       if (recentMessages.length === 0) {
         this.warningCache.delete(key);
-        console.log(`[MODERATION] Cleaned up warning cache for key: ${key}`);
+        logger.debug(`Cleaned up warning cache for key: ${key}`);
       }
       else {
         this.warningCache.set(key, recentMessages);

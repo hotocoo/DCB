@@ -9,8 +9,6 @@ import {
   getProgrammingQuote,
   getGitHubStats,
   getWeather,
-  setAPIKey,
-  getAPIKey,
   getIntegrationStats
 } from '../integrations.js';
 
