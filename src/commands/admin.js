@@ -257,7 +257,7 @@ export async function execute(interaction) {
             });
           }
 
-          if (durationHours !== null && durationHours !== undefined && (durationHours < 1 || durationHours > 168)) { // Max 1 week
+          if (durationHours != null && (durationHours < 1 || durationHours > 168)) { // Max 1 week
             return interaction.reply({
               content: '❌ Duration must be between 1 and 168 hours (1 week) or leave empty for permanent.',
               flags: MessageFlags.Ephemeral
@@ -272,7 +272,7 @@ export async function execute(interaction) {
           }
 
           try {
-            const durationMs = durationHours ? durationHours * 60 * 60 * 1000 : undefined;
+            const durationMs = durationHours ? durationHours * 60 * 60 * 1000 : null;
             banUser(guildId, targetUser.id, interaction.user.id, reason.trim(), durationMs);
 
             const embed = new EmbedBuilder()
