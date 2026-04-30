@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 
 import { startTypingGame, checkTypingAttempt } from '../minigames/typing.js';
-import { CommandError, handleCommandError } from '../errorHandler';
+import { CommandError, handleCommandError } from '../errorHandler.js';
 
 const sessions = new Map(); // In-memory storage for game sessions
 

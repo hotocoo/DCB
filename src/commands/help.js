@@ -63,9 +63,9 @@ export async function execute(interaction) {
 
     if (name === 'rpg') commandCategories.rpg.push(`\`/${name}\` - ${description}`);
     else if (['8ball', 'roll', 'rps', 'minigame', 'novel', 'connect4', 'guess', 'hangman', 'memory', 'tictactoe', 'trivia', 'wordle', 'fun', 'coinflip'].includes(name)) commandCategories.games.push(`\`/${name}\` - ${description}`);
-    else if (['ping', 'echo', 'help', 'setmodel', 'togglechat', 'toggleplay', 'remind', 'poll', 'weather', 'music', 'profile'].includes(name)) commandCategories.utility.push(`\`/${name}\` - ${description}`);
+    else if (['ping', 'echo', 'help', 'setmodel', 'togglechat', 'toggleplay', 'remind', 'poll', 'weather', 'music', 'profile', 'serverinfo', 'userinfo', 'avatar', 'afk', 'calculator', 'leaderboard'].includes(name)) commandCategories.utility.push(`\`/${name}\` - ${description}`);
     else if (['chat', 'ai', 'api'].includes(name)) commandCategories.chat.push(`\`/${name}\` - ${description}`);
-    else if (['admin', 'guild', 'achievements', 'economy', 'inventory', 'trade', 'explore'].includes(name)) commandCategories.admin.push(`\`/${name}\` - ${description}`);
+    else if (['admin', 'guild', 'achievements', 'economy', 'inventory', 'trade', 'explore', 'giveaway'].includes(name)) commandCategories.admin.push(`\`/${name}\` - ${description}`);
     else commandCategories.utility.push(`\`/${name}\` - ${description}`);
   }
 

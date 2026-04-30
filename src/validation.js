@@ -16,9 +16,10 @@ const MAX_LOCATION_LENGTH = 50;
 const MAX_QUESTION_LENGTH = 200;
 const MAX_OPTION_LENGTH = 50;
 const SANITIZATION_PATTERNS = [
-  /[<>]/g, // Remove potential HTML tags
+  /<\/?[a-zA-Z][^>]*>/g, // Remove full HTML tags (e.g. <script>, </script>, <img ...>)
   /javascript:/gi, // Remove javascript: protocol
   /on\w+=/gi, // Remove event handlers
+  /;\s*(DROP|DELETE|INSERT|UPDATE|ALTER|CREATE|TRUNCATE|EXEC|EXECUTE)\s/gi, // Remove SQL injection patterns
   /[^\u0020-\u007E]/g // Remove non-printable characters
 ];
 
