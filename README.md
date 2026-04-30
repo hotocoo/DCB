@@ -12,14 +12,27 @@
 
 A comprehensive, feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, AI-powered interactions, with JSON-based data storage as the current primary method and ongoing SQLite migration for enhanced performance and reliability.
 
+**⚠️ NEW IN v3.0.2: MASSIVE PERFORMANCE & FEATURE UPGRADE**
+- ✅ **Enterprise Monitoring**: Real-time health checks, performance tracking, and system metrics
+- ✅ **Automated Backups**: 6-hour automatic backups with restore capability
+- ✅ **Memory Leak Prevention**: LRU caching with automatic eviction
+- ✅ **Enhanced Logging**: Automatic log rotation with sensitive data filtering
+- ✅ **Daily Quests**: Rotating challenges with rewards and leaderboards
+- ✅ **Production Ready**: Comprehensive error handling and stability improvements
+
+📖 **See [IMPROVEMENTS.md](IMPROVEMENTS.md) for complete details on all enhancements.**
+
 **✨ Features:**
 - **RPG System**: Character progression with classes, inventory, quests, and boss battles
-- **Music Integration**: Multi-source playback with Spotify, YouTube, and Deezer support
+- **Music Integration**: Multi-source playback with Spotify, YouTube, and Deezer support (optimized with LRU caching)
 - **Economy System**: Banking, businesses, investments, and marketplace trading
 - **Moderation Tools**: Advanced warning, mute, ban systems with logging
 - **AI Assistant**: Multiple AI models with personality profiles and memory
 - **Mini-Games**: Trivia, Wordle, Connect Four, Tic-Tac-Toe, and more
 - **Guild Management**: Multiplayer guilds with economies and leaderboards
+- **Daily Quests**: NEW - Rotating challenges with rewards and streaks
+- **Health Monitoring**: NEW - Real-time system health and performance metrics
+- **Automated Backups**: NEW - 6-hour automatic backups with admin management
 - **JSON Storage**: Current primary data storage with SQLite migration in progress
 - **Docker Support**: Containerized deployment with health checks
 
@@ -222,6 +235,22 @@ npm run format
 | `/weather` | Get current weather and forecasts | `/weather location:"New York"` |
 | `/roll` | Roll dice with custom configurations | `/roll dice:2d6` |
 
+### 🆕 NEW - Monitoring & Management Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/health status` | View overall bot health status | `/health status` |
+| `/health performance` | View detailed performance metrics | `/health performance` |
+| `/health cache` | View cache statistics | `/health cache` |
+| `/health logs` | View log file statistics | `/health logs` |
+| `/quests view` | View your daily quests | `/quests view` |
+| `/quests claim` | Claim rewards from completed quests | `/quests claim quest_number:1` |
+| `/quests leaderboard` | View quest completion leaderboard | `/quests leaderboard` |
+| `/backup create` | Create a manual backup (Admin) | `/backup create` |
+| `/backup list` | List all available backups (Admin) | `/backup list` |
+| `/backup restore` | Restore from a backup (Admin) | `/backup restore backup_name:backup_2026-02-09` |
+| `/backup stats` | View backup statistics (Admin) | `/backup stats` |
+
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -334,6 +363,63 @@ We welcome contributions from the community! Whether you're fixing bugs, adding 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🔄 Recent Updates & Fixes
+
+### 🎉 v3.0.2 - MASSIVE Performance & Feature Upgrade (February 2026)
+
+#### New Features
+- **Health Monitoring System**: Real-time bot health checks with `/health` command
+  - System resource monitoring (CPU, memory, disk)
+  - Performance metrics and slowest commands tracking
+  - Cache statistics and hit rates
+  - Log file management
+  
+- **Daily Quests System**: Rotating daily challenges with `/quests` command
+  - 3 daily quests per user with various objectives
+  - Gold and XP rewards
+  - Streak tracking for consecutive completions
+  - Global leaderboard
+
+- **Automated Backup System**: 6-hour automatic backups with `/backup` command (Admin)
+  - Automatic backup creation and retention (keeps last 10)
+  - Manual backup/restore capabilities
+  - Safety backups before restores
+  - Backup statistics and management
+
+#### Performance Improvements
+- **LRU Cache System**: Prevents memory leaks with bounded caches
+  - Music search result caching (5 min TTL)
+  - URL validation caching (10 min TTL)
+  - Automatic eviction of old entries
+  - Cache statistics tracking
+
+- **Performance Monitoring**: Command execution tracking and metrics
+  - Real-time performance tracking
+  - Memory usage snapshots
+  - Error rate monitoring
+  - Slowest command identification
+
+- **Enhanced Logging**: Automatic log rotation and management
+  - 10MB file size limits with automatic rotation
+  - Sensitive data filtering (API keys, tokens, passwords)
+  - 7-day log retention with automatic cleanup
+  - Multiple log levels (error, warn, info, debug)
+
+#### Stability Improvements
+- **Safe File Operations**: Atomic writes with automatic backups
+  - JSON parse error recovery with backup restoration
+  - Concurrent write protection with locks
+  - 50MB file size limits
+  - Async I/O for non-blocking operations
+
+- **Error Handling**: Comprehensive error recovery
+  - Graceful error handling throughout the bot
+  - Automatic fallback to backups on corruption
+  - Enhanced error logging with stack traces
+
+- **Resource Management**: Proper cleanup on shutdown
+  - All timers and intervals properly cleared
+  - Cache cleanup on exit
+  - Performance report generation on shutdown
 
 ### Ongoing Database Migration
 - **JSON Storage Active**: Currently using JSON files as primary data storage method
