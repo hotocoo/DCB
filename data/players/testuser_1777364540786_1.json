@@ -18,14 +18,14 @@
   ],
   "color": 16711680,
   "inventory": {
-    "health_potion": 7
+    "health_potion": 6
   },
   "equipped_weapon": null,
   "equipped_armor": null,
   "gold": 0,
+  "createdAt": 1777364540794,
+  "sessionXpGained": 100,
   "dailyExplorations": 0,
-  "lastDailyReset": 1761995183231,
-  "sessionXpGained": 0,
-  "lastSessionReset": 1761995183231,
-  "createdAt": 1777346429559
+  "lastDailyReset": 1777364649581,
+  "lastSessionReset": 1777364649581
 }

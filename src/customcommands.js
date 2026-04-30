@@ -42,7 +42,9 @@ class CustomCommandManager {
 
   saveCustomCommands() {
     try {
-      fs.writeFileSync(CUSTOM_COMMANDS_FILE, JSON.stringify(this.customCommands, null, 2));
+      const tmpPath = CUSTOM_COMMANDS_FILE + '.tmp';
+      fs.writeFileSync(tmpPath, JSON.stringify(this.customCommands, null, 2));
+      fs.renameSync(tmpPath, CUSTOM_COMMANDS_FILE);
     }
     catch (error) {
       console.error('Failed to save custom commands:', error);
@@ -106,7 +108,6 @@ class CustomCommandManager {
       // This would require access to Discord.js client and guild member
       // Example: if (!member.roles.cache.has(permission)) return { success: false, reason: 'insufficient_permissions' };
       // For now, skip permission check to allow execution
-      console.log(`Permission check for command ${commandName} by user ${userId}: Skipped (implement with Discord.js)`);
     }
 
     // Track usage

@@ -2,11 +2,12 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { createCharacter, getCharacter, applyXp, spendSkillPoints, getLeaderboard, getLeaderboardCount, resetCharacter } from '../src/rpg.js';
+import { createCharacter, getCharacter, applyXp, spendSkillPoints, getLeaderboard, getLeaderboardCount, resetCharacter, deleteCharacter } from '../src/rpg.js';
 
 // Use a temp data dir to avoid clobbering real data during tests
 const DATA_DIR = path.join(process.cwd(), 'data');
-const BACKUP = path.join(process.cwd(), 'data', 'rpg.json.bak');
+const PLAYERS_DIR = path.join(DATA_DIR, 'players');
+const BACKUP = path.join(DATA_DIR, 'rpg.json.bak');
 const FILE = path.join(DATA_DIR, 'rpg.json');
 
 function backupData() {
@@ -25,11 +26,14 @@ function restoreData() {
 
 async function run() {
   backupData();
+  const uid = 'testuser1';
+  // Clean up any existing test player file before starting
+  const playerFile = path.join(PLAYERS_DIR, `${uid}.json`);
+  if (fs.existsSync(playerFile)) fs.unlinkSync(playerFile);
   try {
     // ensure clean start
     if (fs.existsSync(FILE)) fs.unlinkSync(FILE);
 
-    const uid = 'testuser1';
     const char = createCharacter(uid, 'Tester');
     assert.ok(char, 'Character created');
     assert.equal(char.name, 'Tester');
@@ -62,6 +66,9 @@ async function run() {
     console.log('All tests passed');
   }
   finally {
+    // Clean up test player file
+    try { deleteCharacter(uid); } catch { /* ignore */ }
+    if (fs.existsSync(playerFile)) fs.unlinkSync(playerFile);
     restoreData();
   }
 }

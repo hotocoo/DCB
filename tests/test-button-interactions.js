@@ -1,7 +1,7 @@
 // Test script specifically for button interaction handlers
 import assert from 'node:assert';
 
-import { handleButtonInteraction } from '../src/interactionHandlers';
+import { handleButtonInteraction } from '../src/interactionHandlers.js';
 
 // Mock interaction object
 const mockInteraction = {

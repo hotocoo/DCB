@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 
-import { safeExecuteCommand, CommandError, validateRange, validateNotEmpty } from '../errorHandler';
+import { safeExecuteCommand, CommandError, validateRange, validateNotEmpty } from '../errorHandler.js';
 
 /**
  * Roll command data structure.

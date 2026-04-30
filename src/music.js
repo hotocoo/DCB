@@ -17,7 +17,7 @@ import pkg from 'libsodium-wrappers';
 
 // Import validation utilities
 import { inputValidator, sanitizeInput, validateString } from './validation.js';
-import { CommandError, handleCommandError } from './errorHandler';
+import { CommandError, handleCommandError } from './errorHandler.js';
 
 // FFmpeg binary path resolution and validation
 let ffmpegPath = ffmpeg;
@@ -579,7 +579,7 @@ class MusicManager {
         // Try with different search options
         try {
           logger.debug('Retrying YouTube search with different options');
-          const searchResults = await yts(sanitizedQuery, { pages: 1 });
+          const searchResults = await yts({ query: sanitizedQuery });
           const videos = searchResults.videos.slice(0, limit);
 
           const validVideos = [];
