@@ -13,7 +13,7 @@ import { Client, Collection, GatewayIntentBits, Partials, ActivityType } from 'd
 
 // Core bot modules
 import { loadCommands } from './commandLoader.js';
-import { handleInteraction } from './interactionHandlers';
+import { handleInteraction } from './interactionHandlers.js';
 import { handleMessage } from './chat.js';
 import { logger, logError } from './logger.js';
 
@@ -22,6 +22,7 @@ import { checkTypingAttempt } from './minigames/typing.js';
 import { isOnCooldown, setCooldown } from './cooldowns.js';
 import { initializeDatabase } from './storage.js';
 import { schedulerManager } from './scheduler.js';
+import { registerSnipeListener } from './commands/snipe.js';
 
 /**
  * @typedef {Object} Command
@@ -120,6 +121,10 @@ let commandStats = { total: 0, loaded: 0 };
     // Initialize scheduler if available
     await schedulerManager.setClient(client);
     logger.success('Scheduler initialized successfully');
+
+    // Register snipe message delete listener
+    registerSnipeListener(client);
+    logger.success('Snipe listener registered');
   }
   catch (error) {
     logger.error('Failed to initialize database', error instanceof Error ? error : new Error(String(error)));

@@ -1,0 +1,192 @@
+[
+  {
+    "message": "Initial balance: 0",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.454Z"
+  },
+  {
+    "message": "Balance after add: 1000",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.454Z"
+  },
+  {
+    "message": "Transfer successful: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.455Z"
+  },
+  {
+    "message": "Balance after transfer: 500, 500",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.455Z"
+  },
+  {
+    "message": "Market price: 24",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.455Z"
+  },
+  {
+    "message": "Buy successful: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.456Z"
+  },
+  {
+    "message": "Sell successful: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.456Z"
+  },
+  {
+    "message": "Investment created: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.457Z"
+  },
+  {
+    "message": "Investments count: 1",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.457Z"
+  },
+  {
+    "message": "Warning issued: warn_1775278653458_iuyuiiie4",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.458Z"
+  },
+  {
+    "message": "Mute issued: mute_1775278653458_h0vz8n2u8",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.458Z"
+  },
+  {
+    "message": "User is muted: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.458Z"
+  },
+  {
+    "message": "Auto mod triggered: false",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.459Z"
+  },
+  {
+    "message": "Auto mod spam detected: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.459Z"
+  },
+  {
+    "message": "User mod stats: warnings 1",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.459Z"
+  },
+  {
+    "message": "Cleaned up character for testuser_1775278653454_1",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.460Z"
+  },
+  {
+    "message": "Character created: TestHero",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.461Z"
+  },
+  {
+    "message": "XP applied: gained 5",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.461Z"
+  },
+  {
+    "message": "Item added: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.464Z"
+  },
+  {
+    "message": "Inventory count: 1",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.464Z"
+  },
+  {
+    "message": "Character retrieved: TestHero",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.464Z"
+  },
+  {
+    "message": "Character has required properties: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:33.464Z"
+  },
+  {
+    "message": "Search results: 0",
+    "success": false,
+    "timestamp": "2026-04-04T04:57:36.833Z"
+  },
+  {
+    "message": "Queue length: 0",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.833Z"
+  },
+  {
+    "message": "Pause executed: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.833Z"
+  },
+  {
+    "message": "Stop executed: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.833Z"
+  },
+  {
+    "message": "RPG-Economy integration: Balance decreased by 24",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.834Z"
+  },
+  {
+    "message": "Inventory updated after purchase: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.834Z"
+  },
+  {
+    "message": "Cross-site scripting prevented: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.834Z"
+  },
+  {
+    "message": "SQL injection attempt sanitized: false",
+    "success": false,
+    "timestamp": "2026-04-04T04:57:36.834Z"
+  },
+  {
+    "message": "String validation: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.834Z"
+  },
+  {
+    "message": "Number validation: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.835Z"
+  },
+  {
+    "message": "User ID validation: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.835Z"
+  },
+  {
+    "message": "Input sanitization: false",
+    "success": false,
+    "timestamp": "2026-04-04T04:57:36.835Z"
+  },
+  {
+    "message": "Invalid transfer rejected: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.835Z"
+  },
+  {
+    "message": "Insufficient funds rejected: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.835Z"
+  },
+  {
+    "message": "Invalid character handled: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.835Z"
+  },
+  {
+    "message": "Rate limiter working: true",
+    "success": true,
+    "timestamp": "2026-04-04T04:57:36.835Z"
+  }
+]

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
+import { logger } from '../logger.js';
 
 // Rate limiter for weather API (60 requests per minute per user)
 const weatherRateLimiter = new RateLimiterMemory({
@@ -91,9 +92,17 @@ export async function execute(interaction) {
     }
 
     // Using a free weather API (you may want to replace with a paid one for production)
-    const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`, {
-      timeout: 10_000 // 10 second timeout
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+    let response;
+    try {
+      response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`, {
+        signal: controller.signal
+      });
+    }
+    finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       switch (response.status) {
@@ -161,7 +170,7 @@ export async function execute(interaction) {
 
   }
   catch (error) {
-    console.error('Weather command error:', error);
+    logger.error('Weather command error', error instanceof Error ? error : new Error(String(error)));
     if (error.name === 'AbortError') {
       await interaction.reply({ content: '❌ Request timed out. Please try again later.', flags: MessageFlags.Ephemeral });
     }

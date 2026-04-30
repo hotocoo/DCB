@@ -1,16 +1,16 @@
 {
-  "name": "TestHero",
-  "class": "warrior",
-  "hp": 25,
-  "maxHp": 25,
+  "name": "watchandnotlearn",
+  "hp": 10,
+  "maxHp": 20,
+  "atk": 5,
+  "lvl": 9,
+  "xp": 170,
+  "skillPoints": 8,
   "mp": 10,
   "maxMp": 10,
-  "atk": 7,
-  "def": 3,
-  "spd": 1,
-  "lvl": 6,
-  "xp": 100,
-  "skillPoints": 5,
+  "def": 2,
+  "spd": 2,
+  "class": "warrior",
   "abilities": [
     "Power Strike",
     "Shield Block",
@@ -18,7 +18,10 @@
   ],
   "color": 16711680,
   "inventory": {
-    "health_potion": 7
+    "chain_mail": 1,
+    "iron_sword": 1,
+    "mana_potion": 1,
+    "wood": 1
   },
   "equipped_weapon": null,
   "equipped_armor": null,
@@ -27,5 +30,5 @@
   "lastDailyReset": 1761995183231,
   "sessionXpGained": 0,
   "lastSessionReset": 1761995183231,
-  "createdAt": 1775278619309
+  "createdAt": 1775278619308
 }

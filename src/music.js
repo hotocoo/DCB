@@ -17,7 +17,7 @@ import pkg from 'libsodium-wrappers';
 
 // Import validation utilities
 import { inputValidator, sanitizeInput, validateString } from './validation.js';
-import { CommandError, handleCommandError } from './errorHandler';
+import { CommandError, handleCommandError } from './errorHandler.js';
 
 // FFmpeg binary path resolution and validation
 let ffmpegPath = ffmpeg;
