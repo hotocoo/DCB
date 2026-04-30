@@ -10,7 +10,7 @@ import {
   generateProfileInsights,
   checkMilestones
 } from '../profiles.js';
-import { safeExecuteCommand, CommandError, validateUser, validateRange, validateNotEmpty } from '../errorHandler';
+import { safeExecuteCommand, CommandError, validateUser, validateRange, validateNotEmpty } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('profile')

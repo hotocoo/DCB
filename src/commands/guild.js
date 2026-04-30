@@ -12,7 +12,7 @@ import {
   getGuildLeaderboard,
   contributeToGuild
 } from '../guilds.js';
-import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler';
+import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('guild')

@@ -16,10 +16,24 @@ const MAX_LOCATION_LENGTH = 50;
 const MAX_QUESTION_LENGTH = 200;
 const MAX_OPTION_LENGTH = 50;
 const SANITIZATION_PATTERNS = [
-  /[<>]/g, // Remove potential HTML tags
+  /<[^>]+>/g, // Remove all HTML tags (keeps text content between tags)
   /javascript:/gi, // Remove javascript: protocol
-  /on\w+=/gi, // Remove event handlers
+  /on\w+\s*=/gi, // Remove event handlers
   /[^\u0020-\u007E]/g // Remove non-printable characters
+];
+
+/**
+ * SQL injection danger patterns that should be sanitized.
+ */
+const SQL_INJECTION_PATTERNS = [
+  /'\s*;\s*--/g, // Common SQL termination
+  /'\s*;\s*DROP\s+/gi, // DROP statements
+  /'\s*;\s*DELETE\s+/gi, // DELETE statements
+  /'\s*;\s*UPDATE\s+/gi, // UPDATE statements
+  /'\s*;\s*INSERT\s+/gi, // INSERT statements
+  /'\s*OR\s+'[^']*'\s*=\s*'/gi, // OR-based injection
+  /--\s*$/gm, // SQL line comments
+  /\/\*[\s\S]*?\*\//g // SQL block comments
 ];
 
 class InputValidator {
@@ -469,8 +483,13 @@ class InputValidator {
     try {
       let sanitized = input.trim();
 
-      // Apply all sanitization patterns
+      // Apply HTML sanitization patterns
       for (const pattern of SANITIZATION_PATTERNS) {
+        sanitized = sanitized.replace(pattern, '');
+      }
+
+      // Apply SQL injection prevention patterns
+      for (const pattern of SQL_INJECTION_PATTERNS) {
         sanitized = sanitized.replace(pattern, '');
       }
 

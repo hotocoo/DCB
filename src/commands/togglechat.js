@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 
 import { getGuild, setGuild } from '../storage.js';
-import { safeExecuteCommand, CommandError, validateGuild, validatePermissions } from '../errorHandler';
+import { safeExecuteCommand, CommandError, validateGuild, validatePermissions } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('togglechat')

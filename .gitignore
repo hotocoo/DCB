@@ -137,6 +137,16 @@ test-results/
 test-results.json
 tests/*.result.json
 tests/comprehensive-test-results.json
+comprehensive-test-results.json
+
+# Generated data files (runtime state, not source)
+data/players/
+data/economy.json
+data/moderation.json
+data/guilds.json.backup
+
+# Accidentally created files
+nul
 
 # Migration files (temporary)
 migrations/temp/

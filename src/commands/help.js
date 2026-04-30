@@ -63,7 +63,7 @@ export async function execute(interaction) {
 
     if (name === 'rpg') commandCategories.rpg.push(`\`/${name}\` - ${description}`);
     else if (['8ball', 'roll', 'rps', 'minigame', 'novel', 'connect4', 'guess', 'hangman', 'memory', 'tictactoe', 'trivia', 'wordle', 'fun', 'coinflip'].includes(name)) commandCategories.games.push(`\`/${name}\` - ${description}`);
-    else if (['ping', 'echo', 'help', 'setmodel', 'togglechat', 'toggleplay', 'remind', 'poll', 'weather', 'music', 'profile'].includes(name)) commandCategories.utility.push(`\`/${name}\` - ${description}`);
+    else if (['ping', 'echo', 'help', 'setmodel', 'togglechat', 'toggleplay', 'remind', 'poll', 'weather', 'music', 'profile', 'serverinfo', 'userinfo', 'avatar', 'math', 'color'].includes(name)) commandCategories.utility.push(`\`/${name}\` - ${description}`);
     else if (['chat', 'ai', 'api'].includes(name)) commandCategories.chat.push(`\`/${name}\` - ${description}`);
     else if (['admin', 'guild', 'achievements', 'economy', 'inventory', 'trade', 'explore'].includes(name)) commandCategories.admin.push(`\`/${name}\` - ${description}`);
     else commandCategories.utility.push(`\`/${name}\` - ${description}`);
@@ -99,7 +99,7 @@ export async function execute(interaction) {
       embed.setDescription('**Utility Commands**\n\n' + commandCategories.utility.join('\n'));
       embed.addFields({
         name: 'Utility Features',
-        value: '• **ping**: Check bot latency\n• **echo**: Repeat messages\n• **setmodel**: Configure AI models per server\n• **togglechat**: Enable/disable chat responses\n• **toggleplay**: Enable/disable playful responses',
+        value: '• **ping**: Check bot latency\n• **echo**: Repeat messages\n• **serverinfo**: View server information\n• **userinfo**: View user details\n• **avatar**: View user avatar\n• **math**: Calculator, unit converter & stats\n• **color**: Color info and generator\n• **weather**: Get weather for a city\n• **poll**: Create interactive polls\n• **remind**: Set reminders',
         inline: false
       });
       break;
@@ -135,12 +135,12 @@ export async function execute(interaction) {
       embed.addFields(
         {
           name: '💬 Chat & AI',
-          value: 'DM the bot or mention it to chat!\nSupports OpenAI and local models.',
+          value: commandCategories.chat.join('\n') || 'DM the bot or mention it to chat!\nSupports OpenAI and local models.',
           inline: true
         },
         {
           name: '📚 More Info',
-          value: 'Use `/help category:rpg`, `/help category:admin`, `/help category:games`, or `/help category:utility` for more details',
+          value: 'Use `/help category:rpg`, `/help category:admin`, `/help category:games`, `/help category:utility`, or `/help category:chat` for more details',
           inline: true
         }
       );

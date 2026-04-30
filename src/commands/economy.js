@@ -15,7 +15,7 @@ import {
   getUserBusinesses,
   claimDailyReward
 } from '../economy.js';
-import { safeExecuteCommand, CommandError, validateRange, validateNotEmpty, validateUser } from '../errorHandler';
+import { safeExecuteCommand, CommandError, validateRange, validateNotEmpty, validateUser } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('economy')
