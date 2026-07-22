@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { createCharacter, getCharacter, applyXp, spendSkillPoints, getLeaderboard, getLeaderboardCount, resetCharacter } from '../src/rpg.js';
+import { createCharacter, getCharacter, applyXp, spendSkillPoints, getLeaderboard, getLeaderboardCount, resetCharacter, deleteCharacter } from '../src/rpg.js';
 
 // Use a temp data dir to avoid clobbering real data during tests
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -26,10 +26,8 @@ function restoreData() {
 async function run() {
   backupData();
   try {
-    // ensure clean start
-    if (fs.existsSync(FILE)) fs.unlinkSync(FILE);
-
     const uid = 'testuser1';
+    deleteCharacter(uid);
     const char = createCharacter(uid, 'Tester');
     assert.ok(char, 'Character created');
     assert.equal(char.name, 'Tester');

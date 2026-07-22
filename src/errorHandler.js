@@ -7,32 +7,6 @@ import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 
 import { logError } from './logger.js';
 
-// Type definitions for Discord.js interactions
-/**
- * @typedef {import('discord.js').ChatInputCommandInteraction | import('discord.js').ButtonInteraction | import('discord.js').ModalSubmitInteraction} DiscordInteraction
- */
-/**
- * @typedef {import('discord.js').Client} DiscordClient
- */
-/**
- * @typedef {import('discord.js').User} DiscordUser
- */
-/**
- * @typedef {import('discord.js').Guild} DiscordGuild
- */
-/**
- * @typedef {import('discord.js').Channel} DiscordChannel
- */
-/**
- * @typedef {import('discord.js').Role} DiscordRole
- */
-/**
- * @typedef {import('discord.js').GuildMember} DiscordGuildMember
- */
-/**
- * @typedef {import('discord.js').Message} DiscordMessage
- */
-
 /**
  * Circuit breaker configuration constants.
  */
@@ -98,13 +72,6 @@ export class CommandError extends Error {
 }
 
 /**
- * Handles command errors by logging and responding to the user.
- * @param {DiscordInteraction} interaction - Discord interaction object
- * @param {CommandError|Error} error - The error that occurred
- * @param {object} context - Additional context for logging
- * @returns {Promise<void>} Promise resolving to the interaction response
- */
-/**
  * Circuit breaker check imported from interactionHandlers.js
  * This prevents recursive error handling loops.
  * @param {string} interactionId - The interaction identifier
@@ -135,7 +102,8 @@ async function checkCircuitBreaker(interactionId) {
 }
 
 /**
- * @param {DiscordInteraction} interaction
+ * Handles command errors by logging and responding to the user.
+ * @param {import('discord.js').Interaction} interaction
  * @param {CommandError|Error} error
  * @param {object} context
  */
@@ -184,7 +152,6 @@ export async function handleCommandError(interaction, error, context = {}) {
   };
 
   if ('code' in error && error.code && error.code in hints) {
-    // @ts-ignore
     responseOptions.content += hints[error.code];
   }
 
@@ -272,7 +239,7 @@ export async function handleCommandError(interaction, error, context = {}) {
 
 /**
  * Safely executes a command function with error handling.
- * @param {DiscordInteraction} interaction - Discord interaction object
+ * @param {import('discord.js').Interaction} interaction - Discord interaction object
  * @param {Function} commandFunction - The command function to execute
  * @param {object} context - Additional context for error handling
  * @returns {Promise<any>} Promise resolving to command result or error response
@@ -309,14 +276,10 @@ export async function safeExecuteCommand(interaction, commandFunction, context =
 }
 
 /**
- * Validation helpers for common Discord entities and values.
- */
-
-/**
  * Validates and retrieves a user by ID.
- * @param {DiscordInteraction} interaction - Discord interaction object
+ * @param {import('discord.js').Interaction} interaction - Discord interaction object
  * @param {string} userId - User ID to validate
- * @returns {DiscordUser} Discord user object
+ * @returns {import('discord.js').User} Discord user object
  * @throws {CommandError} If user is not found or ID is invalid
  */
 export function validateUser(interaction, userId) {
@@ -336,9 +299,9 @@ export function validateUser(interaction, userId) {
 
 /**
  * Validates and retrieves a channel by ID.
- * @param {DiscordInteraction} interaction - Discord interaction object
+ * @param {import('discord.js').Interaction} interaction - Discord interaction object
  * @param {string} channelId - Channel ID to validate
- * @returns {DiscordChannel} Discord channel object
+ * @returns {import('discord.js').Channel} Discord channel object
  * @throws {CommandError} If channel is not found or ID is invalid
  */
 export function validateChannel(interaction, channelId) {
@@ -358,9 +321,9 @@ export function validateChannel(interaction, channelId) {
 
 /**
  * Validates and retrieves a role by ID.
- * @param {DiscordInteraction} interaction - Discord interaction object
+ * @param {import('discord.js').Interaction} interaction - Discord interaction object
  * @param {string} roleId - Role ID to validate
- * @returns {DiscordRole} Discord role object
+ * @returns {import('discord.js').Role} Discord role object
  * @throws {CommandError} If role is not found or ID is invalid
  */
 export function validateRole(interaction, roleId) {
@@ -379,8 +342,8 @@ export function validateRole(interaction, roleId) {
 
 /**
  * Validates that the command is being used in a guild.
- * @param {DiscordInteraction} interaction - Discord interaction object
- * @returns {DiscordGuild} Discord guild object
+ * @param {import('discord.js').Interaction} interaction - Discord interaction object
+ * @returns {import('discord.js').Guild} Discord guild object
  * @throws {CommandError} If command is not used in a guild
  */
 export function validateGuild(interaction) {
@@ -393,7 +356,7 @@ export function validateGuild(interaction) {
 
 /**
  * Validates that the user has the required permissions.
- * @param {DiscordInteraction} interaction - Discord interaction object
+ * @param {import('discord.js').Interaction} interaction - Discord interaction object
  * @param {Array<string>} permissions - Array of permission strings
  * @throws {CommandError} If user lacks required permissions
  */
@@ -404,7 +367,6 @@ export function validatePermissions(interaction, permissions) {
 
   const memberPermissions = interaction.member?.permissions;
   const missingPermissions = permissions.filter(perm => {
-    // @ts-ignore
     const permBit = PermissionFlagsBits[perm];
     if (typeof memberPermissions === 'string') {
       // Permissions string - not supported for checking individual permissions
@@ -483,7 +445,7 @@ export function createRateLimiter(points, duration, keyGenerator) {
       const userRequests = requests.get(userKey) || [];
 
       // Remove requests outside the current time window
-      const validRequests = userRequests.filter((/** @type {number} */ time) => now - time < duration);
+      const validRequests = userRequests.filter((time) => now - time < duration);
 
       if (validRequests.length >= points) {
         const resetTime = validRequests[0] + duration;

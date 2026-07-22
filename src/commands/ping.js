@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 
-import { safeExecuteCommand, validateNotEmpty } from '../errorHandler';
+import { safeExecuteCommand, validateNotEmpty } from '../errorHandler.js';
 
 /**
  * Ping command data structure.

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { generate } from './model-client.js';
 import { logger } from './logger.js';
 import { inputValidator, sanitizeInput, validateString, validateNumber } from './validation.js';
-import { CommandError } from './errorHandler';
+import { CommandError } from './errorHandler.js';
 
 const PLAYERS_DIR = path.join(process.cwd(), 'data', 'players');
 

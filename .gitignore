@@ -140,3 +140,13 @@ tests/comprehensive-test-results.json
 
 # Migration files (temporary)
 migrations/temp/
+
+# ytdl-core temporary watch.html files
+*-watch.html
+
+# Test-generated player data
+data/players/testuser_*.json
+
+# ESLint analysis output
+eslint-analysis.json
+comprehensive-test-results.json

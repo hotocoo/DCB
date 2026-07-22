@@ -64,7 +64,6 @@
     "libsodium-wrappers": "^0.7.15",
     "node-cron": "^3.0.3",
     "rate-limiter-flexible": "^3.0.4",
-    "sodium": "^3.0.2",
     "spotify-web-api-node": "^5.0.2",
     "tweetnacl": "^1.0.3",
     "ws": "^8.14.0",

@@ -1,7 +1,34 @@
 {
-  "warnings": {},
+  "warnings": {
+    "testguild1": {
+      "testuser_1784710198204_1": [
+        {
+          "id": "warn_1784710198205_zu3e4cvav",
+          "userId": "testuser_1784710198204_1",
+          "moderatorId": "testuser_1784710198204_2",
+          "reason": "Test warning",
+          "severity": "low",
+          "timestamp": 1784710198205,
+          "active": true
+        }
+      ]
+    }
+  },
   "bans": {},
-  "mutes": {},
+  "mutes": {
+    "testguild1": {
+      "testuser_1784710198204_1": {
+        "id": "mute_1784710198206_2wg1k9aro",
+        "userId": "testuser_1784710198204_1",
+        "moderatorId": "testuser_1784710198204_2",
+        "reason": "Test mute",
+        "duration": 60000,
+        "startTime": 1784710198206,
+        "endTime": 1784710258206,
+        "active": true
+      }
+    }
+  },
   "kicks": {
     "941715588269625444": {
       "941664598082355220": [
@@ -24,6 +51,24 @@
       "moderatorId": "333133024520568833",
       "reason": "nihha",
       "timestamp": 1761930154609
+    },
+    {
+      "id": "mod_1784710198205_meb0cpvvw",
+      "guildId": "testguild1",
+      "action": "warn",
+      "targetUserId": "testuser_1784710198204_1",
+      "moderatorId": "testuser_1784710198204_2",
+      "reason": "Test warning",
+      "timestamp": 1784710198205
+    },
+    {
+      "id": "mod_1784710198206_o6qvmbpeb",
+      "guildId": "testguild1",
+      "action": "mute",
+      "targetUserId": "testuser_1784710198204_1",
+      "moderatorId": "testuser_1784710198204_2",
+      "reason": "Test mute (1m)",
+      "timestamp": 1784710198206
     }
   ],
   "auto_mod": {
