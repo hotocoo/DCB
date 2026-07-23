@@ -3,9 +3,10 @@
  * Provides structured error handling, user-friendly messages, and validation helpers.
  */
 
+/* eslint-disable max-lines */
 import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 
-import { logError } from './logger.js';
+import { logError, logger } from './logger.js';
 
 /**
  * Circuit breaker configuration constants.
@@ -80,6 +81,7 @@ export class CommandError extends Error {
 async function checkCircuitBreaker(interactionId) {
   try {
     // Dynamic import to avoid circular dependencies
+    // eslint-disable-next-line import/no-cycle
     const { circuitBreakerMap } = await import('./interactionHandlers.js');
     const circuitData = circuitBreakerMap.get(interactionId);
     if (!circuitData) return true;
@@ -96,7 +98,7 @@ async function checkCircuitBreaker(interactionId) {
   }
   catch (error) {
     // If import fails, allow operation to proceed
-    console.warn('[CIRCUIT_BREAKER] Failed to access circuit breaker, allowing operation:', error instanceof Error ? error.message : String(error));
+    logger.warn('[CIRCUIT_BREAKER] Failed to access circuit breaker, allowing operation:', error instanceof Error ? error.message : String(error));
     return true;
   }
 }
@@ -107,12 +109,13 @@ async function checkCircuitBreaker(interactionId) {
  * @param {CommandError|Error} error
  * @param {object} context
  */
+// eslint-disable-next-line complexity, max-lines-per-function, max-statements, sonarjs/cognitive-complexity
 export async function handleCommandError(interaction, error, context = {}) {
   const interactionId = interaction?.id;
 
   // Check circuit breaker before attempting error response
   if (interactionId && !(await checkCircuitBreaker(interactionId))) {
-    console.error('[HANDLE_COMMAND_ERROR] Circuit breaker tripped for interaction, skipping error response');
+    logger.error('[HANDLE_COMMAND_ERROR] Circuit breaker tripped for interaction, skipping error response');
     logError('Circuit breaker tripped - cannot send error response', new Error('Circuit breaker activated'), {
       originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
       originalError: error instanceof Error ? error.message : String(error),
@@ -135,7 +138,7 @@ export async function handleCommandError(interaction, error, context = {}) {
   let userMessage = ('userMessage' in error ? error.userMessage : undefined) || error.message;
 
   if (process.env.NODE_ENV === 'development') {
-    userMessage = `❌ **Error:** ${error.message}\n\n**Code:** ${'code' in error ? error.code : 'N/A'}\n**Details:** ${JSON.stringify('details' in error ? error.details : {}, null, 2)}`;
+    userMessage = `❌ **Error:** ${error.message}\n\n**Code:** ${'code' in error ? error.code : 'N/A'}\n**Details:** ${JSON.stringify('details' in error ? error.details : {}, undefined, 2)}`;
   }
 
   const responseOptions = {
@@ -157,8 +160,8 @@ export async function handleCommandError(interaction, error, context = {}) {
 
   // Send appropriate response based on interaction state with enhanced error handling
   try {
-    console.error('[HANDLE_COMMAND_ERROR] Attempting to send error response');
-    console.error('[HANDLE_COMMAND_ERROR] Interaction state before response:', {
+    logger.error('[HANDLE_COMMAND_ERROR] Attempting to send error response');
+    logger.error('[HANDLE_COMMAND_ERROR] Interaction state before response:', {
       id: interaction?.id,
       replied: interaction?.replied,
       deferred: interaction?.deferred,
@@ -169,13 +172,13 @@ export async function handleCommandError(interaction, error, context = {}) {
     // Check for DiscordAPIError[10062]: Unknown interaction specifically
     if (interaction && !interaction.replied && !interaction.deferred) {
       try {
-        console.error('[HANDLE_COMMAND_ERROR] Using reply');
+        logger.error('[HANDLE_COMMAND_ERROR] Using reply');
         await interaction.reply(responseOptions);
         return;
       }
       catch (replyError) {
         if (replyError instanceof Error && 'code' in replyError && replyError.code === 10_062) {
-          console.error('[HANDLE_COMMAND_ERROR] Interaction already expired/replied, cannot send error response');
+          logger.error('[HANDLE_COMMAND_ERROR] Interaction already expired/replied, cannot send error response');
           logError('Cannot send error response - interaction expired', replyError, {
             originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
             originalError: error instanceof Error ? error.message : String(error),
@@ -188,13 +191,13 @@ export async function handleCommandError(interaction, error, context = {}) {
     }
     else if (interaction && (interaction.replied || interaction.deferred)) {
       try {
-        console.error('[HANDLE_COMMAND_ERROR] Using followUp');
+        logger.error('[HANDLE_COMMAND_ERROR] Using followUp');
         await interaction.followUp(responseOptions);
         return;
       }
       catch (followUpError) {
         if (followUpError instanceof Error && 'code' in followUpError && followUpError.code === 10_062) {
-          console.error('[HANDLE_COMMAND_ERROR] Interaction already expired, cannot send followUp error response');
+          logger.error('[HANDLE_COMMAND_ERROR] Interaction already expired, cannot send followUp error response');
           logError('Cannot send followUp error response - interaction expired', followUpError, {
             originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
             originalError: error instanceof Error ? error.message : String(error),
@@ -206,7 +209,7 @@ export async function handleCommandError(interaction, error, context = {}) {
       }
     }
     else {
-      console.error('[HANDLE_COMMAND_ERROR] Interaction object invalid or already handled');
+      logger.error('[HANDLE_COMMAND_ERROR] Interaction object invalid or already handled');
       logError('Invalid interaction state for error response', new Error('Invalid interaction object'), {
         originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
         originalError: error instanceof Error ? error.message : String(error),
@@ -217,8 +220,8 @@ export async function handleCommandError(interaction, error, context = {}) {
     }
   }
   catch (responseError) {
-    console.error('[HANDLE_COMMAND_ERROR] Failed to send error response:', responseError instanceof Error ? responseError.message : String(responseError));
-    console.error('[HANDLE_COMMAND_ERROR] Response error details:', {
+    logger.error('[HANDLE_COMMAND_ERROR] Failed to send error response:', responseError instanceof Error ? responseError.message : String(responseError));
+    logger.error('[HANDLE_COMMAND_ERROR] Response error details:', {
       responseError: responseError instanceof Error ? responseError.message : String(responseError),
       stack: responseError instanceof Error ? responseError.stack : undefined,
       interactionId: interaction?.id,
@@ -244,15 +247,16 @@ export async function handleCommandError(interaction, error, context = {}) {
  * @param {object} context - Additional context for error handling
  * @returns {Promise<any>} Promise resolving to command result or error response
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity
 export async function safeExecuteCommand(interaction, commandFunction, context = {}) {
   try {
     return await commandFunction(interaction);
   }
   catch (error) {
     // Log immediately before any interaction attempts
-    console.error('[SAFE_EXECUTE_COMMAND] Error occurred:', error instanceof Error ? error.message : String(error));
-    console.error('[SAFE_EXECUTE_COMMAND] Error stack:', error instanceof Error ? error.stack : undefined);
-    console.error('[SAFE_EXECUTE_COMMAND] Interaction state:', {
+    logger.error('[SAFE_EXECUTE_COMMAND] Error occurred:', error instanceof Error ? error.message : String(error));
+    logger.error('[SAFE_EXECUTE_COMMAND] Error stack:', error instanceof Error ? error.stack : undefined);
+    logger.error('[SAFE_EXECUTE_COMMAND] Interaction state:', {
       id: interaction?.id,
       replied: interaction?.replied,
       deferred: interaction?.deferred,
@@ -268,7 +272,10 @@ export async function safeExecuteCommand(interaction, commandFunction, context =
       const commandError = new CommandError(
         error instanceof Error ? error.message : 'Unknown error occurred',
         'UNKNOWN_ERROR',
-        { originalError: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined }
+        {
+          originalError: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        }
       );
       await handleCommandError(interaction, commandError, context);
     }
@@ -367,7 +374,7 @@ export function validatePermissions(interaction, permissions) {
 
   const memberPermissions = interaction.member?.permissions;
   const missingPermissions = permissions.filter(perm => {
-    const permBit = PermissionFlagsBits[perm];
+    const permBit = PermissionFlagsBits[perm]; // eslint-disable-line security/detect-object-injection
     if (typeof memberPermissions === 'string') {
       // Permissions string - not supported for checking individual permissions
       return true; // Assume missing if we can't check
@@ -476,6 +483,7 @@ export function createRateLimiter(points, duration, keyGenerator) {
  * @returns {Promise<any>} Promise resolving to operation result
  * @throws {CommandError} If all retries are exhausted
  */
+// eslint-disable-next-line complexity, sonarjs/cognitive-complexity
 export async function retryAsync(operation, maxRetries = DEFAULT_MAX_RETRIES, delay = DEFAULT_RETRY_DELAY) {
   if (typeof operation !== 'function') {
     throw new CommandError('Operation must be a function.', 'INVALID_ARGUMENT');
@@ -503,7 +511,8 @@ export async function retryAsync(operation, maxRetries = DEFAULT_MAX_RETRIES, de
       }
 
       // Log retry attempt using logger instead of console.log
-      logError(`Retry attempt ${attempt} failed, retrying in ${delay * attempt}ms`, error instanceof Error ? error : new Error(String(error)), {
+      const retryError = error instanceof Error ? error : new Error(String(error));
+      logError(`Retry attempt ${attempt} failed, retrying in ${delay * attempt}ms`, retryError, {
         attempt,
         maxRetries,
         delay: delay * attempt

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { logger } from './logger.js';
 
 const ENTERTAINMENT_FILE = path.join(process.cwd(), 'data', 'entertainment.json');
 
@@ -35,7 +36,7 @@ class EntertainmentManager {
       this.entertainmentData = data;
     }
     catch (error) {
-      console.error('Failed to load entertainment data:', error);
+      logger.error('Failed to load entertainment data:', error);
       this.entertainmentData = {
         funStats: {},
         jokeRatings: {},
@@ -50,7 +51,7 @@ class EntertainmentManager {
       fs.writeFileSync(ENTERTAINMENT_FILE, JSON.stringify(this.entertainmentData, null, 2));
     }
     catch (error) {
-      console.error('Failed to save entertainment data:', error);
+      logger.error('Failed to save entertainment data:', error);
     }
   }
 

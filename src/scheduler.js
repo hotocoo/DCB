@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { logger } from './logger.js';
 
 const SCHEDULES_FILE = path.join(process.cwd(), 'data', 'schedules.json');
 
@@ -42,7 +43,7 @@ class SchedulerManager {
       this.schedules = data;
     }
     catch (error) {
-      console.error('Failed to load schedules:', error);
+      logger.error('Failed to load schedules:', error);
       this.schedules = {
         reminders: {},
         events: {},
@@ -57,7 +58,7 @@ class SchedulerManager {
       fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(this.schedules, null, 2));
     }
     catch (error) {
-      console.error('Failed to save schedules:', error);
+      logger.error('Failed to save schedules:', error);
     }
   }
 
@@ -142,7 +143,7 @@ class SchedulerManager {
         }
       }
       catch (error) {
-        console.error('Failed to send reminder:', error);
+        logger.error('Failed to send reminder:', error);
       }
     }
 
@@ -285,7 +286,7 @@ class SchedulerManager {
         }
       }
       catch (error) {
-        console.error('Failed to send event:', error);
+        logger.error('Failed to send event:', error);
       }
     }
 
@@ -313,7 +314,7 @@ class SchedulerManager {
         }
       }
       catch (error) {
-        console.error('Failed to send event reminder:', error);
+        logger.error('Failed to send event reminder:', error);
       }
     }
 
@@ -593,7 +594,8 @@ export function getSchedulerStats(userId) {
   return schedulerManager.getSchedulerStats(userId);
 }
 
-// Auto-cleanup every hour
-setInterval(() => {
+// Auto-cleanup every hour (unref so it doesn't block process exit)
+const cleanupInterval = setInterval(() => {
   schedulerManager.cleanup();
 }, 60 * 60 * 1000);
+if (typeof cleanupInterval.unref === 'function') cleanupInterval.unref();

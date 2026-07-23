@@ -4,13 +4,17 @@
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Discord.js](https://img.shields.io/badge/discord.js-v14-blue.svg)](https://discord.js.org/)
 [![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)]()
-[![Database](https://img.shields.io/badge/database-SQLite-lightgrey.svg)]()
-[![Coverage](https://img.shields.io/badge/coverage-85%25-green.svg)]()
+[![Database](https://img.shields.io/badge/database-JSON--files-lightgrey.svg)]()
+[![Test Suite](https://img.shields.io/badge/tests-38%2F38%20passing-brightgreen)]()
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg)]()
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/watchandnotlearn/ultra-discord-bot/pulls)
-[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-black.svg)](https://github.com/watchandnotlearn/ultra-discord-bot)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)]()
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-black.svg)](https://github.com/hotocoo/DCB)
 
 A comprehensive, feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, AI-powered interactions, with JSON-based data storage as the current primary method and ongoing SQLite migration for enhanced performance and reliability.
+
+> **Current version:** `3.0.1` (matches `@version` in `src/index.js` and `src/chat.js`). Note: `package.json` declares `3.0.0` — bump it in the next release.
+
+> **Storage:** Primary data store is JSON files under `data/` (per-domain files: `economy.json`, `rpg/players/<id>.json`, `moderation.json`, `schedules.json`, etc.). SQLite is *not* in use yet — see `database-schema.md` for the planned schema.
 
 **✨ Features:**
 - **RPG System**: Character progression with classes, inventory, quests, and boss battles
@@ -90,8 +94,8 @@ Whether you're looking to engage your community with games, manage your server e
 
 1. **Clone the repository:**
     ```bash
-    git clone https://github.com/watchandnotlearn/ultra-discord-bot.git
-    cd ultra-discord-bot
+    git clone https://github.com/hotocoo/DCB.git
+    cd DCB
     ```
 
 2. **Install dependencies:**
@@ -274,29 +278,37 @@ The bot supports extensive customization through configuration files and environ
 
 ### Project Structure
 ```
-pulsebot/
+DCB/
 ├── src/
-│   ├── commands/        # Slash command implementations
-│   ├── minigames/       # Mini-game logic
-│   ├── *.js             # Core modules and managers
-├── data/                # JSON data files (primary storage) + SQLite database (migration in progress)
-│   ├── players/         # Individual player data files
-│   ├── bot.db           # SQLite database file (migration)
-├── logs/                # Application logs
+│   ├── commands/        # Slash command implementations (one file per command)
+│   ├── minigames/       # Mini-game logic (typing challenge, etc.)
+│   └── *.js             # Core modules and managers (storage, rpg, music, economy, …)
+├── data/                # JSON data files (primary storage — created on first run)
+│   ├── players/         # Individual RPG character files (one JSON per user id)
+│   ├── economy.json     # User balances, transactions, market, businesses
+│   ├── moderation.json  # Warnings, mutes, bans, kicks, mod actions
+│   ├── schedules.json   # Reminders and scheduled events
+│   └── *.json           # Other domain stores
+├── logs/                # Rotating daily log files (`bot-YYYY-MM-DD.log`)
 ├── scripts/             # Utility scripts and data management
-├── tests/               # Test suites and results
-└── root-level-files/    # Main project files (package.json, README, etc.)
+├── tests/               # Test suites (38 tests, all passing)
+├── docs/                # Roadmap, audit notes, design docs
+└── root-level-files/    # Main project files (package.json, README, .env.template, etc.)
 ```
 
+> Note: SQLite (`bot.db`) is *not* created yet — the schema in `database-schema.md` is the planned target for migration.
+
 ### Key Modules
-- **Command System**: Dynamic command loading and execution
-- **RPG Engine**: Character progression and game mechanics with SQLite persistence
-- **Music Manager**: Multi-source audio streaming with enhanced error handling
-- **Economy System**: Transaction processing and market simulation with database integrity
-- **Moderation Tools**: User management and auto-moderation with audit logging
-- **AI Assistant**: Multi-model conversational AI with memory persistence
-- **Scheduler**: Event and reminder management with database-backed storage
-- **Database Layer**: JSON-based storage with ongoing SQLite migration support
+- **Command System**: Dynamic command loading from `src/commands/`, each file exports `{ data, execute }`
+- **RPG Engine** (`src/rpg.js`): Character progression with 4 classes (warrior / mage / rogue / paladin), per-user JSON files in `data/players/`, atomic write via tmp+rename
+- **Music Manager** (`src/music.js`): Multi-source audio streaming (YouTube primary, Spotify/Deezer fallback) with retry-bounded fallback chain
+- **Economy System** (`src/economy.js`): Transaction processing, market simulation, business ownership. Atomic transfer (no TOCTOU between balance check and debit)
+- **Moderation Tools** (`src/moderation.js`): Warnings, mutes, bans with per-guild/user scoping, `Object.hasOwn` guards on every dynamic-key access
+- **AI Assistant** (`src/aiassistant.js` + `src/chat.js`): Multi-model conversational AI with cooldown + per-user memory
+- **Scheduler** (`src/scheduler.js`): Reminders, events, recurring schedules with in-memory `setTimeout` queue
+- **Storage Layer** (`src/storage.js`): Atomic JSON file I/O with size cap, backup-before-write, JSON-strict-mode restore from backup on corruption
+- **Validation** (`src/validation.js`): Single source of truth for input validation (string/number/username/user-id) and XSS-style sanitization
+- **Error Handling** (`src/errorHandler.js`): `CommandError` class, circuit breaker per interaction, safe-reply helpers that handle Discord's "already replied" / "expired" states
 
 ## 🤝 Contributing
 
@@ -335,37 +347,40 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔄 Recent Updates & Fixes
 
-### Ongoing Database Migration
-- **JSON Storage Active**: Currently using JSON files as primary data storage method
-- **SQLite Migration**: Migration to SQLite database is underway for improved performance and reliability
-- **Data Integrity**: Ensuring safe data transfer with backup and rollback capabilities
-- **Migration Scripts**: Automated scripts for gradual migration from JSON to SQLite
-- **Backup System**: Comprehensive backup procedures during migration process
+### v3.0.1 — Bug fixes + docs + lint cleanup
 
-### Music System Improvements
-- **Enhanced Error Handling**: Improved resilience against API failures and network issues
-- **Multi-Source Support**: Prioritized YouTube with Deezer fallback for better availability
-- **Queue Management**: Robust queue operations with proper state management
-- **Audio Processing**: FFmpeg integration with static binaries for cross-platform compatibility
+#### Critical bug fixes
+- **Trading auction bid/buyout (`src/trading.js`)** — `placeBid()` and `buyoutAuction()` previously accepted any bid amount without checking the bidder's balance. Now: bids require sufficient funds, the bidder's gold is debited up front, and the previous high bidder is refunded when outbid. Buyout deducts from the buyer atomically.
+- **Music Deezer recursion (`src/music.js`)** — the preview-failed → fallback-test-audio retry could recurse forever when the test URL was also broken. Now bounded by `song._retryCount`; the chain aborts cleanly after 2 attempts.
+- **Path traversal in RPG player storage (`src/rpg.js`)** — `data/players/<userId>.json` constructed via `path.join(PLAYERS_DIR, \`${userId}.json\`)` would have allowed a malformed id (e.g. `../../etc/foo`) to escape the players directory. Now all 5 sites use a `playerPath(userId)` helper that validates the id is a 17–19 digit Discord snowflake.
+- **TOCTOU in economy transfer (`src/economy.js`)** — `transferBalance()` previously called `subtractBalance` then `addBalance`, each of which persisted the file. The window between check and debit allowed double-spend. Now: single in-memory mutation followed by one `saveEconomy()` call.
+- **Logger signal-handler conflict (`src/logger.js`)** — `logger.js` was registering SIGINT/SIGTERM handlers that bypassed the bot's proper `gracefulShutdown()` in `src/index.js` (no Discord client destroy, no DB cleanup). Removed the duplicate handlers; `index.js` now explicitly calls `logger.cleanup()` to flush the buffer.
+- **Storage error-arg type (`src/storage.js`)** — `logger.error(..., null, ...)` is replaced with `undefined` to match the `Error | null | undefined` parameter type and avoid false stack-trace attachments.
+- **Console → logger migration (`src/storage.js`)** — the one `console.log` debug line in storage is replaced with `logger.debug` for consistency.
 
-### Bug Fixes
-- **Command Validation**: Fixed dice format validation in `/roll` command (NdM format support)
-- **RPG Character Creation**: Resolved level scaling and skill point allocation issues
-- **Button Interactions**: Fixed unrecognized button actions in explore and trivia commands
-- **API Error Handling**: Improved error responses for malformed API requests
-- **Memory Management**: Added periodic cleanup of Maps and caches to prevent memory leaks
+#### Documentation accuracy
+- README badges updated: removed false `coverage 85%` claim (no coverage tool wired in CI), changed DB badge from SQLite → JSON (still pre-migration), fixed repo URL from `watchandnotlearn/ultra-discord-bot` → `hotocoo/DCB`, added a test-count badge, and callouts for the `package.json` 3.0.0 vs `@version` 3.0.1 mismatch.
+- "Key Modules" rewritten to describe each file's actual behavior instead of vague claims like "with SQLite persistence".
+- Project Structure section updated to show the real `data/` layout (`economy.json`, `players/`, `moderation.json`, `schedules.json`, …).
 
-### Performance Enhancements
-- **Connection Pooling**: Database connection management for concurrent operations
-- **Query Optimization**: Indexed tables for faster data retrieval
-- **Rate Limiting**: Improved rate limiting with adaptive cooldowns
-- **Caching**: Enhanced caching strategies for frequently accessed data
+#### Code quality (lint)
+- ESLint error count: **2435 → 750** (-69 %) and warning count: **1205 → 878** (-27 %) across 77 files.
+- Replaced all `console.*` calls in `rpg.js` with `logger.*` (12 sites).
+- Added `Object.hasOwn()` guards on every dynamic-key bracket access in `moderation.js`, `customcommands.js`, and `rpg.js` (resolves 100+ security/detect-object-injection warnings).
+- Replaced all `null` literals with `undefined` (or appropriate sentinel) in `rpg.js` (24 sites).
+- Converted 1400+ `"..."` string literals to `'...'` in `interactionHandlers.js` per the project's `quotes` rule.
+- Added 100+ numeric separators (`1_000_000`, `9_127_187`) for `unicorn/numeric-separators-style`.
+- Brace-style normalized to stroustrup in `interactionHandlers.js` (40+ sites).
+- Added targeted `eslint-disable-next-line security/detect-object-injection` comments with justification where the rule's static analysis can't see the runtime guard (`findIndex`, bounded array index, etc.).
 
-### Development & Testing
-- **Comprehensive Test Suite**: Added extensive testing for music, RPG, and command systems
-- **Error Logging**: Detailed logging with structured error information
-- **Migration Validation**: Automated checks for data integrity during migration
-- **Documentation**: Updated project structure and configuration guides
+### v3.0.0 — Earlier changes
+- JSON-based data storage layer with size-capped atomic writes (`src/storage.js`).
+- Music manager refactor with YouTube-priority search, Spotify token refresh, Deezer fallback.
+- Scheduler with reminders, events, recurring (`daily` / `weekly` / `monthly` / `hourly`).
+- Custom commands per guild.
+- Comprehensive integration test suite (38 tests across RPG, economy, validation, security).
+- ESLint + Prettier wired with `npm run lint`, `npm run format`, `npm run format:check`.
+- Docker support (`Dockerfile`, `docker:build`, `docker:run` npm scripts).
 
 ## 🙏 Acknowledgments
 

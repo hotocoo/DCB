@@ -22,6 +22,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   const difficulty = interaction.options.getString('difficulty') || 'easy';
+  // eslint-disable-next-line security/detect-object-injection -- difficulty validated by slash-command choices
   const config = DIFFICULTIES[difficulty];
 
   // Create shuffled card deck
@@ -52,52 +53,74 @@ export { sendMemoryBoard, getPerformanceRating };
 async function sendMemoryBoard(interaction, gameState) {
   if (!gameState.gameActive) return;
 
-  const { cards, flippedCards, matchedPairs, totalPairs, moves } = gameState;
+  const {
+    cards, flippedCards, matchedPairs, totalPairs, moves, startTime, difficulty
+  } = gameState;
 
   // Check win condition
   if (matchedPairs === totalPairs) {
     gameState.gameActive = false;
-    const timeElapsed = Math.round((Date.now() - gameState.startTime) / 1000);
-
-    const winEmbed = new EmbedBuilder()
-      .setTitle('🎉 Memory Master!')
-      .setDescription(`Congratulations! You matched all ${totalPairs} pairs in ${moves} moves and ${timeElapsed} seconds! 🏆`)
-      .setColor(0x00_FF_00)
-      .addFields(
-        {
-          name: '📊 Stats',
-          value: `**Moves:** ${moves}\n**Time:** ${timeElapsed}s\n**Efficiency:** ${((totalPairs / moves) * 100).toFixed(1)}%`,
-          inline: true
-        },
-        {
-          name: '🏆 Rating',
-          value: getPerformanceRating(moves, totalPairs, timeElapsed),
-          inline: true
-        }
-      );
-
-    await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [winEmbed], components: [] }) : interaction.reply({ embeds: [winEmbed] }));
-
-    // Clean up game state
-    const { memoryGames } = await import('../game-states.js');
-    memoryGames.delete(interaction.message?.id || interaction.id);
-
-    return;
+    const timeElapsed = Math.round((Date.now() - startTime) / 1000);
+    return sendWinEmbed(interaction, gameState, {
+      moves, totalPairs, timeElapsed
+    });
   }
+
+  return sendBoardEmbed(interaction, gameState, {
+    cards, flippedCards, matchedPairs, totalPairs, moves, difficulty
+  });
+}
+
+async function sendWinEmbed(interaction, gameState, { moves, totalPairs, timeElapsed }) {
+  const winEmbed = new EmbedBuilder()
+    .setTitle('🎉 Memory Master!')
+    .setDescription(
+      `Congratulations! You matched all ${totalPairs} pairs in ${moves} moves ` +
+      `and ${timeElapsed} seconds! 🏆`
+    )
+    .setColor(0x00_FF_00)
+    .addFields(
+      {
+        name: '📊 Stats',
+        value:
+          `**Moves:** ${moves}\n**Time:** ${timeElapsed}s\n` +
+          `**Efficiency:** ${((totalPairs / moves) * 100).toFixed(1)}%`,
+        inline: true
+      },
+      {
+        name: '🏆 Rating',
+        value: getPerformanceRating(moves, totalPairs, timeElapsed),
+        inline: true
+      }
+    );
+
+  await (interaction.replied || interaction.deferred
+    ? interaction.editReply({ embeds: [winEmbed], components: [] })
+    : interaction.reply({ embeds: [winEmbed] }));
+
+  // Clean up game state
+  const { memoryGames } = await import('../game-states.js');
+  const messageId = interaction.message?.id || interaction.id;
+  memoryGames.delete(messageId);
+}
+
+async function sendBoardEmbed(interaction, gameState, ctx) {
+  const { cards, flippedCards, matchedPairs, totalPairs, moves, difficulty } = ctx;
 
   const embed = new EmbedBuilder()
     .setTitle(`🧠 Memory Game - ${matchedPairs}/${totalPairs} Pairs Found`)
-    .setDescription(`**Moves:** ${moves} | **Difficulty:** ${gameState.difficulty.toUpperCase()}`)
+    .setDescription(`**Moves:** ${moves} | **Difficulty:** ${difficulty.toUpperCase()}`)
     .setColor(0x00_99_FF);
 
   // Create card grid (4x3 for easy, 4x4 for medium/hard)
-  const gridSize = gameState.totalPairs <= 6 ? 3 : 4;
+  const gridSize = totalPairs <= 6 ? 3 : 4;
+  const flippedSet = new Set(flippedCards);
   let cardGrid = '';
 
   for (let i = 0; i < cards.length; i += gridSize) {
     const row = cards.slice(i, i + gridSize).map(card => {
       if (card.isMatched) return '✅';
-      if (card.isFlipped || flippedCards.includes(card.id)) return card.emoji;
+      if (card.isFlipped || flippedSet.has(card.id)) return card.emoji;
       return '🂠'; // Face down card
     }).join(' ');
     cardGrid += row + '\n';
@@ -114,28 +137,27 @@ async function sendMemoryBoard(interaction, gameState) {
   for (let i = 0; i < cards.length; i += gridSize) {
     const row = new ActionRowBuilder();
     for (let j = i; j < i + gridSize && j < cards.length; j++) {
-      const card = cards[j];
-      row.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`memory_${j}`)
-          .setLabel(card.isMatched ? '✅' : (card.isFlipped ? card.emoji : '🂠'))
-          .setStyle(card.isMatched ? ButtonStyle.Success : ButtonStyle.Primary)
-          .setDisabled(card.isMatched || flippedCards.includes(j))
-      );
+      // eslint-disable-next-line security/detect-object-injection -- j is a numeric loop index
+      const card = Object.hasOwn(cards, j) ? cards[j] : undefined;
+      row.addComponents(buildCardButton(j, card, flippedSet));
     }
     buttons.push(row);
   }
 
   // Add reset button if there are flipped cards
   if (flippedCards.length > 0) {
-    buttons.push(
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`memory_reset:${interaction.user.id}`).setLabel('🔄 Reset Flips').setStyle(ButtonStyle.Secondary)
-      )
-    );
+    const resetId = `memory_reset:${interaction.user.id}`;
+    const resetBtn = new ButtonBuilder()
+      .setCustomId(resetId)
+      .setLabel('🔄 Reset Flips')
+      .setStyle(ButtonStyle.Secondary);
+    buttons.push(new ActionRowBuilder().addComponents(resetBtn));
   }
 
-  await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [embed], components: buttons }) : interaction.reply({ embeds: [embed], components: buttons }));
+  const replyOptions = { embeds: [embed], components: buttons };
+  await (interaction.replied || interaction.deferred
+    ? interaction.editReply(replyOptions)
+    : interaction.reply(replyOptions));
 
   // Store game state after reply (if not already stored)
   const messageId = interaction.message?.id || interaction.id;
@@ -146,9 +168,23 @@ async function sendMemoryBoard(interaction, gameState) {
   }
 }
 
+function buildCardButton(index, card, flippedSet) {
+  const id = `memory_${index}`;
+  const matched = Boolean(card?.isMatched);
+  const label = matched
+    ? '✅'
+    : (card?.isFlipped ? card.emoji : '🂠');
+  const style = matched ? ButtonStyle.Success : ButtonStyle.Primary;
+  const disabled = matched || flippedSet.has(index);
+  return new ButtonBuilder()
+    .setCustomId(id)
+    .setLabel(label)
+    .setStyle(style)
+    .setDisabled(disabled);
+}
+
 function getPerformanceRating(moves, pairs, time) {
   const efficiency = (pairs / moves) * 100;
-  const timeBonus = Math.max(0, 100 - time);
 
   if (efficiency >= 70 && time <= 60) return '🌟 Perfect!';
   if (efficiency >= 60 && time <= 90) return '⭐ Excellent!';

@@ -1,7 +1,7 @@
 {
-  "name": "pulsebot",
-  "version": "3.0.0",
-  "description": "Pulse Bot - The Most Advanced Discord Bot Ever Created",
+  "name": "athena",
+  "version": "0.1.1",
+  "description": "Athena - A feature-rich Discord bot for gaming, music, economy, moderation, and AI",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -89,12 +89,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/watchandnotlearn/ultra-discord-bot.git"
+    "url": "https://github.com/hotocoo/DCB.git"
   },
   "bugs": {
-    "url": "https://github.com/watchandnotlearn/ultra-discord-bot/issues"
+    "url": "https://github.com/hotocoo/DCB/issues"
   },
-  "homepage": "https://github.com/watchandnotlearn/ultra-discord-bot#readme",
+  "homepage": "https://github.com/hotocoo/DCB#readme",
   "config": {
     "commitizen": {
       "path": "./node_modules/cz-conventional-changelog"

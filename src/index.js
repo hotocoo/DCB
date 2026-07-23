@@ -4,7 +4,7 @@
  *
  * @fileoverview Main bot entry point with comprehensive error handling and graceful shutdown.
  * @author Pulse Bot Development Team
- * @version 3.0.1
+ * @version 0.1.1
  * @license MIT
  */
 
@@ -261,8 +261,8 @@ async function gracefulShutdown(client, signal) {
       });
     }
 
-    // Close database connections if applicable
-    // Note: Database cleanup would be handled by the storage module
+    // Flush the logger's file-writer/buffer before tearing down.
+    logger.cleanup();
 
     // Destroy the client after a short delay to allow pending operations
     setTimeout(() => {

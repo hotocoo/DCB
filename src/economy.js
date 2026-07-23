@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { logger } from './logger.js';
 
 const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
 
@@ -35,7 +36,7 @@ class EconomyManager {
       this.economyData = data;
     }
     catch (error) {
-      console.error('Failed to load economy:', error);
+      logger.error('Failed to load economy:', error);
       this.economyData = {
         userBalances: {},
         transactions: [],
@@ -51,7 +52,7 @@ class EconomyManager {
       fs.writeFileSync(ECONOMY_FILE, JSON.stringify(this.economyData, null, 2));
     }
     catch (error) {
-      console.error('Failed to save economy:', error);
+      logger.error('Failed to save economy:', error);
     }
   }
 
@@ -78,10 +79,13 @@ class EconomyManager {
 
   transferBalance(fromUserId, toUserId, amount) {
     if (amount <= 0) return { success: false, reason: 'invalid_amount' };
+    // TOCTOU-safe: single in-memory check + single atomic-ish balance mutation,
+    // then ONE saveEconomy() call at the end (not one per leg).
     if (this.getBalance(fromUserId) < amount) return { success: false, reason: 'insufficient_funds' };
-
-    this.subtractBalance(fromUserId, amount);
-    this.addBalance(toUserId, amount);
+    const fromCurrent = this.economyData.userBalances[fromUserId] || 0;
+    const toCurrent = this.economyData.userBalances[toUserId] || 0;
+    this.economyData.userBalances[fromUserId] = Math.max(0, fromCurrent - amount);
+    this.economyData.userBalances[toUserId] = Math.max(0, toCurrent + amount);
 
     // Log transaction
     this.logTransaction({
@@ -92,6 +96,7 @@ class EconomyManager {
       timestamp: Date.now()
     });
 
+    this.saveEconomy();
     return { success: true };
   }
 
@@ -118,6 +123,12 @@ class EconomyManager {
 
   // Business and Investment System
   createBusiness(userId, businessType, initialInvestment) {
+    if (!userId || typeof userId !== 'string') {
+      return { success: false, reason: 'invalid_user' };
+    }
+    if (typeof initialInvestment !== 'number' || initialInvestment <= 0) {
+      return { success: false, reason: 'invalid_investment' };
+    }
     if (this.getBalance(userId) < initialInvestment) {
       return { success: false, reason: 'insufficient_funds' };
     }
@@ -141,7 +152,9 @@ class EconomyManager {
     }
 
     this.economyData.businessData[userId].push(business);
-    this.subtractBalance(userId, initialInvestment);
+    // In-place balance update so we don't double-write (subtractBalance persists).
+    const current = this.economyData.userBalances[userId] || 0;
+    this.economyData.userBalances[userId] = Math.max(0, current - initialInvestment);
     this.saveEconomy();
 
     return { success: true, business };
@@ -640,7 +653,7 @@ class EconomyManager {
     for (const [itemId, history] of this.priceHistory.entries()) {
       if (history.length > 50) {
         this.priceHistory.set(itemId, history.slice(-50));
-        console.log(`[ECONOMY] Cleaned up price history for ${itemId}: ${history.length} -> 50 entries`);
+        logger.debug(`[ECONOMY] Cleaned up price history for ${itemId}: ${history.length} -> 50 entries`);
       }
     }
 
@@ -654,7 +667,7 @@ class EconomyManager {
       if (!activeItems.has(itemId)) {
         this.marketPrices.delete(itemId);
         this.priceHistory.delete(itemId);
-        console.log(`[ECONOMY] Cleaned up stale market data for ${itemId}`);
+        logger.debug(`[ECONOMY] Cleaned up stale market data for ${itemId}`);
       }
     }
 

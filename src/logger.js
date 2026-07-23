@@ -289,21 +289,7 @@ export function logAchievement(achievement, userId) {
   logger.logAchievement(achievement, userId);
 }
 
-// Graceful shutdown handlers - only register once
-let shutdownHandlersRegistered = false;
-
-if (!shutdownHandlersRegistered) {
-  shutdownHandlersRegistered = true;
-
-  process.on('SIGTERM', () => {
-    logger.info('Received SIGTERM, shutting down gracefully...');
-    logger.cleanup();
-    process.exit(0);
-  });
-
-  process.on('SIGINT', () => {
-    logger.info('Received SIGINT, shutting down gracefully...');
-    logger.cleanup();
-    process.exit(0);
-  });
-}
+// NOTE: Process signal handlers are intentionally NOT registered here.
+// The bot's main entry point (src/index.js) owns SIGINT/SIGTERM/uncaughtException
+// via its gracefulShutdown() flow — registering here too would bypass the
+// Discord client teardown and database cleanup that index.js coordinates.

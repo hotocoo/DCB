@@ -4,7 +4,7 @@
  *
  * @fileoverview Advanced chat system with multiple AI providers, conversation memory, and fallback mechanisms.
  * @author Pulse Bot Development Team
- * @version 3.0.1
+ * @version 0.1.1
  * @license MIT
  */
 

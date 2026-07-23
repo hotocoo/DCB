@@ -1,7 +1,7 @@
 /**
  * @typedef {Object} GameState
  * @property {string} id
- * @property {(null|'red'|'yellow')[][]} board
+ * @property {(undefined|'red'|'yellow')[][]} board
  * @property {Object} players
  * @property {Object} players.red
  * @property {string} players.red.id
@@ -23,12 +23,13 @@
  * @typedef {import('discord.js').ButtonInteraction} ButtonInteraction
  */
 
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
 import { updateUserStats } from '../achievements.js';
 import { connect4Games } from '../game-states.js';
 import { CommandError, handleCommandError } from '../errorHandler.js';
 import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers.js';
+import { logError } from '../logger.js';
 
 export const data = new SlashCommandBuilder()
   .setName('connect4')
@@ -47,9 +48,6 @@ export const data = new SlashCommandBuilder()
       )
       .setRequired(false));
 
-/**
- * @param {CommandInteraction} interaction
- */
 /**
  * @param {CommandInteraction} interaction
  */
@@ -76,7 +74,9 @@ export async function execute(interaction) {
     /** @type {GameState} */
     const gameState = {
       id: gameId,
-      board: Array.from({ length: 6 }).fill(null).map(() => /** @type {(null|'red'|'yellow')[]} */ (Array.from({ length: 7 }).fill(null))),
+      board: Array.from({ length: 6 }, () =>
+        /** @type {(undefined|'red'|'yellow')[]} */ (Array.from({ length: 7 }))
+      ),
       players: {
         red: { id: interaction.user.id, name: interaction.user.username, symbol: '🔴' },
         yellow: { id: opponent.id, name: opponent.username, symbol: '🟡' }
@@ -99,12 +99,27 @@ export async function execute(interaction) {
 }
 
 /**
+ * Look up a player in the players object using Object.hasOwn to prevent
+ * arbitrary-key access (security/detect-object-injection guard).
+ * @param {GameState['players']} players
+ * @param {string} key
+ * @returns {{ id: string, name: string, symbol: string } | undefined}
+ */
+function getPlayer(players, key) {
+  if (Object.hasOwn(players, key)) {
+    // key validated above via Object.hasOwn
+    // eslint-disable-next-line security/detect-object-injection
+    return /** @type {{ id: string, name: string, symbol: string }} */ (players[/** @type {'red'|'yellow'} */ (key)]);
+  }
+}
+
+/**
  * @param {CommandInteraction|ButtonInteraction} interaction
  * @param {GameState} gameState
  */
 async function sendConnect4Board(interaction, gameState) {
   try {
-    const { board, players, currentPlayer, status, isAI, difficulty } = gameState;
+    const { board, players, currentPlayer, status, isAI, difficulty, id } = gameState;
 
     // Check for winner
     const winner = checkConnect4Winner(board);
@@ -112,56 +127,75 @@ async function sendConnect4Board(interaction, gameState) {
       gameState.status = 'completed';
 
       if (winner !== 'tie') {
-        const winnerPlayer = winner === 'red' ? players.red : winner === 'yellow' ? players.yellow : null;
+        const winnerPlayer = getPlayer(players, winner);
         if (winnerPlayer && winnerPlayer.id !== 'ai' && winnerPlayer.id) {
           try {
             updateUserStats(winnerPlayer.id, { connect4_wins: 1 });
           }
           catch (statsError) {
-            console.error('Failed to update user stats:', statsError);
+            logError('Failed to update user stats', statsError, { userId: winnerPlayer.id });
           }
         }
       }
 
       // Clean up game state
-      connect4Games.delete(gameState.id);
+      connect4Games.delete(id);
+
+      const winnerPlayer = winner !== 'tie' ? getPlayer(players, winner) : undefined;
+      const winnerName = winnerPlayer?.name ?? 'Unknown';
 
       const resultEmbed = new EmbedBuilder()
         .setTitle('🎯 Connect Four - Game Over!')
         .setColor(winner === 'tie' ? 0xFF_A5_00 : 0x00_FF_00)
-        .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${(winner === 'red' ? players.red : winner === 'yellow' ? players.yellow : { name: 'Unknown' }).name} wins!**`)
+        .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${winnerName} wins!**`)
         .addFields({
           name: 'Final Board',
           value: formatConnect4Board(board),
           inline: false
         });
 
-      await (interaction.replied || interaction.deferred ? safeInteractionUpdate(interaction, { embeds: [resultEmbed], components: [] }) : safeInteractionReply(interaction, { embeds: [resultEmbed] }));
+      if (interaction.replied || interaction.deferred) {
+        await safeInteractionUpdate(interaction, { embeds: [resultEmbed], components: [] });
+      }
+      else {
+        await safeInteractionReply(interaction, { embeds: [resultEmbed] });
+      }
       return;
     }
 
     // Update game state in storage
-    connect4Games.set(gameState.id, gameState);
+    connect4Games.set(id, gameState);
+
+    // currentPlayer is validated to be 'red' | 'yellow' via the GameState type,
+    // so the player lookup is safe after the Object.hasOwn guard.
+    const activePlayer = getPlayer(players, currentPlayer);
+    const playerName = activePlayer?.name ?? 'Unknown';
+    const playerSymbol = activePlayer?.symbol ?? '❓';
 
     const embed = new EmbedBuilder()
       .setTitle('🎯 Connect Four')
       .setColor(currentPlayer === 'red' ? 0xFF_00_00 : 0xFF_FF_00)
-      .setDescription(`${players[currentPlayer]?.name || 'Unknown'}'s turn ${players[currentPlayer]?.symbol || '❓'}`)
+      .setDescription(`${playerName}'s turn ${playerSymbol}`)
       .addFields({
         name: 'Game Board',
         value: formatConnect4Board(board),
         inline: false
       });
 
-    // Create column buttons (0-6) - Split into two rows since max 5 per row
+    // Create column buttons (0-6) - Split into two rows since max 5 per row.
+    // The board helpers below only access `boardRow[col]` / `testBoard[row]` /
+    // `preferredColumns[i]` etc. with loop-bounded integer indices, so the
+    // security/detect-object-injection warnings there are false positives.
+    /* eslint-disable security/detect-object-injection */
     const row1 = new ActionRowBuilder();
     const row2 = new ActionRowBuilder();
 
     for (let col = 0; col < 7; col++) {
-      const canPlay = board[0] && board[0][col] === null; // Check if top row is empty
+      const topRow = board[0];
+      const canPlay = topRow ? topRow[col] === undefined : false;
 
       const button = new ButtonBuilder()
-        .setCustomId(`c4_${col}_${gameState.id}`)
+        .setCustomId(`c4_${col}_${id}`)
         .setLabel(`${col + 1}`)
         .setStyle(canPlay ? (currentPlayer === 'red' ? ButtonStyle.Danger : ButtonStyle.Secondary) : ButtonStyle.Secondary)
         .setDisabled(!canPlay || (isAI && currentPlayer === 'yellow'));
@@ -174,38 +208,51 @@ async function sendConnect4Board(interaction, gameState) {
       }
     }
 
-    await (interaction.replied || interaction.deferred ? safeInteractionUpdate(interaction, { embeds: [embed], components: [row1, row2] }) : safeInteractionReply(interaction, { embeds: [embed], components: [row1, row2] }));
+    if (interaction.replied || interaction.deferred) {
+      await safeInteractionUpdate(interaction, { embeds: [embed], components: [row1, row2] });
+    }
+    else {
+      await safeInteractionReply(interaction, { embeds: [embed], components: [row1, row2] });
+    }
 
     // AI move if it's AI's turn
     if (isAI && currentPlayer === 'yellow' && status === 'active') {
       setTimeout(async() => {
         try {
           const aiMove = getConnect4AIMove(board, difficulty);
-         if (aiMove !== null && aiMove !== undefined) {
-           await makeConnect4Move(gameState, aiMove);
-           await sendConnect4Board(interaction, gameState);
-         }
+          if (aiMove !== undefined) {
+            await makeConnect4Move(gameState, aiMove);
+            await sendConnect4Board(interaction, gameState);
+          }
         }
         catch (aiError) {
-          console.error('AI move error:', aiError);
+          logError('AI move error', aiError);
         }
       }, 1500);
     }
+    /* eslint-enable security/detect-object-injection */
   }
   catch (error) {
-    console.error('sendConnect4Board error:', error);
+    logError('sendConnect4Board error', error);
     await handleCommandError(interaction, new CommandError('Failed to update game board.', 'UNKNOWN_ERROR', { originalError: error instanceof Error ? error.message : String(error) }));
   }
 }
 
 /**
- * @param {(null|'red'|'yellow')[][]} board
+ * @param {(undefined|'red'|'yellow')[][]} board
+ *
+ * Every `board[row]` / `boardRow[col]` access uses a loop-bounded integer
+ * index and every `symbols[key]` access uses a literal cell string. The
+ * security/detect-object-injection rule cannot prove that statically, so we
+ * disable it at the function level with this justification.
  */
+/* eslint-disable security/detect-object-injection */
 function formatConnect4Board(board) {
+  // Symbol map keyed only by literal cell strings — keys are static.
   const symbols = {
-    null: '⬜',
     red: '🔴',
-    yellow: '🟡'
+    yellow: '🟡',
+    empty: '⬜'
   };
 
   let formatted = '';
@@ -214,17 +261,25 @@ function formatConnect4Board(board) {
     if (!boardRow) continue;
     for (let col = 0; col < 7; col++) {
       const cell = boardRow[col];
-      formatted += cell === null ? symbols.null : cell === 'red' ? symbols.red : cell === 'yellow' ? symbols.yellow : '⬜';
+      const key = cell ?? 'empty';
+      formatted += symbols[key];
     }
     formatted += '\n';
   }
   formatted += '1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣';
   return formatted;
 }
+/* eslint-enable security/detect-object-injection */
 
 /**
- * @param {(null|'red'|'yellow')[][]} board
+ * @param {(undefined|'red'|'yellow')[][]} board
+ *
+ * Note: every `board[row]` / `boardRow[col]` here uses a loop-bounded integer
+ * index that has been validated against the row/column constants below. The
+ * security/detect-object-injection rule cannot prove that statically, so we
+ * disable it at the function level with this justification.
  */
+/* eslint-disable security/detect-object-injection */
 function checkConnect4Winner(board) {
   // Check horizontal
   for (let row = 0; row < 6; row++) {
@@ -232,7 +287,10 @@ function checkConnect4Winner(board) {
     if (!boardRow) continue;
     for (let col = 0; col < 4; col++) {
       const cell = boardRow[col];
-      if (cell && boardRow[col + 1] === cell && boardRow[col + 2] === cell && boardRow[col + 3] === cell) {
+      if (cell
+        && boardRow[col + 1] === cell
+        && boardRow[col + 2] === cell
+        && boardRow[col + 3] === cell) {
         return cell;
       }
     }
@@ -247,7 +305,10 @@ function checkConnect4Winner(board) {
     if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 0; col < 7; col++) {
       const cell = boardRow0[col];
-      if (cell && boardRow1[col] === cell && boardRow2[col] === cell && boardRow3[col] === cell) {
+      if (cell
+        && boardRow1[col] === cell
+        && boardRow2[col] === cell
+        && boardRow3[col] === cell) {
         return cell;
       }
     }
@@ -262,7 +323,10 @@ function checkConnect4Winner(board) {
     if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 0; col < 4; col++) {
       const cell = boardRow0[col];
-      if (cell && boardRow1[col + 1] === cell && boardRow2[col + 2] === cell && boardRow3[col + 3] === cell) {
+      if (cell
+        && boardRow1[col + 1] === cell
+        && boardRow2[col + 2] === cell
+        && boardRow3[col + 3] === cell) {
         return cell;
       }
     }
@@ -277,24 +341,33 @@ function checkConnect4Winner(board) {
     if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 3; col < 7; col++) {
       const cell = boardRow0[col];
-      if (cell && boardRow1[col - 1] === cell && boardRow2[col - 2] === cell && boardRow3[col - 3] === cell) {
+      if (cell
+        && boardRow1[col - 1] === cell
+        && boardRow2[col - 2] === cell
+        && boardRow3[col - 3] === cell) {
         return cell;
       }
     }
   }
 
   // Check for tie
-  if (board[0] && board[0].every(/** @param {null|'red'|'yellow'} cell */ cell => cell !== null)) {
+  const topRow = board[0];
+  if (topRow && topRow.every(cell => cell)) {
     return 'tie';
   }
 
-  return null;
+  return undefined;
 }
+/* eslint-enable security/detect-object-injection */
 
 /**
  * @param {GameState} gameState
  * @param {number} column
+ *
+ * `column` is validated to be an integer in [0, 6] above and `row` is
+ * loop-bounded, so the board index accesses are safe.
  */
+/* eslint-disable security/detect-object-injection */
 async function makeConnect4Move(gameState, column) {
   try {
     // Validate column input
@@ -307,9 +380,10 @@ async function makeConnect4Move(gameState, column) {
     // Find the lowest available row in the column
     for (let row = 5; row >= 0; row--) {
       const boardRow = board[row];
-      if (boardRow && boardRow[column] === null) {
-        boardRow[column] = gameState.currentPlayer;
-        gameState.currentPlayer = gameState.currentPlayer === 'red' ? 'yellow' : 'red';
+      if (boardRow && boardRow[column] === undefined) {
+        const { currentPlayer } = gameState;
+        boardRow[column] = currentPlayer;
+        gameState.currentPlayer = currentPlayer === 'red' ? 'yellow' : 'red';
         return true;
       }
     }
@@ -317,26 +391,33 @@ async function makeConnect4Move(gameState, column) {
     return false; // Column is full
   }
   catch (error) {
-    console.error('makeConnect4Move error:', error);
+    logError('makeConnect4Move error', error, { column });
     return false;
   }
 }
+/* eslint-enable security/detect-object-injection */
 
 /**
- * @param {(null|'red'|'yellow')[][]} board
+ * @param {(undefined|'red'|'yellow')[][]} board
  * @param {'easy'|'medium'|'hard'} difficulty
+ *
+ * Same justification as the other board helpers — every bracket access uses a
+ * loop-bounded integer index or `Math.floor(random * length)` which is always
+ * in range [0, length-1].
  */
+/* eslint-disable security/detect-object-injection */
 function getConnect4AIMove(board, difficulty) {
   try {
     /** @type {number[]} */
     const availableColumns = [];
     for (let col = 0; col < 7; col++) {
-      if (board[0] && board[0][col] === null) {
+      const topRow = board[0];
+      if (topRow && topRow[col] === undefined) {
         availableColumns.push(col);
       }
     }
 
-    if (availableColumns.length === 0) return null;
+    if (availableColumns.length === 0) return undefined;
 
     switch (difficulty) {
       case 'easy': {
@@ -349,14 +430,15 @@ function getConnect4AIMove(board, difficulty) {
       case 'medium': {
         // Check for winning moves and blocking moves
         const winningCol = findConnect4WinningMove(board, 'yellow');
-        if (winningCol !== null) return winningCol;
+        if (winningCol !== undefined) return winningCol;
 
         const blockingCol = findConnect4WinningMove(board, 'red');
-        if (blockingCol !== null) return blockingCol;
+        if (blockingCol !== undefined) return blockingCol;
 
         // Prefer center
         const center = [3, 2, 4, 1, 5, 0, 6].find(col => availableColumns.includes(col));
-        return center !== undefined ? center : availableColumns[Math.floor(Math.random() * availableColumns.length)];
+        if (center !== undefined) return center;
+        return availableColumns[Math.floor(Math.random() * availableColumns.length)];
       }
 
       case 'hard': {
@@ -370,31 +452,39 @@ function getConnect4AIMove(board, difficulty) {
     }
   }
   catch (error) {
-    console.error('getConnect4AIMove error:', error);
+    logError('getConnect4AIMove error', error, { difficulty });
     // Fallback to random move
     const fallbackColumns = [];
     for (let col = 0; col < 7; col++) {
-      if (board[0] && board[0][col] === null) {
+      const topRow = board[0];
+      if (topRow && topRow[col] === undefined) {
         fallbackColumns.push(col);
       }
     }
-    return fallbackColumns.length > 0 ? fallbackColumns[Math.floor(Math.random() * fallbackColumns.length)] : null;
+    if (fallbackColumns.length === 0) return undefined;
+    return fallbackColumns[Math.floor(Math.random() * fallbackColumns.length)];
   }
 }
+/* eslint-enable security/detect-object-injection */
 
 /**
- * @param {(null|'red'|'yellow')[][]} board
+ * @param {(undefined|'red'|'yellow')[][]} board
  * @param {'red'|'yellow'} player
+ *
+ * Same justification as above — every bracket access uses a loop-bounded
+ * integer index.
  */
+/* eslint-disable security/detect-object-injection */
 function findConnect4WinningMove(board, player) {
   for (let col = 0; col < 7; col++) {
-    if (board[0] && board[0][col] !== null) continue;
+    const topRow = board[0];
+    if (topRow && topRow[col] !== undefined) continue;
 
     // Test the move
-    const testBoard = board.map(/** @param {(null|'red'|'yellow')[]} row */ row => [...row]);
+    const testBoard = board.map(/** @param {(undefined|'red'|'yellow')[]} row */ row => [...row]);
     for (let row = 5; row >= 0; row--) {
       const testRow = testBoard[row];
-      if (testRow && testRow[col] === null) {
+      if (testRow && testRow[col] === undefined) {
         testRow[col] = player;
         if (checkConnect4Winner(testBoard) === player) {
           return col;
@@ -403,27 +493,32 @@ function findConnect4WinningMove(board, player) {
       }
     }
   }
-  return null;
+  return undefined;
 }
+/* eslint-enable security/detect-object-injection */
 
 /**
- * @param {(null|'red'|'yellow')[][]} board
+ * @param {(undefined|'red'|'yellow')[][]} board
  * @param {'red'|'yellow'} player
+ *
+ * Same justification as above.
  */
+/* eslint-disable security/detect-object-injection */
 function getConnect4BestMove(board, player) {
   try {
     let bestScore = Number.NEGATIVE_INFINITY;
-    let bestCol = null;
+    let bestCol;
 
     for (let col = 0; col < 7; col++) {
-      if (board[0] && board[0][col] !== null) continue;
-  
-      const testBoard = board.map(/** @param {(null|'red'|'yellow')[]} row */ row => [...row]);
+      const topRow = board[0];
+      if (topRow && topRow[col] !== undefined) continue;
+
+      const testBoard = board.map(/** @param {(undefined|'red'|'yellow')[]} row */ row => [...row]);
       let moveValid = false;
-  
+
       for (let row = 5; row >= 0; row--) {
         const testRow = testBoard[row];
-        if (testRow && testRow[col] === null) {
+        if (testRow && testRow[col] === undefined) {
           testRow[col] = player;
           const score = evaluateConnect4Position(testBoard, 0, player === 'yellow' ? 'red' : 'yellow');
           if (score > bestScore) {
@@ -439,19 +534,23 @@ function getConnect4BestMove(board, player) {
     }
 
     // Fallback to center column if no best move found
-    return bestCol !== null ? bestCol : 3;
+    return bestCol !== undefined ? bestCol : 3;
   }
   catch (error) {
-    console.error('getConnect4BestMove error:', error);
+    logError('getConnect4BestMove error', error, { player });
     return 3; // Return center column as fallback
   }
 }
+/* eslint-enable security/detect-object-injection */
 
 /**
- * @param {(null|'red'|'yellow')[][]} board
+ * @param {(undefined|'red'|'yellow')[][]} board
  * @param {number} depth
  * @param {'red'|'yellow'} player
+ *
+ * Same justification as above.
  */
+/* eslint-disable security/detect-object-injection */
 function evaluateConnect4Position(board, depth, player) {
   const winner = checkConnect4Winner(board);
   if (winner === 'yellow') return 100 - depth;
@@ -466,7 +565,8 @@ function evaluateConnect4Position(board, depth, player) {
     const boardRow = board[row];
     if (!boardRow) continue;
     for (let col = 0; col < 4; col++) {
-      const window = [boardRow[col], boardRow[col + 1], boardRow[col + 2], boardRow[col + 3]].filter(cell => cell != null);
+      const window = [boardRow[col], boardRow[col + 1], boardRow[col + 2], boardRow[col + 3]]
+        .filter(cell => cell !== undefined);
       score += evaluateWindow(window, player);
     }
   }
@@ -479,31 +579,44 @@ function evaluateConnect4Position(board, depth, player) {
     const boardRow3 = board[row + 3];
     if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 0; col < 7; col++) {
-      const window = [boardRow0[col], boardRow1[col], boardRow2[col], boardRow3[col]].filter(cell => cell != null);
+      const window = [boardRow0[col], boardRow1[col], boardRow2[col], boardRow3[col]]
+        .filter(cell => cell !== undefined);
       score += evaluateWindow(window, player);
     }
   }
 
   return score;
 }
+/* eslint-enable security/detect-object-injection */
 
 /**
- * @param {(null|'red'|'yellow')[]} window
+ * @param {(undefined|'red'|'yellow')[]} window
  * @param {'red'|'yellow'} player
  */
 function evaluateWindow(window, player) {
   const opponent = player === 'yellow' ? 'red' : 'yellow';
   let score = 0;
 
-  const playerCount = window.filter(/** @param {null|'red'|'yellow'} cell */ cell => cell === player).length;
-  const nullCount = window.filter(/** @param {null|'red'|'yellow'} cell */ cell => cell === null).length;
-  const opponentCount = window.filter(/** @param {null|'red'|'yellow'} cell */ cell => cell === opponent).length;
+  let playerCount = 0;
+  let emptyCount = 0;
+  let opponentCount = 0;
+  for (const cell of window) {
+    if (cell === undefined) {
+      emptyCount++;
+    }
+    else if (cell === player) {
+      playerCount++;
+    }
+    else if (cell === opponent) {
+      opponentCount++;
+    }
+  }
 
   if (playerCount === 4) score += 100;
-  else if (playerCount === 3 && nullCount === 1) score += 10;
-  else if (playerCount === 2 && nullCount === 2) score += 2;
+  else if (playerCount === 3 && emptyCount === 1) score += 10;
+  else if (playerCount === 2 && emptyCount === 2) score += 2;
 
-  if (opponentCount === 3 && nullCount === 1) score -= 80;
+  if (opponentCount === 3 && emptyCount === 1) score -= 80;
 
   return score;
 }

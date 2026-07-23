@@ -17,7 +17,7 @@ const COMMAND_EXTENSIONS = ['.js', '.mjs', '.cjs'];
 /**
  * Loads all command modules from the commands directory.
  * @param {import('discord.js').Client} client - Discord client instance
- * @returns {Promise<{total: number, loaded: number}>} Object with total command files found and successfully loaded commands
+ * @returns {Promise<{total: number, loaded: number}>} Count of files found and commands loaded
  */
 export async function loadCommands(client) {
   const commandsPath = path.join(process.cwd(), 'src', 'commands');

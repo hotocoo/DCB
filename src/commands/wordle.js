@@ -1,7 +1,18 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags } from 'discord.js';
+import {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  MessageFlags
+} from 'discord.js';
 
 import { wordleGames } from '../game-states.js';
 import { updateUserStats } from '../achievements.js';
+import { logError } from '../logger.js';
 
 const WORD_LIST = [
   'HOUSE', 'PLANE', 'TIGER', 'OCEAN', 'FLAME', 'CLOUD', 'BRAIN', 'CHAIR', 'DANCE', 'EAGLE',
@@ -11,14 +22,8 @@ const WORD_LIST = [
   'ALONE', 'ALONG', 'ALTER', 'AMONG', 'ANGER', 'ANGLE', 'ANGRY', 'APART', 'APPLE', 'APPLY'
 ];
 
-/**
- * Validates if a word is in the word list.
- * @param {string} word - The word to validate.
- * @returns {boolean} True if valid, false otherwise.
- */
-function isValidWord(word) {
-  return WORD_LIST.includes(word.toUpperCase());
-}
+const VALID_DIFFICULTIES = new Set(['easy', 'normal', 'hard']);
+const MAX_GUESSES = 6;
 
 export const data = new SlashCommandBuilder()
   .setName('wordle')
@@ -41,48 +46,69 @@ export async function execute(interaction) {
   try {
     const difficulty = interaction.options.getString('difficulty') || 'normal';
 
-    // Validate difficulty
-    if (!['easy', 'normal', 'hard'].includes(difficulty)) {
-      return await interaction.reply({ content: '❌ Invalid difficulty level.', flags: MessageFlags.Ephemeral });
+    if (!VALID_DIFFICULTIES.has(difficulty)) {
+      return await interaction.reply({
+        content: '❌ Invalid difficulty level.',
+        flags: MessageFlags.Ephemeral
+      });
     }
 
-    // Filter words by difficulty
-    let availableWords = WORD_LIST;
-    if (difficulty === 'easy') {
-      availableWords = WORD_LIST.slice(0, 20); // Common words
-    }
-    else if (difficulty === 'hard') {
-      availableWords = WORD_LIST.slice(30); // Less common words
-    }
-
+    const availableWords = pickWordPool(difficulty);
     if (availableWords.length === 0) {
-      return await interaction.reply({ content: '❌ No words available for this difficulty.', flags: MessageFlags.Ephemeral });
+      return await interaction.reply({
+        content: '❌ No words available for this difficulty.',
+        flags: MessageFlags.Ephemeral
+      });
     }
 
     const secretWord = availableWords[Math.floor(Math.random() * availableWords.length)];
     const gameId = `wordle_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-
     const gameState = {
       id: gameId,
       secretWord,
       guesses: [],
-      maxGuesses: 6,
+      maxGuesses: MAX_GUESSES,
       currentGuess: '',
       gameActive: true,
       difficulty,
       startTime: Date.now()
     };
 
-    // Store game state globally for button handlers
     wordleGames.set(interaction.user.id, gameState);
     await sendWordleBoard(interaction, gameState);
   }
   catch (error) {
-    console.error('Error in wordle execute:', error);
+    logError('Error in wordle execute', error, { userId: interaction.user.id });
     if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: '❌ An error occurred while starting the game.', flags: MessageFlags.Ephemeral });
+      await interaction.reply({
+        content: '❌ An error occurred while starting the game.',
+        flags: MessageFlags.Ephemeral
+      });
     }
   }
+}
+
+function pickWordPool(difficulty) {
+  if (difficulty === 'easy') return WORD_LIST.slice(0, 20);
+  if (difficulty === 'hard') return WORD_LIST.slice(30);
+  return WORD_LIST;
+}
+
+const RESULT_EMOJI = {
+  correct: '🟩',
+  present: '🟨',
+  absent: '⬛'
+};
+
+function resultToString(result) {
+  return result.map(r => Object.hasOwn(RESULT_EMOJI, r) ? RESULT_EMOJI[r] : '⬜').join('');
+}
+
+function performanceMessage(guessCount) {
+  if (guessCount === 1) return '🌟 INCREDIBLE! First try!';
+  if (guessCount <= 3) return '🎉 Excellent guessing!';
+  if (guessCount <= 5) return '👍 Good job!';
+  return '😅 Close one!';
 }
 
 /**
@@ -96,127 +122,128 @@ async function sendWordleBoard(interaction, gameState) {
 
     if (!gameActive) return;
 
-    // Check if player won
     const lastGuess = guesses.at(-1);
-    if (lastGuess && lastGuess.result.every(r => r === 'correct')) {
-      gameState.gameActive = false;
-      const timeElapsed = Math.round((Date.now() - gameState.startTime) / 1000);
-
-      try {
-        await updateUserStats(interaction.user.id, { games: { wordle_wins: 1 } });
-      }
-      catch (error) {
-        console.error('Error updating user stats:', error);
-      }
-
-      let performanceMessage;
-      if (guesses.length === 1) performanceMessage = '🌟 INCREDIBLE! First try!';
-      else if (guesses.length <= 3) performanceMessage = '🎉 Excellent guessing!';
-      else if (guesses.length <= 5) performanceMessage = '👍 Good job!';
-      else performanceMessage = '😅 Close one!';
-
-      const winEmbed = new EmbedBuilder()
-        .setTitle('🎉 Wordle Victory!')
-        .setColor(0x00_FF_00)
-        .setDescription(`You guessed **${gameState.secretWord}** in ${guesses.length}/${maxGuesses} attempts!\n\n${performanceMessage}`)
-        .addFields({
-          name: '📊 Game Stats',
-          value: `**Attempts:** ${guesses.length}/${maxGuesses}\n**Time:** ${timeElapsed}s\n**Difficulty:** ${gameState.difficulty.toUpperCase()}`,
-          inline: false
-        });
-
-      for (const [index, guess] of guesses.entries()) {
-        const resultStr = guess.result.map(r => {
-          switch (r) {
-            case 'correct': { return '🟩';
-            }
-            case 'present': { return '🟨';
-            }
-            case 'absent': { return '⬛';
-            }
-            default: { return '⬜';
-            }
-          }
-        }).join('');
-
-        winEmbed.addFields({
-          name: `Guess ${index + 1}`,
-          value: `${guess.word}\n${resultStr}`,
-          inline: true
-        });
-      }
-
-      await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [winEmbed], components: [] }) : interaction.reply({ embeds: [winEmbed] }));
-      return;
+    if (lastGuess?.result.every(r => r === 'correct')) {
+      return await handleWin(interaction, gameState);
     }
 
-    // Check if game over (too many guesses)
     if (guesses.length >= maxGuesses) {
-      gameState.gameActive = false;
-      const timeElapsed = Math.round((Date.now() - gameState.startTime) / 1000);
-
-      const loseEmbed = new EmbedBuilder()
-        .setTitle('😔 Wordle - Game Over')
-        .setColor(0xFF_00_00)
-        .setDescription(`The word was **${gameState.secretWord}**!\n\nBetter luck next time!`)
-        .addFields({
-          name: '📊 Final Stats',
-          value: `**Attempts:** ${guesses.length}/${maxGuesses}\n**Time:** ${timeElapsed}s`,
-          inline: false
-        });
-
-      await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [loseEmbed], components: [] }) : interaction.reply({ embeds: [loseEmbed] }));
-      return;
+      return await handleLoss(interaction, gameState);
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle('🔤 Wordle Game')
-      .setColor(0x00_99_FF)
-      .setDescription(`Guess the 5-letter word!\n\n**Attempts:** ${guesses.length}/${maxGuesses}`)
-      .addFields({
-        name: 'How to Play',
-        value: '🟩 = Correct letter, correct position\n🟨 = Correct letter, wrong position\n⬛ = Letter not in word',
-        inline: false
-      });
-
-    // Show previous guesses with results
-    if (guesses.length > 0) {
-      const guessHistory = guesses.map((guess, index) => {
-        const resultStr = guess.result.map(r => {
-          switch (r) {
-            case 'correct': { return '🟩';
-            }
-            case 'present': { return '🟨';
-            }
-            case 'absent': { return '⬛';
-            }
-            default: { return '⬜';
-            }
-          }
-        }).join('');
-
-        return `**${index + 1}.** ${guess.word}\n${resultStr}`;
-      }).join('\n\n');
-
-      embed.addFields({
-        name: 'Previous Guesses',
-        value: guessHistory,
-        inline: false
-      });
-    }
-
-    // Create guess button
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`wordle_guess:${interaction.user.id}`).setLabel('🔤 Make Guess').setStyle(ButtonStyle.Primary)
-    );
-
-    await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [embed], components: [row] }) : interaction.reply({ embeds: [embed], components: [row] }));
+    await sendActiveBoard(interaction, gameState);
   }
   catch (error) {
-    console.error('Error in sendWordleBoard:', error);
+    logError('Error in sendWordleBoard', error, { userId: interaction.user.id });
     if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: '❌ An error occurred while updating the game.', flags: MessageFlags.Ephemeral });
+      await interaction.reply({
+        content: '❌ An error occurred while updating the game.',
+        flags: MessageFlags.Ephemeral
+      });
     }
+  }
+}
+
+async function handleWin(interaction, gameState) {
+  const {
+    guesses, maxGuesses, startTime, difficulty, secretWord
+  } = gameState;
+  gameState.gameActive = false;
+  const timeElapsed = Math.round((Date.now() - startTime) / 1000);
+
+  try {
+    await updateUserStats(interaction.user.id, { games: { wordle_wins: 1 } });
+  }
+  catch (error) {
+    logError('Error updating user stats', error, { userId: interaction.user.id });
+  }
+
+  const winEmbed = new EmbedBuilder()
+    .setTitle('🎉 Wordle Victory!')
+    .setColor(0x00_FF_00)
+    .setDescription(
+      `You guessed **${secretWord}** in ${guesses.length}/${maxGuesses} attempts!\n\n` +
+      performanceMessage(guesses.length)
+    )
+    .addFields({
+      name: '📊 Game Stats',
+      value:
+        `**Attempts:** ${guesses.length}/${maxGuesses}\n` +
+        `**Time:** ${timeElapsed}s\n**Difficulty:** ${difficulty.toUpperCase()}`,
+      inline: false
+    });
+
+  for (const [index, guess] of guesses.entries()) {
+    winEmbed.addFields({
+      name: `Guess ${index + 1}`,
+      value: `${guess.word}\n${resultToString(guess.result)}`,
+      inline: true
+    });
+  }
+
+  await replyOrEdit(interaction, { embeds: [winEmbed], components: [] });
+}
+
+async function handleLoss(interaction, gameState) {
+  const { guesses, maxGuesses, startTime, secretWord } = gameState;
+  gameState.gameActive = false;
+  const timeElapsed = Math.round((Date.now() - startTime) / 1000);
+
+  const loseEmbed = new EmbedBuilder()
+    .setTitle('😔 Wordle - Game Over')
+    .setColor(0xFF_00_00)
+    .setDescription(`The word was **${secretWord}**!\n\nBetter luck next time!`)
+    .addFields({
+      name: '📊 Final Stats',
+      value: `**Attempts:** ${guesses.length}/${maxGuesses}\n**Time:** ${timeElapsed}s`,
+      inline: false
+    });
+
+  await replyOrEdit(interaction, { embeds: [loseEmbed], components: [] });
+}
+
+async function sendActiveBoard(interaction, gameState) {
+  const { guesses, maxGuesses } = gameState;
+
+  const embed = new EmbedBuilder()
+    .setTitle('🔤 Wordle Game')
+    .setColor(0x00_99_FF)
+    .setDescription(`Guess the 5-letter word!\n\n**Attempts:** ${guesses.length}/${maxGuesses}`)
+    .addFields({
+      name: 'How to Play',
+      value:
+        '🟩 = Correct letter, correct position\n' +
+        '🟨 = Correct letter, wrong position\n' +
+        '⬛ = Letter not in word',
+      inline: false
+    });
+
+  if (guesses.length > 0) {
+    const guessHistory = guesses.map((guess, index) =>
+      `**${index + 1}.** ${guess.word}\n${resultToString(guess.result)}`
+    ).join('\n\n');
+
+    embed.addFields({
+      name: 'Previous Guesses',
+      value: guessHistory,
+      inline: false
+    });
+  }
+
+  const guessBtn = new ButtonBuilder()
+    .setCustomId(`wordle_guess:${interaction.user.id}`)
+    .setLabel('🔤 Make Guess')
+    .setStyle(ButtonStyle.Primary);
+  const row = new ActionRowBuilder().addComponents(guessBtn);
+
+  await replyOrEdit(interaction, { embeds: [embed], components: [row] });
+}
+
+async function replyOrEdit(interaction, options) {
+  if (interaction.replied || interaction.deferred) {
+    await interaction.editReply(options);
+  } else {
+    await interaction.reply(options);
   }
 }
 
@@ -225,9 +252,11 @@ async function sendWordleBoard(interaction, gameState) {
  * @param {import('discord.js').CommandInteraction} interaction - The interaction object.
  * @param {string} gameId - The game ID.
  */
-async function sendWordleGuessModal(interaction, gameId) {
+export async function sendWordleGuessModal(interaction, gameId) {
   try {
-    const modal = new ModalBuilder().setCustomId(`wordle_submit:${gameId}`).setTitle('Wordle Guess');
+    const modal = new ModalBuilder()
+      .setCustomId(`wordle_submit:${gameId}`)
+      .setTitle('Wordle Guess');
     const guessInput = new TextInputBuilder()
       .setCustomId('word_guess')
       .setLabel('Enter a 5-letter word')
@@ -241,46 +270,10 @@ async function sendWordleGuessModal(interaction, gameId) {
     await interaction.showModal(modal);
   }
   catch (error) {
-    console.error('Error in sendWordleGuessModal:', error);
-    await interaction.reply({ content: '❌ An error occurred while showing the guess modal.', flags: MessageFlags.Ephemeral });
+    logError('Error in sendWordleGuessModal', error, { userId: interaction.user.id });
+    await interaction.reply({
+      content: '❌ An error occurred while showing the guess modal.',
+      flags: MessageFlags.Ephemeral
+    });
   }
-}
-
-/**
- * Checks a Wordle guess against the secret word.
- * @param {string} guess - The player's guess.
- * @param {string} secretWord - The secret word.
- * @returns {Array<string>} Array of result strings ('correct', 'present', 'absent').
- */
-function checkWordleGuess(guess, secretWord) {
-  const result = Array.from({ length: 5 }).fill(null);
-  const guessUpper = guess.toUpperCase();
-  const secretUpper = secretWord.toUpperCase();
-  const secretLetters = secretUpper.split('');
-
-  // First pass: check for correct positions
-  for (let i = 0; i < 5; i++) {
-    if (guessUpper[i] === secretUpper[i]) {
-      result[i] = 'correct';
-      secretLetters[i] = null; // Mark as used
-    }
-  }
-
-  // Second pass: check for present letters (wrong position)
-  for (let i = 0; i < 5; i++) {
-    if (result[i] !== 'correct') {
-      const letter = guessUpper[i];
-      const letterIndex = secretLetters.indexOf(letter);
-
-      if (letterIndex !== -1) {
-        result[i] = 'present';
-        secretLetters[letterIndex] = null; // Mark as used
-      }
-      else {
-        result[i] = 'absent';
-      }
-    }
-  }
-
-  return result;
 }

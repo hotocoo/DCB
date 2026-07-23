@@ -3,6 +3,7 @@
  * Registers slash commands with Discord's API.
  */
 
+// eslint-disable-next-line unicorn/filename-case -- CLI entry script
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -119,6 +120,7 @@ async function main() {
   }
   catch (error) {
     logger.error('Command deployment failed', error);
+    // eslint-disable-next-line unicorn/no-process-exit -- CLI entry script
     process.exit(1);
   }
 }

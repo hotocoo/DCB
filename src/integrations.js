@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { logger } from './logger.js';
 
 const INTEGRATIONS_FILE = path.join(process.cwd(), 'data', 'integrations.json');
 
@@ -33,7 +34,7 @@ class IntegrationManager {
       this.integrations = data;
     }
     catch (error) {
-      console.error('Failed to load integrations:', error);
+      logger.error('Failed to load integrations:', error);
       this.integrations = {
         apiKeys: {},
         usageStats: {},
@@ -48,7 +49,7 @@ class IntegrationManager {
       fs.writeFileSync(INTEGRATIONS_FILE, JSON.stringify(this.integrations, null, 2));
     }
     catch (error) {
-      console.error('Failed to save integrations:', error);
+      logger.error('Failed to save integrations:', error);
     }
   }
 

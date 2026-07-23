@@ -10,7 +10,25 @@
     "testuser_1784709880631_1": 1374,
     "testuser_1784709880631_2": 468,
     "testuser_1784710198204_1": 1374,
-    "testuser_1784710198204_2": 468
+    "testuser_1784710198204_2": 468,
+    "testuser_1784771949718_1": 1374,
+    "testuser_1784771949718_2": 468,
+    "testuser_1784772627555_1": 1375,
+    "testuser_1784772627555_2": 470,
+    "testuser_1784772832063_1": 1374,
+    "testuser_1784772832063_2": 468,
+    "testuser_1784773046294_1": 1374,
+    "testuser_1784773046294_2": 468,
+    "testuser_1784773103350_1": 1376,
+    "testuser_1784773103350_2": 471,
+    "testuser_1784773223235_1": 1374,
+    "testuser_1784773223235_2": 468,
+    "testuser_1784773274630_1": 1375,
+    "testuser_1784773274630_2": 470,
+    "testuser_1784773328935_1": 1376,
+    "testuser_1784773328935_2": 471,
+    "testuser_1784773368509_1": 1376,
+    "testuser_1784773368509_2": 471
   },
   "transactions": [
     {
@@ -222,6 +240,321 @@
       "amount": 26,
       "timestamp": 1784710199627,
       "id": "txn_1784710199627_xr5eojb9y"
+    },
+    {
+      "type": "transfer",
+      "from": "testuser_1784771949718_1",
+      "to": "testuser_1784771949718_2",
+      "amount": 500,
+      "timestamp": 1784771949718,
+      "id": "txn_1784771949718_kw8oorm1g"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784771949718_2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 52,
+      "timestamp": 1784771949719,
+      "id": "txn_1784771949719_wmpkqty2b"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser_1784771949718_2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 20,
+      "timestamp": 1784771949719,
+      "id": "txn_1784771949719_cp0yh8xvq"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784771949718_1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 26,
+      "timestamp": 1784771950901,
+      "id": "txn_1784771950901_nnqeq57hl"
+    },
+    {
+      "type": "transfer",
+      "from": "testuser_1784772627555_1",
+      "to": "testuser_1784772627555_2",
+      "amount": 500,
+      "timestamp": 1784772627556,
+      "id": "txn_1784772627556_ukg0wdqul"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784772627555_2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 50,
+      "timestamp": 1784772627556,
+      "id": "txn_1784772627556_bzyxw5rre"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser_1784772627555_2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 20,
+      "timestamp": 1784772627556,
+      "id": "txn_1784772627556_hvbpygjpu"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784772627555_1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 25,
+      "timestamp": 1784772628587,
+      "id": "txn_1784772628587_6mkprxzad"
+    },
+    {
+      "type": "transfer",
+      "from": "testuser_1784772832063_1",
+      "to": "testuser_1784772832063_2",
+      "amount": 500,
+      "timestamp": 1784772832064,
+      "id": "txn_1784772832064_2h6jp0d9y"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784772832063_2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 52,
+      "timestamp": 1784772832064,
+      "id": "txn_1784772832064_slrxgq3wj"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser_1784772832063_2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 20,
+      "timestamp": 1784772832064,
+      "id": "txn_1784772832064_rd5wv0oie"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784772832063_1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 26,
+      "timestamp": 1784772832940,
+      "id": "txn_1784772832940_xhll1twwv"
+    },
+    {
+      "type": "transfer",
+      "from": "testuser_1784773046294_1",
+      "to": "testuser_1784773046294_2",
+      "amount": 500,
+      "timestamp": 1784773046294,
+      "id": "txn_1784773046294_p40qtzhvb"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773046294_2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 52,
+      "timestamp": 1784773046295,
+      "id": "txn_1784773046295_caqljpl45"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser_1784773046294_2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 20,
+      "timestamp": 1784773046295,
+      "id": "txn_1784773046295_5r93b230s"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773046294_1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 26,
+      "timestamp": 1784773047349,
+      "id": "txn_1784773047349_dt4i7ije9"
+    },
+    {
+      "type": "transfer",
+      "from": "testuser_1784773103350_1",
+      "to": "testuser_1784773103350_2",
+      "amount": 500,
+      "timestamp": 1784773103351,
+      "id": "txn_1784773103351_a0zglort9"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773103350_2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 48,
+      "timestamp": 1784773103351,
+      "id": "txn_1784773103351_itkw66cm0"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser_1784773103350_2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 19,
+      "timestamp": 1784773103351,
+      "id": "txn_1784773103351_6i48suyri"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773103350_1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 24,
+      "timestamp": 1784773104340,
+      "id": "txn_1784773104340_vyikop4w4"
+    },
+    {
+      "type": "transfer",
+      "from": "testuser_1784773223235_1",
+      "to": "testuser_1784773223235_2",
+      "amount": 500,
+      "timestamp": 1784773223236,
+      "id": "txn_1784773223236_0ujqbko4e"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773223235_2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 52,
+      "timestamp": 1784773223236,
+      "id": "txn_1784773223236_uc1yeu2y5"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser_1784773223235_2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 20,
+      "timestamp": 1784773223236,
+      "id": "txn_1784773223236_pe8nnervt"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773223235_1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 26,
+      "timestamp": 1784773224316,
+      "id": "txn_1784773224316_derp0o562"
+    },
+    {
+      "type": "transfer",
+      "from": "testuser_1784773274630_1",
+      "to": "testuser_1784773274630_2",
+      "amount": 500,
+      "timestamp": 1784773274630,
+      "id": "txn_1784773274630_v1ruee29p"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773274630_2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 50,
+      "timestamp": 1784773274630,
+      "id": "txn_1784773274630_m79dsl158"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser_1784773274630_2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 20,
+      "timestamp": 1784773274631,
+      "id": "txn_1784773274631_89p7gbw9x"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773274630_1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 25,
+      "timestamp": 1784773275682,
+      "id": "txn_1784773275682_r4xow5afr"
+    },
+    {
+      "type": "transfer",
+      "from": "testuser_1784773328935_1",
+      "to": "testuser_1784773328935_2",
+      "amount": 500,
+      "timestamp": 1784773328935,
+      "id": "txn_1784773328935_h9gim06me"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773328935_2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 48,
+      "timestamp": 1784773328935,
+      "id": "txn_1784773328935_zeojxgm1s"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser_1784773328935_2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 19,
+      "timestamp": 1784773328936,
+      "id": "txn_1784773328936_8q8dveqx5"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773328935_1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 24,
+      "timestamp": 1784773329883,
+      "id": "txn_1784773329883_6ppg5m9nw"
+    },
+    {
+      "type": "transfer",
+      "from": "testuser_1784773368509_1",
+      "to": "testuser_1784773368509_2",
+      "amount": 500,
+      "timestamp": 1784773368510,
+      "id": "txn_1784773368510_6ck1g4h9v"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773368509_2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 48,
+      "timestamp": 1784773368510,
+      "id": "txn_1784773368510_84cqir62x"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser_1784773368509_2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 19,
+      "timestamp": 1784773368510,
+      "id": "txn_1784773368510_wfsoshawo"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773368509_1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 24,
+      "timestamp": 1784773369407,
+      "id": "txn_1784773369407_nd5e4sz68"
     }
   ],
   "marketItems": {},
@@ -323,6 +656,159 @@
         "amount": 100,
         "created": 1784710198205,
         "maturity": 1787302198205,
+        "rate": 0.05,
+        "status": "active"
+      }
+    ],
+    "testuser_1784771949718_1": [
+      {
+        "id": "investment_1784771949719_axe618pcu",
+        "user": "testuser_1784771949718_1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1784771949719,
+        "maturity": 1787363949719,
+        "rate": 0.05,
+        "status": "active"
+      }
+    ],
+    "testuser_1784772627555_1": [
+      {
+        "id": "investment_1784772627556_ultqylzz3",
+        "user": "testuser_1784772627555_1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1784772627556,
+        "maturity": 1787364627556,
+        "rate": 0.05,
+        "status": "active"
+      }
+    ],
+    "testuser_1784772832063_1": [
+      {
+        "id": "investment_1784772832064_6ghza1wtr",
+        "user": "testuser_1784772832063_1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1784772832064,
+        "maturity": 1787364832064,
+        "rate": 0.05,
+        "status": "active"
+      }
+    ],
+    "testuser_1784773046294_1": [
+      {
+        "id": "investment_1784773046295_fxqb90f6z",
+        "user": "testuser_1784773046294_1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1784773046295,
+        "maturity": 1787365046295,
+        "rate": 0.05,
+        "status": "active"
+      }
+    ],
+    "testuser_1784773103350_1": [
+      {
+        "id": "investment_1784773103352_hw00pxdic",
+        "user": "testuser_1784773103350_1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1784773103352,
+        "maturity": 1787365103352,
+        "rate": 0.05,
+        "status": "active"
+      }
+    ],
+    "testuser_1784773223235_1": [
+      {
+        "id": "investment_1784773223236_ehyo66dfh",
+        "user": "testuser_1784773223235_1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1784773223236,
+        "maturity": 1787365223236,
+        "rate": 0.05,
+        "status": "active"
+      }
+    ],
+    "testuser_1784773274630_1": [
+      {
+        "id": "investment_1784773274631_2lv9r3202",
+        "user": "testuser_1784773274630_1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1784773274631,
+        "maturity": 1787365274631,
+        "rate": 0.05,
+        "status": "active"
+      }
+    ],
+    "testuser_1784773328935_1": [
+      {
+        "id": "investment_1784773328936_23ytlo7nz",
+        "user": "testuser_1784773328935_1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1784773328936,
+        "maturity": 1787365328936,
+        "rate": 0.05,
+        "status": "active"
+      }
+    ],
+    "testuser_1784773368509_1": [
+      {
+        "id": "investment_1784773368511_oqkrgwkv1",
+        "user": "testuser_1784773368509_1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1784773368511,
+        "maturity": 1787365368511,
         "rate": 0.05,
         "status": "active"
       }

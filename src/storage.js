@@ -109,7 +109,7 @@ export function readAll() {
   try {
     const stats = fs.statSync(filePath);
     if (stats.size > MAX_FILE_SIZE) {
-      logger.error('Storage file too large', null, { filePath, size: stats.size, maxSize: MAX_FILE_SIZE });
+      logger.error('Storage file too large', undefined, { filePath, size: stats.size, maxSize: MAX_FILE_SIZE });
       return {};
     }
 
@@ -171,7 +171,7 @@ export function writeAll(data) {
 
     // Write to temporary file first, then rename for atomicity
     const tempPath = filePath + '.tmp';
-    console.log(`[STORAGE DEBUG] Writing to storage file: ${filePath}`);
+    logger.debug(`Writing to storage file: ${filePath}`);
     fs.writeFileSync(tempPath, jsonString, DEFAULT_ENCODING);
     fs.renameSync(tempPath, filePath);
 

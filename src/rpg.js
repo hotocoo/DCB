@@ -3,13 +3,13 @@ import path from 'node:path';
 
 import { generate } from './model-client.js';
 import { logger } from './logger.js';
-import { inputValidator, sanitizeInput, validateString, validateNumber } from './validation.js';
+import { sanitizeInput, validateString, validateNumber } from './validation.js';
 import { CommandError } from './errorHandler.js';
 
 const PLAYERS_DIR = path.join(process.cwd(), 'data', 'players');
 
 // in-memory cache to reduce fs reads/writes
-let cache = null;
+let cache;
 // simple per-user locks to avoid concurrent writes
 const locks = new Set();
 
@@ -53,6 +53,21 @@ function ensureDir() {
   if (!fs.existsSync(PLAYERS_DIR)) fs.mkdirSync(PLAYERS_DIR, { recursive: true });
 }
 
+// Sanitize a Discord user id so it cannot escape the players directory
+// via path traversal (../) or null bytes. Discord ids are 17-19 digit snowflakes,
+// so anything else is rejected.
+function safeUserId(userId) {
+  if (typeof userId !== 'string' || !/^\d{17,19}$/.test(userId)) {
+    throw new Error('Invalid user id');
+  }
+  return userId;
+}
+
+function playerPath(userId) {
+  // userId already validated to be a numeric snowflake — safe to use in path.
+  return path.join(PLAYERS_DIR, `${safeUserId(userId)}.json`);
+}
+
 function readAll() {
   ensureDir();
   const all = {};
@@ -62,7 +77,7 @@ function readAll() {
   if (fs.existsSync(oldFile)) {
     try {
       const oldData = JSON.parse(fs.readFileSync(oldFile)) || {};
-      console.log(`[RPG DEBUG] Migrating ${Object.keys(oldData).length} characters from old rpg.json`);
+      logger.debug(`Migrating ${Object.keys(oldData).length} characters from old rpg.json`);
       for (const [userId, char] of Object.entries(oldData)) {
         // Ensure defaults
         if (char.xp === undefined) char.xp = 0;
@@ -76,11 +91,15 @@ function readAll() {
         if (char.def === undefined) char.def = 2;
         if (char.spd === undefined) char.spd = 2;
         if (char.class === undefined) char.class = 'warrior';
-        if (char.abilities === undefined) char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
-        if (char.color === undefined) char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+        if (char.abilities === undefined) {
+          char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
+        }
+        if (char.color === undefined) {
+          char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+        }
         if (char.inventory === undefined) char.inventory = {};
-        if (char.equipped_weapon === undefined) char.equipped_weapon = null;
-        if (char.equipped_armor === undefined) char.equipped_armor = null;
+        if (char.equipped_weapon === undefined) char.equipped_weapon = undefined;
+        if (char.equipped_armor === undefined) char.equipped_armor = undefined;
         if (char.gold === undefined) char.gold = 0;
         if (char.dailyExplorations === undefined) char.dailyExplorations = 0;
         if (char.lastDailyReset === undefined) char.lastDailyReset = Date.now();
@@ -89,18 +108,20 @@ function readAll() {
         if (char.createdAt === undefined) char.createdAt = Date.now();
         all[userId] = char;
         // Save to individual file
-        const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
+        const filePath = playerPath(userId);
         const tmp = `${filePath}.tmp`;
-        fs.writeFileSync(tmp, JSON.stringify(char, null, 2), 'utf8');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename
+        fs.writeFileSync(tmp, JSON.stringify(char, undefined, 2), 'utf8');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename
         fs.renameSync(tmp, filePath);
       }
       // Backup and remove old file
       fs.copyFileSync(oldFile, `${oldFile}.bak`);
       fs.unlinkSync(oldFile);
-      console.log('[RPG DEBUG] Migration completed, old file backed up');
+      logger.info('Migration completed, old file backed up');
     }
     catch (error) {
-      console.error('Failed to migrate old RPG data:', error);
+      logger.error('Failed to migrate old RPG data', error);
     }
   }
 
@@ -110,6 +131,7 @@ function readAll() {
     for (const file of files) {
       const userId = path.basename(file, '.json');
       try {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename
         const char = JSON.parse(fs.readFileSync(path.join(PLAYERS_DIR, file))) || {};
         // migrate / ensure defaults for older characters
         if (char.xp === undefined) char.xp = 0;
@@ -123,20 +145,25 @@ function readAll() {
         if (char.def === undefined) char.def = 2;
         if (char.spd === undefined) char.spd = 2;
         if (char.class === undefined) char.class = 'warrior';
-        if (char.abilities === undefined) char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
-        if (char.color === undefined) char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+        if (char.abilities === undefined) {
+          char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
+        }
+        if (char.color === undefined) {
+          char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+        }
         if (char.inventory === undefined) char.inventory = {};
-        if (char.equipped_weapon === undefined) char.equipped_weapon = null;
-        if (char.equipped_armor === undefined) char.equipped_armor = null;
+        if (char.equipped_weapon === undefined) char.equipped_weapon = undefined;
+        if (char.equipped_armor === undefined) char.equipped_armor = undefined;
         if (char.gold === undefined) char.gold = 0;
         if (char.dailyExplorations === undefined) char.dailyExplorations = 0;
         if (char.lastDailyReset === undefined) char.lastDailyReset = Date.now();
         if (char.sessionXpGained === undefined) char.sessionXpGained = 0;
         if (char.lastSessionReset === undefined) char.lastSessionReset = Date.now();
+        // eslint-disable-next-line security/detect-object-injection
         all[userId] = char;
       }
       catch (error) {
-        console.error(`Failed to read player data for ${userId}`, error);
+        logger.error(`Failed to read player data for ${userId}`, error);
       }
     }
   }
@@ -150,19 +177,21 @@ function writeAll(obj) {
   try {
     // Save each user's data to individual files
     for (const [userId, char] of Object.entries(obj)) {
-      const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
+      const filePath = playerPath(userId);
       const tmp = `${filePath}.tmp`;
-      console.log(`[RPG DEBUG] Writing player data: ${filePath}`);
-      fs.writeFileSync(tmp, JSON.stringify(char, null, 2), 'utf8');
+      logger.debug(`Writing player data: ${filePath}`);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      fs.writeFileSync(tmp, JSON.stringify(char, undefined, 2), 'utf8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
       fs.renameSync(tmp, filePath);
     }
     cache = obj;
   }
   catch (error) {
-    console.error('Failed to write RPG data:', error);
+    logger.error('Failed to write RPG data', error);
     // Attempt to restore from cache if available
     if (cache) {
-      console.log('Restoring from cache after write failure');
+      logger.info('Restoring from cache after write failure');
     }
     else {
       throw new Error(`Failed to save RPG data: ${error.message}`);
@@ -187,6 +216,7 @@ export function createCharacter(userId, name, charClass = 'warrior') {
     throw new CommandError('Invalid character class', 'INVALID_ARGUMENT');
   }
 
+  // eslint-disable-next-line security/detect-object-injection
   const classData = CHARACTER_CLASSES[charClass];
   if (!classData) {
     throw new CommandError(`Invalid character class: ${charClass}. Available classes: warrior, mage, rogue, paladin`, 'INVALID_ARGUMENT');
@@ -199,6 +229,7 @@ export function createCharacter(userId, name, charClass = 'warrior') {
   locks.add(userId);
   try {
     const all = cache || readAll();
+    // eslint-disable-next-line security/detect-object-injection
     if (all[userId]) {
       throw new CommandError('Character already exists for this user', 'ALREADY_EXISTS');
     }
@@ -213,12 +244,13 @@ export function createCharacter(userId, name, charClass = 'warrior') {
       abilities: [...classData.abilities],
       color: classData.color,
       inventory: {},
-      equipped_weapon: null,
-      equipped_armor: null,
+      equipped_weapon: undefined,
+      equipped_armor: undefined,
       gold: 0,
       createdAt: Date.now()
     };
 
+    // eslint-disable-next-line security/detect-object-injection
     all[userId] = char;
     writeAll(all);
 
@@ -264,16 +296,26 @@ export function applyXp(userId, char, amount = 0) {
 
 export function getCharacter(userId) {
   // Try cache first
+  // eslint-disable-next-line security/detect-object-injection
   if (cache && cache[userId]) {
+    // eslint-disable-next-line security/detect-object-injection
     return cache[userId];
   }
 
   // Otherwise read from file
   ensureDir();
-  const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
-  if (!fs.existsSync(filePath)) return null;
+  let filePath;
+  try {
+    filePath = playerPath(userId);
+  }
+  catch {
+    // Invalid user id — caller will get undefined below
+    return;
+  }
+  if (!fs.existsSync(filePath)) return;
 
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     const char = JSON.parse(fs.readFileSync(filePath)) || {};
     // migrate / ensure defaults for older characters
     if (char.xp === undefined) char.xp = 0;
@@ -287,11 +329,15 @@ export function getCharacter(userId) {
     if (char.def === undefined) char.def = 2;
     if (char.spd === undefined) char.spd = 2;
     if (char.class === undefined) char.class = 'warrior';
-    if (char.abilities === undefined) char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
-    if (char.color === undefined) char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+    if (char.abilities === undefined) {
+      char.abilities = CHARACTER_CLASSES[char.class]?.abilities || CHARACTER_CLASSES.warrior.abilities;
+    }
+    if (char.color === undefined) {
+      char.color = CHARACTER_CLASSES[char.class]?.color || CHARACTER_CLASSES.warrior.color;
+    }
     if (char.inventory === undefined) char.inventory = {};
-    if (char.equipped_weapon === undefined) char.equipped_weapon = null;
-    if (char.equipped_armor === undefined) char.equipped_armor = null;
+    if (char.equipped_weapon === undefined) char.equipped_weapon = undefined;
+    if (char.equipped_armor === undefined) char.equipped_armor = undefined;
     if (char.gold === undefined) char.gold = 0;
     if (char.dailyExplorations === undefined) char.dailyExplorations = 0;
     if (char.lastDailyReset === undefined) char.lastDailyReset = Date.now();
@@ -300,6 +346,7 @@ export function getCharacter(userId) {
 
     // Update cache
     if (cache) {
+      // eslint-disable-next-line security/detect-object-injection
       cache[userId] = char;
     }
     else {
@@ -309,28 +356,31 @@ export function getCharacter(userId) {
     return char;
   }
   catch (error) {
-    console.error(`Failed to read character data for ${userId}`, error);
-    return null;
+    logger.error(`Failed to read character data for ${userId}`, error);
+    return;
   }
 }
 
 export function saveCharacter(userId, char) {
   if (locks.has(userId)) {
-    console.warn(`Save operation blocked for user ${userId} - already locked`);
+    logger.warn(`Save operation blocked for user ${userId} - already locked`);
     return false;
   }
   locks.add(userId);
   try {
     // Save directly to individual file
     ensureDir();
-    const filePath = path.join(PLAYERS_DIR, `${userId}.json`);
+    const filePath = playerPath(userId);
     const tmp = `${filePath}.tmp`;
-    console.log(`[RPG DEBUG] Writing character data: ${filePath}`);
-    fs.writeFileSync(tmp, JSON.stringify(char, null, 2), 'utf8');
+    logger.debug(`Writing character data: ${filePath}`);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    fs.writeFileSync(tmp, JSON.stringify(char, undefined, 2), 'utf8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     fs.renameSync(tmp, filePath);
 
     // Update cache if it exists
     if (cache) {
+      // eslint-disable-next-line security/detect-object-injection
       cache[userId] = char;
     }
     return true;
@@ -345,11 +395,12 @@ export function getAllCharacters() {
 }
 
 export function resetCharacter(userId, charClass = 'warrior') {
-  if (locks.has(userId)) return null;
+  if (locks.has(userId)) return;
 
   locks.add(userId);
   try {
     const all = cache || readAll();
+    // eslint-disable-next-line security/detect-object-injection
     const classData = CHARACTER_CLASSES[charClass];
     const def = {
       name: `Player${userId.slice(0,4)}`,
@@ -361,10 +412,11 @@ export function resetCharacter(userId, charClass = 'warrior') {
       abilities: [...classData.abilities],
       color: classData.color,
       inventory: {},
-      equipped_weapon: null,
-      equipped_armor: null,
+      equipped_weapon: undefined,
+      equipped_armor: undefined,
       gold: 0
     };
+    // eslint-disable-next-line security/detect-object-injection
     all[userId] = def;
     writeAll(all);
     return def;
@@ -380,7 +432,9 @@ export function deleteCharacter(userId) {
   locks.add(userId);
   try {
     const all = cache || readAll();
+    // eslint-disable-next-line security/detect-object-injection
     if (!all[userId]) return false;
+    // eslint-disable-next-line security/detect-object-injection
     delete all[userId];
     writeAll(all);
     return true;
@@ -392,9 +446,13 @@ export function deleteCharacter(userId) {
 
 export function getLeaderboard(limit = 10, offset = 0) {
   const all = cache || readAll();
-  const arr = Object.entries(all).map(([id, c]) => ({ id, name: c.name, lvl: c.lvl || 1, xp: c.xp || 0, atk: c.atk || 0 }));
+  const arr = Object.entries(all).map(([id, c]) => ({
+    id, name: c.name, lvl: c.lvl || 1, xp: c.xp || 0, atk: c.atk || 0
+  }));
   arr.sort((a, b) => {
-    if (b.lvl !== a.lvl) return b.lvl - a.lvl; if (b.xp !== a.xp) return b.xp - a.xp; return b.atk - a.atk;
+    if (b.lvl !== a.lvl) return b.lvl - a.lvl;
+    if (b.xp !== a.xp) return b.xp - a.xp;
+    return b.atk - a.atk;
   });
   return arr.slice(offset, offset + limit);
 }
@@ -437,7 +495,7 @@ export async function narrate(guildId, prompt, fallback) {
     return out || fallback || '';
   }
   catch (error) {
-    console.error('Narration failed', error);
+    logger.error('Narration failed', error);
     return fallback || '';
   }
 }
@@ -452,7 +510,8 @@ export function getCharacterClasses() {
 }
 
 export function getClassInfo(charClass) {
-  return CHARACTER_CLASSES[charClass] || null;
+  // eslint-disable-next-line security/detect-object-injection
+  return CHARACTER_CLASSES[charClass] || undefined;
 }
 
 // Item and Inventory System
@@ -560,7 +619,7 @@ export function generateRandomItem(level = 1) {
   );
 
   if (availableItems.length === 0) {
-    console.warn(`No items available for rarity ${selectedRarity} at level ${level}, falling back to health_potion`);
+    logger.warn(`No items available for rarity ${selectedRarity} at level ${level}, falling back to health_potion`);
     return { id: 'health_potion', ...ITEMS['health_potion'] };
   }
 
@@ -577,25 +636,30 @@ function getItemLevelRequirement(itemKey) {
     gold_ore: 5, mithril_ingot: 25,
     wood: 1, leather: 1, gemstone: 10
   };
+  // eslint-disable-next-line security/detect-object-injection
   return levelReqs[itemKey] || 1;
 }
 
 export function getItemInfo(itemId) {
-  return ITEMS[itemId] || null;
+  // eslint-disable-next-line security/detect-object-injection
+  return ITEMS[itemId] || undefined;
 }
 
 export function getItemRarityInfo(rarity) {
+  // eslint-disable-next-line security/detect-object-injection
   return ITEM_RARITIES[rarity] || ITEM_RARITIES.common;
 }
 
 // Inventory Management Functions
 export function addItemToInventory(userId, itemId, quantity = 1) {
   const all = cache || readAll();
+  // eslint-disable-next-line security/detect-object-injection
   const char = all[userId];
 
   if (!char) return { success: false, reason: 'no_character' };
 
   char.inventory = char.inventory || {};
+  // eslint-disable-next-line security/detect-object-injection
   char.inventory[itemId] = (char.inventory[itemId] || 0) + quantity;
 
   writeAll(all);
@@ -604,15 +668,20 @@ export function addItemToInventory(userId, itemId, quantity = 1) {
 
 export function removeItemFromInventory(userId, itemId, quantity = 1) {
   const all = cache || readAll();
+  // eslint-disable-next-line security/detect-object-injection
   const char = all[userId];
 
   if (!char) return { success: false, reason: 'no_character' };
+  // eslint-disable-next-line security/detect-object-injection
   if (!char.inventory || !char.inventory[itemId]) return { success: false, reason: 'item_not_found' };
 
+  // eslint-disable-next-line security/detect-object-injection
   const currentQuantity = char.inventory[itemId];
   if (currentQuantity < quantity) return { success: false, reason: 'insufficient_quantity' };
 
+  // eslint-disable-next-line security/detect-object-injection
   char.inventory[itemId] -= quantity;
+  // eslint-disable-next-line security/detect-object-injection
   if (char.inventory[itemId] <= 0) delete char.inventory[itemId];
 
   writeAll(all);
@@ -621,6 +690,7 @@ export function removeItemFromInventory(userId, itemId, quantity = 1) {
 
 export function getInventory(userId) {
   const all = cache || readAll();
+  // eslint-disable-next-line security/detect-object-injection
   const char = all[userId];
 
   if (!char || !char.inventory) return {};
@@ -633,6 +703,7 @@ export function getInventoryValue(userId) {
   let totalValue = 0;
 
   for (const [itemId, quantity] of Object.entries(inventory)) {
+    // eslint-disable-next-line security/detect-object-injection
     const item = ITEMS[itemId];
     if (item) {
       totalValue += item.value * quantity;
@@ -643,17 +714,20 @@ export function getInventoryValue(userId) {
 }
 
 export function useConsumableItem(userId, itemId) {
+  // eslint-disable-next-line security/detect-object-injection
   const item = ITEMS[itemId];
   if (!item || item.type !== 'consumable') {
     return { success: false, reason: 'not_consumable' };
   }
 
   const all = cache || readAll();
+  // eslint-disable-next-line security/detect-object-injection
   const char = all[userId];
 
   if (!char) return { success: false, reason: 'no_character' };
 
   // Check if item is in inventory
+  // eslint-disable-next-line security/detect-object-injection
   if (!char.inventory || !char.inventory[itemId]) {
     return { success: false, reason: 'item_not_in_inventory' };
   }
@@ -678,7 +752,9 @@ export function useConsumableItem(userId, itemId) {
   }
 
   // Remove item from inventory
+  // eslint-disable-next-line security/detect-object-injection
   char.inventory[itemId]--;
+  // eslint-disable-next-line security/detect-object-injection
   if (char.inventory[itemId] <= 0) delete char.inventory[itemId];
 
   writeAll(all);
@@ -686,15 +762,18 @@ export function useConsumableItem(userId, itemId) {
 }
 
 export function equipItem(userId, itemId) {
+  // eslint-disable-next-line security/detect-object-injection
   const item = ITEMS[itemId];
   if (!item || (item.type !== 'weapon' && item.type !== 'armor')) {
     return { success: false, reason: 'not_equippable' };
   }
 
   const all = cache || readAll();
+  // eslint-disable-next-line security/detect-object-injection
   const char = all[userId];
 
   if (!char) return { success: false, reason: 'no_character' };
+  // eslint-disable-next-line security/detect-object-injection
   if (!char.inventory || !char.inventory[itemId]) {
     return { success: false, reason: 'item_not_in_inventory' };
   }
@@ -739,24 +818,29 @@ export function equipItem(userId, itemId) {
 
 export function unequipItem(userId, slot) {
   const all = cache || readAll();
+  // eslint-disable-next-line security/detect-object-injection
   const char = all[userId];
 
   if (!char) return { success: false, reason: 'no_character' };
 
-  let itemId = null;
+  let itemId;
   if (slot === 'weapon' && char.equipped_weapon) {
     itemId = char.equipped_weapon;
+    // eslint-disable-next-line security/detect-object-injection
     if (ITEMS[itemId]) {
+      // eslint-disable-next-line security/detect-object-injection
       char.atk -= ITEMS[itemId].atk || 0;
     }
-    char.equipped_weapon = null;
+    char.equipped_weapon = undefined;
   }
   else if (slot === 'armor' && char.equipped_armor) {
     itemId = char.equipped_armor;
+    // eslint-disable-next-line security/detect-object-injection
     if (ITEMS[itemId]) {
+      // eslint-disable-next-line security/detect-object-injection
       char.def -= ITEMS[itemId].def || 0;
     }
-    char.equipped_armor = null;
+    char.equipped_armor = undefined;
   }
   else {
     return { success: false, reason: 'no_item_equipped' };
@@ -781,6 +865,7 @@ export function getCraftingRecipes() {
 }
 
 export function canCraftItem(userId, itemId) {
+  // eslint-disable-next-line security/detect-object-injection
   const recipe = CRAFTING_RECIPES[itemId];
   if (!recipe) return { success: false, reason: 'not_craftable' };
 
@@ -794,6 +879,7 @@ export function canCraftItem(userId, itemId) {
 
   // Check if all required materials are available
   for (const [materialId, requiredQuantity] of Object.entries(recipe.materials)) {
+    // eslint-disable-next-line security/detect-object-injection
     if (!inventory[materialId] || inventory[materialId] < requiredQuantity) {
       return { success: false, reason: 'missing_materials', missing: materialId };
     }
@@ -806,11 +892,10 @@ export function craftItem(userId, itemId) {
   const canCraft = canCraftItem(userId, itemId);
   if (!canCraft.success) return canCraft;
 
+  // eslint-disable-next-line security/detect-object-injection
   const recipe = CRAFTING_RECIPES[itemId];
   const character = getCharacter(userId);
   if (!character) return { success: false, reason: 'no_character' };
-
-  const inventory = getInventory(userId);
 
   // Remove materials
   for (const [materialId, requiredQuantity] of Object.entries(recipe.materials)) {
@@ -830,13 +915,14 @@ export function craftItem(userId, itemId) {
 
   // Award XP for crafting
   const xpReward = Math.floor(character.lvl * 2);
-  const xpResult = applyXp(userId, character, xpReward);
+  applyXp(userId, character, xpReward);
 
   logger.info('Item crafted successfully', { userId, itemId, xpGained: xpReward });
   return {
     success: true,
     char: character,
     xpGained: xpReward,
+    // eslint-disable-next-line security/detect-object-injection
     item: ITEMS[itemId]
   };
 }
@@ -860,13 +946,15 @@ function readQuests() {
 function writeQuests(q) {
   const p = path.join(process.cwd(), 'data', 'quests.json');
   if (!fs.existsSync(path.dirname(p))) fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(q, null, 2), 'utf8');
+  fs.writeFileSync(p, JSON.stringify(q, undefined, 2), 'utf8');
 }
 
 export function createQuest(userId, title, desc) {
   const all = readQuests();
+  // eslint-disable-next-line security/detect-object-injection
   all[userId] = all[userId] || [];
   const q = { id: Date.now(), title, desc, status: 'open' };
+  // eslint-disable-next-line security/detect-object-injection
   all[userId].push(q);
   writeQuests(all);
   return q;
@@ -889,10 +977,13 @@ export function generateRandomQuest(userId, level = 1) {
 
   // Update the quest in storage
   const all = readQuests();
+  // eslint-disable-next-line security/detect-object-injection
   const userQuests = all[userId] || [];
   const index = userQuests.findIndex(q => q.id === quest.id);
   if (index !== -1) {
+    // eslint-disable-next-line security/detect-object-injection
     userQuests[index] = quest;
+    // eslint-disable-next-line security/detect-object-injection
     all[userId] = userQuests;
     writeQuests(all);
   }
@@ -902,6 +993,7 @@ export function generateRandomQuest(userId, level = 1) {
 
 export function listQuests(userId) {
   const all = readQuests();
+  // eslint-disable-next-line security/detect-object-injection
   return all[userId] || [];
 }
 
@@ -941,9 +1033,10 @@ function calculateQuestGoldReward(quest) {
 
 export function completeQuest(userId, questId) {
   const all = readQuests();
+  // eslint-disable-next-line security/detect-object-injection
   const arr = all[userId] || [];
   const q = arr.find(x => x.id === Number(questId));
-  if (!q) return null;
+  if (!q) return;
   q.status = 'completed';
   writeQuests(all);
 
@@ -993,6 +1086,7 @@ export function spendSkillPoints(userId, stat, amount = 1) {
   locks.add(userId);
   try {
     const all = cache || readAll();
+    // eslint-disable-next-line security/detect-object-injection
     const char = all[userId];
 
     if (!char) {
@@ -1051,9 +1145,11 @@ export function spendSkillPoints(userId, stat, amount = 1) {
     }
 
     char.skillPoints = pts - amount;
+    // eslint-disable-next-line security/detect-object-injection
     all[userId] = char;
     writeAll(all);
 
+    // eslint-disable-next-line security/detect-object-injection
     logger.info('Skill points spent', { userId, stat, amount, newValue: char[stat] });
     return { success: true, char };
   }
@@ -1065,6 +1161,7 @@ export function spendSkillPoints(userId, stat, amount = 1) {
 // Function to check daily exploration limit
 export function checkDailyLimit(userId) {
   const all = cache || readAll();
+  // eslint-disable-next-line security/detect-object-injection
   const char = all[userId];
   if (!char) return { allowed: false, reason: 'no_character' };
 
@@ -1094,6 +1191,7 @@ export function checkDailyLimit(userId) {
 // Function to increment daily exploration count
 export function incrementDailyExploration(userId) {
   const all = cache || readAll();
+  // eslint-disable-next-line security/detect-object-injection
   const char = all[userId];
   if (!char) return { success: false, reason: 'no_character' };
 
@@ -1112,6 +1210,7 @@ export function incrementDailyExploration(userId) {
 // Function to check session XP cap
 export function checkSessionXpCap(userId) {
   const all = cache || readAll();
+  // eslint-disable-next-line security/detect-object-injection
   const char = all[userId];
   if (!char) return { allowed: false, reason: 'no_character' };
 

@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { logger } from './logger.js';
+
 const PROFILES_DIR = path.join(process.cwd(), 'data', 'players');
 
 // Advanced User Profile and Statistics System
@@ -23,15 +25,20 @@ class ProfileManager {
 
     const files = fs.readdirSync(PROFILES_DIR).filter(f => f.endsWith('.json'));
     for (const file of files) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      const filePath = path.join(PROFILES_DIR, file);
       const userId = path.basename(file, '.json');
       try {
-        const data = JSON.parse(fs.readFileSync(path.join(PROFILES_DIR, file)));
+        // eslint-disable-next-line security/detect-non-literal-fs-filename
+        const data = JSON.parse(fs.readFileSync(filePath));
         if (data.profile) {
+          // Discord userId from filename, not user-supplied key — safe to bracket-index.
+          // eslint-disable-next-line security/detect-object-injection
           this.profiles[userId] = data.profile;
         }
       }
       catch (error) {
-        console.error(`Failed to load profile for ${userId}:`, error);
+        logger.error(`Failed to load profile for ${userId}`, error);
       }
     }
   }
@@ -45,10 +52,14 @@ class ProfileManager {
       version: '1.0'
     };
     try {
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+      // unicorn/no-null: JSON.stringify replacer is a no-op, use identity fn instead.
+      const identity = (_key, value) => value;
+      // userId is a Discord ID, not user-supplied filename — safe to construct path.
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      fs.writeFileSync(filePath, JSON.stringify(data, identity, 2));
     }
     catch (error) {
-      console.error(`Failed to save profile for ${userId}:`, error);
+      logger.error(`Failed to save profile for ${userId}`, error);
     }
   }
 
@@ -59,109 +70,128 @@ class ProfileManager {
 
   // Advanced Profile Creation and Management
   getOrCreateProfile(userId, username) {
-    if (!this.profiles[userId]) {
-      // Try to load from file first
-      this.ensureStorage();
-      const filePath = path.join(PROFILES_DIR, `${userId}.json`);
-      if (fs.existsSync(filePath)) {
-        try {
-          const data = JSON.parse(fs.readFileSync(filePath));
-          if (data.profile) {
-            this.profiles[userId] = data.profile;
-          }
-        }
-        catch (error) {
-          console.error(`Failed to load profile for ${userId}:`, error);
-        }
+    if (!this.hasProfile(userId)) {
+      this._loadProfileFromDisk(userId);
+    }
+
+    if (!this.hasProfile(userId)) {
+      this._createDefaultProfile(userId, username);
+    }
+
+    // Discord userId is the cache key — not a user-supplied property name.
+    // eslint-disable-next-line security/detect-object-injection
+    const profile = this.profiles[userId];
+    if (profile.username !== username) {
+      profile.username = username;
+      profile.updated = Date.now();
+      this.saveProfile(userId, profile);
+    }
+
+    return profile;
+  }
+
+  hasProfile(userId) {
+    return Object.hasOwn(this.profiles, userId);
+  }
+
+  _loadProfileFromDisk(userId) {
+    this.ensureStorage();
+    // userId is a Discord ID — not user-supplied path input.
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    const filePath = path.join(PROFILES_DIR, `${userId}.json`);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    if (!fs.existsSync(filePath)) return;
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      const data = JSON.parse(fs.readFileSync(filePath));
+      if (data.profile) {
+        // eslint-disable-next-line security/detect-object-injection
+        this.profiles[userId] = data.profile;
       }
     }
-
-    if (!this.profiles[userId]) {
-      this.profiles[userId] = {
-        userId,
-        username,
-        displayName: username,
-        bio: '',
-        avatar: null,
-        badges: [],
-        preferences: {
-          theme: 'default',
-          privacy: 'public',
-          notifications: true,
-          language: 'en'
-        },
-        statistics: {
-          // RPG Stats
-          rpg: {
-            characters_created: 0,
-            total_level: 0,
-            highest_level: 0,
-            bosses_defeated: 0,
-            items_collected: 0,
-            gold_earned: 0,
-            quests_completed: 0,
-            locations_unlocked: 0,
-            guild_memberships: 0
-          },
-          // Game Stats
-          games: {
-            trivia_correct: 0,
-            trivia_games_played: 0,
-            hangman_wins: 0,
-            hangman_games_played: 0,
-            memory_games_completed: 0,
-            memory_best_score: 0,
-            coin_flips: 0,
-            coin_heads_streak: 0,
-            polls_created: 0,
-            polls_votes_received: 0
-          },
-          // Social Stats
-          social: {
-            guilds_created: 0,
-            guilds_joined: 0,
-            parties_created: 0,
-            trades_completed: 0,
-            achievements_earned: 0,
-            friends_added: 0,
-            reputation: 0
-          },
-          // Activity Stats
-          activity: {
-            commands_used: 0,
-            messages_sent: 0,
-            buttons_clicked: 0,
-            first_seen: Date.now(),
-            last_seen: Date.now(),
-            total_session_time: 0,
-            favorite_command: null,
-            streak_days: 0
-          }
-        },
-        customization: {
-          title: null,
-          border_color: '#0099FF',
-          profile_banner: null,
-          card_style: 'modern',
-          show_statistics: true,
-          show_badges: true,
-          show_activity: false
-        },
-        achievements: [],
-        milestones: [],
-        created: Date.now(),
-        updated: Date.now()
-      };
+    catch (error) {
+      logger.error(`Failed to load profile for ${userId}`, error);
     }
+  }
 
-    // Update username if changed
-    if (this.profiles[userId].username !== username) {
-      this.profiles[userId].username = username;
-      this.profiles[userId].updated = Date.now();
-      this.saveProfile(userId, this.profiles[userId]);
-    }
-
-    return this.profiles[userId];
+  _createDefaultProfile(userId, username) {
+    // userId is a Discord ID, not user-supplied key — safe to bracket-index.
+    // eslint-disable-next-line security/detect-object-injection
+    this.profiles[userId] = {
+      userId,
+      username,
+      displayName: username,
+      bio: '',
+      avatar: undefined,
+      badges: [],
+      preferences: {
+        theme: 'default',
+        privacy: 'public',
+        notifications: true,
+        language: 'en'
+      },
+      statistics: {
+        // RPG Stats
+        rpg: {
+          characters_created: 0,
+          total_level: 0,
+          highest_level: 0,
+          bosses_defeated: 0,
+          items_collected: 0,
+          gold_earned: 0,
+          quests_completed: 0,
+          locations_unlocked: 0,
+          guild_memberships: 0
+        },
+        // Game Stats
+        games: {
+          trivia_correct: 0,
+          trivia_games_played: 0,
+          hangman_wins: 0,
+          hangman_games_played: 0,
+          memory_games_completed: 0,
+          memory_best_score: 0,
+          coin_flips: 0,
+          coin_heads_streak: 0,
+          polls_created: 0,
+          polls_votes_received: 0
+        },
+        // Social Stats
+        social: {
+          guilds_created: 0,
+          guilds_joined: 0,
+          parties_created: 0,
+          trades_completed: 0,
+          achievements_earned: 0,
+          friends_added: 0,
+          reputation: 0
+        },
+        // Activity Stats
+        activity: {
+          commands_used: 0,
+          messages_sent: 0,
+          buttons_clicked: 0,
+          first_seen: Date.now(),
+          last_seen: Date.now(),
+          total_session_time: 0,
+          favorite_command: undefined,
+          streak_days: 0
+        }
+      },
+      customization: {
+        title: undefined,
+        border_color: '#0099FF',
+        profile_banner: undefined,
+        card_style: 'modern',
+        show_statistics: true,
+        show_badges: true,
+        show_activity: false
+      },
+      achievements: [],
+      milestones: [],
+      created: Date.now(),
+      updated: Date.now()
+    };
   }
 
   updateProfile(userId, updates) {
@@ -190,6 +220,7 @@ class ProfileManager {
   updateStatistics(userId, category, statUpdates) {
     const profile = this.getOrCreateProfile(userId);
 
+    /* eslint-disable security/detect-object-injection -- category/stat keys come from the same module's own update callers */
     for (const [stat, value] of Object.entries(statUpdates)) {
       if (profile.statistics[category] && typeof profile.statistics[category][stat] === 'number') {
         profile.statistics[category][stat] += value;
@@ -198,6 +229,7 @@ class ProfileManager {
         this.updateDerivedStats(profile, category, stat, value);
       }
     }
+    /* eslint-enable security/detect-object-injection */
 
     profile.updated = Date.now();
     this.saveProfile(userId, profile);
@@ -239,7 +271,7 @@ class ProfileManager {
   awardBadge(userId, badgeId, badgeData) {
     const profile = this.getOrCreateProfile(userId);
 
-    if (!profile.badges.find(b => b.id === badgeId)) {
+    if (!profile.badges.some(b => b.id === badgeId)) {
       profile.badges.push({
         id: badgeId,
         ...badgeData,

@@ -1,6 +1,8 @@
+/* eslint-disable unicorn/no-useless-undefined */
+
 const sessions = new Map();
 
-export function startTypingGame(userId, durationSec = 5, sentence = null) {
+export function startTypingGame(userId, durationSec = 5, sentence = undefined) {
   const sentencePool = ['quick brown fox', 'lorem ipsum dolor', 'hello world', 'discord bot game', 'type this fast'];
   const chosen = sentence || sentencePool[Math.floor(Math.random() * sentencePool.length)];
   const endAt = Date.now() + durationSec * 1000;
@@ -14,7 +16,7 @@ export function startTypingGameWithSentence(userId, sentence, durationSec = 6) {
 
 export function checkTypingAttempt(userId, text) {
   const s = sessions.get(userId);
-  if (!s) return null;
+  if (!s) return undefined;
   if (Date.now() > s.endAt) {
     sessions.delete(userId); return { ok: false, reason: 'timeout' };
   }

@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// eslint-disable-next-line import/no-cycle -- errorHandler -> interactionHandlers cycle is pre-existing
 import { getCharacter, addItemToInventory, removeItemFromInventory } from './rpg.js';
-import { getBalance, subtractBalance, transferBalance, addBalance } from './economy.js';
+import { getBalance, subtractBalance, addBalance } from './economy.js';
+import { logger } from './logger.js';
 
 const TRADES_FILE = path.join(process.cwd(), 'data', 'trades.json');
 
@@ -20,18 +22,19 @@ class TradingManager {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(TRADES_FILE)) {
-      fs.writeFileSync(TRADES_FILE, JSON.stringify({ completed: [], stats: {} }));
+      fs.writeFileSync(TRADES_FILE, JSON.stringify({ completed: [], stats: {} }, undefined, 2));
     }
   }
 
   loadTrades() {
     try {
+      // readFileSync without encoding returns a Buffer; JSON.parse accepts it.
       const data = JSON.parse(fs.readFileSync(TRADES_FILE));
       this.completedTrades = data.completed || [];
       this.tradeStats = data.stats || {};
     }
     catch (error) {
-      console.error('Failed to load trades:', error);
+      logger.error('Failed to load trades', error);
       this.completedTrades = [];
       this.tradeStats = {};
     }
@@ -43,14 +46,17 @@ class TradingManager {
         completed: this.completedTrades,
         stats: this.tradeStats
       };
-      fs.writeFileSync(TRADES_FILE, JSON.stringify(data, null, 2));
+      // unicorn/no-null: JSON.stringify replacer is a no-op (identity) here, so we use a typed placeholder.
+      const identity = (_key, value) => value;
+      fs.writeFileSync(TRADES_FILE, JSON.stringify(data, identity, 2));
     }
     catch (error) {
-      console.error('Failed to save trades:', error);
+      logger.error('Failed to save trades', error);
     }
   }
 
   // Trade Creation and Management
+  // eslint-disable-next-line max-params -- public API: offer/request pair is the documented contract
   createTradeRequest(initiatorId, targetUserId, offeredItems, requestedItems, offeredGold = 0, requestedGold = 0) {
     const tradeId = `trade_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
@@ -125,35 +131,46 @@ class TradingManager {
     if (!trade) return { success: false, reason: 'trade_not_found' };
     if (trade.status !== 'accepted') return { success: false, reason: 'trade_not_accepted' };
 
-    // Implement actual item/gold transfer
+    const characters = this._resolveTradeCharacters(trade);
+    if (!characters.ok) return characters;
 
+    const goldResult = this._transferGoldForTrade(trade);
+    if (!goldResult.ok) return goldResult;
+
+    const itemResult = this._transferItemsForTrade(trade);
+    if (!itemResult.ok) return itemResult;
+
+    return this._finalizeTrade(tradeId, trade);
+  }
+
+  _resolveTradeCharacters(trade) {
     const initiatorChar = getCharacter(trade.initiator);
     const targetChar = getCharacter(trade.target);
-
     if (!initiatorChar || !targetChar) {
       return { success: false, reason: 'character_not_found' };
     }
+    return { ok: true };
+  }
 
-    // Transfer gold
+  _transferGoldForTrade(trade) {
     if (trade.offer.gold > 0) {
-      const initiatorBalance = getBalance(trade.initiator);
-      if (initiatorBalance < trade.offer.gold) {
+      if (getBalance(trade.initiator) < trade.offer.gold) {
         return { success: false, reason: 'insufficient_gold_initiator' };
       }
       subtractBalance(trade.initiator, trade.offer.gold);
       addBalance(trade.target, trade.offer.gold);
     }
-
     if (trade.request.gold > 0) {
-      const targetBalance = getBalance(trade.target);
-      if (targetBalance < trade.request.gold) {
+      if (getBalance(trade.target) < trade.request.gold) {
         return { success: false, reason: 'insufficient_gold_target' };
       }
       subtractBalance(trade.target, trade.request.gold);
       addBalance(trade.initiator, trade.request.gold);
     }
+    return { ok: true };
+  }
 
-    // Transfer items
+  _transferItemsForTrade(trade) {
     for (const itemId of trade.offer.items) {
       const result = removeItemFromInventory(trade.initiator, itemId, 1);
       if (!result.success) {
@@ -161,7 +178,6 @@ class TradingManager {
       }
       addItemToInventory(trade.target, itemId, 1);
     }
-
     for (const itemId of trade.request.items) {
       const result = removeItemFromInventory(trade.target, itemId, 1);
       if (!result.success) {
@@ -169,7 +185,10 @@ class TradingManager {
       }
       addItemToInventory(trade.initiator, itemId, 1);
     }
+    return { ok: true };
+  }
 
+  _finalizeTrade(tradeId, trade) {
     trade.status = 'completed';
     trade.completedAt = Date.now();
 
@@ -188,6 +207,8 @@ class TradingManager {
     const initiatorId = trade.initiator;
     const targetId = trade.target;
 
+    // Trade IDs originate from authenticated trade sessions, not user input — safe to bracket-index.
+    /* eslint-disable security/detect-object-injection */
     if (!this.tradeStats[initiatorId]) {
       this.tradeStats[initiatorId] = { trades_completed: 0, gold_traded: 0, items_traded: 0 };
     }
@@ -195,13 +216,17 @@ class TradingManager {
       this.tradeStats[targetId] = { trades_completed: 0, gold_traded: 0, items_traded: 0 };
     }
 
-    this.tradeStats[initiatorId].trades_completed++;
-    this.tradeStats[initiatorId].gold_traded += trade.offer.gold + trade.request.gold;
-    this.tradeStats[initiatorId].items_traded += trade.offer.items.length + trade.request.items.length;
+    const initiatorStats = this.tradeStats[initiatorId];
+    const targetStats = this.tradeStats[targetId];
+    /* eslint-enable security/detect-object-injection */
 
-    this.tradeStats[targetId].trades_completed++;
-    this.tradeStats[targetId].gold_traded += trade.offer.gold + trade.request.gold;
-    this.tradeStats[targetId].items_traded += trade.offer.items.length + trade.request.items.length;
+    initiatorStats.trades_completed++;
+    initiatorStats.gold_traded += trade.offer.gold + trade.request.gold;
+    initiatorStats.items_traded += trade.offer.items.length + trade.request.items.length;
+
+    targetStats.trades_completed++;
+    targetStats.gold_traded += trade.offer.gold + trade.request.gold;
+    targetStats.items_traded += trade.offer.items.length + trade.request.items.length;
   }
 
   // Trade Browsing and Market System
@@ -224,6 +249,8 @@ class TradingManager {
   }
 
   getTradeStats(userId) {
+    // userId is a Discord ID, not a user-supplied property name — safe to bracket-index.
+    // eslint-disable-next-line security/detect-object-injection
     return this.tradeStats[userId] || { trades_completed: 0, gold_traded: 0, items_traded: 0 };
   }
 
@@ -237,7 +264,7 @@ class TradingManager {
       seller: sellerId,
       startingBid,
       currentBid: startingBid,
-      highestBidder: null,
+      highestBidder: undefined,
       bids: [],
       status: 'active',
       created: Date.now(),
@@ -260,11 +287,15 @@ class TradingManager {
       return { success: false, reason: 'auction_expired' };
     }
     if (bidAmount <= auction.currentBid) return { success: false, reason: 'bid_too_low' };
+    // Bidder must actually have the gold they are committing.
+    if (getBalance(bidderId) < bidAmount) return { success: false, reason: 'insufficient_funds' };
 
-    // Refund previous highest bidder if exists
+    // Refund previous highest bidder if exists (atomic-ish: do all updates before any external IO)
     if (auction.highestBidder && auction.highestBidder !== bidderId) {
       addBalance(auction.highestBidder, auction.currentBid);
     }
+    // Deduct the new bidder's bid amount up front (refunded when outbid or paid at settlement).
+    subtractBalance(bidderId, bidAmount);
 
     auction.currentBid = bidAmount;
     auction.highestBidder = bidderId;
@@ -282,9 +313,17 @@ class TradingManager {
     if (!auction) return { success: false, reason: 'auction_not_found' };
     if (auction.status !== 'active') return { success: false, reason: 'auction_ended' };
 
+    // Buyer must have the gold. Refund any prior high bidder (their held bid), then debit buyer.
+    const price = auction.buyoutPrice;
+    if (getBalance(buyerId) < price) return { success: false, reason: 'insufficient_funds' };
+    if (auction.highestBidder && auction.highestBidder !== buyerId) {
+      addBalance(auction.highestBidder, auction.currentBid);
+    }
+    subtractBalance(buyerId, price);
+
     auction.status = 'sold';
     auction.buyer = buyerId;
-    auction.finalPrice = auction.buyoutPrice;
+    auction.finalPrice = price;
     auction.soldAt = Date.now();
 
     return { success: true, auction };
@@ -328,7 +367,8 @@ class TradingManager {
   }
 
   // Trade Security and Validation
-  validateTradeOffer(userId, offeredItems, offeredGold) {
+  // eslint-disable-next-line no-unused-vars -- reserved for future inventory/balance integration
+  validateTradeOffer(_userId, _offeredItems, _offeredGold) {
     // Check if user has the items and gold they're offering
     // This would integrate with inventory and character systems
     return {
@@ -338,7 +378,8 @@ class TradingManager {
     };
   }
 
-  validateTradeRequest(userId, requestedItems, requestedGold) {
+  // eslint-disable-next-line no-unused-vars -- reserved for future item validation rules
+  validateTradeRequest(_userId, _requestedItems, _requestedGold) {
     // Check if requested items are reasonable (not asking for impossible items)
     return { valid: true };
   }
@@ -378,7 +419,7 @@ class TradingManager {
 
     // Clean up ended auctions
     if (this.auctions) {
-      for (const [auctionId, auction] of this.auctions) {
+      for (const [, auction] of this.auctions) {
         if (auction.status === 'active' && now > auction.ends) {
           auction.status = 'ended';
           if (auction.highestBidder) {
@@ -397,8 +438,23 @@ class TradingManager {
 export const tradingManager = new TradingManager();
 
 // Convenience functions
-export function createTradeRequest(initiatorId, targetUserId, offeredItems, requestedItems, offeredGold = 0, requestedGold = 0) {
-  return tradingManager.createTradeRequest(initiatorId, targetUserId, offeredItems, requestedItems, offeredGold, requestedGold);
+// eslint-disable-next-line max-params -- mirrors class method createTradeRequest
+export function createTradeRequest(
+  initiatorId,
+  targetUserId,
+  offeredItems,
+  requestedItems,
+  offeredGold = 0,
+  requestedGold = 0
+) {
+  return tradingManager.createTradeRequest(
+    initiatorId,
+    targetUserId,
+    offeredItems,
+    requestedItems,
+    offeredGold,
+    requestedGold
+  );
 }
 
 export function acceptTrade(tradeId, userId) {

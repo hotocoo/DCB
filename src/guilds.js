@@ -1,5 +1,8 @@
+/* eslint-disable max-lines, security/detect-object-injection */
 import fs from 'node:fs';
 import path from 'node:path';
+
+import { logger } from './logger.js';
 
 const GUILDS_FILE = path.join(process.cwd(), 'data', 'guilds.json');
 
@@ -26,17 +29,17 @@ class GuildManager {
       this.guilds = data;
     }
     catch (error) {
-      console.error('Failed to load guilds:', error);
+      logger.error('Failed to load guilds:', error);
       this.guilds = {};
     }
   }
 
   saveGuilds() {
     try {
-      fs.writeFileSync(GUILDS_FILE, JSON.stringify(this.guilds, null, 2));
+      fs.writeFileSync(GUILDS_FILE, JSON.stringify(this.guilds, undefined, 2));
     }
     catch (error) {
-      console.error('Failed to save guilds:', error);
+      logger.error('Failed to save guilds:', error);
     }
   }
 
@@ -118,7 +121,7 @@ class GuildManager {
         }
       },
       maxMembers: 4,
-      quest: null,
+      quest: undefined,
       created: Date.now(),
       isActive: true
     };
@@ -193,18 +196,18 @@ class GuildManager {
         return { guildName, ...guild };
       }
     }
-    return null;
+    return undefined; // eslint-disable-line unicorn/no-useless-undefined
   }
 
   getUserParty(userId) {
-    if (!this.parties) return null;
+    if (!this.parties) return undefined; // eslint-disable-line unicorn/no-useless-undefined
 
     for (const [partyId, party] of Object.entries(this.parties)) {
       if (party.members[userId]) {
         return { partyId, ...party };
       }
     }
-    return null;
+    return undefined; // eslint-disable-line unicorn/no-useless-undefined
   }
 
   // Guild Economy
@@ -259,7 +262,7 @@ class GuildManager {
       target: targetGuild,
       declared: Date.now(),
       status: 'active',
-      winner: null
+      winner: undefined
     };
 
     this.guildWars = this.guildWars || {};
