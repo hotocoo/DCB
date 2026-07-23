@@ -1,8 +1,12 @@
+/* eslint-disable max-statements, complexity, max-depth */
+// Comprehensive test suite — the orchestration of 6 test groups
+// naturally exceeds the default complexity/statements thresholds. The
+// per-group helpers stay below the limits individually.
 import assert from 'node:assert';
 import fs from 'node:fs';
 
-import { getBalance, addBalance, transferBalance, buyFromMarket, sellToMarket, createInvestment, getUserInvestments, getMarketPrice } from '../src/economy.js';
-import { warnUser, muteUser, isUserMuted, checkAutoMod, getUserModStats } from '../src/moderation.js';
+import { getBalance, addBalance, transferBalance, buyFromMarket, sellToMarket, createInvestment, getUserInvestments, getMarketPrice, resetUserEconomyData } from '../src/economy.js';
+import { warnUser, muteUser, isUserMuted, checkAutoMod, getUserModStats, resetUserModerationData } from '../src/moderation.js';
 import { createCharacter, getCharacter, applyXp, addItemToInventory, getInventory, deleteCharacter } from '../src/rpg.js';
 import { searchSongs, play, pause, stop, getQueue } from '../src/music.js';
 import { CommandError, validateUser, validateGuild, validatePermissions, validateRange, validateNotEmpty, createRateLimiter } from '../src/errorHandler.js';
@@ -270,12 +274,20 @@ class ComprehensiveTestSuite {
     console.log('🚀 Starting Comprehensive Bot System Test Suite');
     console.log('=' .repeat(60));
 
-    await this.testEconomy();
-    await this.testModeration();
-    await this.testRPG();
-    await this.testMusic();
-    await this.testIntegrations();
-    await this.testErrorHandling();
+    try {
+      await this.testEconomy();
+      await this.testModeration();
+      await this.testRPG();
+      await this.testMusic();
+      await this.testIntegrations();
+      await this.testErrorHandling();
+    }
+    finally {
+      // Always clean up test data so reruns (and CI) don't pollute the
+      // committed data/ tree. If the suite crashes mid-run, we still
+      // get the scrub.
+      this.cleanupAllTestData();
+    }
 
     console.log('\n' + '=' .repeat(60));
     console.log('📊 Test Results Summary:');
@@ -294,6 +306,85 @@ class ComprehensiveTestSuite {
       failed: this.failCount,
       successRate: ((this.passCount / this.testCount) * 100).toFixed(1)
     };
+  }
+
+  // Scrub every test user from every persistent store. Each cleanup
+  // helper is best-effort and logs nothing on its own — failures here
+  // would just leave test data behind, which is the same outcome as
+  // before this method existed.
+  cleanupAllTestData() {
+    // 1) Always clean up THIS run's test users, identified by the
+    //    `testuser_<ts>_<n>` pattern the suite generates at construction.
+    for (const userId of this.testUsers) {
+      try {
+        deleteCharacter(userId);
+      }
+      catch { /* ignore */ }
+      try {
+        resetUserEconomyData(userId);
+      }
+      catch { /* ignore */ }
+      try {
+        resetUserModerationData(userId);
+      }
+      catch { /* ignore */ }
+    }
+
+    // 2) Also scrub any pre-existing testuser_* rows that older runs
+    //    (before cleanup existed) left behind, plus the snowflake
+    //    pattern used by the RPG smoke tests. Bounded by the
+    //    `testuser_` prefix and the literal snowflake so we never
+    //    touch real user data.
+    const playersDir = 'data/players';
+    if (fs.existsSync(playersDir)) {
+      for (const file of fs.readdirSync(playersDir)) {
+        if (file.startsWith('testuser_')
+          || file === '123456789012345678.json'
+          || file.startsWith('testuser1')) {
+          try {
+            fs.unlinkSync(`${playersDir}/${file}`);
+          }
+          catch { /* ignore */ }
+        }
+      }
+    }
+
+    // 3) Older runs left warnings/transactions/mutes for testuser_*
+    //    users that this run didn't generate. Sweep them too so the
+    //    committed data files don't grow on every CI invocation.
+    const legacySweepIds = new Set();
+    for (const id of Object.keys(this.collectLegacyTestUserIds())) {
+      legacySweepIds.add(id);
+    }
+    for (const userId of legacySweepIds) {
+      try {
+        resetUserEconomyData(userId);
+      }
+      catch { /* ignore */ }
+      try {
+        resetUserModerationData(userId);
+      }
+      catch { /* ignore */ }
+    }
+  }
+
+  // Discover `testuser_<digits>_<digits>` user ids that previous
+  // comprehensive-test runs may have left in data/economy.json or
+  // data/moderation.json. Read directly from disk so we don't depend
+  // on the live in-memory cache, and bound the scan to the two files
+  // the test actually writes to.
+  collectLegacyTestUserIds() {
+    const ids = new Set();
+    const testuserPattern = /testuser_\d+_\d+/g;
+    for (const file of ['data/economy.json', 'data/moderation.json']) {
+      if (!fs.existsSync(file)) continue;
+      try {
+        const text = fs.readFileSync(file, 'utf8');
+        for (const match of text.matchAll(testuserPattern)) ids.add(match[0]);
+      }
+      catch { /* ignore */ }
+    }
+    return ids;
   }
 }
 

@@ -509,7 +509,11 @@ export function getTradeAnalytics(userId) {
   return tradingManager.getTradeAnalytics(userId);
 }
 
-// Auto-cleanup every 5 minutes
-setInterval(() => {
+// Auto-cleanup every 5 minutes. `unref()` is needed so this timer
+// doesn't keep the Node event loop alive in one-shot scripts / CI tests.
+const tradingCleanupInterval = setInterval(() => {
   tradingManager.cleanup();
 }, 5 * 60 * 1000);
+if (typeof tradingCleanupInterval.unref === 'function') {
+  tradingCleanupInterval.unref();
+}

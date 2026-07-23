@@ -1,3 +1,7 @@
+/* eslint-disable unicorn/no-process-exit, promise/always-return, brace-style */
+// This is a CLI test runner — process.exit() is the correct way to
+// signal the test verdict to the parent shell. Disabling the
+// no-process-exit rule here (it's designed for libraries, not scripts).
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,7 +30,8 @@ function restoreData() {
 async function run() {
   backupData();
   try {
-    const uid = 'testuser1';
+    // Valid Discord snowflake (17-19 digits) — required by safeUserId() in src/rpg.js
+    const uid = '123456789012345678';
     deleteCharacter(uid);
     const char = createCharacter(uid, 'Tester');
     assert.ok(char, 'Character created');
@@ -60,10 +65,29 @@ async function run() {
     console.log('All tests passed');
   }
   finally {
+    // Always clean up the per-user file and any pre-existing testuser_*
+    // leftovers from previous runs. Without this, every `npm run
+    // test:rpg` invocation leaves a new data/players/<snowflake>.json
+    // file behind that gets committed to the repo.
+    try {
+      deleteCharacter('123456789012345678');
+    }
+    catch { /* ignore */ }
+    const playersDir = path.join(process.cwd(), 'data', 'players');
+    if (fs.existsSync(playersDir)) {
+      for (const file of fs.readdirSync(playersDir)) {
+        if (file === '123456789012345678.json' || file.startsWith('testuser_')) {
+          try {
+            fs.unlinkSync(path.join(playersDir, file));
+          }
+          catch { /* ignore */ }
+        }
+      }
+    }
     restoreData();
   }
 }
 
-run().catch(error => {
+run().then(() => process.exit(0)).catch(error => {
   console.error(error); process.exit(1);
 });

@@ -1,18 +1,18 @@
-# Pulse Bot
+# Athena
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Discord.js](https://img.shields.io/badge/discord.js-v14-blue.svg)](https://discord.js.org/)
-[![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)]()
 [![Database](https://img.shields.io/badge/database-JSON--files-lightgrey.svg)]()
 [![Test Suite](https://img.shields.io/badge/tests-38%2F38%20passing-brightgreen)]()
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)]()
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-black.svg)](https://github.com/hotocoo/DCB)
 
-A comprehensive, feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, AI-powered interactions, with JSON-based data storage as the current primary method and ongoing SQLite migration for enhanced performance and reliability.
+A feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, and AI-powered interactions. Primary data store is JSON files (SQLite migration planned).
 
-> **Current version:** `3.0.1` (matches `@version` in `src/index.js` and `src/chat.js`). Note: `package.json` declares `3.0.0` — bump it in the next release.
+> **Current version:** `0.1.1` (matches `@version` in `src/index.js` and `src/chat.js`, and `package.json`).
 
 > **Storage:** Primary data store is JSON files under `data/` (per-domain files: `economy.json`, `rpg/players/<id>.json`, `moderation.json`, `schedules.json`, etc.). SQLite is *not* in use yet — see `database-schema.md` for the planned schema.
 
@@ -29,9 +29,9 @@ A comprehensive, feature-rich Discord bot built with Node.js and Discord.js, off
 
 ## 🌟 Overview
 
-PulseBot is a versatile Discord bot that transforms your server into an interactive entertainment platform. Combining cutting-edge features with intuitive design, it provides everything from immersive RPG adventures and high-quality music streaming to sophisticated economic systems and powerful moderation tools.
+Athena is a versatile Discord bot that transforms your server into an interactive entertainment platform. Combining cutting-edge features with intuitive design, it provides everything from immersive RPG adventures and high-quality music streaming to sophisticated economic systems and powerful moderation tools.
 
-Whether you're looking to engage your community with games, manage your server effectively, or create immersive role-playing experiences, Pulse Bot delivers professional-grade functionality with enterprise-level reliability.
+Whether you're looking to engage your community with games, manage your server effectively, or create immersive role-playing experiences, Athena delivers professional-grade functionality with enterprise-level reliability.
 
 ## ✨ Features
 
@@ -81,8 +81,8 @@ Whether you're looking to engage your community with games, manage your server e
 
 ## 🚀 Installation
 
-### Database Migration Note (v3.0.0)
-⚠️ **Important**: SQLite migration is in progress. Currently using JSON files as primary storage. Backup your `data/` folder before upgrading.
+### Database Migration Note
+⚠️ **Important**: SQLite migration is planned but not yet wired up. Currently using JSON files as primary storage. Backup your `data/` folder before any migration.
 
 ### Prerequisites
 - **Node.js** 18.0.0 or higher
@@ -347,7 +347,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔄 Recent Updates & Fixes
 
-### v3.0.1 — Bug fixes + docs + lint cleanup
+### v0.1.1 — Bug fixes + docs + lint cleanup
 
 #### Critical bug fixes
 - **Trading auction bid/buyout (`src/trading.js`)** — `placeBid()` and `buyoutAuction()` previously accepted any bid amount without checking the bidder's balance. Now: bids require sufficient funds, the bidder's gold is debited up front, and the previous high bidder is refunded when outbid. Buyout deducts from the buyer atomically.
@@ -373,7 +373,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Brace-style normalized to stroustrup in `interactionHandlers.js` (40+ sites).
 - Added targeted `eslint-disable-next-line security/detect-object-injection` comments with justification where the rule's static analysis can't see the runtime guard (`findIndex`, bounded array index, etc.).
 
-### v3.0.0 — Earlier changes
+### v0.1.0 — Earlier changes
 - JSON-based data storage layer with size-capped atomic writes (`src/storage.js`).
 - Music manager refactor with YouTube-priority search, Spotify token refresh, Deezer fallback.
 - Scheduler with reminders, events, recurring (`daily` / `weekly` / `monthly` / `hourly`).

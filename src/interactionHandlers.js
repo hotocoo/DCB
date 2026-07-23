@@ -86,11 +86,13 @@ function recordErrorAttempt(interactionId) {
 }
 async function safeInteractionReply(interaction, options) {
   const interactionId = interaction.id;
-  console.log(`DEBUG: safeInteractionReply called with interaction: ${interaction.constructor.name}, interactionId: ${interactionId}`);
-  console.log(`DEBUG: interaction.user: ${interaction.user ? interaction.user.constructor.name : 'null'}, userId: ${interaction.user?.id}`);
-  console.log(`DEBUG: options type: ${typeof options}, options keys: ${Object.keys(options || {})}`);
+  logger.debug('safeInteractionReply called', {
+    interactionType: interaction.constructor.name,
+    interactionId,
+    userId: interaction.user?.id,
+    optionsKeys: Object.keys(options || {})
+  });
   if (!checkCircuitBreaker(interactionId)) {
-    console.error(`[SAFE_INTERACTION_REPLY] Circuit breaker tripped for interaction ${interactionId}, skipping reply`);
     logger.error(`Circuit breaker tripped - too many error attempts for interaction ${interactionId}`, new Error('Circuit breaker activated'), {
       interactionId,
       userId: interaction.user?.id
@@ -384,7 +386,7 @@ async function handleModalSubmit(interaction, client) {
       if (!text || text.trim() !== 'RESET') {
         throw new CommandError('Confirmation text did not match. Type RESET to confirm.', 'INVALID_ARGUMENT');
       }
-      console.log(`DEBUG: Modal submit - reset confirmation for user ${interaction.user.id}, mode: ${mode}`);
+      logger.debug('Modal submit: reset confirmation', { userId: interaction.user.id, mode });
       const className = parts[3] || 'warrior';
       const validation = inputValidator.validateCharacterClass(className);
       if (!validation.valid) {
@@ -398,9 +400,9 @@ async function handleModalSubmit(interaction, client) {
     }
     if (custom.startsWith('guess_submit:')) {
       const [, gameId] = custom.split(':');
-      console.log(`DEBUG: Processing guess_submit for gameId: ${gameId}`);
+      logger.debug('Processing guess_submit', { gameId });
       const gameState = guessGames.get(gameId);
-      console.log(`DEBUG: Game state found: ${!!gameState}, gameState type: ${typeof gameState}`);
+      logger.debug('Guess game state lookup', { found: !!gameState, type: typeof gameState });
       if (!gameState) {
         await safeInteractionReply(interaction, { content: '\u274C **Game not found!** The game may have expired.', flags: MessageFlags.Ephemeral });
         return;
@@ -410,7 +412,7 @@ async function handleModalSubmit(interaction, client) {
         return;
       }
       const guess = interaction.fields.getTextInputValue('guess_number');
-      console.log(`DEBUG: Retrieved guess input: ${guess}, type: ${typeof guess}`);
+      logger.debug('Guess input retrieved', { guess, type: typeof guess });
       if (!guess || typeof guess !== 'string') {
         throw new CommandError('Invalid guess input.', 'INVALID_ARGUMENT');
       }
@@ -556,10 +558,12 @@ async function handleButtonInteraction(interaction, client) {
   const userId = interaction.user.id;
   const buttonCooldownType = getButtonCooldownType(interaction.customId);
   const cooldownCheck = isOnCooldown(userId, buttonCooldownType);
-  console.log(`DEBUG: handleButtonInteraction called with interaction: ${interaction.constructor.name}, customId: ${interaction.customId}`);
-  console.log(`DEBUG: userId: ${userId}, buttonCooldownType: ${buttonCooldownType}`);
-  console.log(`DEBUG: interaction.user: ${interaction.user ? interaction.user.constructor.name : 'null'}`);
-  console.log(`DEBUG: interaction.message: ${interaction.message ? interaction.message.constructor.name : 'null'}`);
+  logger.debug('handleButtonInteraction called', {
+    interactionType: interaction.constructor.name,
+    customId: interaction.customId,
+    userId,
+    buttonCooldownType
+  });
   if (cooldownCheck.onCooldown) {
     logCommandExecution(interaction, false, new Error('Button on cooldown'));
     logger.warn('Button on cooldown', {

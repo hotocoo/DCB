@@ -524,7 +524,11 @@ export function getIntegrationStats() {
   return integrationManager.getIntegrationStats();
 }
 
-// Auto-cleanup every 30 minutes
-setInterval(() => {
+// Auto-cleanup every 30 minutes. `unref()` is needed so this timer
+// doesn't keep the Node event loop alive in one-shot scripts / CI tests.
+const integrationCleanupInterval = setInterval(() => {
   integrationManager.cleanup();
 }, 30 * 60 * 1000);
+if (typeof integrationCleanupInterval.unref === 'function') {
+  integrationCleanupInterval.unref();
+}

@@ -6,7 +6,7 @@ import { logger } from '../logger.js';
 
 export const data = new SlashCommandBuilder()
   .setName('music')
-  .setDescription('🎵 Pulse Bot Music System - YouTube & Spotify Priority!')
+  .setDescription('🎵 Athena Music System - YouTube & Spotify Priority!')
   .addSubcommand(sub => sub.setName('play').setDescription('🎵 Play any song instantly').addStringOption(opt => opt.setName('query').setDescription('Song name or URL').setRequired(true)))
   .addSubcommand(sub => sub.setName('search').setDescription('🔍 Search millions of songs').addStringOption(opt => opt.setName('query').setDescription('Search term').setRequired(true)))
   .addSubcommand(sub => sub.setName('back').setDescription('⬅️ Go back to previous song'))

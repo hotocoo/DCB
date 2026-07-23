@@ -500,7 +500,11 @@ export function validateCommand(commandData) {
   return customCommandManager.validateCommand(commandData);
 }
 
-// Auto-cleanup every hour
-setInterval(() => {
+// Auto-cleanup every hour. `unref()` is needed so this timer doesn't
+// keep the Node event loop alive in one-shot scripts / CI tests.
+const customCommandsCleanupInterval = setInterval(() => {
   customCommandManager.cleanup();
 }, 60 * 60 * 1000);
+if (typeof customCommandsCleanupInterval.unref === 'function') {
+  customCommandsCleanupInterval.unref();
+}

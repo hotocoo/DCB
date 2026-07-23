@@ -342,8 +342,10 @@ class EconomyManager {
       this.marketPrices.set(itemId, Math.max(1, Math.round(currentPrice)));
     }
 
-    // Start price fluctuation
-    setInterval(() => this.updateMarketPrices(), 300_000); // Every 5 minutes
+    // Start price fluctuation. `unref()` so this timer doesn't keep
+    // the Node event loop alive in one-shot scripts / CI tests.
+    const priceTimer = setInterval(() => this.updateMarketPrices(), 300_000); // Every 5 minutes
+    if (typeof priceTimer.unref === 'function') priceTimer.unref();
   }
 
   updateMarketPrices() {
@@ -640,6 +642,50 @@ class EconomyManager {
     return { success: true, reward, streak: streak + 1 };
   }
 
+  // Test/Cleanup helper: fully wipe a user's economy data. Returns true
+  // if anything was actually removed. Intended for test teardown so
+  // automated runs don't pollute the committed `data/economy.json` with
+  // balances, transactions, investments, or businesses for fake user ids.
+  // Not exposed in any user-facing command surface.
+  resetUser(userId) {
+    if (!userId || typeof userId !== 'string') return false;
+    let removed = false;
+
+    if (this.economyData.userBalances[userId] !== undefined) {
+      delete this.economyData.userBalances[userId];
+      removed = true;
+    }
+    if (this.economyData.businessData[userId] !== undefined) {
+      delete this.economyData.businessData[userId];
+      removed = true;
+    }
+    if (this.economyData.investments[userId] !== undefined) {
+      delete this.economyData.investments[userId];
+      removed = true;
+    }
+
+    // Investments are tracked by id elsewhere; scrub any investments
+    // owned by this user.
+    if (this.economyData.investments && typeof this.economyData.investments === 'object') {
+      for (const [invId, inv] of Object.entries(this.economyData.investments)) {
+        if (inv && inv.userId === userId) {
+          delete this.economyData.investments[invId];
+          removed = true;
+        }
+      }
+    }
+
+    // Filter transactions involving this user.
+    const before = this.economyData.transactions.length;
+    this.economyData.transactions = this.economyData.transactions.filter(
+      txn => txn.from !== userId && txn.to !== userId && txn.user !== userId
+    );
+    if (this.economyData.transactions.length !== before) removed = true;
+
+    if (removed) this.saveEconomy();
+    return removed;
+  }
+
   // Cleanup and Maintenance
   cleanup() {
     // Process mature investments
@@ -749,6 +795,12 @@ export function createInvestment(userId, investmentType, amount) {
 
 export function getUserInvestments(userId) {
   return economyManager.getUserInvestments(userId);
+}
+
+// Test/Cleanup helper exposed at the module level for symmetry with the
+// other convenience functions. See EconomyManager.resetUser for details.
+export function resetUserEconomyData(userId) {
+  return economyManager.resetUser(userId);
 }
 
 // End of file

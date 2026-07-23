@@ -1,9 +1,9 @@
 /**
- * Main entry point for the Pulse Bot application.
+ * Main entry point for the Athena Discord bot.
  * Initializes the client, loads commands, sets up event listeners, and manages bot lifecycle.
  *
  * @fileoverview Main bot entry point with comprehensive error handling and graceful shutdown.
- * @author Pulse Bot Development Team
+ * @author watchandnotlearn
  * @version 0.1.1
  * @license MIT
  */
@@ -149,7 +149,23 @@ client.once('ready', () => {
 
   logger.success(`Bot started successfully as ${user.tag}`, stats);
 
-  // Set up graceful shutdown handlers
+  // Log system information
+  logger.info('System information', {
+    nodeVersion: process.version,
+    platform: process.platform,
+    arch: process.arch,
+    memoryUsage: process.memoryUsage(),
+    uptime: process.uptime()
+  });
+});
+
+// Set up graceful shutdown handlers ONCE at module load. Placing them
+// inside the `ready` callback (as a previous version did) would re-add
+// listeners on every re-ready and leak handlers over the process
+// lifetime. We use a guard so hot-reload (`node --watch`) doesn't add
+// duplicate listeners either.
+if (!process[Symbol.for('athena.shutdown.handlersInstalled')]) {
+  process[Symbol.for('athena.shutdown.handlersInstalled')] = true;
   process.on('SIGINT', () => gracefulShutdown(client, 'SIGINT'));
   process.on('SIGTERM', () => gracefulShutdown(client, 'SIGTERM'));
   process.on('uncaughtException', (error) => {
@@ -160,16 +176,7 @@ client.once('ready', () => {
     logger.error('Unhandled rejection', reason instanceof Error ? reason : new Error(String(reason)), { promise: String(promise) });
     gracefulShutdown(client, 'unhandledRejection');
   });
-
-  // Log system information
-  logger.info('System information', {
-    nodeVersion: process.version,
-    platform: process.platform,
-    arch: process.arch,
-    memoryUsage: process.memoryUsage(),
-    uptime: process.uptime()
-  });
-});
+}
 
 client.on('interactionCreate', async interaction => {
   if (interaction.isChatInputCommand() || interaction.isButton() || interaction.isModalSubmit()) {

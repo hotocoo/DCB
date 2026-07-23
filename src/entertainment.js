@@ -613,7 +613,11 @@ export function rateJoke(jokeId, rating) {
   return entertainmentManager.rateJoke(jokeId, rating);
 }
 
-// Auto-cleanup every hour
-setInterval(() => {
+// Auto-cleanup every hour. `unref()` is needed so this timer doesn't
+// keep the Node event loop alive in one-shot scripts / CI tests.
+const entertainmentCleanupInterval = setInterval(() => {
   entertainmentManager.cleanup();
 }, 60 * 60 * 1000);
+if (typeof entertainmentCleanupInterval.unref === 'function') {
+  entertainmentCleanupInterval.unref();
+}

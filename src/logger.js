@@ -35,6 +35,10 @@ class Logger {
   constructor() {
     this.logBuffer = [];
     this.flushInterval = setInterval(() => this.flushLogs(), FLUSH_INTERVAL_MS);
+    // Don't keep the Node event loop alive solely for log flushing —
+    // one-shot scripts (CI tests, `node scripts/test-imports.mjs`, etc.)
+    // should be able to exit without waiting for the next flush.
+    if (typeof this.flushInterval.unref === 'function') this.flushInterval.unref();
     this.ensureLogDirectory();
   }
 
@@ -194,10 +198,30 @@ class Logger {
    * @param {Error|null} error - Error object if command failed
    */
   logCommand(interaction, success = true, error = null) {
+    // `interaction.commandName` only exists on ChatInputCommand. For
+    // button / modal / context-menu interactions we have to use a
+    // different identifier (customId) so log lines don't read
+    // "Command failed: /undefined".
+    const isChatInput = typeof interaction.commandName === 'string';
+    const identifier = isChatInput
+      ? interaction.commandName
+      : (interaction.customId || interaction.constructor.name || 'unknown');
+    const verb = isChatInput ? `/${identifier}` : `[${identifier}]`;
+
+    // Modern Discord user objects (post-username-rewrite) no longer
+    // expose `discriminator` — guard so the log line still prints
+    // something useful.
+    const username = interaction.user?.username || 'unknown';
+    const discriminator = interaction.user?.discriminator;
+    const userTag = discriminator && discriminator !== '0'
+      ? `${username}#${discriminator}`
+      : username;
+
     const meta = {
-      command: interaction.commandName,
-      user: `${interaction.user.username}#${interaction.user.discriminator}`,
-      userId: interaction.user.id,
+      command: identifier,
+      interactionType: interaction.constructor.name,
+      user: userTag,
+      userId: interaction.user?.id,
       guild: interaction.guild?.name || 'DM',
       guildId: interaction.guild?.id || null,
       channel: interaction.channel?.name || 'Unknown',
@@ -205,10 +229,10 @@ class Logger {
     };
 
     if (success) {
-      this.success(`Command executed: /${interaction.commandName}`, meta);
+      this.success(`Interaction executed: ${verb}`, meta);
     }
     else {
-      this.error(`Command failed: /${interaction.commandName}`, error, meta);
+      this.error(`Interaction failed: ${verb}`, error, meta);
     }
   }
 

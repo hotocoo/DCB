@@ -53,18 +53,32 @@ function ensureDir() {
   if (!fs.existsSync(PLAYERS_DIR)) fs.mkdirSync(PLAYERS_DIR, { recursive: true });
 }
 
-// Sanitize a Discord user id so it cannot escape the players directory
-// via path traversal (../) or null bytes. Discord ids are 17-19 digit snowflakes,
-// so anything else is rejected.
+// Validate a user-id-like string so it cannot escape the players directory
+// via path traversal (../), backslashes, null bytes, or non-filename chars.
+//
+// NOTE: this is a PATH-SAFETY check, not a Discord snowflake validator.
+// Production callers pass Discord user ids (17-19 digit snowflakes) which
+// match this regex. Tests, admin scripts, and legacy data may pass other
+// safe identifiers (e.g. "testuser1", "testuser_1700000000_1"); those are
+// also valid. The DISCORD snowflake check lives in src/validation.js
+// (validateUserId) and should be applied upstream when Discord-specific
+// guarantees are required.
 function safeUserId(userId) {
-  if (typeof userId !== 'string' || !/^\d{17,19}$/.test(userId)) {
+  if (typeof userId !== 'string' || userId.length === 0 || userId.length > 64) {
+    throw new Error('Invalid user id');
+  }
+  // Reject anything that could escape the players directory or break fs APIs:
+  // path separators, parent-dir refs, null bytes, control chars, or any
+  // character outside [A-Za-z0-9_-].
+  if (!/^[A-Za-z0-9_-]+$/.test(userId)) {
     throw new Error('Invalid user id');
   }
   return userId;
 }
 
 function playerPath(userId) {
-  // userId already validated to be a numeric snowflake — safe to use in path.
+  // userId is validated by safeUserId to contain only [A-Za-z0-9_-] — safe to
+  // use in a file path without further escaping.
   return path.join(PLAYERS_DIR, `${safeUserId(userId)}.json`);
 }
 
@@ -174,6 +188,13 @@ function readAll() {
 
 function writeAll(obj) {
   ensureDir();
+  // Snapshot the current cache as a DEEP CLONE so we can roll back the
+  // in-memory state if the write fails. Callers commonly pass the cache
+  // reference itself and mutate it before calling writeAll, so a shallow
+  // reference snapshot would capture the post-mutation state and provide
+  // no rollback at all. A deep clone gives us a pre-mutation copy that
+  // does not share identity with the caller's (already-mutated) object.
+  const previousCache = deepClonePlayers(cache);
   try {
     // Save each user's data to individual files
     for (const [userId, char] of Object.entries(obj)) {
@@ -188,14 +209,29 @@ function writeAll(obj) {
     cache = obj;
   }
   catch (error) {
+    // Roll back the in-memory cache to the pre-write snapshot so callers do
+    // not see a successful mutation that was never persisted to disk.
+    cache = previousCache;
     logger.error('Failed to write RPG data', error);
-    // Attempt to restore from cache if available
-    if (cache) {
-      logger.info('Restoring from cache after write failure');
-    }
-    else {
-      throw new Error(`Failed to save RPG data: ${error.message}`);
-    }
+    throw new Error(`Failed to save RPG data: ${error.message}`);
+  }
+}
+
+// Deep-clone the players cache for safe rollback. Uses JSON round-trip
+// because player records are plain JSON (no Dates, Maps, Sets, or
+// functions) and this is significantly faster than structuredClone on
+// large datasets.
+function deepClonePlayers(players) {
+  if (!players) return players;
+  try {
+    return JSON.parse(JSON.stringify(players));
+  }
+  catch (error) {
+    logger.error('Failed to clone RPG players cache for rollback', error);
+    // If clone fails, fall back to the original reference so callers see
+    // the current (mutated) state. This is no worse than the pre-fix
+    // behaviour.
+    return players;
   }
 }
 
@@ -437,6 +473,23 @@ export function deleteCharacter(userId) {
     // eslint-disable-next-line security/detect-object-injection
     delete all[userId];
     writeAll(all);
+
+    // Unlink the per-user file. writeAll() only writes files for entries
+    // still in `all`, so it does NOT remove the file for the deleted user.
+    // Leaving the file behind would let readAll() resurrect the character on
+    // the next process restart.
+    let filePath;
+    try {
+      filePath = playerPath(userId);
+    }
+    catch {
+      // Invalid user id — nothing to unlink.
+      return true;
+    }
+    if (fs.existsSync(filePath)) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      fs.unlinkSync(filePath);
+    }
     return true;
   }
   finally {

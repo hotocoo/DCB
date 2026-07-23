@@ -560,6 +560,68 @@ class ModerationManager {
 
     this.saveModerationData();
   }
+
+  // Test/Cleanup helper: wipe a user's moderation history across all
+  // guilds. Removes them from `warnings[guildId]`, scrubs any actions
+  // in `mod_actions` that target them, and clears any mute/ban state.
+  // Used by automated tests to keep `data/moderation.json` from
+  // accumulating test artifacts.
+  resetUser(userId) {
+    if (!userId || typeof userId !== 'string') return false;
+    let removed = false;
+
+    // warnings: shape is { [guildId]: { [userId]: [warnings] } }
+    for (const [guildId, users] of Object.entries(this.moderationData.warnings || {})) {
+      if (users && Object.prototype.hasOwnProperty.call(users, userId)) {
+        delete this.moderationData.warnings[guildId][userId];
+        removed = true;
+        // Tidy empty guild buckets so the file stays small.
+        if (Object.keys(this.moderationData.warnings[guildId]).length === 0) {
+          delete this.moderationData.warnings[guildId];
+        }
+      }
+    }
+
+    // mutes: shape is { [guildId]: { [userId]: { until, reason } } }
+    if (this.moderationData.mutes) {
+      for (const [guildId, users] of Object.entries(this.moderationData.mutes)) {
+        if (users && Object.prototype.hasOwnProperty.call(users, userId)) {
+          delete this.moderationData.mutes[guildId][userId];
+          removed = true;
+          if (Object.keys(this.moderationData.mutes[guildId]).length === 0) {
+            delete this.moderationData.mutes[guildId];
+          }
+        }
+      }
+    }
+
+    // bans: shape is { [guildId]: { [userId]: { reason, bannedBy } } }
+    if (this.moderationData.bans) {
+      for (const [guildId, users] of Object.entries(this.moderationData.bans)) {
+        if (users && Object.prototype.hasOwnProperty.call(users, userId)) {
+          delete this.moderationData.bans[guildId][userId];
+          removed = true;
+          if (Object.keys(this.moderationData.bans[guildId]).length === 0) {
+            delete this.moderationData.bans[guildId];
+          }
+        }
+      }
+    }
+
+    // mod_actions: array of records; scrub any that involve the user as
+    // target or moderator. NOTE: mod_action records use `targetUserId`
+    // (not `userId`) as the field name — see ModerationManager.logModAction.
+    if (Array.isArray(this.moderationData.mod_actions)) {
+      const before = this.moderationData.mod_actions.length;
+      this.moderationData.mod_actions = this.moderationData.mod_actions.filter(
+        a => a.targetUserId !== userId && a.moderatorId !== userId
+      );
+      if (this.moderationData.mod_actions.length !== before) removed = true;
+    }
+
+    if (removed) this.saveModerationData();
+    return removed;
+  }
 }
 
 // Export singleton instance
@@ -614,7 +676,17 @@ export function unbanUser(guildId, userId, moderatorId, reason = 'Manual unban')
   return moderationManager.unbanUser(guildId, userId, moderatorId, reason);
 }
 
-// Auto-cleanup every 5 minutes
-setInterval(() => {
+// Test/Cleanup helper exposed at the module level. See
+// ModerationManager.resetUser for details.
+export function resetUserModerationData(userId) {
+  return moderationManager.resetUser(userId);
+}
+
+// Auto-cleanup every 5 minutes. `unref()` is needed so this timer
+// doesn't keep the Node event loop alive in one-shot scripts / CI tests.
+const moderationCleanupInterval = setInterval(() => {
   moderationManager.cleanup();
 }, 5 * 60 * 1000);
+if (typeof moderationCleanupInterval.unref === 'function') {
+  moderationCleanupInterval.unref();
+}

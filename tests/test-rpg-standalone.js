@@ -1,3 +1,8 @@
+/* eslint-disable unicorn/no-process-exit, promise/always-return, brace-style, import/order */
+// CLI test runner — process.exit() is the correct way to signal the
+// test verdict to the parent shell. Disabling no-process-exit (it's
+// designed for libraries, not scripts) and other cosmetic rules that
+// are misfiring on the inline catch blocks used for cleanup.
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert';
@@ -8,7 +13,7 @@ import { inputValidator, sanitizeInput, validateString, validateNumber } from '.
 import { CommandError } from '../src/errorHandler.js';
 
 // Import RPG functions
-import { createCharacter, getCharacter, applyXp, spendSkillPoints, getLeaderboard, getLeaderboardCount, resetCharacter } from '../src/rpg.js';
+import { createCharacter, getCharacter, applyXp, spendSkillPoints, getLeaderboard, getLeaderboardCount, resetCharacter, deleteCharacter } from '../src/rpg.js';
 
 const FILE = path.join(process.cwd(), 'data', 'rpg.json');
 
@@ -45,7 +50,8 @@ async function run() {
       }
     }
 
-    const uid = 'testuser1';
+    // Valid Discord snowflake (17-19 digits) — required by safeUserId() in src/rpg.js
+    const uid = '123456789012345678';
     const char = createCharacter(uid, 'Tester');
     assert.ok(char, 'Character created');
     assert.equal(char.name, 'Tester');
@@ -78,10 +84,28 @@ async function run() {
     console.log('All RPG tests passed');
   }
   finally {
+    // Always clean up the per-user file and any testuser_* leftovers
+    // from previous runs. Without this, the new snowflake-based UID
+    // leaves `data/players/123456789012345678.json` behind on every run.
+    try {
+      deleteCharacter('123456789012345678');
+    }
+    catch { /* ignore */ }
+    const playerDir = path.join(process.cwd(), 'data', 'players');
+    if (fs.existsSync(playerDir)) {
+      for (const file of fs.readdirSync(playerDir)) {
+        if (file === '123456789012345678.json' || file.startsWith('testuser_') || file.startsWith('testuser1')) {
+          try {
+            fs.unlinkSync(path.join(playerDir, file));
+          }
+          catch { /* ignore */ }
+        }
+      }
+    }
     restoreData();
   }
 }
 
-run().catch(error => {
+run().then(() => process.exit(0)).catch(error => {
   console.error(error); process.exit(1);
 });

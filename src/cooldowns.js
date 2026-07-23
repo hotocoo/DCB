@@ -355,7 +355,11 @@ export function getButtonCooldownType(customId) {
 
 // Export the function from the class instance
 
-// Auto-cleanup every minute
-setInterval(() => {
+// Auto-cleanup every minute. `unref()` is needed so this timer doesn't
+// keep the Node event loop alive in one-shot scripts / CI tests.
+const cooldownCleanupInterval = setInterval(() => {
   cooldownManager.cleanup();
 }, 60_000);
+if (typeof cooldownCleanupInterval.unref === 'function') {
+  cooldownCleanupInterval.unref();
+}
