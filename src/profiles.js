@@ -114,6 +114,9 @@ class ProfileManager {
     }
   }
 
+  // Builds a fresh default profile for a user. Long because it enumerates the
+  // full statistics schema; splitting it would just split the data.
+  // eslint-disable-next-line max-lines-per-function
   _createDefaultProfile(userId, username) {
     // userId is a Discord ID, not user-supplied key — safe to bracket-index.
     // eslint-disable-next-line security/detect-object-injection
@@ -220,7 +223,7 @@ class ProfileManager {
   updateStatistics(userId, category, statUpdates) {
     const profile = this.getOrCreateProfile(userId);
 
-    /* eslint-disable security/detect-object-injection -- category/stat keys come from the same module's own update callers */
+    /* eslint-disable security/detect-object-injection -- category/stat keys come from the same module's own callers */
     for (const [stat, value] of Object.entries(statUpdates)) {
       if (profile.statistics[category] && typeof profile.statistics[category][stat] === 'number') {
         profile.statistics[category][stat] += value;
@@ -317,7 +320,8 @@ class ProfileManager {
     // Find most active category
     const categoryActivity = {
       rpg: stats.rpg.total_level + (stats.rpg.bosses_defeated * 10) + (stats.rpg.items_collected * 2),
-      games: (stats.games.trivia_correct * 3) + (stats.games.hangman_wins * 5) + (stats.games.memory_games_completed * 4),
+      games: (stats.games.trivia_correct * 3) + (stats.games.hangman_wins * 5)
+        + (stats.games.memory_games_completed * 4),
       social: (stats.social.guilds_created * 20) + (stats.social.trades_completed * 8) + stats.social.reputation
     };
 
@@ -562,8 +566,10 @@ class ProfileManager {
     ];
 
     for (const milestone of milestones) {
-      if (!profile.milestones.find(m => m.id === milestone.id) && // Simple requirement check (in real implementation, use more sophisticated evaluation)
-        this.evaluateRequirement(profile, milestone.requirement)) {
+      const alreadyAchieved = profile.milestones.some(m => m.id === milestone.id);
+      // Requirement string is parsed by evaluateRequirement below — not executed.
+      const meetsRequirement = alreadyAchieved ? false : this.evaluateRequirement(profile, milestone.requirement);
+      if (!alreadyAchieved && meetsRequirement) {
         profile.milestones.push({
           id: milestone.id,
           name: milestone.name,

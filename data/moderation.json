@@ -83,6 +83,15 @@
           "timestamp": 1784773368511,
           "active": true
         }
+      ],
+      "testuser_1784773480038_1": [
+        {
+          "id": "warn_1784773480040_dvhlsye6q",
+          "userId": "testuser_1784773480038_1",
+          "severity": "medium",
+          "timestamp": 1784773480040,
+          "active": true
+        }
       ]
     }
   },
@@ -161,6 +170,14 @@
         "duration": 3600000,
         "startTime": 1784773368511,
         "endTime": 1784776968511,
+        "active": true
+      },
+      "testuser_1784773480038_1": {
+        "id": "mute_1784773480040_55f2txctc",
+        "userId": "testuser_1784773480038_1",
+        "duration": 3600000,
+        "startTime": 1784773480040,
+        "endTime": 1784777080040,
         "active": true
       }
     }
@@ -325,6 +342,21 @@
       "targetUserId": "testuser_1784773368509_1",
       "reason": "undefined (60m)",
       "timestamp": 1784773368511
+    },
+    {
+      "id": "mod_1784773480040_q0x677oeu",
+      "guildId": "testguild1",
+      "action": "warn",
+      "targetUserId": "testuser_1784773480038_1",
+      "timestamp": 1784773480040
+    },
+    {
+      "id": "mod_1784773480040_hpotwk495",
+      "guildId": "testguild1",
+      "action": "mute",
+      "targetUserId": "testuser_1784773480038_1",
+      "reason": "undefined (60m)",
+      "timestamp": 1784773480040
     }
   ],
   "auto_mod": {

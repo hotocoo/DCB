@@ -101,7 +101,10 @@ const RESULT_EMOJI = {
 };
 
 function resultToString(result) {
-  return result.map(r => Object.hasOwn(RESULT_EMOJI, r) ? RESULT_EMOJI[r] : '⬜').join('');
+  return result.map(r =>
+    // eslint-disable-next-line security/detect-object-injection -- membership validated by Object.hasOwn
+    Object.hasOwn(RESULT_EMOJI, r) ? RESULT_EMOJI[r] : '⬜'
+  ).join('');
 }
 
 function performanceMessage(guessCount) {
@@ -240,11 +243,8 @@ async function sendActiveBoard(interaction, gameState) {
 }
 
 async function replyOrEdit(interaction, options) {
-  if (interaction.replied || interaction.deferred) {
-    await interaction.editReply(options);
-  } else {
-    await interaction.reply(options);
-  }
+  const responder = interaction.replied || interaction.deferred ? interaction.editReply : interaction.reply;
+  await responder(options);
 }
 
 /**

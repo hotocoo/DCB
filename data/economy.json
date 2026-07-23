@@ -28,7 +28,9 @@
     "testuser_1784773328935_1": 1376,
     "testuser_1784773328935_2": 471,
     "testuser_1784773368509_1": 1376,
-    "testuser_1784773368509_2": 471
+    "testuser_1784773368509_2": 471,
+    "testuser_1784773480038_1": 1375,
+    "testuser_1784773480038_2": 470
   },
   "transactions": [
     {
@@ -555,6 +557,41 @@
       "amount": 24,
       "timestamp": 1784773369407,
       "id": "txn_1784773369407_nd5e4sz68"
+    },
+    {
+      "type": "transfer",
+      "from": "testuser_1784773480038_1",
+      "to": "testuser_1784773480038_2",
+      "amount": 500,
+      "timestamp": 1784773480039,
+      "id": "txn_1784773480039_9ui8g8pkn"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773480038_2",
+      "item": "health_potion",
+      "quantity": 2,
+      "amount": 50,
+      "timestamp": 1784773480039,
+      "id": "txn_1784773480039_aukyrpth5"
+    },
+    {
+      "type": "market_sale",
+      "user": "testuser_1784773480038_2",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 20,
+      "timestamp": 1784773480039,
+      "id": "txn_1784773480039_pocpp94cm"
+    },
+    {
+      "type": "market_purchase",
+      "user": "testuser_1784773480038_1",
+      "item": "health_potion",
+      "quantity": 1,
+      "amount": 25,
+      "timestamp": 1784773480942,
+      "id": "txn_1784773480942_ax0tpj1mq"
     }
   ],
   "marketItems": {},
@@ -809,6 +846,23 @@
         "amount": 100,
         "created": 1784773368511,
         "maturity": 1787365368511,
+        "rate": 0.05,
+        "status": "active"
+      }
+    ],
+    "testuser_1784773480038_1": [
+      {
+        "id": "investment_1784773480040_qcpv7wfta",
+        "user": "testuser_1784773480038_1",
+        "type": {
+          "name": "Bank Deposit",
+          "rate": 0.05,
+          "duration": 30,
+          "minAmount": 100
+        },
+        "amount": 100,
+        "created": 1784773480040,
+        "maturity": 1787365480040,
         "rate": 0.05,
         "status": "active"
       }
