@@ -393,10 +393,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const testSuite = new ComprehensiveTestSuite();
   testSuite.runAllTests().then(results => {
     console.log('\n🏁 Test execution completed');
-    process.exit(results.failed > 0 ? 1 : 0);
+    return process.exit(results.failed > 0 ? 1 : 0);
   }).catch(error => {
     console.error('Test suite failed:', error);
-    process.exit(1);
+    return process.exit(1);
   });
 }
 

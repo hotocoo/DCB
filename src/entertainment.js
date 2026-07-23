@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+
 import { logger } from './logger.js';
 
 const ENTERTAINMENT_FILE = path.join(process.cwd(), 'data', 'entertainment.json');

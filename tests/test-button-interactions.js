@@ -32,7 +32,7 @@ const mockInteraction = {
   /** @param {*} modal */
   showModal: async(modal) => {
     console.log('Mock showModal called with:', modal.customId);
-    return;
+
   }
 };
 
@@ -101,10 +101,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   testButtonHandlers().then(result => {
     console.log('\n🏁 Button interaction test completed');
     console.log('Result:', result);
-    process.exit(result.success ? 0 : 1);
+    return process.exit(result.success ? 0 : 1);
   }).catch(error => {
     console.error('Test suite failed:', error);
-    process.exit(1);
+    return process.exit(1);
   });
 }
 

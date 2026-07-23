@@ -1,6 +1,4 @@
 
-import { logger } from './logger.js';
-
 import 'dotenv/config';
 import { spawn, execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -15,7 +13,7 @@ import { RateLimiterMemory } from 'rate-limiter-flexible';
 import SpotifyWebApi from 'spotify-web-api-node';
 import pkg from 'libsodium-wrappers';
 
-// Import validation utilities
+import { logger } from './logger.js';
 import { inputValidator, sanitizeInput, validateString } from './validation.js';
 import { CommandError, handleCommandError } from './errorHandler.js';
 
@@ -283,12 +281,13 @@ class MusicManager {
           if (!result.success) {
             logger.error(`[MUSIC] Failed to play previous song "${previousSong.title}":`, result.error);
             // Try to play next available song
-            this.playNext(guildId);
+            return this.playNext(guildId);
           }
+          return result;
         })
         .catch(error => {
           logger.error('[MUSIC] Unexpected error playing previous song:', error);
-          this.playNext(guildId);
+          return this.playNext(guildId);
         });
     }
 
@@ -1005,7 +1004,7 @@ class MusicManager {
 
     logger.debug('Checking encryption packages in playWithErrorHandling');
     try {
-      const sodiumModule = await import('sodium');
+      const sodiumModule = await import('libsodium-wrappers');
       logger.debug(`Sodium available: ${!!sodiumModule.default}`);
     }
     catch (error) {
@@ -2365,12 +2364,13 @@ class MusicManager {
             if (!result.success) {
               logger.error(`[MUSIC] Failed to skip to song "${nextSong.title}":`, result.error);
               // Try to play next available song
-              this.playNext(guildId);
+              return this.playNext(guildId);
             }
+            return result;
           })
           .catch(error => {
             logger.error('[MUSIC] Unexpected error skipping to song:', error);
-            this.playNext(guildId);
+            return this.playNext(guildId);
           });
       }
       else {
@@ -2449,12 +2449,15 @@ class MusicManager {
             logger.error(`[MUSIC] Failed to play next song "${nextSong.title}":`, result.error);
             // Try to play the song after next
             setTimeout(() => this.playNext(guildId), 1000);
+            return null;
           }
+          return result;
         })
         .catch(error => {
           logger.error('[MUSIC] Unexpected error playing next song:', error);
           // Try to play the song after next
           setTimeout(() => this.playNext(guildId), 1000);
+          return null;
         });
     }
     else {

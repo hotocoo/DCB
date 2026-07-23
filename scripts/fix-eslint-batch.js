@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
-import { execSync } from 'child_process';
+import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { glob } from 'glob';
-import fs from 'fs';
-import path from 'path';
 
 // Type definitions for glob
 /** @typedef {string} GlobPattern */
@@ -24,7 +25,8 @@ async function runCommand(command, description) {
   try {
     execSync(command, { stdio: 'inherit', cwd: process.cwd() });
     console.log(`✅ ${description} completed successfully.`);
-  } catch (error) {
+  }
+  catch (error) {
     console.error(`❌ ${description} failed.`);
     console.log(`DEBUG: Error type: ${typeof error}, error constructor: ${error?.constructor?.name}`);
     throw error;
@@ -76,7 +78,8 @@ async function main() {
 
     console.log('\n📝 Note: Run "npm run lint" to check remaining issues that require manual fixes.');
 
-  } catch (error) {
+  }
+  catch (error) {
     console.error('\n💥 Batch processing failed:', error instanceof Error ? error.message : String(error));
     console.log(`DEBUG: Main error type: ${typeof error}, constructor: ${error?.constructor?.name}`);
     process.exit(1);

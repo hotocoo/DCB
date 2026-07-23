@@ -594,6 +594,8 @@ class ProfileManager {
       const stats = profile.statistics;
 
       // Replace stat paths with actual values, e.g., 'rpg.highest_level' -> stats.rpg.highest_level
+      // Safe regex: validates identifier-segmented paths (not ReDoS-vulnerable)
+      // eslint-disable-next-line security/detect-unsafe-regex
       const expression = requirement.replaceAll(/(\w+(?:\.\w+)*)/g, (match) => {
         const keys = match.split('.');
         let value = stats;

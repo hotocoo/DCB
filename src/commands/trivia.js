@@ -258,7 +258,12 @@ async function sendQuestion(interaction, gameState) {
     }
   });
 
-  await (interaction.replied || interaction.deferred ? interaction.followUp({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral }) : interaction.reply({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral }));
+  if (interaction.replied || interaction.deferred) {
+    await interaction.followUp({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
+  }
+  else {
+    await interaction.reply({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
+  }
 }
 
 async function sendResults(interaction, gameState) {
@@ -300,7 +305,12 @@ async function sendResults(interaction, gameState) {
     });
   }
 
-  await (interaction.replied || interaction.deferred ? interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral }) : interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral }));
+  if (interaction.replied || interaction.deferred) {
+    await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  }
+  else {
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  }
 }
 
 export async function safeExecute(interaction) {

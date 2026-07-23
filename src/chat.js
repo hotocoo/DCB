@@ -4,7 +4,7 @@
  *
  * @fileoverview Advanced chat system with multiple AI providers, conversation memory, and fallback mechanisms.
  * @author watchandnotlearn
- * @version 0.1.1
+ * @version 0.1.3
  * @license MIT
  */
 
@@ -56,7 +56,7 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Athena/0.1.1'
+          'User-Agent': 'Athena/0.1.3'
         },
         body: JSON.stringify({
           model: 'gpt-oss-20b',
@@ -87,7 +87,7 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Athena/0.1.1'
+          'User-Agent': 'Athena/0.1.3'
         },
         body: JSON.stringify({ prompt }),
         signal: controller.signal
@@ -108,7 +108,7 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Athena/0.1.1'
+          'User-Agent': 'Athena/0.1.3'
         },
         body: JSON.stringify({ prompt }),
         signal: controller.signal
@@ -213,7 +213,7 @@ export async function respondWithOpenAI(messages) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${OPENAI_KEY}`,
-        'User-Agent': 'Athena/0.1.1'
+        'User-Agent': 'Athena/0.1.3'
       },
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
@@ -383,7 +383,7 @@ function handleSpecialCommands(command, message) {
     const users = message.client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0);
     const aiStatus = OPENAI_KEY ? 'OpenAI ✓' : (LOCAL_MODEL_URL ? 'Local Model ✓' : 'Basic Chat ✓');
 
-    return `🤖 **Bot Status:**\n• Servers: ${guilds}\n• Users: ${users}\n• AI: ${aiStatus}\n• Version: Athena v0.1.1`;
+    return `🤖 **Bot Status:**\n• Servers: ${guilds}\n• Users: ${users}\n• AI: ${aiStatus}\n• Version: Athena v0.1.3`;
   }
 
   if (lowerCommand === '!commands') {
@@ -515,6 +515,8 @@ function handlePlayfulPrompt(text, message) {
   }
 
   // roll: 'roll 2d6' or '2d6' or 'roll d20'
+  // Safe regex: bounded short user-input match (not ReDoS-vulnerable)
+  // eslint-disable-next-line security/detect-unsafe-regex
   const rollMatch = lower.match(/(\d+)?d(\d+)/);
   if (rollMatch) {
     const n = Number(rollMatch[1] || 1);

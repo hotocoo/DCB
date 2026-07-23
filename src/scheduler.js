@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+
 import { logger } from './logger.js';
 
 const SCHEDULES_FILE = path.join(process.cwd(), 'data', 'schedules.json');
@@ -372,6 +373,8 @@ class SchedulerManager {
   }
 
   parseTimeWithDate(timeString, date) {
+    // Safe regex: bounded 12h time string parser (not ReDoS-vulnerable)
+    // eslint-disable-next-line security/detect-unsafe-regex
     const timeMatch = timeString.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
     if (timeMatch) {
       let hours = Number.parseInt(timeMatch[1]);

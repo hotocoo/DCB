@@ -104,7 +104,12 @@ async function sendTicTacToeBoard(interaction, gameState) {
           inline: false
         });
 
-      await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [resultEmbed], components: [] }) : interaction.reply({ embeds: [resultEmbed] }));
+      if (interaction.replied || interaction.deferred) {
+        await interaction.editReply({ embeds: [resultEmbed], components: [] });
+      }
+      else {
+        await interaction.reply({ embeds: [resultEmbed] });
+      }
       return;
     }
 
@@ -137,7 +142,12 @@ async function sendTicTacToeBoard(interaction, gameState) {
       buttons.push(row);
     }
 
-    await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [embed], components: buttons }) : interaction.reply({ embeds: [embed], components: buttons }));
+    if (interaction.replied || interaction.deferred) {
+      await interaction.editReply({ embeds: [embed], components: buttons });
+    }
+    else {
+      await interaction.reply({ embeds: [embed], components: buttons });
+    }
 
     // AI move if it's AI's turn
     if (isAI && currentPlayer === 'O' && status === 'active') {
@@ -179,7 +189,12 @@ async function sendTicTacToeBoard(interaction, gameState) {
             // Clean up game state
             tttGames.delete(gameState.id);
 
-            await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [resultEmbed], components: [] }) : interaction.reply({ embeds: [resultEmbed] }));
+            if (interaction.replied || interaction.deferred) {
+              await interaction.editReply({ embeds: [resultEmbed], components: [] });
+            }
+            else {
+              await interaction.reply({ embeds: [resultEmbed] });
+            }
             return;
           }
           await sendTicTacToeBoard(interaction, gameState);

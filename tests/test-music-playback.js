@@ -88,8 +88,8 @@ async function testMusicPlayback() {
 // Run the test
 testMusicPlayback().then(success => {
   console.log('\n🏁 Test completed');
-  process.exit(success ? 0 : 1);
+  return process.exit(success ? 0 : 1);
 }).catch(error => {
   console.error('Test suite error:', error);
-  process.exit(1);
+  return process.exit(1);
 });

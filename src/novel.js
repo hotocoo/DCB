@@ -10,7 +10,9 @@ function ensureDir() {
 }
 
 function readAll() {
-  ensureDir(); if (!fs.existsSync(FILE)) return {}; try {
+  ensureDir();
+  if (!fs.existsSync(FILE)) return {};
+  try {
     return JSON.parse(fs.readFileSync(FILE)) || {};
   }
   catch {
@@ -18,7 +20,8 @@ function readAll() {
   }
 }
 function writeAll(obj) {
-  ensureDir(); fs.writeFileSync(FILE, JSON.stringify(obj, null, 2), 'utf8');
+  ensureDir();
+  fs.writeFileSync(FILE, JSON.stringify(obj, null, 2), 'utf8');
 }
 
 export function listNovels() {
@@ -53,11 +56,15 @@ export async function generateChapter(guildId, novelId) {
     const fallbackText = templates[chapIndex % templates.length];
     const chapter = { index: chapIndex, text: fallbackText };
     novel.chapters.push(chapter);
-    const all = readAll(); all[novelId] = novel; writeAll(all);
+    const all = readAll();
+    all[novelId] = novel;
+    writeAll(all);
     return chapter;
   }
   const chapter = { index: chapIndex, text };
   novel.chapters.push(chapter);
-  const all = readAll(); all[novelId] = novel; writeAll(all);
+  const all = readAll();
+  all[novelId] = novel;
+  writeAll(all);
   return chapter;
 }

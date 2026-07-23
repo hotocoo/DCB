@@ -4,7 +4,7 @@
  *
  * @fileoverview Main bot entry point with comprehensive error handling and graceful shutdown.
  * @author watchandnotlearn
- * @version 0.1.1
+ * @version 0.1.3
  * @license MIT
  */
 
@@ -16,8 +16,6 @@ import { loadCommands } from './commandLoader.js';
 import { handleInteraction } from './interactionHandlers.js';
 import { handleMessage } from './chat.js';
 import { logger, logError } from './logger.js';
-
-// Feature modules
 import { checkTypingAttempt } from './minigames/typing.js';
 import { isOnCooldown, setCooldown } from './cooldowns.js';
 import { initializeDatabase } from './storage.js';
@@ -292,7 +290,7 @@ async function gracefulShutdown(client, signal) {
   try {
     logger.info('Attempting to login to Discord...');
     const loginPromise = client.login(token);
-    const timeoutPromise = new Promise((_, reject) =>
+    const timeoutPromise = new Promise((_resolve, reject) =>
       setTimeout(() => reject(new Error(`Discord login timed out after ${LOGIN_TIMEOUT_MS / 1000} seconds. Please check your DISCORD_TOKEN in .env file.`)), LOGIN_TIMEOUT_MS)
     );
     await Promise.race([loginPromise, timeoutPromise]);

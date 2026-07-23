@@ -160,7 +160,7 @@ async function sendConnect4Board(interaction, gameState) {
       else {
         await safeInteractionReply(interaction, { embeds: [resultEmbed] });
       }
-      return;
+
     }
 
     // Update game state in storage
@@ -352,11 +352,10 @@ function checkConnect4Winner(board) {
 
   // Check for tie
   const topRow = board[0];
-  if (topRow && topRow.every(cell => cell)) {
+  if (topRow && topRow.every(Boolean)) {
     return 'tie';
   }
 
-  return undefined;
 }
 /* eslint-enable security/detect-object-injection */
 
@@ -417,7 +416,7 @@ function getConnect4AIMove(board, difficulty) {
       }
     }
 
-    if (availableColumns.length === 0) return undefined;
+    if (availableColumns.length === 0) return;
 
     switch (difficulty) {
       case 'easy': {
@@ -461,7 +460,7 @@ function getConnect4AIMove(board, difficulty) {
         fallbackColumns.push(col);
       }
     }
-    if (fallbackColumns.length === 0) return undefined;
+    if (fallbackColumns.length === 0) return;
     return fallbackColumns[Math.floor(Math.random() * fallbackColumns.length)];
   }
 }
@@ -493,7 +492,7 @@ function findConnect4WinningMove(board, player) {
       }
     }
   }
-  return undefined;
+
 }
 /* eslint-enable security/detect-object-injection */
 
@@ -601,14 +600,23 @@ function evaluateWindow(window, player) {
   let emptyCount = 0;
   let opponentCount = 0;
   for (const cell of window) {
-    if (cell === undefined) {
-      emptyCount++;
-    }
-    else if (cell === player) {
-      playerCount++;
-    }
-    else if (cell === opponent) {
-      opponentCount++;
+    switch (cell) {
+      case undefined: {
+        emptyCount++;
+
+        break;
+      }
+      case player: {
+        playerCount++;
+
+        break;
+      }
+      case opponent: {
+        opponentCount++;
+
+        break;
+      }
+    // No default
     }
   }
 

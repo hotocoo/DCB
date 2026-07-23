@@ -43,23 +43,33 @@ export async function execute(interaction) {
     // Set difficulty parameters
     switch (difficulty) {
       case 'easy': {
-        min = 1; max = 50; attempts = 10;
+        min = 1;
+        max = 50;
+        attempts = 10;
         break;
       }
       case 'medium': {
-        min = 1; max = 100; attempts = 8;
+        min = 1;
+        max = 100;
+        attempts = 8;
         break;
       }
       case 'hard': {
-        min = 1; max = 200; attempts = 6;
+        min = 1;
+        max = 200;
+        attempts = 6;
         break;
       }
       case 'expert': {
-        min = 1; max = 500; attempts = 5;
+        min = 1;
+        max = 500;
+        attempts = 5;
         break;
       }
       case 'master': {
-        min = 1; max = 1000; attempts = 4;
+        min = 1;
+        max = 1000;
+        attempts = 4;
         break;
       }
       default: {
@@ -143,7 +153,12 @@ async function sendGuessPrompt(interaction, gameState) {
           inline: false
         });
 
-      await (interaction.replied || interaction.deferred ? safeInteractionUpdate(interaction, { embeds: [loseEmbed], components: [] }) : safeInteractionReply(interaction, { embeds: [loseEmbed] }));
+      if (interaction.replied || interaction.deferred) {
+        await safeInteractionUpdate(interaction, { embeds: [loseEmbed], components: [] });
+      }
+      else {
+        await safeInteractionReply(interaction, { embeds: [loseEmbed] });
+      }
       return;
     }
 
@@ -164,7 +179,12 @@ async function sendGuessPrompt(interaction, gameState) {
       new ButtonBuilder().setCustomId(`guess_modal:${gameState.id}:${min}:${max}`).setLabel('🔢 Make Guess').setStyle(ButtonStyle.Primary)
     );
 
-    await (interaction.replied || interaction.deferred ? safeInteractionUpdate(interaction, { embeds: [embed], components: [row] }) : safeInteractionReply(interaction, { embeds: [embed], components: [row] }));
+    if (interaction.replied || interaction.deferred) {
+      await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
+    }
+    else {
+      await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
+    }
   }
   catch (error) {
     console.error('sendGuessPrompt error:', error);

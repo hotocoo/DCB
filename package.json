@@ -1,6 +1,6 @@
 {
   "name": "athena",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "description": "Athena - A feature-rich Discord bot for gaming, music, economy, moderation, and AI",
   "main": "src/index.js",
   "type": "module",

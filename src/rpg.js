@@ -70,7 +70,7 @@ function safeUserId(userId) {
   // Reject anything that could escape the players directory or break fs APIs:
   // path separators, parent-dir refs, null bytes, control chars, or any
   // character outside [A-Za-z0-9_-].
-  if (!/^[A-Za-z0-9_-]+$/.test(userId)) {
+  if (!/^[\w-]+$/.test(userId)) {
     throw new Error('Invalid user id');
   }
   return userId;

@@ -373,5 +373,5 @@ export async function execute(interaction) {
     await handleCommandError(interaction, error instanceof CommandError ? error :
       new CommandError(error instanceof Error ? error.message : String(error) || 'An error occurred while processing the fun command.', 'UNKNOWN_ERROR'));
   }
-  return;
+
 }
