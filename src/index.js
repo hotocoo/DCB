@@ -4,7 +4,7 @@
  *
  * @fileoverview Main bot entry point with comprehensive error handling and graceful shutdown.
  * @author watchandnotlearn
- * @version 0.1.3
+ * @version 0.1.4
  * @license MIT
  */
 

@@ -5,6 +5,23 @@ import { logger } from './logger.js';
 
 const PROFILES_DIR = path.join(process.cwd(), 'data', 'players');
 
+// Validate userId before using it in a file path. userId accepts Discord snowflake
+// IDs (17-19 digits) — anything else is either a malformed input or a path-traversal
+// attempt. Mirrors safeUserId()/playerPath() in src/rpg.js for defense-in-depth.
+function safeUserId(userId) {
+  if (typeof userId !== 'string' || userId.length === 0 || userId.length > 64) {
+    throw new Error('Invalid user id');
+  }
+  if (!/^[\w-]+$/.test(userId)) {
+    throw new Error('Invalid user id');
+  }
+  return userId;
+}
+
+function profilePath(userId) {
+  return path.join(PROFILES_DIR, `${safeUserId(userId)}.json`);
+}
+
 // Advanced User Profile and Statistics System
 class ProfileManager {
   constructor() {
@@ -45,7 +62,7 @@ class ProfileManager {
 
   saveProfile(userId, profile) {
     this.ensureStorage();
-    const filePath = path.join(PROFILES_DIR, `${userId}.json`);
+    const filePath = profilePath(userId);
     const data = {
       profile,
       exported: Date.now(),
@@ -96,16 +113,11 @@ class ProfileManager {
 
   _loadProfileFromDisk(userId) {
     this.ensureStorage();
-    // userId is a Discord ID — not user-supplied path input.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    const filePath = path.join(PROFILES_DIR, `${userId}.json`);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    const filePath = profilePath(userId);
     if (!fs.existsSync(filePath)) return;
     try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename
       const data = JSON.parse(fs.readFileSync(filePath));
       if (data.profile) {
-        // eslint-disable-next-line security/detect-object-injection
         this.profiles[userId] = data.profile;
       }
     }

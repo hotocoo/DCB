@@ -1,4 +1,4 @@
-# Pulse Bot Dockerfile
+# Athena Dockerfile
 FROM node:20-alpine AS base
 
 # Install system dependencies for audio processing and SQLite
