@@ -46,9 +46,7 @@ async function loadCommandData() {
   logger.info('Loading command data for deployment', { path: commandsPath });
 
   try {
-    const files = fs.readdirSync(commandsPath).filter(file =>
-      COMMAND_EXTENSIONS.some(ext => file.endsWith(ext))
-    );
+    const files = fs.readdirSync(commandsPath).filter((file) => COMMAND_EXTENSIONS.some((ext) => file.endsWith(ext)));
 
     for (const file of files) {
       try {
@@ -58,19 +56,16 @@ async function loadCommandData() {
         if (data && typeof data.toJSON === 'function') {
           commands.push(data.toJSON());
           logger.debug('Loaded command data', { file, name: data.name });
-        }
-        else {
+        } else {
           logger.warn('Command file missing data export or toJSON method', { file });
         }
-      }
-      catch (error) {
+      } catch (error) {
         logger.error('Failed to load command data', error, { file });
       }
     }
 
     logger.info('Command data loaded', { count: commands.length });
-  }
-  catch (error) {
+  } catch (error) {
     logger.error('Failed to read commands directory', error, { path: commandsPath });
     throw error;
   }
@@ -91,14 +86,12 @@ async function deployCommands(commands, { token, clientId, guildId }) {
       logger.info('Registering guild-specific commands', { guildId, commandCount: commands.length });
       await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
       logger.success('Guild commands registered successfully');
-    }
-    else {
+    } else {
       logger.info('Registering global commands', { commandCount: commands.length });
       await rest.put(Routes.applicationCommands(clientId), { body: commands });
       logger.success('Global commands registered successfully');
     }
-  }
-  catch (error) {
+  } catch (error) {
     logger.error('Failed to register commands', error);
     throw error;
   }
@@ -118,8 +111,7 @@ async function main() {
     }
 
     await deployCommands(commands, config);
-  }
-  catch (error) {
+  } catch (error) {
     logger.error('Command deployment failed', error);
     // eslint-disable-next-line unicorn/no-process-exit -- CLI entry script
     process.exit(1);

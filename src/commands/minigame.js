@@ -12,8 +12,18 @@ const TYPING_GAME_DURATION = 6000; // 6 seconds in milliseconds
 export const data = new SlashCommandBuilder()
   .setName('minigame')
   .setDescription('Play a quick minigame')
-  .addSubcommand(sub => sub.setName('guess').setDescription('Start or guess the number').addIntegerOption(opt => opt.setName('number').setDescription('Your guess').setRequired(false)))
-  .addSubcommand(sub => sub.setName('type').setDescription('Start a typing challenge').addStringOption(opt => opt.setName('novel').setDescription('Novel ID to source sentence from')));
+  .addSubcommand((sub) =>
+    sub
+      .setName('guess')
+      .setDescription('Start or guess the number')
+      .addIntegerOption((opt) => opt.setName('number').setDescription('Your guess').setRequired(false)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('type')
+      .setDescription('Start a typing challenge')
+      .addStringOption((opt) => opt.setName('novel').setDescription('Novel ID to source sentence from')),
+  );
 
 export async function execute(interaction) {
   try {
@@ -38,7 +48,7 @@ export async function execute(interaction) {
         sessions.set(user, target);
         return interaction.reply({
           content: `🎯 I have picked a number between ${GUESS_GAME_RANGE.min} and ${GUESS_GAME_RANGE.max}. Try \`/minigame guess <number>\` to guess!`,
-          flags: MessageFlags.Ephemeral
+          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -48,7 +58,7 @@ export async function execute(interaction) {
         if (!guess) {
           return interaction.reply({
             content: '❌ You need to provide a number to guess.',
-            flags: MessageFlags.Ephemeral
+            flags: MessageFlags.Ephemeral,
           });
         }
 
@@ -56,7 +66,7 @@ export async function execute(interaction) {
         if (guess < GUESS_GAME_RANGE.min || guess > GUESS_GAME_RANGE.max) {
           return interaction.reply({
             content: `❌ Please guess a number between ${GUESS_GAME_RANGE.min} and ${GUESS_GAME_RANGE.max}.`,
-            flags: MessageFlags.Ephemeral
+            flags: MessageFlags.Ephemeral,
           });
         }
 
@@ -68,7 +78,7 @@ export async function execute(interaction) {
         const hint = guess < target ? 'higher' : 'lower';
         return interaction.reply({
           content: `❌ Nope — try ${hint}.`,
-          flags: MessageFlags.Ephemeral
+          flags: MessageFlags.Ephemeral,
         });
       }
     }
@@ -87,19 +97,17 @@ export async function execute(interaction) {
             if (sentences.length > 0) {
               sentence = sentences[Math.floor(Math.random() * sentences.length)].trim();
             }
-          }
-          else {
+          } else {
             return interaction.reply({
               content: '❌ Novel not found or has no chapters.',
-              flags: MessageFlags.Ephemeral
+              flags: MessageFlags.Ephemeral,
             });
           }
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Failed to load novel for typing:', error);
           return interaction.reply({
             content: '❌ Failed to load novel data.',
-            flags: MessageFlags.Ephemeral
+            flags: MessageFlags.Ephemeral,
           });
         }
       }
@@ -112,12 +120,10 @@ export async function execute(interaction) {
       sessions.set(user, { type: 'typing', sentence: gameData.sentence, endAt: Date.now() + TYPING_GAME_DURATION });
       return interaction.reply({
         content: `⌨️ Type this exactly within ${TYPING_GAME_DURATION / 1000} seconds:\n\`${gameData.sentence}\``,
-        ephemeral: false
+        ephemeral: false,
       });
     }
-  }
-  catch (error) {
+  } catch (error) {
     return handleCommandError(interaction, error);
   }
 }
-

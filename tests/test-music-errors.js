@@ -28,7 +28,7 @@ class MusicTestSuite {
   }
 
   async delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async testDeezerSearch() {
@@ -39,14 +39,13 @@ class MusicTestSuite {
       if (results.length > 0) {
         await this.log(`Deezer search returned ${results.length} results`);
         // Verify Deezer results have required fields
-        const deezerResults = results.filter(r => r.source === 'deezer');
+        const deezerResults = results.filter((r) => r.source === 'deezer');
         if (deezerResults.length > 0) {
           const result = deezerResults[0];
           const hasRequiredFields = result.title && result.artist && result.url && result.source === 'deezer';
           await this.log(`Deezer result has required fields: ${hasRequiredFields}`, hasRequiredFields);
         }
-      }
-      else {
+      } else {
         await this.log('Deezer search returned no results', false);
       }
 
@@ -61,9 +60,7 @@ class MusicTestSuite {
         rateLimitResults.push(results.length);
       }
       await this.log(`Rate limiting test completed: ${rateLimitResults.join(', ')} requests`);
-
-    }
-    catch (error) {
+    } catch (error) {
       await this.logError('Deezer search test failed', error);
     }
   }
@@ -74,16 +71,14 @@ class MusicTestSuite {
       // Test 1: Force YouTube fallback by using a term that might not exist on Deezer
       const results = await searchSongs('very obscure song that probably does not exist', 3);
       if (results.length > 0) {
-        const youtubeResults = results.filter(r => r.source === 'youtube');
+        const youtubeResults = results.filter((r) => r.source === 'youtube');
         await this.log(`YouTube fallback returned ${youtubeResults.length} results`);
       }
 
       // Test 2: YouTube URL search
       const ytResults = await searchSongs('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 1);
       await (ytResults.length > 0 ? this.log(`YouTube URL search successful: ${ytResults[0].title}`) : this.log('YouTube URL search failed', false));
-
-    }
-    catch (error) {
+    } catch (error) {
       await this.logError('YouTube fallback test failed', error);
     }
   }
@@ -112,9 +107,7 @@ class MusicTestSuite {
       // Test music stats
       const updatedStats = getMusicStats(this.guildId);
       await this.log(`Music stats retrieved: ${typeof updatedStats === 'object'}`);
-
-    }
-    catch (error) {
+    } catch (error) {
       await this.logError('Queue management test failed', error);
     }
   }
@@ -137,9 +130,7 @@ class MusicTestSuite {
       // Test 4: Special characters
       const specialCharResults = await searchSongs('!@#$%^&*()', 1);
       await this.log(`Special characters handled: ${Array.isArray(specialCharResults)}`);
-
-    }
-    catch (error) {
+    } catch (error) {
       await this.logError('Error handling test failed', error);
     }
   }
@@ -148,18 +139,13 @@ class MusicTestSuite {
     console.log('\n🔗 Testing Direct URL Support');
     try {
       // Test various URL formats
-      const testUrls = [
-        'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-        'https://youtu.be/dQw4w9WgXcQ',
-        'https://www.deezer.com/track/3135556'
-      ];
+      const testUrls = ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'https://youtu.be/dQw4w9WgXcQ', 'https://www.deezer.com/track/3135556'];
 
       for (const url of testUrls) {
         const results = await searchSongs(url, 1);
         await (results.length > 0 ? this.log(`Direct URL supported: ${url}`) : this.log(`Direct URL failed: ${url}`, false));
       }
-    }
-    catch (error) {
+    } catch (error) {
       await this.logError('Direct URL test failed', error);
     }
   }
@@ -190,9 +176,7 @@ class MusicTestSuite {
 
       const currentLoop = getLoop(this.guildId);
       await this.log(`Loop mode retrieved: ${currentLoop === 'single'}`);
-
-    }
-    catch (error) {
+    } catch (error) {
       await this.logError('Music controls test failed', error);
     }
   }
@@ -202,14 +186,14 @@ class MusicTestSuite {
     try {
       // Test Deezer API connectivity
       const deezerResponse = await axios.get('https://api.deezer.com/track/3135556', { timeout: 5000 });
-      await (deezerResponse.data && deezerResponse.data.title ? this.log('Deezer API connectivity: ✅ Connected') : this.log('Deezer API connectivity: ❌ Invalid response', false));
+      await (deezerResponse.data && deezerResponse.data.title
+        ? this.log('Deezer API connectivity: ✅ Connected')
+        : this.log('Deezer API connectivity: ❌ Invalid response', false));
 
       // Test YouTube search functionality
       const ytResponse = await axios.get('https://www.youtube.com/', { timeout: 5000 });
       await (ytResponse.status === 200 ? this.log('YouTube connectivity: ✅ Connected') : this.log('YouTube connectivity: ❌ Connection failed', false));
-
-    }
-    catch (error) {
+    } catch (error) {
       await this.logError('API connectivity test failed', error);
     }
   }
@@ -221,7 +205,7 @@ class MusicTestSuite {
       const mockVoiceChannel = {
         id: 'mock-voice-channel-123',
         name: 'Test Voice Channel',
-        guild: { voiceAdapterCreator: {} }
+        guild: { voiceAdapterCreator: {} },
       };
 
       // Test 1: Simulate /music search command
@@ -229,13 +213,13 @@ class MusicTestSuite {
       if (searchResults.length > 0) {
         await this.log(`Discord search command simulation: Found ${searchResults.length} results`);
         // Check if YouTube results are prioritized (new priority system)
-        const youtubeCount = searchResults.filter(r => r.source === 'youtube').length;
+        const youtubeCount = searchResults.filter((r) => r.source === 'youtube').length;
         await this.log(`YouTube results prioritized: ${youtubeCount > 0}`, youtubeCount > 0);
       }
 
       // Test 2: Simulate /music play command with Deezer track
       if (searchResults.length > 0) {
-        const deezerSong = searchResults.find(s => s.source === 'deezer') || searchResults[0];
+        const deezerSong = searchResults.find((s) => s.source === 'deezer') || searchResults[0];
         await this.log(`Selected song for playback: ${deezerSong.title} (${deezerSong.source})`);
 
         // Simulate the command validation that would happen in Discord
@@ -251,16 +235,14 @@ class MusicTestSuite {
       const queue = getQueue(this.guildId);
       const stats = getMusicStats(this.guildId);
       await this.log(`Queue and stats accessible: ${typeof stats === 'object'}`);
-
-    }
-    catch (error) {
+    } catch (error) {
       await this.logError('Discord command simulation test failed', error);
     }
   }
 
   async runAllTests() {
     console.log('🚀 Starting Comprehensive Music System Test Suite');
-    console.log('=' .repeat(60));
+    console.log('='.repeat(60));
 
     await this.testApiConnectivity();
     await this.testDeezerSearch();
@@ -271,7 +253,7 @@ class MusicTestSuite {
     await this.testMusicControls();
     await this.testDiscordCommandSimulation();
 
-    console.log('\n' + '=' .repeat(60));
+    console.log('\n' + '='.repeat(60));
     console.log('📊 Test Results Summary:');
     console.log(`Total Tests: ${this.testCount}`);
     console.log(`✅ Passed: ${this.passCount}`);
@@ -287,7 +269,7 @@ class MusicTestSuite {
       total: this.testCount,
       passed: this.passCount,
       failed: this.failCount,
-      successRate: ((this.passCount / this.testCount) * 100).toFixed(1)
+      successRate: ((this.passCount / this.testCount) * 100).toFixed(1),
     };
   }
 }
@@ -295,13 +277,16 @@ class MusicTestSuite {
 // Run the tests if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   const testSuite = new MusicTestSuite();
-  testSuite.runAllTests().then(results => {
-    console.log('\n🏁 Test execution completed');
-    return process.exit(results.failed > 0 ? 1 : 0);
-  }).catch(error => {
-    console.error('Test suite failed:', error);
-    return process.exit(1);
-  });
+  testSuite
+    .runAllTests()
+    .then((results) => {
+      console.log('\n🏁 Test execution completed');
+      return process.exit(results.failed > 0 ? 1 : 0);
+    })
+    .catch((error) => {
+      console.error('Test suite failed:', error);
+      return process.exit(1);
+    });
 }
 
 export default MusicTestSuite;

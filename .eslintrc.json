@@ -1,6 +1,7 @@
 {
   "extends": [
-    "eslint:recommended"
+    "eslint:recommended",
+    "prettier"
   ],
   "parser": "@babel/eslint-parser",
   "parserOptions": {
@@ -45,15 +46,14 @@
     "no-multiple-empty-lines": ["error", { "max": 1 }],
     "semi": ["error", "always"],
     "quotes": ["error", "single", { "avoidEscape": true }],
-    "indent": ["error", 2, { "SwitchCase": 1 }],
+    "indent": "off",
     "comma-dangle": ["error", "only-multiline"],
     "object-curly-spacing": ["error", "always"],
     "array-bracket-spacing": ["error", "never"],
-    "brace-style": ["error", "stroustrup"],
+    "brace-style": "off",
     "key-spacing": ["error", { "beforeColon": false, "afterColon": true }],
     "keyword-spacing": ["error", { "before": true, "after": true }],
     "space-before-blocks": ["error", "always"],
-    "space-before-function-paren": ["error", "never"],
     "space-in-parens": ["error", "never"],
     "space-infix-ops": "error",
     "space-unary-ops": "error",

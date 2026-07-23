@@ -32,9 +32,7 @@ export async function loadCommands(client) {
   }
 
   try {
-    const files = fs.readdirSync(commandsPath).filter(file =>
-      COMMAND_EXTENSIONS.some(ext => file.endsWith(ext))
-    );
+    const files = fs.readdirSync(commandsPath).filter((file) => COMMAND_EXTENSIONS.some((ext) => file.endsWith(ext)));
 
     total = files.length;
     logger.info('Found command files', { count: total, files });
@@ -46,8 +44,7 @@ export async function loadCommands(client) {
     }
 
     logger.success('Commands loaded successfully', { total, loaded: loadedCount });
-  }
-  catch (error) {
+  } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     logger.error('Failed to load commands', err, { path: commandsPath });
   }
@@ -73,7 +70,7 @@ async function loadCommandFile(client, commandsPath, file) {
       logger.warn('Command file missing required exports', {
         file,
         hasData: !!commandModule.data,
-        hasExecute: !!commandModule.execute
+        hasExecute: !!commandModule.execute,
       });
       return false;
     }
@@ -81,13 +78,12 @@ async function loadCommandFile(client, commandsPath, file) {
     const commandName = commandModule.data.name;
     client.commands.set(commandName, {
       data: commandModule.data,
-      execute: commandModule.execute
+      execute: commandModule.execute,
     });
 
     logger.debug('Command loaded', { name: commandName, file });
     return true;
-  }
-  catch (error) {
+  } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     logger.error('Failed to load command file', err, { file, filePath });
     return false;

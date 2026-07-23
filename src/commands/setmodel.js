@@ -1,12 +1,12 @@
-import { SlashCommandBuilder , MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 
 import { setGuild } from '../storage.js';
 
 export const data = new SlashCommandBuilder()
   .setName('setmodel')
   .setDescription('Set the model URL for this guild')
-  .addStringOption(opt => opt.setName('url').setDescription('Model base URL').setRequired(true))
-  .addStringOption(opt => opt.setName('api').setDescription('API type (openai-compatible|openwebui|generic)'));
+  .addStringOption((opt) => opt.setName('url').setDescription('Model base URL').setRequired(true))
+  .addStringOption((opt) => opt.setName('api').setDescription('API type (openai-compatible|openwebui|generic)'));
 
 export async function execute(interaction) {
   if (!interaction.memberPermissions?.has || !interaction.memberPermissions.has('ManageGuild')) {

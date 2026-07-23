@@ -6,20 +6,19 @@ import { tttGames } from '../game-states.js';
 export const data = new SlashCommandBuilder()
   .setName('tictactoe')
   .setDescription('Play Tic-Tac-Toe against another player or AI')
-  .addUserOption(option =>
-    option.setName('opponent')
-      .setDescription('Player to challenge (leave empty for AI)')
-      .setRequired(false))
-  .addStringOption(option =>
-    option.setName('difficulty')
+  .addUserOption((option) => option.setName('opponent').setDescription('Player to challenge (leave empty for AI)').setRequired(false))
+  .addStringOption((option) =>
+    option
+      .setName('difficulty')
       .setDescription('AI difficulty (if playing against AI)')
       .addChoices(
         { name: 'Easy', value: 'easy' },
         { name: 'Medium', value: 'medium' },
         { name: 'Hard', value: 'hard' },
-        { name: 'Impossible', value: 'impossible' }
+        { name: 'Impossible', value: 'impossible' },
       )
-      .setRequired(false));
+      .setRequired(false),
+  );
 
 /**
  * Executes the Tic-Tac-Toe command.
@@ -51,21 +50,20 @@ export async function execute(interaction) {
       board: Array.from({ length: 9 }).fill(null),
       players: {
         X: { id: interaction.user.id, name: interaction.user.username },
-        O: opponent ? { id: opponent.id, name: opponent.username } : { id: 'ai', name: `${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} AI` }
+        O: opponent ? { id: opponent.id, name: opponent.username } : { id: 'ai', name: `${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} AI` },
       },
       currentPlayer: 'X',
       status: 'active',
       difficulty,
       isAI: !opponent,
-      created: Date.now()
+      created: Date.now(),
     };
 
     // Store game state
     tttGames.set(gameId, gameState);
 
     await sendTicTacToeBoard(interaction, gameState);
-  }
-  catch (error) {
+  } catch (error) {
     console.error('Error in tictactoe execute:', error);
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({ content: '❌ An error occurred while starting the game.', flags: MessageFlags.Ephemeral });
@@ -96,18 +94,17 @@ async function sendTicTacToeBoard(interaction, gameState) {
 
       const resultEmbed = new EmbedBuilder()
         .setTitle('⭕ Tic-Tac-Toe - Game Over!')
-        .setColor(winner === 'tie' ? 0xFF_A5_00 : 0x00_FF_00)
-        .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${players[winner].name} wins!**`)
+        .setColor(winner === 'tie' ? 0xff_a5_00 : 0x00_ff_00)
+        .setDescription(winner === 'tie' ? "🤝 **It's a tie!**" : `🎉 **${players[winner].name} wins!**`)
         .addFields({
           name: 'Final Board',
           value: formatBoard(board),
-          inline: false
+          inline: false,
         });
 
       if (interaction.replied || interaction.deferred) {
         await interaction.editReply({ embeds: [resultEmbed], components: [] });
-      }
-      else {
+      } else {
         await interaction.reply({ embeds: [resultEmbed] });
       }
       return;
@@ -115,12 +112,12 @@ async function sendTicTacToeBoard(interaction, gameState) {
 
     const embed = new EmbedBuilder()
       .setTitle('⭕ Tic-Tac-Toe')
-      .setColor(0x00_99_FF)
+      .setColor(0x00_99_ff)
       .setDescription(`${players[currentPlayer].name}'s turn (${currentPlayer})`)
       .addFields({
         name: 'Game Board',
         value: formatBoard(board),
-        inline: false
+        inline: false,
       });
 
     // Create board buttons
@@ -136,7 +133,7 @@ async function sendTicTacToeBoard(interaction, gameState) {
             .setCustomId(`ttt_${position}_${gameState.id}`)
             .setLabel(isTaken ? board[position] : `${position + 1}`)
             .setStyle(isTaken ? ButtonStyle.Secondary : ButtonStyle.Primary)
-            .setDisabled(isTaken || (isAI && currentPlayer === 'O'))
+            .setDisabled(isTaken || (isAI && currentPlayer === 'O')),
         );
       }
       buttons.push(row);
@@ -144,14 +141,13 @@ async function sendTicTacToeBoard(interaction, gameState) {
 
     if (interaction.replied || interaction.deferred) {
       await interaction.editReply({ embeds: [embed], components: buttons });
-    }
-    else {
+    } else {
       await interaction.reply({ embeds: [embed], components: buttons });
     }
 
     // AI move if it's AI's turn
     if (isAI && currentPlayer === 'O' && status === 'active') {
-      setTimeout(async() => {
+      setTimeout(async () => {
         const aiMove = getAIMove(board, difficulty);
         if (aiMove !== null) {
           gameState.board[aiMove] = 'O';
@@ -178,12 +174,12 @@ async function sendTicTacToeBoard(interaction, gameState) {
 
             const resultEmbed = new EmbedBuilder()
               .setTitle('⭕ Tic-Tac-Toe - Game Over!')
-              .setColor(aiWinner === 'tie' ? 0xFF_A5_00 : 0x00_FF_00)
-              .setDescription(aiWinner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${gameState.players[aiWinner].name} wins!**`)
+              .setColor(aiWinner === 'tie' ? 0xff_a5_00 : 0x00_ff_00)
+              .setDescription(aiWinner === 'tie' ? "🤝 **It's a tie!**" : `🎉 **${gameState.players[aiWinner].name} wins!**`)
               .addFields({
                 name: 'Final Board',
                 value: formatBoard(gameState.board),
-                inline: false
+                inline: false,
               });
 
             // Clean up game state
@@ -191,8 +187,7 @@ async function sendTicTacToeBoard(interaction, gameState) {
 
             if (interaction.replied || interaction.deferred) {
               await interaction.editReply({ embeds: [resultEmbed], components: [] });
-            }
-            else {
+            } else {
               await interaction.reply({ embeds: [resultEmbed] });
             }
             return;
@@ -201,8 +196,7 @@ async function sendTicTacToeBoard(interaction, gameState) {
         }
       }, 1000);
     }
-  }
-  catch (error) {
+  } catch (error) {
     console.error('Error in sendTicTacToeBoard:', error);
   }
 }
@@ -216,7 +210,7 @@ function formatBoard(board) {
   const symbols = {
     null: '⬜',
     X: '❌',
-    O: '⭕'
+    O: '⭕',
   };
 
   let formatted = '';
@@ -233,9 +227,14 @@ function formatBoard(board) {
  */
 function checkWinner(board) {
   const lines = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
-    [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
-    [0, 4, 8], [2, 4, 6] // Diagonals
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8], // Rows
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8], // Columns
+    [0, 4, 8],
+    [2, 4, 6], // Diagonals
   ];
 
   for (const [a, b, c] of lines) {
@@ -244,7 +243,7 @@ function checkWinner(board) {
     }
   }
 
-  if (board.every(cell => cell !== null)) {
+  if (board.every((cell) => cell !== null)) {
     return 'tie';
   }
 
@@ -258,7 +257,7 @@ function checkWinner(board) {
  * @returns {number|null} The move index or null if no moves available.
  */
 function getAIMove(board, difficulty) {
-  const availableMoves = board.map((cell, index) => cell === null ? index : null).filter(val => val !== null);
+  const availableMoves = board.map((cell, index) => (cell === null ? index : null)).filter((val) => val !== null);
 
   if (availableMoves.length === 0) return null;
 
@@ -377,8 +376,7 @@ function minimax(board, depth, isMaximizing, aiPlayer) {
       }
     }
     return bestScore;
-  }
-  else {
+  } else {
     let bestScore = Number.POSITIVE_INFINITY;
     for (let i = 0; i < 9; i++) {
       if (board[i] === null) {

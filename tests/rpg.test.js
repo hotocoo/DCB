@@ -20,8 +20,7 @@ function restoreData() {
   if (fs.existsSync(BACKUP)) {
     fs.copyFileSync(BACKUP, FILE);
     fs.unlinkSync(BACKUP);
-  }
-  else {
+  } else {
     // remove test file if created
     if (fs.existsSync(FILE)) fs.unlinkSync(FILE);
   }
@@ -63,24 +62,25 @@ async function run() {
     assert.equal(def.lvl, 1);
 
     console.log('All tests passed');
-  }
-  finally {
+  } finally {
     // Always clean up the per-user file and any pre-existing testuser_*
     // leftovers from previous runs. Without this, every `npm run
     // test:rpg` invocation leaves a new data/players/<snowflake>.json
     // file behind that gets committed to the repo.
     try {
       deleteCharacter('123456789012345678');
+    } catch {
+      /* ignore */
     }
-    catch { /* ignore */ }
     const playersDir = path.join(process.cwd(), 'data', 'players');
     if (fs.existsSync(playersDir)) {
       for (const file of fs.readdirSync(playersDir)) {
         if (file === '123456789012345678.json' || file.startsWith('testuser_')) {
           try {
             fs.unlinkSync(path.join(playersDir, file));
+          } catch {
+            /* ignore */
           }
-          catch { /* ignore */ }
         }
       }
     }
@@ -88,6 +88,9 @@ async function run() {
   }
 }
 
-run().then(() => process.exit(0)).catch(error => {
-  console.error(error); process.exit(1);
-});
+run()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

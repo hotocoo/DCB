@@ -27,8 +27,7 @@ class GuildManager {
     try {
       const data = JSON.parse(fs.readFileSync(GUILDS_FILE));
       this.guilds = data;
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to load guilds:', error);
       this.guilds = {};
     }
@@ -37,8 +36,7 @@ class GuildManager {
   saveGuilds() {
     try {
       fs.writeFileSync(GUILDS_FILE, JSON.stringify(this.guilds, undefined, 2));
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to save guilds:', error);
     }
   }
@@ -58,8 +56,8 @@ class GuildManager {
           role: 'leader',
           joined: Date.now(),
           level: 1,
-          contribution: 0
-        }
+          contribution: 0,
+        },
       },
       level: 1,
       experience: 0,
@@ -67,7 +65,7 @@ class GuildManager {
       created: Date.now(),
       description: '',
       maxMembers: 10,
-      isPublic: true
+      isPublic: true,
     };
 
     this.guilds[guildName] = guild;
@@ -89,7 +87,7 @@ class GuildManager {
       role: 'member',
       joined: Date.now(),
       level: 1,
-      contribution: 0
+      contribution: 0,
     };
 
     this.saveGuilds();
@@ -117,13 +115,13 @@ class GuildManager {
         [leaderId]: {
           name: leaderName,
           role: 'leader',
-          joined: Date.now()
-        }
+          joined: Date.now(),
+        },
       },
       maxMembers: 4,
       quest: undefined,
       created: Date.now(),
-      isActive: true
+      isActive: true,
     };
 
     // Store party in memory (could be persisted to file)
@@ -145,7 +143,7 @@ class GuildManager {
     party.members[userId] = {
       name: userName,
       role: 'member',
-      joined: Date.now()
+      joined: Date.now(),
     };
 
     return { success: true, party };
@@ -161,8 +159,7 @@ class GuildManager {
     // Disband party if no members left
     if (Object.keys(party.members).length === 0) {
       delete this.parties[partyId];
-    }
-    else if (party.leader === userId) {
+    } else if (party.leader === userId) {
       // Transfer leadership to another member
       const newLeader = Object.keys(party.members)[0];
       party.leader = newLeader;
@@ -180,7 +177,7 @@ class GuildManager {
         level: guild.level,
         memberCount: Object.keys(guild.members).length,
         gold: guild.gold,
-        experience: guild.experience
+        experience: guild.experience,
       }))
       .sort((a, b) => {
         if (b.level !== a.level) return b.level - a.level;
@@ -262,7 +259,7 @@ class GuildManager {
       target: targetGuild,
       declared: Date.now(),
       status: 'active',
-      winner: undefined
+      winner: undefined,
     };
 
     this.guildWars = this.guildWars || {};

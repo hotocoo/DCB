@@ -1,36 +1,91 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 
-import { searchSongs, play, pause, resume, skip, stop, getQueue, getMusicStats, getLyrics, getRadioStations, setVolume, shuffleQueue, clearQueue, back, setLoop, getLoop } from '../music.js';
+import {
+  searchSongs,
+  play,
+  pause,
+  resume,
+  skip,
+  stop,
+  getQueue,
+  getMusicStats,
+  getLyrics,
+  getRadioStations,
+  setVolume,
+  shuffleQueue,
+  clearQueue,
+  back,
+  setLoop,
+  getLoop,
+} from '../music.js';
 import { CommandError, handleCommandError } from '../errorHandler.js';
 import { logger } from '../logger.js';
 
 export const data = new SlashCommandBuilder()
   .setName('music')
   .setDescription('🎵 Athena Music System - YouTube & Spotify Priority!')
-  .addSubcommand(sub => sub.setName('play').setDescription('🎵 Play any song instantly').addStringOption(opt => opt.setName('query').setDescription('Song name or URL').setRequired(true)))
-  .addSubcommand(sub => sub.setName('search').setDescription('🔍 Search millions of songs').addStringOption(opt => opt.setName('query').setDescription('Search term').setRequired(true)))
-  .addSubcommand(sub => sub.setName('back').setDescription('⬅️ Go back to previous song'))
-  .addSubcommand(sub => sub.setName('loop').setDescription('🔄 Set loop mode').addStringOption(opt => opt.setName('mode').setDescription('Loop mode').addChoices(
-    { name: 'None', value: 'none' },
-    { name: 'Single', value: 'single' },
-    { name: 'Queue', value: 'queue' }
-  ).setRequired(true)))
-  .addSubcommand(sub => sub.setName('skip').setDescription('⏭️ Skip to next song'))
-  .addSubcommand(sub => sub.setName('pause').setDescription('⏸️ Pause current song'))
-  .addSubcommand(sub => sub.setName('resume').setDescription('▶️ Resume paused song'))
-  .addSubcommand(sub => sub.setName('stop').setDescription('⏹️ Stop music and leave voice'))
-  .addSubcommand(sub => sub.setName('queue').setDescription('📋 View music queue'))
-  .addSubcommand(sub => sub.setName('nowplaying').setDescription('🎵 Show currently playing'))
-  .addSubcommand(sub => sub.setName('shuffle').setDescription('🔀 Shuffle queue'))
-  .addSubcommand(sub => sub.setName('volume').setDescription('🔊 Set volume (0-200)').addIntegerOption(opt => opt.setName('level').setDescription('Volume level').setRequired(true)))
-  .addSubcommand(sub => sub.setName('lyrics').setDescription('📝 Get song lyrics').addStringOption(opt => opt.setName('song').setDescription('Song name').setRequired(true)))
-  .addSubcommand(sub => sub.setName('radio').setDescription('📻 Play radio stations').addStringOption(opt => opt.setName('station').setDescription('Radio station').addChoices(
-    { name: '🎵 Lo-fi Hip Hop', value: 'lofi' },
-    { name: '🎸 Rock Classics', value: 'rock' },
-    { name: '🎶 Electronic', value: 'electronic' },
-    { name: '🎷 Smooth Jazz', value: 'jazz' },
-    { name: '🎼 Classical', value: 'classical' }
-  ).setRequired(true)));
+  .addSubcommand((sub) =>
+    sub
+      .setName('play')
+      .setDescription('🎵 Play any song instantly')
+      .addStringOption((opt) => opt.setName('query').setDescription('Song name or URL').setRequired(true)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('search')
+      .setDescription('🔍 Search millions of songs')
+      .addStringOption((opt) => opt.setName('query').setDescription('Search term').setRequired(true)),
+  )
+  .addSubcommand((sub) => sub.setName('back').setDescription('⬅️ Go back to previous song'))
+  .addSubcommand((sub) =>
+    sub
+      .setName('loop')
+      .setDescription('🔄 Set loop mode')
+      .addStringOption((opt) =>
+        opt
+          .setName('mode')
+          .setDescription('Loop mode')
+          .addChoices({ name: 'None', value: 'none' }, { name: 'Single', value: 'single' }, { name: 'Queue', value: 'queue' })
+          .setRequired(true),
+      ),
+  )
+  .addSubcommand((sub) => sub.setName('skip').setDescription('⏭️ Skip to next song'))
+  .addSubcommand((sub) => sub.setName('pause').setDescription('⏸️ Pause current song'))
+  .addSubcommand((sub) => sub.setName('resume').setDescription('▶️ Resume paused song'))
+  .addSubcommand((sub) => sub.setName('stop').setDescription('⏹️ Stop music and leave voice'))
+  .addSubcommand((sub) => sub.setName('queue').setDescription('📋 View music queue'))
+  .addSubcommand((sub) => sub.setName('nowplaying').setDescription('🎵 Show currently playing'))
+  .addSubcommand((sub) => sub.setName('shuffle').setDescription('🔀 Shuffle queue'))
+  .addSubcommand((sub) =>
+    sub
+      .setName('volume')
+      .setDescription('🔊 Set volume (0-200)')
+      .addIntegerOption((opt) => opt.setName('level').setDescription('Volume level').setRequired(true)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('lyrics')
+      .setDescription('📝 Get song lyrics')
+      .addStringOption((opt) => opt.setName('song').setDescription('Song name').setRequired(true)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('radio')
+      .setDescription('📻 Play radio stations')
+      .addStringOption((opt) =>
+        opt
+          .setName('station')
+          .setDescription('Radio station')
+          .addChoices(
+            { name: '🎵 Lo-fi Hip Hop', value: 'lofi' },
+            { name: '🎸 Rock Classics', value: 'rock' },
+            { name: '🎶 Electronic', value: 'electronic' },
+            { name: '🎷 Smooth Jazz', value: 'jazz' },
+            { name: '🎼 Classical', value: 'classical' },
+          )
+          .setRequired(true),
+      ),
+  );
 
 export async function execute(interaction) {
   try {
@@ -45,7 +100,7 @@ export async function execute(interaction) {
     if (!interaction.guild?.id && sub !== 'lyrics') {
       return interaction.reply({
         content: '❌ Music commands can only be used in servers.',
-        flags: MessageFlags.Ephemeral
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -58,7 +113,7 @@ export async function execute(interaction) {
         if (!voiceChannel) {
           return interaction.reply({
             content: '🎵 **You must be in a voice channel to play music!**',
-            flags: MessageFlags.Ephemeral
+            flags: MessageFlags.Ephemeral,
           });
         }
 
@@ -67,7 +122,7 @@ export async function execute(interaction) {
         if (!botPermissions.has('Connect') || !botPermissions.has('Speak')) {
           return interaction.reply({
             content: '❌ **I need "Connect" and "Speak" permissions in your voice channel.**',
-            flags: MessageFlags.Ephemeral
+            flags: MessageFlags.Ephemeral,
           });
         }
 
@@ -77,7 +132,7 @@ export async function execute(interaction) {
           guildId: interaction.guild.id,
           userId: interaction.user.id,
           query: query.slice(0, 100), // Log first 100 chars for privacy
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
 
         try {
@@ -88,21 +143,21 @@ export async function execute(interaction) {
 
             // Provide more specific messaging for URL queries
             if (query.includes('spotify.com')) {
-              noResultsMessage = '❌ **Track unavailable on Spotify**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
-            }
-            else if (query.includes('youtube.com') || query.includes('youtu.be')) {
-              noResultsMessage = '❌ **Video unavailable**\n\n📹 The requested video is not available, private, or has been deleted.\n🔍 Try searching for the song title instead of using the direct URL.';
-            }
-            else if (query.includes('deezer.com')) {
-              noResultsMessage = '❌ **Track unavailable on Deezer**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
-            }
-            else {
+              noResultsMessage =
+                '❌ **Track unavailable on Spotify**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
+            } else if (query.includes('youtube.com') || query.includes('youtu.be')) {
+              noResultsMessage =
+                '❌ **Video unavailable**\n\n📹 The requested video is not available, private, or has been deleted.\n🔍 Try searching for the song title instead of using the direct URL.';
+            } else if (query.includes('deezer.com')) {
+              noResultsMessage =
+                '❌ **Track unavailable on Deezer**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
+            } else {
               noResultsMessage = '❌ **No results found**\n\n🔍 No tracks found for your search query.\n💡 Try different keywords or check the spelling.';
             }
 
             return interaction.reply({
               content: noResultsMessage,
-              flags: MessageFlags.Ephemeral
+              flags: MessageFlags.Ephemeral,
             });
           }
 
@@ -118,11 +173,9 @@ export async function execute(interaction) {
               case 'validation_failed': {
                 if (song.source === 'spotify') {
                   errorMessage += '\n\n🎵 **Track unavailable on Spotify**\nThe requested track is no longer available or has no preview.';
-                }
-                else if (song.source === 'deezer') {
+                } else if (song.source === 'deezer') {
                   errorMessage += '\n\n🎵 **Track unavailable on Deezer**\nThe requested track is no longer available or has no preview.';
-                }
-                else {
+                } else {
                   errorMessage += '\n\n📹 **Video unavailable or deleted**\nThe requested video is no longer available on YouTube.';
                 }
                 break;
@@ -163,19 +216,19 @@ export async function execute(interaction) {
 
             return interaction.reply({
               content: errorMessage,
-              flags: MessageFlags.Ephemeral
+              flags: MessageFlags.Ephemeral,
             });
           }
 
           // Create success embed with detailed info
           const embed = new EmbedBuilder()
             .setTitle('🎵 Now Playing')
-            .setColor(0x00_FF_00)
+            .setColor(0x00_ff_00)
             .setDescription(`**${song.title}** by **${song.artist}**`)
             .addFields(
               { name: '⏱️ Duration', value: song.duration, inline: true },
               { name: '🔊 Volume', value: `${getMusicStats(interaction.guild.id).volume}%`, inline: true },
-              { name: '👤 Requested by', value: interaction.user.username, inline: true }
+              { name: '👤 Requested by', value: interaction.user.username, inline: true },
             )
             .setThumbnail(song.thumbnail || 'https://i.imgur.com/SjIgjlE.png');
 
@@ -195,14 +248,14 @@ export async function execute(interaction) {
 
               break;
             }
-          // No default
+            // No default
           }
 
           const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`music_pause:${interaction.guild.id}`).setLabel('⏸️ Pause').setStyle(ButtonStyle.Primary),
             new ButtonBuilder().setCustomId(`music_skip:${interaction.guild.id}`).setLabel('⏭️ Skip').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`music_stop:${interaction.guild.id}`).setLabel('⏹️ Stop').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary),
           );
 
           console.log(`[MUSIC] Editing deferred reply for interaction: ${interaction.id} with success embed`);
@@ -211,12 +264,11 @@ export async function execute(interaction) {
             userId: interaction.user.id,
             songTitle: song.title,
             songSource: song.source,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           });
 
           await interaction.editReply({ embeds: [embed], components: [row] });
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Play command error:', error);
           logger.error('Music play command failed', {
             guildId: interaction.guild.id,
@@ -224,18 +276,20 @@ export async function execute(interaction) {
             query: query.slice(0, 100),
             error: error.message,
             stack: error.stack,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           });
 
           // Check if interaction was already deferred
-          await (interaction.deferred ? interaction.editReply({
-            content: '❌ **An error occurred while playing music.**',
-            embeds: [],
-            components: []
-          }) : interaction.reply({
-            content: '❌ **An error occurred while playing music.**',
-            flags: MessageFlags.Ephemeral
-          }));
+          await (interaction.deferred
+            ? interaction.editReply({
+                content: '❌ **An error occurred while playing music.**',
+                embeds: [],
+                components: [],
+              })
+            : interaction.reply({
+                content: '❌ **An error occurred while playing music.**',
+                flags: MessageFlags.Ephemeral,
+              }));
         }
 
         break;
@@ -250,16 +304,17 @@ export async function execute(interaction) {
 
             // Provide more specific messaging for URL queries
             if (query.includes('spotify.com')) {
-              noResultsMessage = '❌ **Track unavailable on Spotify**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
-            }
-            else if (query.includes('youtube.com') || query.includes('youtu.be')) {
-              noResultsMessage = '❌ **Video unavailable**\n\n📹 The requested video is not available, private, or has been deleted.\n🔍 Try searching for the song title instead of using the direct URL.';
-            }
-            else if (query.includes('deezer.com')) {
-              noResultsMessage = '❌ **Track unavailable on Deezer**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
-            }
-            else {
-              noResultsMessage = '❌ **No search results found**\n\n🔍 No tracks found for your search query.\n💡 Try different keywords or check the spelling.';
+              noResultsMessage =
+                '❌ **Track unavailable on Spotify**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
+            } else if (query.includes('youtube.com') || query.includes('youtu.be')) {
+              noResultsMessage =
+                '❌ **Video unavailable**\n\n📹 The requested video is not available, private, or has been deleted.\n🔍 Try searching for the song title instead of using the direct URL.';
+            } else if (query.includes('deezer.com')) {
+              noResultsMessage =
+                '❌ **Track unavailable on Deezer**\n\n🎵 The requested track is not available or has no preview.\n🔍 Try searching for the song title instead.';
+            } else {
+              noResultsMessage =
+                '❌ **No search results found**\n\n🔍 No tracks found for your search query.\n💡 Try different keywords or check the spelling.';
             }
 
             return interaction.reply({ content: noResultsMessage, flags: MessageFlags.Ephemeral });
@@ -267,14 +322,14 @@ export async function execute(interaction) {
 
           const embed = new EmbedBuilder()
             .setTitle(`🔍 Search Results for "${query}"`)
-            .setColor(0x00_99_FF)
+            .setColor(0x00_99_ff)
             .setDescription('Click the buttons below to play songs!');
 
           for (const [index, song] of results.entries()) {
             embed.addFields({
               name: `${index + 1}. ${song.title}`,
               value: `👤 ${song.artist} • ⏱️ ${song.duration}`,
-              inline: false
+              inline: false,
             });
           }
 
@@ -287,15 +342,14 @@ export async function execute(interaction) {
                 new ButtonBuilder()
                   .setCustomId(`music_play:${j}:${query}`)
                   .setLabel(`Play ${j + 1}`)
-                  .setStyle(ButtonStyle.Primary)
+                  .setStyle(ButtonStyle.Primary),
               );
             }
             rows.push(row);
           }
 
           await interaction.reply({ embeds: [embed], components: rows });
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Search command error:', error);
           await interaction.reply({ content: '❌ Failed to search songs.', flags: MessageFlags.Ephemeral });
         }
@@ -308,11 +362,11 @@ export async function execute(interaction) {
           if (previousSong) {
             const embed = new EmbedBuilder()
               .setTitle('⬅️ Back to Previous Song')
-              .setColor(0xFF_A5_00)
+              .setColor(0xff_a5_00)
               .setDescription(`**Now Playing:** ${previousSong.title} by ${previousSong.artist}`)
               .addFields(
                 { name: '⏱️ Duration', value: previousSong.duration, inline: true },
-                { name: '👤 Requested by', value: interaction.user.username, inline: true }
+                { name: '👤 Requested by', value: interaction.user.username, inline: true },
               )
               .setThumbnail(previousSong.thumbnail || 'https://i.imgur.com/SjIgjlE.png');
 
@@ -321,16 +375,14 @@ export async function execute(interaction) {
               new ButtonBuilder().setCustomId(`music_skip:${interaction.guild.id}`).setLabel('⏭️ Skip').setStyle(ButtonStyle.Secondary),
               new ButtonBuilder().setCustomId(`music_back:${interaction.guild.id}`).setLabel('⬅️ Back').setStyle(ButtonStyle.Secondary),
               new ButtonBuilder().setCustomId(`music_stop:${interaction.guild.id}`).setLabel('⏹️ Stop').setStyle(ButtonStyle.Danger),
-              new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary)
+              new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary),
             );
 
             await interaction.reply({ embeds: [embed], components: [row] });
-          }
-          else {
+          } else {
             await interaction.reply({ content: '❌ No previous song in history.', flags: MessageFlags.Ephemeral });
           }
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Back command error:', error);
           await interaction.reply({ content: '❌ Failed to go back.', flags: MessageFlags.Ephemeral });
         }
@@ -344,11 +396,10 @@ export async function execute(interaction) {
           setLoop(interaction.guild.id, mode);
           const embed = new EmbedBuilder()
             .setTitle('🔄 Loop Mode Set')
-            .setColor(0x99_32_CC)
+            .setColor(0x99_32_cc)
             .setDescription(`Loop mode set to **${mode.charAt(0).toUpperCase() + mode.slice(1)}**`);
           await interaction.reply({ embeds: [embed] });
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Loop command error:', error);
           await interaction.reply({ content: '❌ Failed to set loop mode.', flags: MessageFlags.Ephemeral });
         }
@@ -361,11 +412,11 @@ export async function execute(interaction) {
           if (nextSong) {
             const embed = new EmbedBuilder()
               .setTitle('⏭️ Song Skipped')
-              .setColor(0xFF_A5_00)
+              .setColor(0xff_a5_00)
               .setDescription(`**Now Playing:** ${nextSong.title} by ${nextSong.artist}`)
               .addFields(
                 { name: '⏱️ Duration', value: nextSong.duration, inline: true },
-                { name: '👤 Requested by', value: interaction.user.username, inline: true }
+                { name: '👤 Requested by', value: interaction.user.username, inline: true },
               )
               .setThumbnail(nextSong.thumbnail || 'https://i.imgur.com/SjIgjlE.png');
 
@@ -373,16 +424,14 @@ export async function execute(interaction) {
               new ButtonBuilder().setCustomId(`music_pause:${interaction.guild.id}`).setLabel('⏸️ Pause').setStyle(ButtonStyle.Primary),
               new ButtonBuilder().setCustomId(`music_skip:${interaction.guild.id}`).setLabel('⏭️ Skip').setStyle(ButtonStyle.Secondary),
               new ButtonBuilder().setCustomId(`music_stop:${interaction.guild.id}`).setLabel('⏹️ Stop').setStyle(ButtonStyle.Danger),
-              new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary)
+              new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary),
             );
 
             await interaction.reply({ embeds: [embed], components: [row] });
-          }
-          else {
+          } else {
             await interaction.reply({ content: '❌ No songs in queue to skip.', flags: MessageFlags.Ephemeral });
           }
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Skip command error:', error);
           await interaction.reply({ content: '❌ Failed to skip song.', flags: MessageFlags.Ephemeral });
         }
@@ -395,15 +444,13 @@ export async function execute(interaction) {
           if (success) {
             const embed = new EmbedBuilder()
               .setTitle('⏸️ Music Paused')
-              .setColor(0xFF_FF_00)
+              .setColor(0xff_ff_00)
               .setDescription('Music has been paused. Use `/music resume` to continue.');
             await interaction.reply({ embeds: [embed] });
-          }
-          else {
+          } else {
             await interaction.reply({ content: '❌ No music is currently playing.', flags: MessageFlags.Ephemeral });
           }
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Pause command error:', error);
           await interaction.reply({ content: '❌ Failed to pause music.', flags: MessageFlags.Ephemeral });
         }
@@ -414,17 +461,12 @@ export async function execute(interaction) {
         try {
           const success = resume(interaction.guild.id);
           if (success) {
-            const embed = new EmbedBuilder()
-              .setTitle('▶️ Music Resumed')
-              .setColor(0x00_FF_00)
-              .setDescription('Music is now playing!');
+            const embed = new EmbedBuilder().setTitle('▶️ Music Resumed').setColor(0x00_ff_00).setDescription('Music is now playing!');
             await interaction.reply({ embeds: [embed] });
-          }
-          else {
+          } else {
             await interaction.reply({ content: '❌ No paused music to resume.', flags: MessageFlags.Ephemeral });
           }
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Resume command error:', error);
           await interaction.reply({ content: '❌ Failed to resume music.', flags: MessageFlags.Ephemeral });
         }
@@ -435,17 +477,12 @@ export async function execute(interaction) {
         try {
           const success = stop(interaction.guild.id);
           if (success) {
-            const embed = new EmbedBuilder()
-              .setTitle('⏹️ Music Stopped')
-              .setColor(0xFF_00_00)
-              .setDescription('Music stopped and left voice channel.');
+            const embed = new EmbedBuilder().setTitle('⏹️ Music Stopped').setColor(0xff_00_00).setDescription('Music stopped and left voice channel.');
             await interaction.reply({ embeds: [embed] });
-          }
-          else {
+          } else {
             await interaction.reply({ content: '❌ No music is currently playing.', flags: MessageFlags.Ephemeral });
           }
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Stop command error:', error);
           await interaction.reply({ content: '❌ Failed to stop music.', flags: MessageFlags.Ephemeral });
         }
@@ -470,29 +507,27 @@ export async function execute(interaction) {
             if (queue.length > 10) {
               description += `... and ${queue.length - 10} more songs`;
             }
-          }
-          else {
+          } else {
             description += 'Queue is empty.';
           }
 
           const embed = new EmbedBuilder()
             .setTitle('📋 Music Queue')
-            .setColor(0x00_99_FF)
+            .setColor(0x00_99_ff)
             .setDescription(description)
             .addFields({
               name: '📊 Queue Info',
               value: `**Total Songs:** ${stats.queueLength}\n**Volume:** ${stats.volume}%`,
-              inline: true
+              inline: true,
             });
 
           const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`music_shuffle:${interaction.guild.id}`).setLabel('🔀 Shuffle').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`music_clear:${interaction.guild.id}`).setLabel('🗑️ Clear Queue').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId(`music_clear:${interaction.guild.id}`).setLabel('🗑️ Clear Queue').setStyle(ButtonStyle.Danger),
           );
 
           await interaction.reply({ embeds: [embed], components: [row] });
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Queue command error:', error);
           await interaction.reply({ content: '❌ Failed to get queue.', flags: MessageFlags.Ephemeral });
         }
@@ -509,12 +544,12 @@ export async function execute(interaction) {
           const current = stats.currentlyPlaying;
           const embed = new EmbedBuilder()
             .setTitle('🎵 Now Playing')
-            .setColor(0x00_FF_00)
+            .setColor(0x00_ff_00)
             .setDescription(`**${current.title}** by **${current.artist}**`)
             .addFields(
               { name: '⏱️ Progress', value: `${Math.floor(current.progress / 1000)}s / ${current.duration}`, inline: true },
               { name: '🔊 Volume', value: `${stats.volume}%`, inline: true },
-              { name: '👤 Status', value: current.status, inline: true }
+              { name: '👤 Status', value: current.status, inline: true },
             )
             .setThumbnail(current.thumbnail || 'https://i.imgur.com/SjIgjlE.png');
 
@@ -522,12 +557,11 @@ export async function execute(interaction) {
             new ButtonBuilder().setCustomId(`music_pause:${interaction.guild.id}`).setLabel('⏸️ Pause').setStyle(ButtonStyle.Primary),
             new ButtonBuilder().setCustomId(`music_skip:${interaction.guild.id}`).setLabel('⏭️ Skip').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`music_stop:${interaction.guild.id}`).setLabel('⏹️ Stop').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary),
           );
 
           await interaction.reply({ embeds: [embed], components: [row] });
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Nowplaying command error:', error);
           await interaction.reply({ content: '❌ Failed to get now playing info.', flags: MessageFlags.Ephemeral });
         }
@@ -538,17 +572,12 @@ export async function execute(interaction) {
         try {
           const success = shuffleQueue(interaction.guild.id);
           if (success) {
-            const embed = new EmbedBuilder()
-              .setTitle('🔀 Queue Shuffled')
-              .setColor(0x99_32_CC)
-              .setDescription('Music queue has been shuffled!');
+            const embed = new EmbedBuilder().setTitle('🔀 Queue Shuffled').setColor(0x99_32_cc).setDescription('Music queue has been shuffled!');
             await interaction.reply({ embeds: [embed] });
-          }
-          else {
+          } else {
             await interaction.reply({ content: '❌ Queue is empty or too small to shuffle.', flags: MessageFlags.Ephemeral });
           }
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Shuffle command error:', error);
           await interaction.reply({ content: '❌ Failed to shuffle queue.', flags: MessageFlags.Ephemeral });
         }
@@ -562,7 +591,7 @@ export async function execute(interaction) {
         if (typeof volume !== 'number' || volume < 0 || volume > 200) {
           return interaction.reply({
             content: '❌ Volume must be a number between 0 and 200.',
-            flags: MessageFlags.Ephemeral
+            flags: MessageFlags.Ephemeral,
           });
         }
 
@@ -571,17 +600,13 @@ export async function execute(interaction) {
           if (!success) {
             return interaction.reply({
               content: '❌ No active music session to adjust volume.',
-              flags: MessageFlags.Ephemeral
+              flags: MessageFlags.Ephemeral,
             });
           }
 
-          const embed = new EmbedBuilder()
-            .setTitle('🔊 Volume Changed')
-            .setColor(0x00_99_FF)
-            .setDescription(`Volume set to **${volume}%**`);
+          const embed = new EmbedBuilder().setTitle('🔊 Volume Changed').setColor(0x00_99_ff).setDescription(`Volume set to **${volume}%**`);
           await interaction.reply({ embeds: [embed] });
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Volume command error:', error);
           await interaction.reply({ content: '❌ Failed to set volume.', flags: MessageFlags.Ephemeral });
         }
@@ -601,16 +626,14 @@ export async function execute(interaction) {
           if (lyrics) {
             const embed = new EmbedBuilder()
               .setTitle(`📝 Lyrics: ${lyrics.title}`)
-              .setColor(0x99_32_CC)
+              .setColor(0x99_32_cc)
               .setDescription(lyrics.lyrics.slice(0, 4000)) // Discord embed limit
               .setFooter({ text: `Powered by ${lyrics.source}` });
             await interaction.reply({ embeds: [embed] });
-          }
-          else {
+          } else {
             await interaction.reply({ content: '❌ Lyrics not found for that song.', flags: MessageFlags.Ephemeral });
           }
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Lyrics command error:', error);
           await interaction.reply({ content: '❌ Failed to get lyrics.', flags: MessageFlags.Ephemeral });
         }
@@ -641,7 +664,7 @@ export async function execute(interaction) {
             duration: 'Live Stream',
             url: station.url,
             thumbnail: 'https://i.imgur.com/SjIgjlE.png',
-            requestedBy: interaction.user.username
+            requestedBy: interaction.user.username,
           };
 
           // Play the radio
@@ -681,32 +704,30 @@ export async function execute(interaction) {
 
           const embed = new EmbedBuilder()
             .setTitle(`📻 Now Playing: ${station.name}`)
-            .setColor(0xFF_98_00)
+            .setColor(0xff_98_00)
             .setDescription(`**${station.name}** radio is now playing!\n\n🎵 *Live streaming activated*`)
             .addFields(
               { name: '📻 Station', value: station.name, inline: true },
               { name: '🎵 Genre', value: station.genre, inline: true },
-              { name: '🔊 Quality', value: 'Live Stream', inline: true }
+              { name: '🔊 Quality', value: 'Live Stream', inline: true },
             );
 
           const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`music_radio_change:${stationKey}`).setLabel('🔄 Change Station').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId(`music_stop:${interaction.guild.id}`).setLabel('⏹️ Stop Radio').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId(`music_stop:${interaction.guild.id}`).setLabel('⏹️ Stop Radio').setStyle(ButtonStyle.Danger),
           );
 
           await interaction.reply({ embeds: [embed], components: [row] });
-        }
-        catch (error) {
+        } catch (error) {
           console.error('Radio command error:', error);
           await interaction.reply({ content: '❌ Failed to play radio.', flags: MessageFlags.Ephemeral });
         }
 
         break;
       }
-    // No default
+      // No default
     }
-  }
-  catch (error) {
+  } catch (error) {
     return handleCommandError(interaction, error);
   }
 }

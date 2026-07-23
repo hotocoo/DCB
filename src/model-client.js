@@ -50,8 +50,7 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
   // Rate limiting for local model API
   try {
     await localModelRateLimiter.consume('local_model_api');
-  }
-  catch (error) {
+  } catch (error) {
     const waitTime = Math.round(error.msBeforeNext / 1000);
     throw new Error(`Rate limit exceeded. Try again in ${waitTime} seconds.`);
   }
@@ -67,15 +66,15 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.LOCAL_MODEL_TOKEN || 'not-needed'}`
+          Authorization: `Bearer ${process.env.LOCAL_MODEL_TOKEN || 'not-needed'}`,
         },
         body: JSON.stringify({
           model: process.env.LOCAL_MODEL_NAME || 'default-model',
           messages: [{ role: 'user', content: prompt }],
           max_tokens: 512,
-          temperature: 0.7
+          temperature: 0.7,
         }),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
@@ -86,10 +85,7 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
       }
 
       const data = await response.json();
-      const content = data.choices?.[0]?.message?.content ??
-                     data.result ??
-                     data.response ??
-                     'No response generated from local model';
+      const content = data.choices?.[0]?.message?.content ?? data.result ?? data.response ?? 'No response generated from local model';
 
       logger.debug('Local model response received', { contentLength: content.length });
       return content;
@@ -102,7 +98,7 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
@@ -124,9 +120,9 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
       body: JSON.stringify({
         prompt,
         max_tokens: 512,
-        temperature: 0.7
+        temperature: 0.7,
       }),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
@@ -139,9 +135,7 @@ async function callLocalModel(prompt, url = DEFAULT_LOCAL_URL, api = DEFAULT_LOC
     const content = data.result ?? data.output ?? data.response ?? data.text ?? 'No response from generic API';
     logger.debug('Generic API response received', { contentLength: content.length });
     return content;
-
-  }
-  catch (error) {
+  } catch (error) {
     clearTimeout(timeoutId);
 
     if (error.name === 'AbortError') {
@@ -166,8 +160,7 @@ async function callOpenAI(messages) {
   // Rate limiting for OpenAI API
   try {
     await openAIRateLimiter.consume('openai_api');
-  }
-  catch (error) {
+  } catch (error) {
     const waitTime = Math.round(error.msBeforeNext / 1000);
     throw new Error(`Rate limit exceeded. Try again in ${waitTime} seconds.`);
   }
@@ -182,7 +175,7 @@ async function callOpenAI(messages) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_KEY}`
+        Authorization: `Bearer ${OPENAI_KEY}`,
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
@@ -190,9 +183,9 @@ async function callOpenAI(messages) {
         max_tokens: 512,
         temperature: 0.8,
         presence_penalty: 0.1,
-        frequency_penalty: 0.1
+        frequency_penalty: 0.1,
       }),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
@@ -207,9 +200,7 @@ async function callOpenAI(messages) {
 
     logger.debug('OpenAI response received', { contentLength: content.length });
     return content.slice(0, MAX_RESPONSE_LENGTH); // Limit response length
-
-  }
-  catch (error) {
+  } catch (error) {
     clearTimeout(timeoutId);
 
     if (error.name === 'AbortError') {
@@ -246,8 +237,7 @@ export async function generate(guildId, prompt) {
         logger.info('Local model response generated successfully');
         return response;
       }
-    }
-    catch (error) {
+    } catch (error) {
       logger.warn('Local model failed, trying OpenAI fallback', error);
     }
   }
@@ -258,12 +248,13 @@ export async function generate(guildId, prompt) {
       const messages = [
         {
           role: 'system',
-          content: 'You are Athena, an advanced AI Discord bot. Provide creative, engaging responses for RPG narration and storytelling. Keep responses under 500 characters.'
+          content:
+            'You are Athena, an advanced AI Discord bot. Provide creative, engaging responses for RPG narration and storytelling. Keep responses under 500 characters.',
         },
         {
           role: 'user',
-          content: prompt
-        }
+          content: prompt,
+        },
       ];
 
       const response = await callOpenAI(messages);
@@ -271,8 +262,7 @@ export async function generate(guildId, prompt) {
         logger.info('OpenAI response generated successfully');
         return response;
       }
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('OpenAI fallback failed', error);
     }
   }
@@ -284,7 +274,7 @@ export async function generate(guildId, prompt) {
     'Legends speak of great treasures waiting for worthy champions...',
     'Dark magic swirls as the hero faces their greatest challenge yet...',
     'The gods watch as fate unfolds in this epic tale...',
-    'Mysterious energies pulse through the air, revealing new possibilities...'
+    'Mysterious energies pulse through the air, revealing new possibilities...',
   ];
 
   const fallback = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];

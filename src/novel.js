@@ -6,7 +6,8 @@ import { generate } from './model-client.js';
 const FILE = path.join(process.cwd(), 'data', 'novels.json');
 
 function ensureDir() {
-  const dir = path.dirname(FILE); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const dir = path.dirname(FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
 function readAll() {
@@ -14,8 +15,7 @@ function readAll() {
   if (!fs.existsSync(FILE)) return {};
   try {
     return JSON.parse(fs.readFileSync(FILE)) || {};
-  }
-  catch {
+  } catch {
     return {};
   }
 }
@@ -37,7 +37,8 @@ export function createNovel(ownerId, title, prompt) {
 }
 
 export function getNovel(id) {
-  const all = readAll(); return all[id] || null;
+  const all = readAll();
+  return all[id] || null;
 }
 
 export async function generateChapter(guildId, novelId) {
@@ -51,7 +52,7 @@ export async function generateChapter(guildId, novelId) {
     const templates = [
       `Chapter ${chapIndex}: The Journey Begins\n\nIn the world of ${novel.title}, our hero embarks on an epic adventure. Guided by the context of ${novel.prompt}, they face challenges and discover new horizons.`,
       `Chapter ${chapIndex}: Unexpected Twists\n\nAs the story unfolds in ${novel.title}, surprises await. Building on ${novel.prompt}, the narrative takes a thrilling turn.`,
-      `Chapter ${chapIndex}: Deep Reflections\n\nOur characters in ${novel.title} pause to reflect. Drawing from ${novel.prompt}, they grow and evolve.`
+      `Chapter ${chapIndex}: Deep Reflections\n\nOur characters in ${novel.title} pause to reflect. Drawing from ${novel.prompt}, they grow and evolve.`,
     ];
     const fallbackText = templates[chapIndex % templates.length];
     const chapter = { index: chapIndex, text: fallbackText };

@@ -32,8 +32,7 @@ class TradingManager {
       const data = JSON.parse(fs.readFileSync(TRADES_FILE));
       this.completedTrades = data.completed || [];
       this.tradeStats = data.stats || {};
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to load trades', error);
       this.completedTrades = [];
       this.tradeStats = {};
@@ -44,13 +43,12 @@ class TradingManager {
     try {
       const data = {
         completed: this.completedTrades,
-        stats: this.tradeStats
+        stats: this.tradeStats,
       };
       // unicorn/no-null: JSON.stringify replacer is a no-op (identity) here, so we use a typed placeholder.
       const identity = (_key, value) => value;
       fs.writeFileSync(TRADES_FILE, JSON.stringify(data, identity, 2));
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to save trades', error);
     }
   }
@@ -68,13 +66,13 @@ class TradingManager {
       created: Date.now(),
       offer: {
         items: offeredItems || [],
-        gold: offeredGold
+        gold: offeredGold,
       },
       request: {
         items: requestedItems || [],
-        gold: requestedGold
+        gold: requestedGold,
       },
-      responses: {}
+      responses: {},
     };
 
     this.activeTrades.set(tradeId, trade);
@@ -233,17 +231,14 @@ class TradingManager {
   getTradeListings(limit = 20) {
     // Return recent completed trades for market research
     return this.completedTrades
-      .filter(trade => trade.status === 'completed')
+      .filter((trade) => trade.status === 'completed')
       .sort((a, b) => b.completedAt - a.completedAt)
       .slice(0, limit);
   }
 
   getUserTradeHistory(userId, limit = 10) {
     return this.completedTrades
-      .filter(trade =>
-        (trade.initiator === userId || trade.target === userId) &&
-        trade.status === 'completed'
-      )
+      .filter((trade) => (trade.initiator === userId || trade.target === userId) && trade.status === 'completed')
       .sort((a, b) => b.completedAt - a.completedAt)
       .slice(0, limit);
   }
@@ -268,8 +263,8 @@ class TradingManager {
       bids: [],
       status: 'active',
       created: Date.now(),
-      ends: Date.now() + (durationHours * 60 * 60 * 1000),
-      buyoutPrice: startingBid * 3 // Buyout at 3x starting price
+      ends: Date.now() + durationHours * 60 * 60 * 1000,
+      buyoutPrice: startingBid * 3, // Buyout at 3x starting price
     };
 
     this.auctions = this.auctions || new Map();
@@ -302,7 +297,7 @@ class TradingManager {
     auction.bids.push({
       bidder: bidderId,
       amount: bidAmount,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     return { success: true, auction };
@@ -334,35 +329,34 @@ class TradingManager {
 
     const now = Date.now();
     return [...this.auctions.values()]
-      .filter(auction => auction.status === 'active' && auction.ends > now)
+      .filter((auction) => auction.status === 'active' && auction.ends > now)
       .sort((a, b) => b.currentBid - a.currentBid)
       .slice(0, limit);
   }
 
   // Market Price Tracking
   getMarketPrices(itemId, days = 7) {
-    const cutoffTime = Date.now() - (days * 24 * 60 * 60 * 1000);
+    const cutoffTime = Date.now() - days * 24 * 60 * 60 * 1000;
 
-    const relevantTrades = this.completedTrades.filter(trade => {
+    const relevantTrades = this.completedTrades.filter((trade) => {
       const tradeTime = trade.completedAt || trade.created;
-      return tradeTime > cutoffTime &&
-             (trade.offer.items.includes(itemId) || trade.request.items.includes(itemId));
+      return tradeTime > cutoffTime && (trade.offer.items.includes(itemId) || trade.request.items.includes(itemId));
     });
 
     if (relevantTrades.length === 0) {
       return { average: 0, min: 0, max: 0, trades: 0 };
     }
 
-    const prices = relevantTrades.map(trade => {
+    const prices = relevantTrades.map((trade) => {
       // Calculate price based on gold involved in trade
-      return (trade.offer.gold + trade.request.gold) || 50; // Use gold amount or default
+      return trade.offer.gold + trade.request.gold || 50; // Use gold amount or default
     });
 
     return {
       average: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length),
       min: Math.min(...prices),
       max: Math.max(...prices),
-      trades: prices.length
+      trades: prices.length,
     };
   }
 
@@ -374,7 +368,7 @@ class TradingManager {
     return {
       valid: true,
       missingItems: [],
-      insufficientGold: false
+      insufficientGold: false,
     };
   }
 
@@ -386,21 +380,17 @@ class TradingManager {
 
   // Trade Analytics
   getTradeAnalytics(userId) {
-    const userTrades = this.completedTrades.filter(trade =>
-      trade.initiator === userId || trade.target === userId
-    );
+    const userTrades = this.completedTrades.filter((trade) => trade.initiator === userId || trade.target === userId);
 
-    const successfulTrades = userTrades.filter(t => t.status === 'completed');
-    const totalValue = successfulTrades.reduce((sum, trade) =>
-      sum + trade.offer.gold + trade.request.gold, 0
-    );
+    const successfulTrades = userTrades.filter((t) => t.status === 'completed');
+    const totalValue = successfulTrades.reduce((sum, trade) => sum + trade.offer.gold + trade.request.gold, 0);
 
     return {
       totalTrades: userTrades.length,
       successfulTrades: successfulTrades.length,
       totalValueTraded: totalValue,
       successRate: userTrades.length > 0 ? (successfulTrades.length / userTrades.length) * 100 : 0,
-      averageTradeValue: successfulTrades.length > 0 ? totalValue / successfulTrades.length : 0
+      averageTradeValue: successfulTrades.length > 0 ? totalValue / successfulTrades.length : 0,
     };
   }
 
@@ -439,22 +429,8 @@ export const tradingManager = new TradingManager();
 
 // Convenience functions
 // eslint-disable-next-line max-params -- mirrors class method createTradeRequest
-export function createTradeRequest(
-  initiatorId,
-  targetUserId,
-  offeredItems,
-  requestedItems,
-  offeredGold = 0,
-  requestedGold = 0
-) {
-  return tradingManager.createTradeRequest(
-    initiatorId,
-    targetUserId,
-    offeredItems,
-    requestedItems,
-    offeredGold,
-    requestedGold
-  );
+export function createTradeRequest(initiatorId, targetUserId, offeredItems, requestedItems, offeredGold = 0, requestedGold = 0) {
+  return tradingManager.createTradeRequest(initiatorId, targetUserId, offeredItems, requestedItems, offeredGold, requestedGold);
 }
 
 export function acceptTrade(tradeId, userId) {
@@ -511,9 +487,12 @@ export function getTradeAnalytics(userId) {
 
 // Auto-cleanup every 5 minutes. `unref()` is needed so this timer
 // doesn't keep the Node event loop alive in one-shot scripts / CI tests.
-const tradingCleanupInterval = setInterval(() => {
-  tradingManager.cleanup();
-}, 5 * 60 * 1000);
+const tradingCleanupInterval = setInterval(
+  () => {
+    tradingManager.cleanup();
+  },
+  5 * 60 * 1000,
+);
 if (typeof tradingCleanupInterval.unref === 'function') {
   tradingCleanupInterval.unref();
 }

@@ -29,12 +29,15 @@ class SchedulerManager {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(SCHEDULES_FILE)) {
-      fs.writeFileSync(SCHEDULES_FILE, JSON.stringify({
-        reminders: {},
-        events: {},
-        recurring: {},
-        stats: {}
-      }));
+      fs.writeFileSync(
+        SCHEDULES_FILE,
+        JSON.stringify({
+          reminders: {},
+          events: {},
+          recurring: {},
+          stats: {},
+        }),
+      );
     }
   }
 
@@ -42,14 +45,13 @@ class SchedulerManager {
     try {
       const data = JSON.parse(fs.readFileSync(SCHEDULES_FILE));
       this.schedules = data;
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to load schedules:', error);
       this.schedules = {
         reminders: {},
         events: {},
         recurring: {},
-        stats: {}
+        stats: {},
       };
     }
   }
@@ -57,8 +59,7 @@ class SchedulerManager {
   saveSchedules() {
     try {
       fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(this.schedules, null, 2));
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to save schedules:', error);
     }
   }
@@ -78,7 +79,7 @@ class SchedulerManager {
       guildId: reminderData.guildId,
       created: Date.now(),
       active: true,
-      executed: false
+      executed: false,
     };
 
     if (!this.schedules.reminders[userId]) {
@@ -137,13 +138,11 @@ class SchedulerManager {
           const guild = await this.client.guilds.fetch(reminder.guildId);
           const channel = await guild.channels.fetch(reminder.channelId);
           await channel.send(message);
-        }
-        else {
+        } else {
           const channel = await this.client.channels.fetch(reminder.channelId);
           await channel.send(message);
         }
-      }
-      catch (error) {
+      } catch (error) {
         logger.error('Failed to send reminder:', error);
       }
     }
@@ -151,7 +150,7 @@ class SchedulerManager {
     return {
       success: true,
       reminder,
-      message: `⏰ **Reminder: ${reminder.title}**\n${reminder.message}`
+      message: `⏰ **Reminder: ${reminder.title}**\n${reminder.message}`,
     };
   }
 
@@ -163,7 +162,7 @@ class SchedulerManager {
       id: `reminder_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       scheduledFor: nextExecution,
       executed: false,
-      created: Date.now()
+      created: Date.now(),
     };
 
     if (!this.schedules.reminders[originalReminder.userId]) {
@@ -183,7 +182,7 @@ class SchedulerManager {
         break;
       }
       case 'weekly': {
-        date.setDate(date.getDate() + ((recurrence.interval || 1) * 7));
+        date.setDate(date.getDate() + (recurrence.interval || 1) * 7);
         break;
       }
       case 'monthly': {
@@ -216,7 +215,7 @@ class SchedulerManager {
       participants: [],
       reminders: eventData.reminders || [],
       created: Date.now(),
-      active: true
+      active: true,
     };
 
     if (!this.schedules.events[eventData.guildId]) {
@@ -280,13 +279,11 @@ class SchedulerManager {
           const guild = await this.client.guilds.fetch(event.guildId);
           const channel = await guild.channels.fetch(event.channelId);
           await channel.send(message);
-        }
-        else {
+        } else {
           const channel = await this.client.channels.fetch(event.channelId);
           await channel.send(message);
         }
-      }
-      catch (error) {
+      } catch (error) {
         logger.error('Failed to send event:', error);
       }
     }
@@ -294,7 +291,7 @@ class SchedulerManager {
     return {
       success: true,
       event,
-      message: `📅 **Event Started: ${event.title}**\n${event.description}`
+      message: `📅 **Event Started: ${event.title}**\n${event.description}`,
     };
   }
 
@@ -308,20 +305,18 @@ class SchedulerManager {
           const guild = await this.client.guilds.fetch(event.guildId);
           const channel = await guild.channels.fetch(event.channelId);
           await channel.send(message);
-        }
-        else {
+        } else {
           const channel = await this.client.channels.fetch(event.channelId);
           await channel.send(message);
         }
-      }
-      catch (error) {
+      } catch (error) {
         logger.error('Failed to send event reminder:', error);
       }
     }
 
     return {
       success: true,
-      message
+      message,
     };
   }
 
@@ -341,10 +336,10 @@ class SchedulerManager {
           minute: 60_000,
           hour: 3_600_000,
           day: 86_400_000,
-          week: 604_800_000
+          week: 604_800_000,
         };
 
-        return now.getTime() + (amount * multipliers[unit]);
+        return now.getTime() + amount * multipliers[unit];
       }
     }
 
@@ -399,7 +394,7 @@ class SchedulerManager {
       wednesday: 3,
       thursday: 4,
       friday: 5,
-      saturday: 6
+      saturday: 6,
     };
 
     return days[dayName.toLowerCase()] || 0;
@@ -409,7 +404,7 @@ class SchedulerManager {
   getUserReminders(userId, limit = 20) {
     const reminders = this.schedules.reminders[userId] || [];
     return reminders
-      .filter(r => r.active && !r.executed)
+      .filter((r) => r.active && !r.executed)
       .sort((a, b) => a.scheduledFor - b.scheduledFor)
       .slice(0, limit);
   }
@@ -417,7 +412,7 @@ class SchedulerManager {
   getUserEvents(guildId, limit = 20) {
     const events = this.schedules.events[guildId] || [];
     return events
-      .filter(e => e.active)
+      .filter((e) => e.active)
       .sort((a, b) => a.scheduledFor - b.scheduledFor)
       .slice(0, limit);
   }
@@ -426,7 +421,7 @@ class SchedulerManager {
     const reminders = this.schedules.reminders[userId];
     if (!reminders) return false;
 
-    const reminder = reminders.find(r => r.id === reminderId);
+    const reminder = reminders.find((r) => r.id === reminderId);
     if (!reminder) return false;
 
     reminder.active = false;
@@ -443,7 +438,7 @@ class SchedulerManager {
     const events = this.schedules.events[guildId];
     if (!events) return false;
 
-    const event = events.find(e => e.id === eventId);
+    const event = events.find((e) => e.id === eventId);
     if (!event) return false;
 
     // Check if user is the creator
@@ -472,7 +467,7 @@ class SchedulerManager {
     this.schedules.userSettings[userId] = {
       ...this.schedules.userSettings[userId],
       timeZone,
-      updated: Date.now()
+      updated: Date.now(),
     };
 
     this.saveSchedules();
@@ -485,17 +480,14 @@ class SchedulerManager {
 
   // Calendar Integration
   getUpcomingEvents(userId, guildId, days = 7) {
-    const endTime = Date.now() + (days * 24 * 60 * 60 * 1000);
+    const endTime = Date.now() + days * 24 * 60 * 60 * 1000;
     const userReminders = this.getUserReminders(userId, 100);
     const guildEvents = this.getUserEvents(guildId, 100);
 
-    const allEvents = [
-      ...userReminders.map(r => ({ ...r, type: 'reminder' })),
-      ...guildEvents.map(e => ({ ...e, type: 'event' }))
-    ];
+    const allEvents = [...userReminders.map((r) => ({ ...r, type: 'reminder' })), ...guildEvents.map((e) => ({ ...e, type: 'event' }))];
 
     return allEvents
-      .filter(item => item.scheduledFor <= endTime)
+      .filter((item) => item.scheduledFor <= endTime)
       .sort((a, b) => a.scheduledFor - b.scheduledFor)
       .slice(0, 20);
   }
@@ -508,7 +500,7 @@ class SchedulerManager {
       remindersSent: stats.reminders_sent,
       eventsExecuted: stats.events_executed,
       totalScheduled: stats.reminders_sent + stats.events_executed,
-      activeReminders: this.getUserReminders(userId, 100).length
+      activeReminders: this.getUserReminders(userId, 100).length,
     };
   }
 
@@ -541,7 +533,7 @@ class SchedulerManager {
     for (const userId in this.schedules.reminders) {
       const userReminders = this.schedules.reminders[userId];
       for (const reminder of userReminders) {
-        if (reminder.scheduledFor < now - (24 * 60 * 60 * 1000) && !reminder.executed) {
+        if (reminder.scheduledFor < now - 24 * 60 * 60 * 1000 && !reminder.executed) {
           expiredReminders.push(reminder.id);
         }
       }
@@ -598,7 +590,10 @@ export function getSchedulerStats(userId) {
 }
 
 // Auto-cleanup every hour (unref so it doesn't block process exit)
-const cleanupInterval = setInterval(() => {
-  schedulerManager.cleanup();
-}, 60 * 60 * 1000);
+const cleanupInterval = setInterval(
+  () => {
+    schedulerManager.cleanup();
+  },
+  60 * 60 * 1000,
+);
 if (typeof cleanupInterval.unref === 'function') cleanupInterval.unref();

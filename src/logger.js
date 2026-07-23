@@ -18,11 +18,11 @@ const KEEP_RECENT_ENTRIES = 50;
  * ANSI color codes for console output formatting.
  */
 const CONSOLE_COLORS = {
-  info: '\u001B[36m',    // Cyan
-  warn: '\u001B[33m',    // Yellow
-  error: '\u001B[31m',   // Red
+  info: '\u001B[36m', // Cyan
+  warn: '\u001B[33m', // Yellow
+  error: '\u001B[31m', // Red
   success: '\u001B[32m', // Green
-  debug: '\u001B[35m'    // Magenta
+  debug: '\u001B[35m', // Magenta
 };
 
 /**
@@ -81,8 +81,7 @@ class Logger {
     try {
       const logFile = this.getLogFilePath();
       fs.appendFileSync(logFile, message + '\n');
-    }
-    catch (error) {
+    } catch (error) {
       console.error('Failed to write to log file:', error);
     }
   }
@@ -110,7 +109,7 @@ class Logger {
       level,
       message: formattedMessage,
       timestamp: Date.now(),
-      meta
+      meta,
     });
 
     // Prevent memory leaks by limiting buffer size
@@ -144,11 +143,13 @@ class Logger {
    * @param {object} meta - Additional metadata
    */
   error(message, error = null, meta = {}) {
-    const errorInfo = error ? {
-      ...meta,
-      error: error.message,
-      stack: error.stack
-    } : meta;
+    const errorInfo = error
+      ? {
+          ...meta,
+          error: error.message,
+          stack: error.stack,
+        }
+      : meta;
     this.log('error', message, errorInfo);
   }
 
@@ -203,9 +204,7 @@ class Logger {
     // different identifier (customId) so log lines don't read
     // "Command failed: /undefined".
     const isChatInput = typeof interaction.commandName === 'string';
-    const identifier = isChatInput
-      ? interaction.commandName
-      : (interaction.customId || interaction.constructor.name || 'unknown');
+    const identifier = isChatInput ? interaction.commandName : interaction.customId || interaction.constructor.name || 'unknown';
     const verb = isChatInput ? `/${identifier}` : `[${identifier}]`;
 
     // Modern Discord user objects (post-username-rewrite) no longer
@@ -213,9 +212,7 @@ class Logger {
     // something useful.
     const username = interaction.user?.username || 'unknown';
     const discriminator = interaction.user?.discriminator;
-    const userTag = discriminator && discriminator !== '0'
-      ? `${username}#${discriminator}`
-      : username;
+    const userTag = discriminator && discriminator !== '0' ? `${username}#${discriminator}` : username;
 
     const meta = {
       command: identifier,
@@ -225,13 +222,12 @@ class Logger {
       guild: interaction.guild?.name || 'DM',
       guildId: interaction.guild?.id || null,
       channel: interaction.channel?.name || 'Unknown',
-      success
+      success,
     };
 
     if (success) {
       this.success(`Interaction executed: ${verb}`, meta);
-    }
-    else {
+    } else {
       this.error(`Interaction failed: ${verb}`, error, meta);
     }
   }
@@ -255,7 +251,7 @@ class Logger {
     this.success(`Achievement Unlocked: ${achievement.name}`, {
       achievement: achievement.id,
       points: achievement.points,
-      userId
+      userId,
     });
   }
 

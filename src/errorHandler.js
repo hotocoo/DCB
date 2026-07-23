@@ -42,7 +42,7 @@ const ERROR_MESSAGES = {
   ALREADY_EXISTS: 'This item already exists.',
   NOT_FOUND: 'The requested item was not found.',
   NETWORK_ERROR: 'Network error occurred. Please check your connection and try again.',
-  UNKNOWN_ERROR: 'An unknown error occurred. Please contact support if this persists.'
+  UNKNOWN_ERROR: 'An unknown error occurred. Please contact support if this persists.',
 };
 
 /**
@@ -95,8 +95,7 @@ async function checkCircuitBreaker(interactionId) {
     }
 
     return attempts < CIRCUIT_BREAKER_MAX_ATTEMPTS;
-  }
-  catch (error) {
+  } catch (error) {
     // If import fails, allow operation to proceed
     logger.warn('[CIRCUIT_BREAKER] Failed to access circuit breaker, allowing operation:', error instanceof Error ? error.message : String(error));
     return true;
@@ -119,7 +118,7 @@ export async function handleCommandError(interaction, error, context = {}) {
     logError('Circuit breaker tripped - cannot send error response', new Error('Circuit breaker activated'), {
       originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
       originalError: error instanceof Error ? error.message : String(error),
-      interactionId
+      interactionId,
     });
     return;
   }
@@ -131,7 +130,7 @@ export async function handleCommandError(interaction, error, context = {}) {
     guild: interaction?.guild?.id,
     code: 'code' in error ? error.code : undefined,
     details: 'details' in error ? error.details : undefined,
-    ...context
+    ...context,
   });
 
   // Determine user message based on environment
@@ -143,7 +142,7 @@ export async function handleCommandError(interaction, error, context = {}) {
 
   const responseOptions = {
     content: userMessage,
-    ephemeral: true
+    ephemeral: true,
   };
 
   // Add helpful hints for common errors
@@ -151,7 +150,7 @@ export async function handleCommandError(interaction, error, context = {}) {
     PERMISSION_DENIED: '\n\n💡 *Make sure you have the required permissions or roles.*',
     COOLDOWN_ACTIVE: '\n\n💡 *You can use other commands while waiting.*',
     INVALID_ARGUMENT: '\n\n💡 *Use `/help` for command usage information.*',
-    INSUFFICIENT_FUNDS: '\n\n💡 *Earn more gold through work, businesses, or trading.*'
+    INSUFFICIENT_FUNDS: '\n\n💡 *Earn more gold through work, businesses, or trading.*',
   };
 
   if ('code' in error && error.code && error.code in hints) {
@@ -166,7 +165,7 @@ export async function handleCommandError(interaction, error, context = {}) {
       replied: interaction?.replied,
       deferred: interaction?.deferred,
       type: interaction?.type,
-      commandName: 'commandName' in interaction ? interaction.commandName : undefined
+      commandName: 'commandName' in interaction ? interaction.commandName : undefined,
     });
 
     // Check for DiscordAPIError[10062]: Unknown interaction specifically
@@ -175,58 +174,53 @@ export async function handleCommandError(interaction, error, context = {}) {
         logger.error('[HANDLE_COMMAND_ERROR] Using reply');
         await interaction.reply(responseOptions);
         return;
-      }
-      catch (replyError) {
+      } catch (replyError) {
         if (replyError instanceof Error && 'code' in replyError && replyError.code === 10_062) {
           logger.error('[HANDLE_COMMAND_ERROR] Interaction already expired/replied, cannot send error response');
           logError('Cannot send error response - interaction expired', replyError, {
             originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
             originalError: error instanceof Error ? error.message : String(error),
-            interactionId: interaction?.id
+            interactionId: interaction?.id,
           });
           return;
         }
         throw replyError; // Re-throw other errors
       }
-    }
-    else if (interaction && (interaction.replied || interaction.deferred)) {
+    } else if (interaction && (interaction.replied || interaction.deferred)) {
       try {
         logger.error('[HANDLE_COMMAND_ERROR] Using followUp');
         await interaction.followUp(responseOptions);
         return;
-      }
-      catch (followUpError) {
+      } catch (followUpError) {
         if (followUpError instanceof Error && 'code' in followUpError && followUpError.code === 10_062) {
           logger.error('[HANDLE_COMMAND_ERROR] Interaction already expired, cannot send followUp error response');
           logError('Cannot send followUp error response - interaction expired', followUpError, {
             originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
             originalError: error instanceof Error ? error.message : String(error),
-            interactionId: interaction?.id
+            interactionId: interaction?.id,
           });
           return;
         }
         throw followUpError; // Re-throw other errors
       }
-    }
-    else {
+    } else {
       logger.error('[HANDLE_COMMAND_ERROR] Interaction object invalid or already handled');
       logError('Invalid interaction state for error response', new Error('Invalid interaction object'), {
         originalCommand: 'commandName' in interaction ? interaction.commandName : undefined,
         originalError: error instanceof Error ? error.message : String(error),
         interactionId: interaction?.id,
-        interactionExists: !!interaction
+        interactionExists: !!interaction,
       });
       return;
     }
-  }
-  catch (responseError) {
+  } catch (responseError) {
     logger.error('[HANDLE_COMMAND_ERROR] Failed to send error response:', responseError instanceof Error ? responseError.message : String(responseError));
     logger.error('[HANDLE_COMMAND_ERROR] Response error details:', {
       responseError: responseError instanceof Error ? responseError.message : String(responseError),
       stack: responseError instanceof Error ? responseError.stack : undefined,
       interactionId: interaction?.id,
       originalError: error instanceof Error ? error.message : String(error),
-      errorCode: responseError instanceof Error && 'code' in responseError ? responseError.code : undefined
+      errorCode: responseError instanceof Error && 'code' in responseError ? responseError.code : undefined,
     });
 
     // If we can't send a response, log it and continue - don't attempt to log error response failure recursively
@@ -235,7 +229,7 @@ export async function handleCommandError(interaction, error, context = {}) {
       originalError: error instanceof Error ? error.message : String(error),
       interactionReplied: interaction?.replied,
       interactionDeferred: interaction?.deferred,
-      errorCode: responseError instanceof Error && 'code' in responseError ? responseError.code : undefined
+      errorCode: responseError instanceof Error && 'code' in responseError ? responseError.code : undefined,
     });
   }
 }
@@ -251,8 +245,7 @@ export async function handleCommandError(interaction, error, context = {}) {
 export async function safeExecuteCommand(interaction, commandFunction, context = {}) {
   try {
     return await commandFunction(interaction);
-  }
-  catch (error) {
+  } catch (error) {
     // Log immediately before any interaction attempts
     logger.error('[SAFE_EXECUTE_COMMAND] Error occurred:', error instanceof Error ? error.message : String(error));
     logger.error('[SAFE_EXECUTE_COMMAND] Error stack:', error instanceof Error ? error.stack : undefined);
@@ -261,22 +254,17 @@ export async function safeExecuteCommand(interaction, commandFunction, context =
       replied: interaction?.replied,
       deferred: interaction?.deferred,
       type: interaction?.type,
-      commandName: 'commandName' in interaction ? interaction.commandName : undefined
+      commandName: 'commandName' in interaction ? interaction.commandName : undefined,
     });
 
     if (error instanceof CommandError) {
       await handleCommandError(interaction, error, context);
-    }
-    else {
+    } else {
       // Wrap unknown errors in CommandError for consistency
-      const commandError = new CommandError(
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        'UNKNOWN_ERROR',
-        {
-          originalError: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined
-        }
-      );
+      const commandError = new CommandError(error instanceof Error ? error.message : 'Unknown error occurred', 'UNKNOWN_ERROR', {
+        originalError: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       await handleCommandError(interaction, commandError, context);
     }
   }
@@ -294,8 +282,7 @@ export function validateUser(interaction, userId) {
     throw new CommandError('User ID is required.', 'INVALID_ARGUMENT');
   }
 
-  const user = interaction.client.users.cache.get(userId) ||
-                interaction.guild?.members.cache.get(userId)?.user;
+  const user = interaction.client.users.cache.get(userId) || interaction.guild?.members.cache.get(userId)?.user;
 
   if (!user) {
     throw new CommandError('User not found.', 'USER_NOT_FOUND');
@@ -316,8 +303,7 @@ export function validateChannel(interaction, channelId) {
     throw new CommandError('Channel ID is required.', 'INVALID_ARGUMENT');
   }
 
-  const channel = interaction.client.channels.cache.get(channelId) ||
-                   interaction.guild?.channels.cache.get(channelId);
+  const channel = interaction.client.channels.cache.get(channelId) || interaction.guild?.channels.cache.get(channelId);
 
   if (!channel) {
     throw new CommandError('Channel not found.', 'CHANNEL_NOT_FOUND');
@@ -373,24 +359,22 @@ export function validatePermissions(interaction, permissions) {
   }
 
   const memberPermissions = interaction.member?.permissions;
-  const missingPermissions = permissions.filter(perm => {
+  const missingPermissions = permissions.filter((perm) => {
     const permBit = PermissionFlagsBits[perm]; // eslint-disable-line security/detect-object-injection
     if (typeof memberPermissions === 'string') {
       // Permissions string - not supported for checking individual permissions
       return true; // Assume missing if we can't check
-    }
-    else if (memberPermissions instanceof PermissionsBitField) {
+    } else if (memberPermissions instanceof PermissionsBitField) {
       return !memberPermissions.has(permBit);
     }
     return true; // Fallback
   });
 
   if (missingPermissions.length > 0) {
-    throw new CommandError(
-      `Missing permissions: ${missingPermissions.join(', ')}`,
-      'PERMISSION_DENIED',
-      { required: permissions, missing: missingPermissions }
-    );
+    throw new CommandError(`Missing permissions: ${missingPermissions.join(', ')}`, 'PERMISSION_DENIED', {
+      required: permissions,
+      missing: missingPermissions,
+    });
   }
 }
 
@@ -405,11 +389,7 @@ export function validatePermissions(interaction, permissions) {
  */
 export function validateRange(value, min, max, fieldName = 'value') {
   if (value < min || value > max) {
-    throw new CommandError(
-      `${fieldName} must be between ${min} and ${max}.`,
-      'OUT_OF_RANGE',
-      { value, min, max }
-    );
+    throw new CommandError(`${fieldName} must be between ${min} and ${max}.`, 'OUT_OF_RANGE', { value, min, max });
   }
 
   return value;
@@ -456,22 +436,18 @@ export function createRateLimiter(points, duration, keyGenerator) {
 
       if (validRequests.length >= points) {
         const resetTime = validRequests[0] + duration;
-        throw new CommandError(
-          'Rate limit exceeded. Please slow down.',
-          'RATE_LIMITED',
-          {
-            points,
-            duration,
-            remaining: Math.ceil((resetTime - now) / 1000)
-          }
-        );
+        throw new CommandError('Rate limit exceeded. Please slow down.', 'RATE_LIMITED', {
+          points,
+          duration,
+          remaining: Math.ceil((resetTime - now) / 1000),
+        });
       }
 
       validRequests.push(now);
       requests.set(userKey, validRequests);
 
       return true;
-    }
+    },
   };
 }
 
@@ -500,14 +476,12 @@ export async function retryAsync(operation, maxRetries = DEFAULT_MAX_RETRIES, de
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await operation();
-    }
-    catch (error) {
+    } catch (error) {
       if (attempt === maxRetries) {
-        throw new CommandError(
-          `Operation failed after ${maxRetries} attempts: ${error instanceof Error ? error.message : String(error)}`,
-          'API_ERROR',
-          { originalError: error instanceof Error ? error.message : String(error), attempts: maxRetries }
-        );
+        throw new CommandError(`Operation failed after ${maxRetries} attempts: ${error instanceof Error ? error.message : String(error)}`, 'API_ERROR', {
+          originalError: error instanceof Error ? error.message : String(error),
+          attempts: maxRetries,
+        });
       }
 
       // Log retry attempt using logger instead of console.log
@@ -515,9 +489,9 @@ export async function retryAsync(operation, maxRetries = DEFAULT_MAX_RETRIES, de
       logError(`Retry attempt ${attempt} failed, retrying in ${delay * attempt}ms`, retryError, {
         attempt,
         maxRetries,
-        delay: delay * attempt
+        delay: delay * attempt,
       });
-      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+      await new Promise((resolve) => setTimeout(resolve, delay * attempt));
     }
   }
 }

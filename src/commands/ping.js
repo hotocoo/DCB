@@ -5,9 +5,7 @@ import { safeExecuteCommand, validateNotEmpty } from '../errorHandler.js';
 /**
  * Ping command data structure.
  */
-export const data = new SlashCommandBuilder()
-  .setName('ping')
-  .setDescription('Replies with Pong! and latency');
+export const data = new SlashCommandBuilder().setName('ping').setDescription('Replies with Pong! and latency');
 
 /**
  * Executes the ping command to measure bot latency.
@@ -15,7 +13,7 @@ export const data = new SlashCommandBuilder()
  * @returns {Promise<void>}
  */
 export async function execute(interaction) {
-  return safeExecuteCommand(interaction, async() => {
+  return safeExecuteCommand(interaction, async () => {
     // Validate interaction object
     validateNotEmpty(interaction, 'interaction');
     validateNotEmpty(interaction.client, 'client');
@@ -24,7 +22,7 @@ export async function execute(interaction) {
     // Send initial ping message and fetch reply for timing
     const sent = await interaction.reply({
       content: 'Pinging...',
-      fetchReply: true
+      fetchReply: true,
     });
 
     // Calculate latencies

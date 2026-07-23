@@ -23,11 +23,10 @@ const SANITIZATION_PATTERNS = [
   /javascript:/gi, // Remove javascript: protocol
   /on\w+=/gi, // Remove event handlers
   /[';]|--/g, // Remove SQL injection control characters
-  /[^\u0020-\u007E]/g // Remove non-printable characters
+  /[^\u0020-\u007E]/g, // Remove non-printable characters
 ];
 
 class InputValidator {
-
   /**
    * Validates string input with various constraints.
    * @param {string} input - The string to validate
@@ -37,12 +36,7 @@ class InputValidator {
   // eslint-disable-next-line complexity, sonarjs/cognitive-complexity
   validateString(input, options = {}) {
     try {
-      const {
-        minLength = 0,
-        maxLength = MAX_STRING_LENGTH,
-        blockedWords = [],
-        required = false
-      } = options;
+      const { minLength = 0, maxLength = MAX_STRING_LENGTH, blockedWords = [], required = false } = options;
       const allowedChars = options.allowedChars;
 
       if (required && (!input || input.trim() === '')) {
@@ -77,8 +71,7 @@ class InputValidator {
       }
 
       return { valid: true };
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Error in validateString', error, { input: typeof input, options });
       return { valid: false, reason: 'Validation error occurred' };
     }
@@ -92,13 +85,7 @@ class InputValidator {
    */
   // eslint-disable-next-line complexity
   validateNumber(input, options = {}) {
-    const {
-      min = Number.NEGATIVE_INFINITY,
-      max = Number.POSITIVE_INFINITY,
-      integer = false,
-      positive = false,
-      required = false
-    } = options;
+    const { min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY, integer = false, positive = false, required = false } = options;
 
     if (required && (input === null || input === undefined || input === '')) {
       return { valid: false, reason: 'This field is required' };
@@ -135,12 +122,7 @@ class InputValidator {
    * @returns {object} Validation result
    */
   validateUsername(username, options = {}) {
-    const {
-      minLength = 2,
-      maxLength = MAX_USERNAME_LENGTH,
-      allowSpaces = false,
-      allowSpecialChars = false
-    } = options;
+    const { minLength = 2, maxLength = MAX_USERNAME_LENGTH, allowSpaces = false, allowSpecialChars = false } = options;
 
     let allowedChars = 'a-zA-Z0-9';
     if (allowSpaces) allowedChars += ' ';
@@ -150,7 +132,7 @@ class InputValidator {
       minLength,
       maxLength,
       allowedChars,
-      required: true
+      required: true,
     });
   }
 
@@ -161,10 +143,20 @@ class InputValidator {
    */
   validateItemName(itemName) {
     const validItems = [
-      'rusty_sword', 'iron_sword', 'magic_staff', 'legendary_blade',
-      'leather_armor', 'chain_mail', 'plate_armor', 'dragon_armor',
-      'health_potion', 'mana_potion', 'revive_crystal',
-      'iron_ore', 'magic_crystal', 'dragon_scale'
+      'rusty_sword',
+      'iron_sword',
+      'magic_staff',
+      'legendary_blade',
+      'leather_armor',
+      'chain_mail',
+      'plate_armor',
+      'dragon_armor',
+      'health_potion',
+      'mana_potion',
+      'revive_crystal',
+      'iron_ore',
+      'magic_crystal',
+      'dragon_scale',
     ];
 
     if (!validItems.includes(itemName)) {
@@ -184,16 +176,13 @@ class InputValidator {
       minLength: 3,
       maxLength: MAX_GUILD_NAME_LENGTH,
       allowedChars: 'a-zA-Z0-9 ',
-      required: true
+      required: true,
     });
   }
 
   // Location validation
   validateLocation(locationName) {
-    const validLocations = [
-      'whispering_woods', 'crystal_caverns', 'volcano_summit',
-      'forgotten_temple', 'shadow_realm', 'celestial_spire'
-    ];
+    const validLocations = ['whispering_woods', 'crystal_caverns', 'volcano_summit', 'forgotten_temple', 'shadow_realm', 'celestial_spire'];
 
     if (!validLocations.includes(locationName)) {
       return { valid: false, reason: 'Invalid location' };
@@ -285,7 +274,11 @@ class InputValidator {
         }
         if (subOptions.amount) {
           const amountValidation = this.validateNumber(subOptions.amount, {
-            min: 1, max: 100, integer: true, positive: true, required: true
+            min: 1,
+            max: 100,
+            integer: true,
+            positive: true,
+            required: true,
           });
           if (!amountValidation.valid) return amountValidation;
         }
@@ -366,18 +359,24 @@ class InputValidator {
       case 'offer': {
         if (options.offer_gold) {
           const goldValidation = this.validateNumber(options.offer_gold, {
-            min: 0, max: 100_000, integer: true, required: false
+            min: 0,
+            max: 100_000,
+            integer: true,
+            required: false,
           });
           if (!goldValidation.valid) return goldValidation;
         }
         if (options.request_gold) {
           const goldValidation = this.validateNumber(options.request_gold, {
-            min: 0, max: 100_000, integer: true, required: false
+            min: 0,
+            max: 100_000,
+            integer: true,
+            required: false,
           });
           if (!goldValidation.valid) return goldValidation;
         }
         if (options.offer_items) {
-          const items = options.offer_items.split(',').map(s => s.trim());
+          const items = options.offer_items.split(',').map((s) => s.trim());
           for (const item of items) {
             if (!item) {
               continue;
@@ -394,13 +393,21 @@ class InputValidator {
       case 'auction': {
         if (options.action === 'create' && options.price) {
           const priceValidation = this.validateNumber(options.price, {
-            min: 1, max: 10_000, integer: true, positive: true, required: true
+            min: 1,
+            max: 10_000,
+            integer: true,
+            positive: true,
+            required: true,
           });
           if (!priceValidation.valid) return priceValidation;
         }
         if (options.action === 'bid' && options.price) {
           const priceValidation = this.validateNumber(options.price, {
-            min: 1, max: 100_000, integer: true, positive: true, required: true
+            min: 1,
+            max: 100_000,
+            integer: true,
+            positive: true,
+            required: true,
           });
           if (!priceValidation.valid) return priceValidation;
         }
@@ -415,7 +422,8 @@ class InputValidator {
     return { valid: true };
   }
 
-  validateInventoryCommand(_options) { // eslint-disable-line no-unused-vars
+  validateInventoryCommand(_options) {
+    // eslint-disable-line no-unused-vars
     // Inventory commands generally don't need complex validation
     return { valid: true };
   }
@@ -425,7 +433,7 @@ class InputValidator {
       const locationValidation = this.validateString(options.location, {
         minLength: 2,
         maxLength: 50,
-        required: true
+        required: true,
       });
       if (!locationValidation.valid) return locationValidation;
     }
@@ -438,7 +446,7 @@ class InputValidator {
       const questionValidation = this.validateString(options.question, {
         minLength: 5,
         maxLength: 200,
-        required: true
+        required: true,
       });
       if (!questionValidation.valid) return questionValidation;
     }
@@ -448,7 +456,7 @@ class InputValidator {
         const optionValidation = this.validateString(options[`option${i}`], {
           minLength: 1,
           maxLength: 50,
-          required: i <= 2 // First two options are required
+          required: i <= 2, // First two options are required
         });
         if (!optionValidation.valid) return optionValidation;
       }
@@ -456,7 +464,11 @@ class InputValidator {
 
     if (options.duration) {
       const durationValidation = this.validateNumber(options.duration, {
-        min: 1, max: 60, integer: true, positive: true, required: false
+        min: 1,
+        max: 60,
+        integer: true,
+        positive: true,
+        required: false,
       });
       if (!durationValidation.valid) return durationValidation;
     }
@@ -482,8 +494,7 @@ class InputValidator {
 
       // Limit length
       return sanitized.slice(0, MAX_STRING_LENGTH);
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Error in sanitizeInput', error, { inputType: typeof input });
       return ''; // Return empty string on error
     }
@@ -566,10 +577,9 @@ class InputValidator {
 
       return {
         valid: errors.length === 0,
-        errors
+        errors,
       };
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Error in validateObject', error, { objKeys: Object.keys(obj || {}), schemaKeys: Object.keys(schema || {}) });
       return { valid: false, errors: ['Validation error occurred'] };
     }
@@ -585,11 +595,11 @@ class InputValidator {
   // eslint-disable-next-line complexity
   _validateByType(key, value, rules) {
     const typeValidators = {
-      string: v => this.validateString(v, rules),
-      number: v => this.validateNumber(v, rules),
-      userId: v => this.validateUserId(v),
-      channelId: v => this.validateChannelId(v),
-      roleId: v => this.validateRoleId(v)
+      string: (v) => this.validateString(v, rules),
+      number: (v) => this.validateNumber(v, rules),
+      userId: (v) => this.validateUserId(v),
+      channelId: (v) => this.validateChannelId(v),
+      roleId: (v) => this.validateRoleId(v),
     };
 
     const validator = typeValidators[rules.type];

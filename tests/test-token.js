@@ -26,11 +26,7 @@ console.log('✅ Token format looks correct');
 console.log('🔄 Testing connection to Discord...');
 
 const testClient = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.DirectMessages,
-    GatewayIntentBits.MessageContent
-  ]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages, GatewayIntentBits.MessageContent],
 });
 
 testClient.on('ready', () => {

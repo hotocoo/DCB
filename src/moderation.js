@@ -19,21 +19,24 @@ class ModerationManager {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(MODERATION_FILE)) {
-      fs.writeFileSync(MODERATION_FILE, JSON.stringify({
-        warnings: {},
-        bans: {},
-        mutes: {},
-        kicks: {},
-        mod_actions: [],
-        auto_mod: {
-          enabled: true,
-          spam_detection: true,
-          caps_detection: true,
-          link_detection: false,
-          invite_detection: true,
-          bad_words: []
-        }
-      }));
+      fs.writeFileSync(
+        MODERATION_FILE,
+        JSON.stringify({
+          warnings: {},
+          bans: {},
+          mutes: {},
+          kicks: {},
+          mod_actions: [],
+          auto_mod: {
+            enabled: true,
+            spam_detection: true,
+            caps_detection: true,
+            link_detection: false,
+            invite_detection: true,
+            bad_words: [],
+          },
+        }),
+      );
     }
   }
 
@@ -41,15 +44,14 @@ class ModerationManager {
     try {
       const data = JSON.parse(fs.readFileSync(MODERATION_FILE));
       this.moderationData = data;
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to load moderation data', error);
       this.moderationData = {
         warnings: {},
         bans: {},
         mutes: {},
         kicks: {},
-        mod_actions: []
+        mod_actions: [],
       };
     }
   }
@@ -57,8 +59,7 @@ class ModerationManager {
   saveModerationData() {
     try {
       fs.writeFileSync(MODERATION_FILE, JSON.stringify(this.moderationData, undefined, 2));
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to save moderation data', error);
     }
   }
@@ -96,7 +97,7 @@ class ModerationManager {
       reason,
       severity,
       timestamp: Date.now(),
-      active: true
+      active: true,
     };
 
     // eslint-disable-next-line security/detect-object-injection -- userId guarded by Object.hasOwn
@@ -119,7 +120,7 @@ class ModerationManager {
     const warnings = this.moderationData.warnings[guildId]?.[userId];
     if (!warnings) return false;
 
-    const warningIndex = warnings.findIndex(w => w.id === warningId);
+    const warningIndex = warnings.findIndex((w) => w.id === warningId);
     if (warningIndex === -1) return false;
 
     // eslint-disable-next-line security/detect-object-injection -- warningIndex bounds-checked via findIndex
@@ -134,7 +135,7 @@ class ModerationManager {
       action: 'remove_warning',
       targetUserId: userId,
       moderatorId,
-      reason: `Removed warning: ${warningId}`
+      reason: `Removed warning: ${warningId}`,
     });
     this.saveModerationData();
     return true;
@@ -153,7 +154,7 @@ class ModerationManager {
       duration,
       startTime: Date.now(),
       endTime: Date.now() + duration,
-      active: true
+      active: true,
     };
 
     // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
@@ -163,7 +164,7 @@ class ModerationManager {
       action: 'mute',
       targetUserId: userId,
       moderatorId,
-      reason: `${reason} (${Math.round(duration / 60_000)}m)`
+      reason: `${reason} (${Math.round(duration / 60_000)}m)`,
     });
 
     this.saveModerationData();
@@ -200,7 +201,7 @@ class ModerationManager {
       muted: true,
       endTime: mute.endTime,
       reason: mute.reason,
-      remaining: mute.endTime - Date.now()
+      remaining: mute.endTime - Date.now(),
     };
   }
 
@@ -218,7 +219,7 @@ class ModerationManager {
       startTime: Date.now(),
       endTime: duration ? Date.now() + duration : undefined,
       permanent: !duration,
-      active: true
+      active: true,
     };
 
     // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
@@ -259,7 +260,7 @@ class ModerationManager {
       banned: true,
       permanent: ban.permanent,
       reason: ban.reason,
-      remaining: ban.endTime ? ban.endTime - Date.now() : undefined
+      remaining: ban.endTime ? ban.endTime - Date.now() : undefined,
     };
   }
 
@@ -277,7 +278,7 @@ class ModerationManager {
       userId,
       moderatorId,
       reason,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     // eslint-disable-next-line security/detect-object-injection -- userId guarded by Object.hasOwn
@@ -298,7 +299,7 @@ class ModerationManager {
       targetUserId,
       moderatorId,
       reason,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     this.moderationData.mod_actions.push(modAction);
@@ -314,7 +315,7 @@ class ModerationManager {
 
   getModActions(guildId, limit = 50) {
     return this.moderationData.mod_actions
-      .filter(action => action.guildId === guildId)
+      .filter((action) => action.guildId === guildId)
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
   }
@@ -346,7 +347,7 @@ class ModerationManager {
 
     return {
       triggered: violations.length > 0,
-      violations
+      violations,
     };
   }
 
@@ -355,16 +356,14 @@ class ModerationManager {
     const recentMessages = this.warningCache.get(`${userId}_messages`) || [];
 
     // Check for repeated messages
-    const repeatedMessages = recentMessages.filter(msg =>
-      msg.content === message.content && now - msg.timestamp < 10_000
-    );
+    const repeatedMessages = recentMessages.filter((msg) => msg.content === message.content && now - msg.timestamp < 10_000);
 
     if (repeatedMessages.length >= 3) {
       return {
         triggered: true,
         type: 'spam',
         severity: 'medium',
-        reason: 'Repeated messages detected'
+        reason: 'Repeated messages detected',
       };
     }
 
@@ -387,7 +386,7 @@ class ModerationManager {
         triggered: true,
         type: 'caps',
         severity: 'low',
-        reason: 'Excessive capital letters'
+        reason: 'Excessive capital letters',
       };
     }
 
@@ -403,7 +402,7 @@ class ModerationManager {
           triggered: true,
           type: 'bad_words',
           severity: 'high',
-          reason: `Inappropriate language: ${word}`
+          reason: `Inappropriate language: ${word}`,
         };
       }
     }
@@ -419,7 +418,7 @@ class ModerationManager {
       action: 'role_assign',
       targetUserId: userId,
       moderatorId,
-      reason: `${reason} (Role: ${roleId})`
+      reason: `${reason} (Role: ${roleId})`,
     });
   }
 
@@ -430,7 +429,7 @@ class ModerationManager {
       action: 'role_remove',
       targetUserId: userId,
       moderatorId,
-      reason: `${reason} (Role: ${roleId})`
+      reason: `${reason} (Role: ${roleId})`,
     });
   }
 
@@ -442,28 +441,34 @@ class ModerationManager {
       action: 'message_delete',
       targetUserId: undefined,
       moderatorId,
-      reason: `${reason} (Channel: ${channelId})`
+      reason: `${reason} (Channel: ${channelId})`,
     });
   }
 
   // User Statistics for Moderation
   getUserModStats(guildId, userId) {
-    const warnings = this.getUserWarnings(guildId, userId).filter(w => w.active);
+    const warnings = this.getUserWarnings(guildId, userId).filter((w) => w.active);
     // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
     const kicks = this.moderationData.kicks[guildId]?.[userId]?.length || 0;
-    const mutesEntry = Object.hasOwn(this.moderationData.mutes, guildId)
+    const mutesEntry =
+      Object.hasOwn(this.moderationData.mutes, guildId) &&
       // eslint-disable-next-line security/detect-object-injection -- guildId guarded by Object.hasOwn
-      && this.moderationData.mutes[guildId]?.[userId];
+      this.moderationData.mutes[guildId]?.[userId];
     const mutes = mutesEntry
-      // eslint-disable-next-line security/detect-object-injection -- userId from optional chain above
-      ? (this.moderationData.mutes[guildId][userId].active ? 1 : 0)
+      ? // eslint-disable-next-line security/detect-object-injection -- userId from optional chain above
+        this.moderationData.mutes[guildId][userId].active
+        ? 1
+        : 0
       : 0;
-    const bansEntry = Object.hasOwn(this.moderationData.bans, guildId)
+    const bansEntry =
+      Object.hasOwn(this.moderationData.bans, guildId) &&
       // eslint-disable-next-line security/detect-object-injection -- guildId guarded by Object.hasOwn
-      && this.moderationData.bans[guildId]?.[userId];
+      this.moderationData.bans[guildId]?.[userId];
     const bans = bansEntry
-      // eslint-disable-next-line security/detect-object-injection -- userId from optional chain above
-      ? (this.moderationData.bans[guildId][userId].active ? 1 : 0)
+      ? // eslint-disable-next-line security/detect-object-injection -- userId from optional chain above
+        this.moderationData.bans[guildId][userId].active
+        ? 1
+        : 0
       : 0;
 
     return {
@@ -472,16 +477,16 @@ class ModerationManager {
       mutes,
       bans,
       total_actions: warnings.length + kicks + mutes + bans,
-      risk_level: this.calculateRiskLevel(warnings, kicks, mutes, bans)
+      risk_level: this.calculateRiskLevel(warnings, kicks, mutes, bans),
     };
   }
 
   calculateRiskLevel(warnings, kicks, mutes, bans) {
     let riskScore = 0;
-    riskScore += warnings * 1;  // 1 point per warning
-    riskScore += kicks * 3;     // 3 points per kick
-    riskScore += mutes * 2;     // 2 points per mute
-    riskScore += bans * 5;      // 5 points per ban
+    riskScore += warnings * 1; // 1 point per warning
+    riskScore += kicks * 3; // 3 points per kick
+    riskScore += mutes * 2; // 2 points per mute
+    riskScore += bans * 5; // 5 points per ban
 
     if (riskScore >= 15) return 'critical';
     if (riskScore >= 10) return 'high';
@@ -543,12 +548,11 @@ class ModerationManager {
     // Clean up warning cache for inactive users (older than 1 hour)
     const cleanupThreshold = 60 * 60 * 1000; // 1 hour
     for (const [key, messages] of this.warningCache.entries()) {
-      const recentMessages = messages.filter(msg => now - msg.timestamp < cleanupThreshold);
+      const recentMessages = messages.filter((msg) => now - msg.timestamp < cleanupThreshold);
       if (recentMessages.length === 0) {
         this.warningCache.delete(key);
         logger.warn(`[MODERATION] Cleaned up warning cache for key: ${key}`);
-      }
-      else {
+      } else {
         this.warningCache.set(key, recentMessages);
       }
     }
@@ -613,9 +617,7 @@ class ModerationManager {
     // (not `userId`) as the field name — see ModerationManager.logModAction.
     if (Array.isArray(this.moderationData.mod_actions)) {
       const before = this.moderationData.mod_actions.length;
-      this.moderationData.mod_actions = this.moderationData.mod_actions.filter(
-        a => a.targetUserId !== userId && a.moderatorId !== userId
-      );
+      this.moderationData.mod_actions = this.moderationData.mod_actions.filter((a) => a.targetUserId !== userId && a.moderatorId !== userId);
       if (this.moderationData.mod_actions.length !== before) removed = true;
     }
 
@@ -684,9 +686,12 @@ export function resetUserModerationData(userId) {
 
 // Auto-cleanup every 5 minutes. `unref()` is needed so this timer
 // doesn't keep the Node event loop alive in one-shot scripts / CI tests.
-const moderationCleanupInterval = setInterval(() => {
-  moderationManager.cleanup();
-}, 5 * 60 * 1000);
+const moderationCleanupInterval = setInterval(
+  () => {
+    moderationManager.cleanup();
+  },
+  5 * 60 * 1000,
+);
 if (typeof moderationCleanupInterval.unref === 'function') {
   moderationCleanupInterval.unref();
 }

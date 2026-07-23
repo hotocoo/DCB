@@ -8,63 +8,61 @@ const triviaQuestions = [
     question: 'What is the capital of France?',
     options: ['London', 'Berlin', 'Paris', 'Madrid'],
     correct: 2,
-    category: 'Geography'
+    category: 'Geography',
   },
   {
     question: 'Which planet is known as the Red Planet?',
     options: ['Venus', 'Mars', 'Jupiter', 'Saturn'],
     correct: 1,
-    category: 'Science'
+    category: 'Science',
   },
   {
     question: 'What is 2 + 2 × 3?',
     options: ['8', '10', '12', '14'],
     correct: 0,
-    category: 'Math'
+    category: 'Math',
   },
   {
     question: 'Who painted the Mona Lisa?',
     options: ['Vincent van Gogh', 'Pablo Picasso', 'Leonardo da Vinci', 'Michelangelo'],
     correct: 2,
-    category: 'Art'
+    category: 'Art',
   },
   {
     question: 'What is the largest mammal in the world?',
     options: ['African Elephant', 'Blue Whale', 'Giraffe', 'Hippopotamus'],
     correct: 1,
-    category: 'Nature'
+    category: 'Nature',
   },
   {
     question: 'In which year did World War II end?',
     options: ['1944', '1945', '1946', '1947'],
     correct: 1,
-    category: 'History'
+    category: 'History',
   },
   {
     question: 'What is the chemical symbol for gold?',
     options: ['Go', 'Gd', 'Au', 'Ag'],
     correct: 2,
-    category: 'Science'
+    category: 'Science',
   },
   {
     question: "Which programming language is known as the 'mother of all languages'?",
     options: ['Python', 'C', 'Assembly', 'Java'],
     correct: 1,
-    category: 'Technology'
-  }
+    category: 'Technology',
+  },
 ];
 
 export const data = new SlashCommandBuilder()
   .setName('trivia')
   .setDescription('Start an interactive trivia quiz game')
-  .addIntegerOption(option =>
-    option.setName('questions')
-      .setDescription('Number of questions (1-10, default: 5)')
-      .setMinValue(1)
-      .setMaxValue(10)
-      .setRequired(false))
-  .addStringOption(option =>
-    option.setName('category')
+  .addIntegerOption((option) =>
+    option.setName('questions').setDescription('Number of questions (1-10, default: 5)').setMinValue(1).setMaxValue(10).setRequired(false),
+  )
+  .addStringOption((option) =>
+    option
+      .setName('category')
       .setDescription('Trivia category')
       .addChoices(
         { name: 'All Categories', value: 'all' },
@@ -74,9 +72,10 @@ export const data = new SlashCommandBuilder()
         { name: 'Art', value: 'Art' },
         { name: 'Nature', value: 'Nature' },
         { name: 'History', value: 'History' },
-        { name: 'Technology', value: 'Technology' }
+        { name: 'Technology', value: 'Technology' },
       )
-      .setRequired(false));
+      .setRequired(false),
+  );
 
 export async function execute(interaction) {
   const questionCount = interaction.options.getInteger('questions') || 5;
@@ -92,11 +91,14 @@ export async function execute(interaction) {
     if (!validCategories.includes(category)) {
       throw new CommandError('Invalid category specified.', 'INVALID_ARGUMENT');
     }
-    availableQuestions = triviaQuestions.filter(q => q.category === category);
+    availableQuestions = triviaQuestions.filter((q) => q.category === category);
   }
 
   if (availableQuestions.length < questionCount) {
-    throw new CommandError(`Not enough questions available in ${category === 'all' ? 'all categories' : category} category. Available: ${availableQuestions.length}, Requested: ${questionCount}`, 'INVALID_ARGUMENT');
+    throw new CommandError(
+      `Not enough questions available in ${category === 'all' ? 'all categories' : category} category. Available: ${availableQuestions.length}, Requested: ${questionCount}`,
+      'INVALID_ARGUMENT',
+    );
   }
 
   if (availableQuestions.length === 0) {
@@ -119,8 +121,7 @@ export async function execute(interaction) {
     if (selectedQuestions.length < questionCount) {
       throw new CommandError('Failed to select sufficient unique questions.', 'COMMAND_ERROR');
     }
-  }
-  catch (error) {
+  } catch (error) {
     throw new CommandError(`Failed to prepare trivia questions: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
   }
 
@@ -137,7 +138,7 @@ export async function execute(interaction) {
     score: 0,
     answers: [],
     startTime: Date.now(),
-    gameActive: true
+    gameActive: true,
   };
 
   // Store game state
@@ -157,11 +158,11 @@ async function sendQuestion(interaction, gameState) {
   const embed = new EmbedBuilder()
     .setTitle(`🧠 Trivia Quiz - Question ${gameState.currentQuestion + 1}/${gameState.questions.length}`)
     .setDescription(`**${question.question}**`)
-    .setColor(0x00_99_FF)
+    .setColor(0x00_99_ff)
     .addFields({
       name: 'Category',
       value: question.category,
-      inline: true
+      inline: true,
     })
     .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` })
     .setTimestamp();
@@ -170,7 +171,7 @@ async function sendQuestion(interaction, gameState) {
     new ButtonBuilder()
       .setCustomId(`trivia_${index}`)
       .setLabel(`${String.fromCharCode(65 + index)}) ${option}`)
-      .setStyle(ButtonStyle.Primary)
+      .setStyle(ButtonStyle.Primary),
   );
 
   const rows = [];
@@ -184,10 +185,10 @@ async function sendQuestion(interaction, gameState) {
     componentType: ComponentType.Button,
     filter,
     time: 30_000,
-    max: 1
+    max: 1,
   });
 
-  collector.on('collect', async(i) => {
+  collector.on('collect', async (i) => {
     try {
       const selectedAnswer = Number.parseInt(i.customId.split('_')[1]);
 
@@ -208,7 +209,7 @@ async function sendQuestion(interaction, gameState) {
         correctAnswer: question.correct,
         isCorrect: isCorrect,
         userChoice: question.options[selectedAnswer],
-        correctChoice: question.options[question.correct]
+        correctChoice: question.options[question.correct],
       });
 
       gameState.currentQuestion++;
@@ -216,8 +217,10 @@ async function sendQuestion(interaction, gameState) {
       // Send feedback and next question
       const feedbackEmbed = new EmbedBuilder()
         .setTitle(isCorrect ? '✅ Correct!' : '❌ Incorrect!')
-        .setDescription(`**${question.question}**\n\nYour answer: **${question.options[selectedAnswer]}**\nCorrect answer: **${question.options[question.correct]}**`)
-        .setColor(isCorrect ? 0x00_FF_00 : 0xFF_00_00)
+        .setDescription(
+          `**${question.question}**\n\nYour answer: **${question.options[selectedAnswer]}**\nCorrect answer: **${question.options[question.correct]}**`,
+        )
+        .setColor(isCorrect ? 0x00_ff_00 : 0xff_00_00)
         .setFooter({ text: `Score: ${gameState.score}/${gameState.currentQuestion}` });
 
       await i.reply({ embeds: [feedbackEmbed], flags: MessageFlags.Ephemeral });
@@ -226,19 +229,18 @@ async function sendQuestion(interaction, gameState) {
       setTimeout(() => {
         sendQuestion(interaction, gameState);
       }, 2000);
-    }
-    catch (error) {
+    } catch (error) {
       console.error('Error in trivia collector:', error);
       await i.reply({ content: 'An error occurred while processing your answer.', flags: MessageFlags.Ephemeral });
     }
   });
 
-  collector.on('end', async(collected) => {
+  collector.on('end', async (collected) => {
     if (collected.size === 0) {
       const timeoutEmbed = new EmbedBuilder()
-        .setTitle('⏰ Time\'s Up!')
-        .setDescription('You didn\'t answer in time. Moving to next question...')
-        .setColor(0xFF_A5_00);
+        .setTitle("⏰ Time's Up!")
+        .setDescription("You didn't answer in time. Moving to next question...")
+        .setColor(0xff_a5_00);
 
       await interaction.followUp({ embeds: [timeoutEmbed], flags: MessageFlags.Ephemeral });
 
@@ -247,7 +249,7 @@ async function sendQuestion(interaction, gameState) {
         selectedAnswer: null,
         correctAnswer: question.correct,
         isCorrect: false,
-        timeout: true
+        timeout: true,
       });
 
       gameState.currentQuestion++;
@@ -260,8 +262,7 @@ async function sendQuestion(interaction, gameState) {
 
   if (interaction.replied || interaction.deferred) {
     await interaction.followUp({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
-  }
-  else {
+  } else {
     await interaction.reply({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
   }
 }
@@ -271,44 +272,42 @@ async function sendResults(interaction, gameState) {
   const percentage = Math.round((gameState.score / gameState.questions.length) * 100);
 
   let resultMessage = '';
-  if (percentage >= 90) resultMessage = '🏆 Outstanding! You\'re a trivia master!';
+  if (percentage >= 90) resultMessage = "🏆 Outstanding! You're a trivia master!";
   else if (percentage >= 70) resultMessage = '🥇 Great job! You know your stuff!';
   else if (percentage >= 50) resultMessage = '🥈 Not bad! Keep practicing!';
   else resultMessage = '📚 Keep learning and try again!';
 
   // Track trivia achievements
   try {
-    const correctAnswers = gameState.answers.filter(a => a.isCorrect).length;
+    const correctAnswers = gameState.answers.filter((a) => a.isCorrect).length;
     updateUserStats(interaction.user.id, {
       trivia_correct: correctAnswers,
-      features_tried: 1
+      features_tried: 1,
     });
-  }
-  catch (error) {
+  } catch (error) {
     console.warn('Failed to update trivia achievements:', error.message);
   }
 
   const embed = new EmbedBuilder()
     .setTitle('🎯 Trivia Quiz Complete!')
     .setDescription(`${resultMessage}\n\n**Final Score: ${gameState.score}/${gameState.questions.length} (${percentage}%)**\n⏱️ Time: ${totalTime}s`)
-    .setColor(percentage >= 70 ? 0x00_FF_00 : (percentage >= 50 ? 0xFF_A5_00 : 0xFF_00_00))
+    .setColor(percentage >= 70 ? 0x00_ff_00 : percentage >= 50 ? 0xff_a5_00 : 0xff_00_00)
     .setTimestamp();
 
   // Add detailed results
   for (const [index, answer] of gameState.answers.entries()) {
-    const emoji = answer.isCorrect ? '✅' : (answer.timeout ? '⏰' : '❌');
-    const status = answer.isCorrect ? 'Correct' : (answer.timeout ? 'Timeout' : 'Incorrect');
+    const emoji = answer.isCorrect ? '✅' : answer.timeout ? '⏰' : '❌';
+    const status = answer.isCorrect ? 'Correct' : answer.timeout ? 'Timeout' : 'Incorrect';
     embed.addFields({
       name: `Q${index + 1}: ${status}`,
       value: `${emoji} **${answer.question}**\n${answer.isCorrect ? 'Your answer: ' + answer.userChoice : `Your answer: ${answer.userChoice}\nCorrect: ${answer.correctChoice}`}`,
-      inline: false
+      inline: false,
     });
   }
 
   if (interaction.replied || interaction.deferred) {
     await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
-  }
-  else {
+  } else {
     await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   }
 }

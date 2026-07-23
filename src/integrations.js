@@ -20,12 +20,15 @@ class IntegrationManager {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(INTEGRATIONS_FILE)) {
-      fs.writeFileSync(INTEGRATIONS_FILE, JSON.stringify({
-        apiKeys: {},
-        usageStats: {},
-        cache: {},
-        settings: {}
-      }));
+      fs.writeFileSync(
+        INTEGRATIONS_FILE,
+        JSON.stringify({
+          apiKeys: {},
+          usageStats: {},
+          cache: {},
+          settings: {},
+        }),
+      );
     }
   }
 
@@ -33,14 +36,13 @@ class IntegrationManager {
     try {
       const data = JSON.parse(fs.readFileSync(INTEGRATIONS_FILE));
       this.integrations = data;
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to load integrations:', error);
       this.integrations = {
         apiKeys: {},
         usageStats: {},
         cache: {},
-        settings: {}
+        settings: {},
       };
     }
   }
@@ -48,8 +50,7 @@ class IntegrationManager {
   saveIntegrations() {
     try {
       fs.writeFileSync(INTEGRATIONS_FILE, JSON.stringify(this.integrations, null, 2));
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to save integrations:', error);
     }
   }
@@ -60,7 +61,7 @@ class IntegrationManager {
       key: apiKey,
       setAt: Date.now(),
       lastUsed: null,
-      usageCount: 0
+      usageCount: 0,
     };
     this.saveIntegrations();
     return true;
@@ -86,7 +87,7 @@ class IntegrationManager {
     const windowStart = now - rateLimit.windowMs;
 
     // Clean old requests
-    limiter.requests = limiter.requests.filter(time => time > windowStart);
+    limiter.requests = limiter.requests.filter((time) => time > windowStart);
 
     if (limiter.requests.length >= rateLimit.maxRequests) {
       const resetTime = limiter.requests[0] + rateLimit.windowMs;
@@ -94,7 +95,7 @@ class IntegrationManager {
         allowed: false,
         reason: 'rate_limit',
         resetIn: resetTime - now,
-        resetAt: new Date(resetTime)
+        resetAt: new Date(resetTime),
       };
     }
 
@@ -127,7 +128,7 @@ class IntegrationManager {
       this.integrations.usageStats[service].errors++;
       this.integrations.usageStats[service].lastError = {
         message: error.message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
     }
     this.saveIntegrations();
@@ -135,18 +136,19 @@ class IntegrationManager {
 
   getServiceRateLimit(service) {
     const limits = {
-      'openweather': { maxRequests: 60, windowMs: 60_000 }, // 60 per minute
-      'newsapi': { maxRequests: 1000, windowMs: 86_400_000 }, // 1000 per day
-      'jokes': { maxRequests: 100, windowMs: 60_000 }, // 100 per minute
-      'catfacts': { maxRequests: 50, windowMs: 60_000 }, // 50 per minute
-      'numbersapi': { maxRequests: 100, windowMs: 60_000 } // 100 per minute
+      openweather: { maxRequests: 60, windowMs: 60_000 }, // 60 per minute
+      newsapi: { maxRequests: 1000, windowMs: 86_400_000 }, // 1000 per day
+      jokes: { maxRequests: 100, windowMs: 60_000 }, // 100 per minute
+      catfacts: { maxRequests: 50, windowMs: 60_000 }, // 50 per minute
+      numbersapi: { maxRequests: 100, windowMs: 60_000 }, // 100 per minute
     };
 
     return limits[service] || { maxRequests: 10, windowMs: 60_000 };
   }
 
   // Advanced Caching System
-  getCachedData(key, maxAge = 300_000) { // 5 minutes default
+  getCachedData(key, maxAge = 300_000) {
+    // 5 minutes default
     const cached = this.apiCache.get(key);
     if (cached && Date.now() - cached.timestamp < maxAge) {
       return cached.data;
@@ -157,7 +159,7 @@ class IntegrationManager {
   setCachedData(key, data) {
     this.apiCache.set(key, {
       data,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     // Clean old cache entries
@@ -189,7 +191,9 @@ class IntegrationManager {
     }
 
     try {
-      const response = await fetch(`https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&apiKey=${apiKey.key}&pageSize=${limit}&sortBy=publishedAt`);
+      const response = await fetch(
+        `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&apiKey=${apiKey.key}&pageSize=${limit}&sortBy=publishedAt`,
+      );
 
       if (!response.ok) {
         throw new Error(`News API error: ${response.status}`);
@@ -202,8 +206,7 @@ class IntegrationManager {
       this.setCachedData(cacheKey, data.articles);
 
       return { success: true, data: data.articles };
-    }
-    catch (error) {
+    } catch (error) {
       this.recordAPIError(service, error);
       return { success: false, reason: error.message };
     }
@@ -229,8 +232,7 @@ class IntegrationManager {
       this.recordAPIUsage(service);
 
       return { success: true, data: joke };
-    }
-    catch (error) {
+    } catch (error) {
       this.recordAPIError(service, error);
       return { success: false, reason: error.message };
     }
@@ -256,8 +258,7 @@ class IntegrationManager {
       this.recordAPIUsage(service);
 
       return { success: true, data: fact };
-    }
-    catch (error) {
+    } catch (error) {
       this.recordAPIError(service, error);
       return { success: false, reason: error.message };
     }
@@ -285,8 +286,7 @@ class IntegrationManager {
       this.recordAPIUsage(service);
 
       return { success: true, data: fact };
-    }
-    catch (error) {
+    } catch (error) {
       this.recordAPIError(service, error);
       return { success: false, reason: error.message };
     }
@@ -296,7 +296,7 @@ class IntegrationManager {
   async getDadJoke() {
     try {
       const response = await fetch('https://icanhazdadjoke.com/', {
-        headers: { 'Accept': 'application/json' }
+        headers: { Accept: 'application/json' },
       });
 
       if (!response.ok) {
@@ -306,8 +306,7 @@ class IntegrationManager {
       const joke = await response.json();
 
       return { success: true, data: joke };
-    }
-    catch (error) {
+    } catch (error) {
       return { success: false, reason: error.message };
     }
   }
@@ -324,8 +323,7 @@ class IntegrationManager {
       const quote = await response.json();
 
       return { success: true, data: quote };
-    }
-    catch (error) {
+    } catch (error) {
       return { success: false, reason: error.message };
     }
   }
@@ -350,11 +348,10 @@ class IntegrationManager {
           publicRepos: user.public_repos,
           followers: user.followers,
           following: user.following,
-          created: user.created_at
-        }
+          created: user.created_at,
+        },
       };
-    }
-    catch (error) {
+    } catch (error) {
       return { success: false, reason: error.message };
     }
   }
@@ -384,8 +381,7 @@ class IntegrationManager {
       this.recordAPIUsage(service);
 
       return { success: true, data };
-    }
-    catch (error) {
+    } catch (error) {
       this.recordAPIError(service, error);
       return { success: false, reason: error.message };
     }
@@ -398,7 +394,7 @@ class IntegrationManager {
       totalUsage: Object.values(this.integrations.usageStats).reduce((sum, stats) => sum + stats.calls, 0),
       totalErrors: Object.values(this.integrations.usageStats).reduce((sum, stats) => sum + stats.errors, 0),
       cacheSize: this.apiCache.size,
-      rateLimitStatus: this.getRateLimitStatus()
+      rateLimitStatus: this.getRateLimitStatus(),
     };
   }
 
@@ -409,7 +405,7 @@ class IntegrationManager {
       const rateLimit = this.checkRateLimit(service);
       status[service] = {
         allowed: rateLimit.allowed,
-        remaining: rateLimit.allowed ? 'unknown' : Math.ceil(rateLimit.resetIn / 1000)
+        remaining: rateLimit.allowed ? 'unknown' : Math.ceil(rateLimit.resetIn / 1000),
       };
     }
 
@@ -442,14 +438,13 @@ class IntegrationManager {
         health[service] = {
           status: testResult.success ? 'healthy' : 'error',
           lastCheck: Date.now(),
-          error: testResult.success ? null : testResult.reason
+          error: testResult.success ? null : testResult.reason,
         };
-      }
-      catch (error) {
+      } catch (error) {
         health[service] = {
           status: 'error',
           lastCheck: Date.now(),
-          error: error.message
+          error: error.message,
         };
       }
     }
@@ -462,7 +457,8 @@ class IntegrationManager {
     // Clean old cache
     const now = Date.now();
     for (const [key, cached] of this.apiCache) {
-      if (now - cached.timestamp > 3_600_000) { // 1 hour
+      if (now - cached.timestamp > 3_600_000) {
+        // 1 hour
         this.apiCache.delete(key);
       }
     }
@@ -470,7 +466,7 @@ class IntegrationManager {
     // Clean old rate limit data
     for (const [service, limiter] of this.rateLimiters) {
       const cutoff = now - this.getServiceRateLimit(service).windowMs;
-      limiter.requests = limiter.requests.filter(time => time > cutoff);
+      limiter.requests = limiter.requests.filter((time) => time > cutoff);
     }
 
     this.saveIntegrations();
@@ -527,9 +523,12 @@ export function getIntegrationStats() {
 
 // Auto-cleanup every 30 minutes. `unref()` is needed so this timer
 // doesn't keep the Node event loop alive in one-shot scripts / CI tests.
-const integrationCleanupInterval = setInterval(() => {
-  integrationManager.cleanup();
-}, 30 * 60 * 1000);
+const integrationCleanupInterval = setInterval(
+  () => {
+    integrationManager.cleanup();
+  },
+  30 * 60 * 1000,
+);
 if (typeof integrationCleanupInterval.unref === 'function') {
   integrationCleanupInterval.unref();
 }

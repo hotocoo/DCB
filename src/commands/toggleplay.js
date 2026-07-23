@@ -6,7 +6,7 @@ import { safeExecuteCommand, CommandError, validateGuild, validatePermissions } 
 export const data = new SlashCommandBuilder()
   .setName('toggleplay')
   .setDescription('Enable or disable playful interactions for this guild')
-  .addBooleanOption(opt => opt.setName('enabled').setDescription('Enable playful interactions').setRequired(true));
+  .addBooleanOption((opt) => opt.setName('enabled').setDescription('Enable playful interactions').setRequired(true));
 
 export async function execute(interaction) {
   validateGuild(interaction);
@@ -26,10 +26,9 @@ export async function execute(interaction) {
 
     await interaction.reply({
       content: `✅ Playful interactions are now **${enabled ? 'enabled' : 'disabled'}** for this guild.`,
-      flags: MessageFlags.Ephemeral
+      flags: MessageFlags.Ephemeral,
     });
-  }
-  catch (error) {
+  } catch (error) {
     throw new CommandError(`Failed to toggle playful interactions: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
   }
 }

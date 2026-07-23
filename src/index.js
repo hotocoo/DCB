@@ -41,7 +41,19 @@ function validateToken() {
   const token = process.env.DISCORD_TOKEN;
   if (!token || token.trim() === '' || token === 'your-discord-bot-token-here') {
     throw new Error(
-      'DISCORD_TOKEN is missing or invalid in .env file. Please add a valid Discord bot token from https://discord.com/developers/applications. Update the .env file with: DISCORD_TOKEN=your_actual_token_here'
+      'DISCORD_TOKEN is missing or invalid in .env file. Please add a valid Discord bot token from https://discord.com/developers/applications. Update the .env file with: DISCORD_TOKEN=your_actual_token_here',
+    );
+  }
+
+  // Fast-fail on known test/dummy tokens so the bot doesn't make a
+  // doomed network round-trip to Discord. Real bot tokens have 3 base64
+  // segments separated by dots, each with the right base64 alphabet;
+  // any "test_*" or "dummy_*" or "fake_*" string is clearly a stub.
+  if (/^(test|dummy|fake|placeholder|sample|xxx|your)[_-]?/i.test(token)) {
+    throw new Error(
+      `DISCORD_TOKEN looks like a placeholder (${token.slice(0, 12)}...). ` +
+        'Replace it in .env with a real bot token before running the bot. ' +
+        'See https://discord.com/developers/applications',
     );
   }
 
@@ -60,8 +72,7 @@ let token;
 try {
   token = validateToken();
   logger.info('Token validation successful');
-}
-catch (error) {
+} catch (error) {
   logger.error('Token validation failed', error instanceof Error ? error : new Error(String(error)));
   process.exit(1);
 }
@@ -72,8 +83,7 @@ const validStatuses = ['online', 'idle', 'dnd', 'invisible'];
 let status;
 if (validStatuses.includes(botStatus.toLowerCase())) {
   status = botStatus.toLowerCase();
-}
-else {
+} else {
   console.warn(`Invalid BOT_STATUS: ${botStatus}. Defaulting to 'online'.`);
   status = 'online';
 }
@@ -87,16 +97,18 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildModeration
+    GatewayIntentBits.GuildModeration,
   ],
   partials: [Partials.Channel],
   presence: {
-    activities: [{
-      name: process.env.BOT_ACTIVITY || 'Playing RPG Adventures',
-      type: ActivityType.Playing
-    }],
-    status: /** @type {import('discord.js').PresenceStatusData} */ (status)
-  }
+    activities: [
+      {
+        name: process.env.BOT_ACTIVITY || 'Playing RPG Adventures',
+        type: ActivityType.Playing,
+      },
+    ],
+    status: /** @type {import('discord.js').PresenceStatusData} */ (status),
+  },
 });
 
 // Initialize commands collection with proper typing
@@ -104,7 +116,7 @@ client.commands = /** @type {import('discord.js').Collection<string, Command>} *
 
 // Initialize database connection and commands
 let commandStats = { total: 0, loaded: 0 };
-(async() => {
+(async () => {
   try {
     logger.info('Initializing database connection...');
     await initializeDatabase();
@@ -118,8 +130,7 @@ let commandStats = { total: 0, loaded: 0 };
     // Initialize scheduler if available
     await schedulerManager.setClient(client);
     logger.success('Scheduler initialized successfully');
-  }
-  catch (error) {
+  } catch (error) {
     logger.error('Failed to initialize database', error instanceof Error ? error : new Error(String(error)));
     process.exit(1);
   }
@@ -142,7 +153,7 @@ client.once('ready', () => {
     users: client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0),
     totalCommands: commandStats.total,
     loadedCommands: client.commands?.size || 0,
-    uptime: process.uptime()
+    uptime: process.uptime(),
   };
 
   logger.success(`Bot started successfully as ${user.tag}`, stats);
@@ -153,7 +164,7 @@ client.once('ready', () => {
     platform: process.platform,
     arch: process.arch,
     memoryUsage: process.memoryUsage(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
   });
 });
 
@@ -176,7 +187,7 @@ if (!process[Symbol.for('athena.shutdown.handlersInstalled')]) {
   });
 }
 
-client.on('interactionCreate', async interaction => {
+client.on('interactionCreate', async (interaction) => {
   if (interaction.isChatInputCommand() || interaction.isButton() || interaction.isModalSubmit()) {
     await handleInteraction(interaction, client);
   }
@@ -185,7 +196,7 @@ client.on('interactionCreate', async interaction => {
  * Handles incoming messages with enhanced error handling and logging.
  * @param {import('discord.js').Message} message - The Discord message object.
  */
-client.on('messageCreate', async message => {
+client.on('messageCreate', async (message) => {
   const startTime = Date.now();
 
   try {
@@ -199,7 +210,7 @@ client.on('messageCreate', async message => {
     if (messageCooldown.onCooldown) {
       logger.debug('Message ignored due to cooldown', {
         userId: message.author.id,
-        remainingTime: messageCooldown.remaining
+        remainingTime: messageCooldown.remaining,
       });
       return;
     }
@@ -212,9 +223,9 @@ client.on('messageCreate', async message => {
     if (attempt) {
       const response = attempt.ok
         ? `Nice! You typed it correctly: ${attempt.expected}`
-        : (attempt.reason === 'timeout'
+        : attempt.reason === 'timeout'
           ? 'Too slow! The typing challenge expired.'
-          : 'Invalid typing attempt.');
+          : 'Invalid typing attempt.';
       await message.reply({ content: response });
       return;
     }
@@ -227,16 +238,15 @@ client.on('messageCreate', async message => {
 
     // Log message processing time for performance monitoring
     const processingTime = Date.now() - startTime;
-    if (processingTime > 1000) { // Log slow message processing (>1s)
+    if (processingTime > 1000) {
+      // Log slow message processing (>1s)
       logger.warn('Slow message processing detected', {
         processingTime,
         userId: message.author.id,
-        messageLength: message.content.length
+        messageLength: message.content.length,
       });
     }
-
-  }
-  catch (error_) {
+  } catch (error_) {
     const error = error_ instanceof Error ? error_ : new Error(String(error_));
     logError('Message handling failed', error, {
       user: `${message.author.username}#${message.author.discriminator}`,
@@ -244,7 +254,7 @@ client.on('messageCreate', async message => {
       guild: message.guild?.name || 'DM',
       channel: message.channel.type === 1 ? 'DM' : message.channel?.name || 'Unknown',
       messageLength: message.content.length,
-      processingTime: Date.now() - startTime
+      processingTime: Date.now() - startTime,
     });
   }
 });
@@ -262,7 +272,7 @@ async function gracefulShutdown(client, signal) {
     if (client.user) {
       await client.user.setPresence({
         activities: [{ name: 'Shutting down...', type: ActivityType.Playing }],
-        status: 'dnd'
+        status: 'dnd',
       });
     }
 
@@ -275,9 +285,7 @@ async function gracefulShutdown(client, signal) {
       logger.info('Bot shutdown complete');
       process.exit(0);
     }, 2000);
-
-  }
-  catch (error) {
+  } catch (error) {
     logger.error('Error during graceful shutdown', error instanceof Error ? error : new Error(String(error)));
     process.exit(1);
   }
@@ -286,31 +294,31 @@ async function gracefulShutdown(client, signal) {
 /**
  * Initiates the bot login process with timeout protection and enhanced error handling.
  */
-(async() => {
+(async () => {
   try {
     logger.info('Attempting to login to Discord...');
     const loginPromise = client.login(token);
     const timeoutPromise = new Promise((_resolve, reject) =>
-      setTimeout(() => reject(new Error(`Discord login timed out after ${LOGIN_TIMEOUT_MS / 1000} seconds. Please check your DISCORD_TOKEN in .env file.`)), LOGIN_TIMEOUT_MS)
+      setTimeout(
+        () => reject(new Error(`Discord login timed out after ${LOGIN_TIMEOUT_MS / 1000} seconds. Please check your DISCORD_TOKEN in .env file.`)),
+        LOGIN_TIMEOUT_MS,
+      ),
     );
     await Promise.race([loginPromise, timeoutPromise]);
     logger.success('Login successful');
-
-  }
-  catch (error) {
+  } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     logger.error('Failed to login to Discord', err);
 
     if (err.message.includes('timeout')) {
       logger.error('Login timed out. Please check your internet connection and try again.');
-    }
-    else if (err.message.includes('Invalid token') || err.message.includes('Incorrect login details')) {
-      logger.error('Invalid token provided. Please ensure DISCORD_TOKEN in .env is set to a valid Discord bot token from https://discord.com/developers/applications');
-    }
-    else if (err.message.includes('Privileged intent')) {
+    } else if (err.message.includes('Invalid token') || err.message.includes('Incorrect login details')) {
+      logger.error(
+        'Invalid token provided. Please ensure DISCORD_TOKEN in .env is set to a valid Discord bot token from https://discord.com/developers/applications',
+      );
+    } else if (err.message.includes('Privileged intent')) {
       logger.error('Missing privileged intents. Please enable required intents in your Discord application settings.');
-    }
-    else {
+    } else {
       logger.error('Unknown login error occurred. Please check your configuration and try again.');
     }
 

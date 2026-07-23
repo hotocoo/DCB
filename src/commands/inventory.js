@@ -12,17 +12,32 @@ import {
   generateRandomItem,
   getCharacter,
   saveCharacter,
-  removeItemFromInventory
+  removeItemFromInventory,
 } from '../rpg.js';
 import { CommandError, handleCommandError } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('inventory')
   .setDescription('Manage your RPG inventory and equipment')
-  .addSubcommand(sub => sub.setName('view').setDescription('View your inventory and equipment'))
-  .addSubcommand(sub => sub.setName('use').setDescription('Use a consumable item').addStringOption(opt => opt.setName('item').setDescription('Item to use').setRequired(true)))
-  .addSubcommand(sub => sub.setName('equip').setDescription('Equip a weapon or armor').addStringOption(opt => opt.setName('item').setDescription('Item to equip').setRequired(true)))
-  .addSubcommand(sub => sub.setName('unequip').setDescription('Unequip weapon or armor').addStringOption(opt => opt.setName('slot').setDescription('weapon|armor').setRequired(true)));
+  .addSubcommand((sub) => sub.setName('view').setDescription('View your inventory and equipment'))
+  .addSubcommand((sub) =>
+    sub
+      .setName('use')
+      .setDescription('Use a consumable item')
+      .addStringOption((opt) => opt.setName('item').setDescription('Item to use').setRequired(true)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('equip')
+      .setDescription('Equip a weapon or armor')
+      .addStringOption((opt) => opt.setName('item').setDescription('Item to equip').setRequired(true)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('unequip')
+      .setDescription('Unequip weapon or armor')
+      .addStringOption((opt) => opt.setName('slot').setDescription('weapon|armor').setRequired(true)),
+  );
 
 export async function execute(interaction) {
   try {
@@ -55,7 +70,7 @@ export async function execute(interaction) {
 
         const embed = new EmbedBuilder()
           .setTitle(`🛄 ${interaction.user.username}'s Inventory`)
-          .setColor(0x00_99_FF)
+          .setColor(0x00_99_ff)
           .setDescription(`💰 Total Value: ${inventoryValue} gold`);
 
         // Add equipped items section
@@ -73,7 +88,7 @@ export async function execute(interaction) {
           embed.addFields({
             name: '⚡ Equipped',
             value: equippedItems.join('\n') || 'None',
-            inline: true
+            inline: true,
           });
         }
 
@@ -81,7 +96,7 @@ export async function execute(interaction) {
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`inventory_refresh:${userId}`).setLabel('🔄 Refresh').setStyle(ButtonStyle.Primary),
           new ButtonBuilder().setCustomId(`inventory_random:${userId}`).setLabel('🎲 Get Random Item').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId(`inventory_sell_all:${userId}`).setLabel('💰 Sell All Junk').setStyle(ButtonStyle.Success)
+          new ButtonBuilder().setCustomId(`inventory_sell_all:${userId}`).setLabel('💰 Sell All Junk').setStyle(ButtonStyle.Success),
         );
 
         await interaction.reply({ embeds: [embed], components: [row] });
@@ -216,38 +231,39 @@ export async function execute(interaction) {
 
         break;
       }
-    // No default
+      // No default
     }
-  }
-  catch (error) {
+  } catch (error) {
     return handleCommandError(interaction, error);
   }
 }
 
 // Helper function to update inventory embed
 async function updateInventoryEmbed(interaction, itemsByType, inventoryValue) {
-  const embed = EmbedBuilder.from(interaction.message.embeds[0])
-    .setDescription(`💰 Total Value: ${inventoryValue} gold`);
+  const embed = EmbedBuilder.from(interaction.message.embeds[0]).setDescription(`💰 Total Value: ${inventoryValue} gold`);
 
   const fields = [];
 
   for (const [type, items] of Object.entries(itemsByType)) {
-    const typeEmoji = {
-      weapon: '⚔️',
-      armor: '🛡️',
-      consumable: '🧪',
-      material: '🔩'
-    }[type] || '📦';
+    const typeEmoji =
+      {
+        weapon: '⚔️',
+        armor: '🛡️',
+        consumable: '🧪',
+        material: '🔩',
+      }[type] || '📦';
 
-    const itemList = items.map(item => {
-      const rarityInfo = getItemRarityInfo(item.rarity);
-      return `${typeEmoji} **${item.name}** (${item.quantity}x)`;
-    }).join('\n');
+    const itemList = items
+      .map((item) => {
+        const rarityInfo = getItemRarityInfo(item.rarity);
+        return `${typeEmoji} **${item.name}** (${item.quantity}x)`;
+      })
+      .join('\n');
 
     fields.push({
       name: `${typeEmoji} ${type.charAt(0).toUpperCase() + type.slice(1)}s`,
       value: itemList || 'None',
-      inline: true
+      inline: true,
     });
   }
 

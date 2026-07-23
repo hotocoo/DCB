@@ -22,12 +22,15 @@ class EntertainmentManager {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(ENTERTAINMENT_FILE)) {
-      fs.writeFileSync(ENTERTAINMENT_FILE, JSON.stringify({
-        funStats: {},
-        jokeRatings: {},
-        gameScores: {},
-        entertainmentHistory: []
-      }));
+      fs.writeFileSync(
+        ENTERTAINMENT_FILE,
+        JSON.stringify({
+          funStats: {},
+          jokeRatings: {},
+          gameScores: {},
+          entertainmentHistory: [],
+        }),
+      );
     }
   }
 
@@ -35,14 +38,13 @@ class EntertainmentManager {
     try {
       const data = JSON.parse(fs.readFileSync(ENTERTAINMENT_FILE));
       this.entertainmentData = data;
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to load entertainment data:', error);
       this.entertainmentData = {
         funStats: {},
         jokeRatings: {},
         gameScores: {},
-        entertainmentHistory: []
+        entertainmentHistory: [],
       };
     }
   }
@@ -50,8 +52,7 @@ class EntertainmentManager {
   saveEntertainment() {
     try {
       fs.writeFileSync(ENTERTAINMENT_FILE, JSON.stringify(this.entertainmentData, null, 2));
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to save entertainment data:', error);
     }
   }
@@ -67,7 +68,7 @@ class EntertainmentManager {
         "What do you call cheese that isn't yours? Nacho cheese!",
         'Why did the bicycle fall over? Because it was two-tired!',
         'What do you call a bear with no teeth? A gummy bear!',
-        "Why don't skeletons fight each other? They don't have the guts!"
+        "Why don't skeletons fight each other? They don't have the guts!",
       ],
       programming: [
         'Why do programmers prefer dark mode? Because light attracts bugs!',
@@ -77,7 +78,7 @@ class EntertainmentManager {
         "Why did the programmer quit his job? Because he didn't get arrays!",
         "There are 10 types of people in the world: those who understand binary and those who don't!",
         'Why do programmers always mix up Halloween and Christmas? Because Oct 31 == Dec 25!',
-        'How do you comfort a JavaScript bug? You console it!'
+        'How do you comfort a JavaScript bug? You console it!',
       ],
       dad: [
         "I'm reading a book about anti-gravity. It's impossible to put down!",
@@ -87,7 +88,7 @@ class EntertainmentManager {
         'What do you call someone with no body and no nose? Nobody knows!',
         "Why can't you hear a pterodactyl go to the bathroom? Because the 'P' is silent!",
         "What does a zombie vegetarian eat? 'GRRRAAAINNS!'",
-        'Why did the math book look sad? Because it had too many problems!'
+        'Why did the math book look sad? Because it had too many problems!',
       ],
       math: [
         "Why was the equal sign so humble? Because it knew it wasn't less than or greater than anyone else!",
@@ -97,7 +98,7 @@ class EntertainmentManager {
         "What did the zero say to the eight? 'Nice belt!'",
         'Why was the math book sad? Because it had too many problems!',
         "What do you call a number that can't keep still? A roamin' numeral!",
-        'Why did the two fours skip lunch? They already eight!'
+        'Why did the two fours skip lunch? They already eight!',
       ],
       science: [
         "Why can't you trust atoms? They make up everything!",
@@ -107,8 +108,8 @@ class EntertainmentManager {
         'Why are chemists excellent for solving problems? They have all the solutions!',
         'What do you do with a dead scientist? You barium!',
         'Why did the photon refuse to check a bag at the airport? Because it was traveling light!',
-        "What is a physicist's favorite food? Fission chips!"
-      ]
+        "What is a physicist's favorite food? Fission chips!",
+      ],
     };
 
     const categoryJokes = jokes[category] || jokes.general;
@@ -120,7 +121,7 @@ class EntertainmentManager {
     return {
       joke,
       category,
-      id: `joke_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+      id: `joke_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
     };
   }
 
@@ -138,7 +139,7 @@ class EntertainmentManager {
     }
     this.entertainmentData.jokeRatings[jokeId].push({
       rating,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
     this.saveEntertainment();
     return true;
@@ -150,23 +151,23 @@ class EntertainmentManager {
       fantasy: [
         'In the enchanted kingdom of Eldoria, where dragons soar and magic flows like rivers...',
         'Deep in the mystical forest of Eldertree, ancient secrets wait to be discovered...',
-        'Upon the floating islands of Aetheria, where wind spirits dance and stars whisper...'
+        'Upon the floating islands of Aetheria, where wind spirits dance and stars whisper...',
       ],
       adventure: [
         'The brave explorer set forth on a perilous journey across uncharted lands...',
         'With map in hand and courage in heart, the adventurer faced the unknown...',
-        'The call to adventure echoed through the hero\'s soul, impossible to ignore...'
+        "The call to adventure echoed through the hero's soul, impossible to ignore...",
       ],
       mystery: [
-        'Shadows concealed secrets in the old mansion, waiting for a detective\'s keen eye...',
+        "Shadows concealed secrets in the old mansion, waiting for a detective's keen eye...",
         'The puzzle pieces scattered like autumn leaves, hiding the truth from view...',
-        'Whispers of conspiracy filled the air, drawing the investigator deeper...'
+        'Whispers of conspiracy filled the air, drawing the investigator deeper...',
       ],
       sciFi: [
-        'In the year 2147, aboard the starship Odyssey, humanity\'s fate hung in the balance...',
+        "In the year 2147, aboard the starship Odyssey, humanity's fate hung in the balance...",
         'The quantum computer hummed with artificial consciousness, questioning its existence...',
-        'Across the galaxy, alien civilizations watched as Earth reached for the stars...'
-      ]
+        'Across the galaxy, alien civilizations watched as Earth reached for the stars...',
+      ],
     };
 
     const templates = storyTemplates[genre] || storyTemplates.fantasy;
@@ -176,7 +177,7 @@ class EntertainmentManager {
     const continuations = [
       `${prompt} became the catalyst for an extraordinary tale of courage and discovery.`,
       `What began as ${prompt} evolved into a legendary saga of heroism and wonder.`,
-      `The threads of fate wove ${prompt} into an epic narrative of triumph and magic.`
+      `The threads of fate wove ${prompt} into an epic narrative of triumph and magic.`,
     ];
 
     const continuation = continuations[Math.floor(Math.random() * continuations.length)];
@@ -188,7 +189,7 @@ class EntertainmentManager {
       prompt,
       length: 'medium',
       type: 'story',
-      id: `story_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+      id: `story_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
     };
 
     // Store for sharing
@@ -204,20 +205,23 @@ class EntertainmentManager {
         { riddle: "What has keys but can't open locks?", answer: 'piano' },
         { riddle: 'What gets wetter as it dries?', answer: 'towel' },
         { riddle: 'What has a head, a tail, is brown, and has no legs?', answer: 'penny' },
-        { riddle: 'What can you catch but not throw?', answer: 'cold' }
+        { riddle: 'What can you catch but not throw?', answer: 'cold' },
       ],
       medium: [
         { riddle: 'I speak without a mouth and hear without ears. I have no body, but I come alive with the wind. What am I?', answer: 'echo' },
         { riddle: 'The more you take, the more you leave behind. What are they?', answer: 'footsteps' },
         { riddle: "What has many teeth but can't bite?", answer: 'comb' },
-        { riddle: 'What is full of holes but still holds water?', answer: 'sponge' }
+        { riddle: 'What is full of holes but still holds water?', answer: 'sponge' },
       ],
       hard: [
         { riddle: "I am not alive, but I grow; I don't have lungs, but I need air; I don't have a mouth, but water kills me. What am I?", answer: 'fire' },
-        { riddle: "The person who makes it, sells it. The person who buys it never uses it. The person who uses it never knows they're using it. What is it?", answer: 'coffin' },
+        {
+          riddle: "The person who makes it, sells it. The person who buys it never uses it. The person who uses it never knows they're using it. What is it?",
+          answer: 'coffin',
+        },
         { riddle: 'What has 13 hearts, but no other organs?', answer: 'deck of cards' },
-        { riddle: 'I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?', answer: 'map' }
-      ]
+        { riddle: 'I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?', answer: 'map' },
+      ],
     };
 
     const difficultyRiddles = riddles[difficulty] || riddles.medium;
@@ -226,7 +230,7 @@ class EntertainmentManager {
     return {
       ...riddle,
       difficulty,
-      id: `riddle_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+      id: `riddle_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
     };
   }
 
@@ -237,26 +241,26 @@ class EntertainmentManager {
         'Octopuses have three hearts and blue blood!',
         "A group of flamingos is called a 'flamboyance'!",
         'Butterflies taste with their feet!',
-        'Penguins can jump as high as 6 feet in the air!'
+        'Penguins can jump as high as 6 feet in the air!',
       ],
       space: [
         "There are more stars in the universe than grains of sand on all the Earth's beaches!",
         'A day on Venus is longer than its year!',
         'Jupiter has 79 confirmed moons!',
-        'The footprints on the Moon will be there for 100 million years!'
+        'The footprints on the Moon will be there for 100 million years!',
       ],
       science: [
         "Bananas are berries, but strawberries aren't!",
         'A single cloud can weigh more than a million pounds!',
         "Your brain uses about 20% of your body's energy!",
-        'There are more possible games of chess than atoms in the observable universe!'
+        'There are more possible games of chess than atoms in the observable universe!',
       ],
       history: [
         'The shortest war in history lasted only 38-45 minutes!',
         'Ancient Romans used urine as mouthwash!',
         'The first computer mouse was made of wood!',
-        'Cleopatra lived closer in time to the Moon landing than to the construction of the Great Pyramid!'
-      ]
+        'Cleopatra lived closer in time to the Moon landing than to the construction of the Great Pyramid!',
+      ],
     };
 
     if (category === 'random') {
@@ -271,7 +275,7 @@ class EntertainmentManager {
       fact,
       category,
       type: 'fact',
-      id: `fact_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+      id: `fact_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
     };
 
     // Store for sharing
@@ -287,26 +291,26 @@ class EntertainmentManager {
         { quote: 'The only way to do great work is to love what you do.', author: 'Steve Jobs' },
         { quote: 'Innovation distinguishes between a leader and a follower.', author: 'Steve Jobs' },
         { quote: 'Success is not final, failure is not fatal: It is the courage to continue that counts.', author: 'Winston Churchill' },
-        { quote: 'The future belongs to those who believe in the beauty of their dreams.', author: 'Eleanor Roosevelt' }
+        { quote: 'The future belongs to those who believe in the beauty of their dreams.', author: 'Eleanor Roosevelt' },
       ],
       motivational: [
         { quote: "Believe you can and you're halfway there.", author: 'Theodore Roosevelt' },
         { quote: "It always seems impossible until it's done.", author: 'Nelson Mandela' },
         { quote: "Don't watch the clock; do what it does. Keep going.", author: 'Sam Levenson' },
-        { quote: 'The only limit to our realization of tomorrow will be our doubts of today.', author: 'Franklin D. Roosevelt' }
+        { quote: 'The only limit to our realization of tomorrow will be our doubts of today.', author: 'Franklin D. Roosevelt' },
       ],
       wisdom: [
         { quote: 'The only true wisdom is in knowing you know nothing.', author: 'Socrates' },
         { quote: 'Knowing yourself is the beginning of all wisdom.', author: 'Aristotle' },
         { quote: 'The unexamined life is not worth living.', author: 'Socrates' },
-        { quote: 'Be kind, for everyone you meet is fighting a hard battle.', author: 'Plato' }
+        { quote: 'Be kind, for everyone you meet is fighting a hard battle.', author: 'Plato' },
       ],
       humor: [
         { quote: "I'm writing a book. I've got the page numbers done.", author: 'Steven Wright' },
         { quote: 'I always wanted to be somebody, but now I realize I should have been more specific.', author: 'Lily Tomlin' },
         { quote: 'Why is the math book sad? Because it has too many problems.', author: 'Unknown' },
-        { quote: 'I told my wife she was drawing her eyebrows too high. She looked surprised.', author: 'Unknown' }
-      ]
+        { quote: 'I told my wife she was drawing her eyebrows too high. She looked surprised.', author: 'Unknown' },
+      ],
     };
 
     const categoryQuotes = quotes[category] || quotes.inspirational;
@@ -316,7 +320,7 @@ class EntertainmentManager {
       ...quote,
       category,
       type: 'quote',
-      id: `quote_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+      id: `quote_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
     };
 
     // Store for sharing
@@ -335,7 +339,7 @@ class EntertainmentManager {
       'I saw Susie sitting in a shoeshine shop.',
       'Six sick slick seals sit by the sea.',
       'Black bug bit a big black bear.',
-      'How can a clam cram in a clean cream can?'
+      'How can a clam cram in a clean cream can?',
     ];
 
     return twisters[Math.floor(Math.random() * twisters.length)];
@@ -345,17 +349,30 @@ class EntertainmentManager {
   magic8Ball(question) {
     const responses = [
       // Affirmative
-      'It is certain.', 'It is decidedly so.', 'Without a doubt.', 'Yes definitely.',
-      'You may rely on it.', 'As I see it, yes.', 'Most likely.', 'Outlook good.',
-      'Yes.', 'Signs point to yes.',
+      'It is certain.',
+      'It is decidedly so.',
+      'Without a doubt.',
+      'Yes definitely.',
+      'You may rely on it.',
+      'As I see it, yes.',
+      'Most likely.',
+      'Outlook good.',
+      'Yes.',
+      'Signs point to yes.',
 
       // Non-committal
-      'Reply hazy, try again.', 'Ask again later.', 'Better not tell you now.',
-      'Cannot predict now.', 'Concentrate and ask again.',
+      'Reply hazy, try again.',
+      'Ask again later.',
+      'Better not tell you now.',
+      'Cannot predict now.',
+      'Concentrate and ask again.',
 
       // Negative
-      "Don't count on it.", 'My reply is no.', 'My sources say no.', 'Outlook not so good.',
-      'Very doubtful.'
+      "Don't count on it.",
+      'My reply is no.',
+      'My sources say no.',
+      'Outlook not so good.',
+      'Very doubtful.',
     ];
 
     const response = responses[Math.floor(Math.random() * responses.length)];
@@ -363,7 +380,7 @@ class EntertainmentManager {
     return {
       question,
       answer: response,
-      id: `8ball_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+      id: `8ball_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
     };
   }
 
@@ -371,21 +388,27 @@ class EntertainmentManager {
   generateFunName(type = 'superhero') {
     const names = {
       superhero: [
-        'Captain Awesome', 'The Amazing Wonder', 'Super Spectacular', 'Mighty Marvel',
-        'Incredible Hero', 'Fantastic Force', 'Dynamic Defender', 'Ultimate Champion'
+        'Captain Awesome',
+        'The Amazing Wonder',
+        'Super Spectacular',
+        'Mighty Marvel',
+        'Incredible Hero',
+        'Fantastic Force',
+        'Dynamic Defender',
+        'Ultimate Champion',
       ],
       villain: [
-        'Dr. Disaster', 'The Evil Genius', 'Chaos Master', 'Shadow Lord',
-        'Dark Destroyer', 'The Terrible Tyrant', 'Wicked Warlock', 'Sinister Sorcerer'
+        'Dr. Disaster',
+        'The Evil Genius',
+        'Chaos Master',
+        'Shadow Lord',
+        'Dark Destroyer',
+        'The Terrible Tyrant',
+        'Wicked Warlock',
+        'Sinister Sorcerer',
       ],
-      fantasy: [
-        'Mystic Mage', 'Dragon Rider', 'Elven Archer', 'Dwarven Warrior',
-        'Phoenix Knight', 'Shadow Assassin', 'Crystal Sorceress', 'Storm Caller'
-      ],
-      sciFi: [
-        'Cyber Warrior', 'Space Ranger', 'Quantum Hacker', 'Nano Engineer',
-        'Star Captain', 'Robot Commander', 'Laser Knight', 'Plasma Pilot'
-      ]
+      fantasy: ['Mystic Mage', 'Dragon Rider', 'Elven Archer', 'Dwarven Warrior', 'Phoenix Knight', 'Shadow Assassin', 'Crystal Sorceress', 'Storm Caller'],
+      sciFi: ['Cyber Warrior', 'Space Ranger', 'Quantum Hacker', 'Nano Engineer', 'Star Captain', 'Robot Commander', 'Laser Knight', 'Plasma Pilot'],
     };
 
     const typeNames = names[type] || names.superhero;
@@ -394,7 +417,7 @@ class EntertainmentManager {
     return {
       name,
       type,
-      id: `name_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+      id: `name_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
     };
   }
 
@@ -404,18 +427,18 @@ class EntertainmentManager {
       {
         question: 'How do you prefer to spend your free time?',
         options: ['Reading or learning', 'Socializing with friends', 'Creating art or music', 'Playing sports or games'],
-        traits: ['intellectual', 'social', 'creative', 'active']
+        traits: ['intellectual', 'social', 'creative', 'active'],
       },
       {
         question: "What's your ideal vacation?",
         options: ['Cultural city tour', 'Beach relaxation', 'Adventure trip', 'Staycation at home'],
-        traits: ['cultural', 'relaxed', 'adventurous', 'homebody']
+        traits: ['cultural', 'relaxed', 'adventurous', 'homebody'],
       },
       {
         question: 'How do you make decisions?',
         options: ['Based on logic and facts', 'Based on feelings and values', 'After consulting others', 'Spontaneously'],
-        traits: ['logical', 'emotional', 'collaborative', 'spontaneous']
-      }
+        traits: ['logical', 'emotional', 'collaborative', 'spontaneous'],
+      },
     ];
 
     return questions[Math.floor(Math.random() * questions.length)];
@@ -443,19 +466,21 @@ class EntertainmentManager {
 
     this.contentCache.set(content.id, {
       ...content,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
   // Fun Statistics
   getEntertainmentStats(userId) {
-    return this.entertainmentData.funStats[userId] || {
-      jokesHeard: 0,
-      riddlesSolved: 0,
-      storiesGenerated: 0,
-      factsLearned: 0,
-      gamesPlayed: 0
-    };
+    return (
+      this.entertainmentData.funStats[userId] || {
+        jokesHeard: 0,
+        riddlesSolved: 0,
+        storiesGenerated: 0,
+        factsLearned: 0,
+        gamesPlayed: 0,
+      }
+    );
   }
 
   updateEntertainmentStats(userId, activity) {
@@ -465,7 +490,7 @@ class EntertainmentManager {
         riddlesSolved: 0,
         storiesGenerated: 0,
         factsLearned: 0,
-        gamesPlayed: 0
+        gamesPlayed: 0,
       };
     }
 
@@ -485,22 +510,22 @@ class EntertainmentManager {
         'Learn 3 new fun facts and share them!',
         'Create an original story with your friends!',
         'Solve 5 riddles or brain teasers!',
-        'Try 3 different types of games!'
+        'Try 3 different types of games!',
       ],
       weekly: [
         'Complete 10 different achievements!',
         'Try every game mode available!',
         'Create and share 5 original jokes!',
         'Reach level 10 in the RPG system!',
-        'Build the ultimate trading empire!'
+        'Build the ultimate trading empire!',
       ],
       monthly: [
         'Become a guild leader!',
         'Master all game difficulties!',
         'Build a business empire!',
         'Complete 50 achievements!',
-        'Become a legendary trader!'
-      ]
+        'Become a legendary trader!',
+      ],
     };
 
     const typeChallenges = challenges[type] || challenges.daily;
@@ -510,7 +535,7 @@ class EntertainmentManager {
       challenge,
       type,
       id: `challenge_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-      reward: this.getChallengeReward(type)
+      reward: this.getChallengeReward(type),
     };
   }
 
@@ -518,7 +543,7 @@ class EntertainmentManager {
     const rewards = {
       daily: '50 bonus achievement points',
       weekly: 'Special badge + 200 points',
-      monthly: 'Exclusive title + 500 points + Special role'
+      monthly: 'Exclusive title + 500 points + Special role',
     };
 
     return rewards[type] || rewards.daily;
@@ -535,19 +560,16 @@ class EntertainmentManager {
       }
     }
 
-    return stats
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+    return stats.sort((a, b) => b.score - a.score).slice(0, limit);
   }
 
   // Cleanup and Maintenance
   cleanup() {
     // Clean old joke ratings
-    const cutoffTime = Date.now() - (30 * 24 * 60 * 60 * 1000); // 30 days
+    const cutoffTime = Date.now() - 30 * 24 * 60 * 60 * 1000; // 30 days
 
     for (const jokeId in this.entertainmentData.jokeRatings) {
-      this.entertainmentData.jokeRatings[jokeId] = this.entertainmentData.jokeRatings[jokeId]
-        .filter(rating => rating.timestamp > cutoffTime);
+      this.entertainmentData.jokeRatings[jokeId] = this.entertainmentData.jokeRatings[jokeId].filter((rating) => rating.timestamp > cutoffTime);
     }
 
     this.saveEntertainment();
@@ -616,9 +638,12 @@ export function rateJoke(jokeId, rating) {
 
 // Auto-cleanup every hour. `unref()` is needed so this timer doesn't
 // keep the Node event loop alive in one-shot scripts / CI tests.
-const entertainmentCleanupInterval = setInterval(() => {
-  entertainmentManager.cleanup();
-}, 60 * 60 * 1000);
+const entertainmentCleanupInterval = setInterval(
+  () => {
+    entertainmentManager.cleanup();
+  },
+  60 * 60 * 1000,
+);
 if (typeof entertainmentCleanupInterval.unref === 'function') {
   entertainmentCleanupInterval.unref();
 }

@@ -19,11 +19,14 @@ class CustomCommandManager {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(CUSTOM_COMMANDS_FILE)) {
-      fs.writeFileSync(CUSTOM_COMMANDS_FILE, JSON.stringify({
-        commands: {},
-        usage: {},
-        templates: {}
-      }));
+      fs.writeFileSync(
+        CUSTOM_COMMANDS_FILE,
+        JSON.stringify({
+          commands: {},
+          usage: {},
+          templates: {},
+        }),
+      );
     }
   }
 
@@ -31,13 +34,12 @@ class CustomCommandManager {
     try {
       const data = JSON.parse(fs.readFileSync(CUSTOM_COMMANDS_FILE));
       this.customCommands = data;
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to load custom commands', error);
       this.customCommands = {
         commands: {},
         usage: {},
-        templates: {}
+        templates: {},
       };
     }
   }
@@ -45,8 +47,7 @@ class CustomCommandManager {
   saveCustomCommands() {
     try {
       fs.writeFileSync(CUSTOM_COMMANDS_FILE, JSON.stringify(this.customCommands, undefined, 2));
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to save custom commands', error);
     }
   }
@@ -86,7 +87,7 @@ class CustomCommandManager {
       enabled: true,
       aliases: commandData.aliases || [],
       variables: commandData.variables || {},
-      embed: commandData.embed || undefined
+      embed: commandData.embed || undefined,
     };
 
     const guildCommands = this.ensureNested(this.customCommands.commands, guildId);
@@ -155,7 +156,7 @@ class CustomCommandManager {
       success: true,
       response,
       embed: command.embed,
-      type: command.type
+      type: command.type,
     };
   }
 
@@ -216,7 +217,7 @@ class CustomCommandManager {
       variables: templateData.variables || [],
       category: templateData.category || 'general',
       created_by: templateData.created_by,
-      created_at: Date.now()
+      created_at: Date.now(),
     };
 
     // eslint-disable-next-line security/detect-object-injection -- templateId is freshly generated
@@ -233,8 +234,7 @@ class CustomCommandManager {
     const results = [];
 
     for (const [id, command] of Object.entries(commands)) {
-      if (command.name.toLowerCase().includes(query.toLowerCase()) ||
-          command.description.toLowerCase().includes(query.toLowerCase())) {
+      if (command.name.toLowerCase().includes(query.toLowerCase()) || command.description.toLowerCase().includes(query.toLowerCase())) {
         results.push({ id, ...command });
       }
     }
@@ -274,7 +274,7 @@ class CustomCommandManager {
     return {
       totalUses,
       userBreakdown,
-      averagePerUser: Object.keys(userBreakdown).length > 0 ? totalUses / Object.keys(userBreakdown).length : 0
+      averagePerUser: Object.keys(userBreakdown).length > 0 ? totalUses / Object.keys(userBreakdown).length : 0,
     };
   }
 
@@ -290,13 +290,11 @@ class CustomCommandManager {
         name: command.name,
         description: command.description,
         usage: usage.totalUses,
-        created_by: command.created_by
+        created_by: command.created_by,
       });
     }
 
-    return popularity
-      .sort((a, b) => b.usage - a.usage)
-      .slice(0, limit);
+    return popularity.sort((a, b) => b.usage - a.usage).slice(0, limit);
   }
 
   // Advanced Features
@@ -310,7 +308,7 @@ class CustomCommandManager {
       commands: chainData.commandList,
       delay: chainData.delay || 1000,
       created_by: chainData.created_by,
-      created_at: Date.now()
+      created_at: Date.now(),
     };
 
     if (!Object.hasOwn(this.customCommands, 'chains')) {
@@ -353,7 +351,7 @@ class CustomCommandManager {
         totalCommands: 0,
         totalUsage: 0,
         averageUsage: 0,
-        categories: {}
+        categories: {},
       };
     }
 
@@ -370,7 +368,7 @@ class CustomCommandManager {
       totalUsage,
       averageUsage: totalUsage / commandList.length,
       categories,
-      mostUsed: commandList.sort((a, b) => b.usage_count - a.usage_count)[0]?.name || 'None'
+      mostUsed: commandList.sort((a, b) => b.usage_count - a.usage_count)[0]?.name || 'None',
     };
   }
 
@@ -383,7 +381,7 @@ class CustomCommandManager {
       commands: Object.values(commands),
       exported_at: Date.now(),
       guild_id: guildId,
-      version: '1.0'
+      version: '1.0',
     };
   }
 
@@ -432,7 +430,7 @@ class CustomCommandManager {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -502,9 +500,12 @@ export function validateCommand(commandData) {
 
 // Auto-cleanup every hour. `unref()` is needed so this timer doesn't
 // keep the Node event loop alive in one-shot scripts / CI tests.
-const customCommandsCleanupInterval = setInterval(() => {
-  customCommandManager.cleanup();
-}, 60 * 60 * 1000);
+const customCommandsCleanupInterval = setInterval(
+  () => {
+    customCommandManager.cleanup();
+  },
+  60 * 60 * 1000,
+);
 if (typeof customCommandsCleanupInterval.unref === 'function') {
   customCommandsCleanupInterval.unref();
 }

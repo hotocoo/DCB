@@ -1,4 +1,14 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+} from 'discord.js';
 
 import {
   getOrCreateProfile,
@@ -8,19 +18,40 @@ import {
   searchProfiles,
   getLeaderboard,
   generateProfileInsights,
-  checkMilestones
+  checkMilestones,
 } from '../profiles.js';
 import { safeExecuteCommand, CommandError, validateUser, validateRange, validateNotEmpty } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()
   .setName('profile')
   .setDescription('Advanced user profile management and statistics')
-  .addSubcommand(sub => sub.setName('view').setDescription('View your profile').addUserOption(opt => opt.setName('user').setDescription('User to view (defaults to yourself)')))
-  .addSubcommand(sub => sub.setName('edit').setDescription('Edit your profile settings'))
-  .addSubcommand(sub => sub.setName('compare').setDescription('Compare profiles with another user').addUserOption(opt => opt.setName('user').setDescription('User to compare with').setRequired(true)))
-  .addSubcommand(sub => sub.setName('search').setDescription('Search for user profiles').addStringOption(opt => opt.setName('query').setDescription('Search term').setRequired(true)))
-  .addSubcommand(sub => sub.setName('leaderboard').setDescription('View leaderboards').addStringOption(opt => opt.setName('category').setDescription('Category').setRequired(true)).addStringOption(opt => opt.setName('stat').setDescription('Statistic').setRequired(true)))
-  .addSubcommand(sub => sub.setName('insights').setDescription('Get AI-powered profile insights'));
+  .addSubcommand((sub) =>
+    sub
+      .setName('view')
+      .setDescription('View your profile')
+      .addUserOption((opt) => opt.setName('user').setDescription('User to view (defaults to yourself)')),
+  )
+  .addSubcommand((sub) => sub.setName('edit').setDescription('Edit your profile settings'))
+  .addSubcommand((sub) =>
+    sub
+      .setName('compare')
+      .setDescription('Compare profiles with another user')
+      .addUserOption((opt) => opt.setName('user').setDescription('User to compare with').setRequired(true)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('search')
+      .setDescription('Search for user profiles')
+      .addStringOption((opt) => opt.setName('query').setDescription('Search term').setRequired(true)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('leaderboard')
+      .setDescription('View leaderboards')
+      .addStringOption((opt) => opt.setName('category').setDescription('Category').setRequired(true))
+      .addStringOption((opt) => opt.setName('stat').setDescription('Statistic').setRequired(true)),
+  )
+  .addSubcommand((sub) => sub.setName('insights').setDescription('Get AI-powered profile insights'));
 
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
@@ -68,28 +99,31 @@ export async function execute(interaction) {
             {
               name: '🏆 Level & Engagement',
               value: `**Level:** ${analytics.totalLevel || 1}\n**Engagement:** ${analytics.engagementLevel}\n**Activity Score:** ${Math.round(analytics.activityScore)}/100`,
-              inline: true
+              inline: true,
             },
             {
               name: '🎯 Most Active',
               value: `**Category:** ${analytics.mostActiveCategory.toUpperCase()}\n**Playtime:** ${analytics.totalPlayTime}h\n**Account Age:** ${analytics.accountAge} days`,
-              inline: true
+              inline: true,
             },
             {
               name: '📈 Key Stats',
               value: `**Commands:** ${profile.statistics.activity.commands_used}\n**Messages:** ${profile.statistics.activity.messages_sent}\n**Achievements:** ${profile.achievements.length}`,
-              inline: true
-            }
+              inline: true,
+            },
           );
         }
 
         // Add badges if enabled
         if (profile.customization.show_badges && profile.badges.length > 0) {
-          const badgeText = profile.badges.slice(0, 5).map(badge => badge.icon || '🏆').join(' ');
+          const badgeText = profile.badges
+            .slice(0, 5)
+            .map((badge) => badge.icon || '🏆')
+            .join(' ');
           embed.addFields({
             name: '🏅 Recent Badges',
             value: badgeText,
-            inline: false
+            inline: false,
           });
         }
 
@@ -98,7 +132,7 @@ export async function execute(interaction) {
           embed.addFields({
             name: '💡 Profile Insights',
             value: insights.slice(0, 3).join('\n'),
-            inline: false
+            inline: false,
           });
         }
 
@@ -106,23 +140,37 @@ export async function execute(interaction) {
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`profile_edit:${viewUserId}`).setLabel('✏️ Edit Profile').setStyle(ButtonStyle.Primary),
           new ButtonBuilder().setCustomId(`profile_refresh:${viewUserId}`).setLabel('🔄 Refresh').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId(`profile_compare:${viewUserId}:${userId}`).setLabel('⚖️ Compare').setStyle(ButtonStyle.Secondary)
+          new ButtonBuilder().setCustomId(`profile_compare:${viewUserId}:${userId}`).setLabel('⚖️ Compare').setStyle(ButtonStyle.Secondary),
         );
 
         await interaction.reply({ embeds: [embed], components: [row] });
-      }
-      catch (error) {
+      } catch (error) {
         throw new CommandError(`Failed to display profile: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
       }
 
       break;
     }
     case 'edit': {
-    // Show profile editing interface
+      // Show profile editing interface
       const modal = new ModalBuilder().setCustomId(`profile_edit_modal:${userId}`).setTitle('Edit Profile');
-      const displayNameInput = new TextInputBuilder().setCustomId('display_name').setLabel('Display Name').setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder('Your display name');
-      const bioInput = new TextInputBuilder().setCustomId('bio').setLabel('Bio').setStyle(TextInputStyle.Paragraph).setRequired(false).setPlaceholder('Tell us about yourself...');
-      const titleInput = new TextInputBuilder().setCustomId('title').setLabel('Profile Title').setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder('Adventurer Extraordinaire');
+      const displayNameInput = new TextInputBuilder()
+        .setCustomId('display_name')
+        .setLabel('Display Name')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('Your display name');
+      const bioInput = new TextInputBuilder()
+        .setCustomId('bio')
+        .setLabel('Bio')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+        .setPlaceholder('Tell us about yourself...');
+      const titleInput = new TextInputBuilder()
+        .setCustomId('title')
+        .setLabel('Profile Title')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('Adventurer Extraordinaire');
 
       modal.addComponents({ type: 1, components: [displayNameInput] });
       modal.addComponents({ type: 1, components: [bioInput] });
@@ -130,7 +178,6 @@ export async function execute(interaction) {
 
       await interaction.showModal(modal);
       return;
-
     }
     case 'compare': {
       const otherUser = interaction.options.getUser('user');
@@ -153,7 +200,7 @@ export async function execute(interaction) {
 
         const embed = new EmbedBuilder()
           .setTitle('⚖️ Profile Comparison')
-          .setColor(0x00_99_FF)
+          .setColor(0x00_99_ff)
           .setDescription(`Comparing **${interaction.user.username}** vs **${otherUser.username}**`);
 
         // Add comparison results
@@ -173,21 +220,20 @@ export async function execute(interaction) {
             embed.addFields({
               name: category.toUpperCase(),
               value: leadingStats.slice(0, 3).join('\n'),
-              inline: true
+              inline: true,
             });
           }
         }
 
-        const winner = comparison.winner === 'user1' ? 'You' : (comparison.winner === 'user2' ? otherUser.username : 'Tie');
+        const winner = comparison.winner === 'user1' ? 'You' : comparison.winner === 'user2' ? otherUser.username : 'Tie';
         embed.addFields({
           name: '🏆 Overall Winner',
           value: winner,
-          inline: false
+          inline: false,
         });
 
         await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-      }
-      catch (error) {
+      } catch (error) {
         throw new CommandError(`Failed to compare profiles: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
       }
 
@@ -205,21 +251,18 @@ export async function execute(interaction) {
           throw new CommandError('Failed to search profiles.', 'COMMAND_ERROR');
         }
 
-        const embed = new EmbedBuilder()
-          .setTitle(`🔍 Search Results for "${query}"`)
-          .setColor(0x00_99_FF);
+        const embed = new EmbedBuilder().setTitle(`🔍 Search Results for "${query}"`).setColor(0x00_99_ff);
 
         for (const [index, profile] of results.entries()) {
           embed.addFields({
             name: `${index + 1}. ${profile.displayName}`,
             value: `**Level:** ${getUserLevel(profile)}\n**Achievements:** ${profile.achievements.length}\n**Bio:** ${profile.bio || 'No bio'}`,
-            inline: false
+            inline: false,
           });
         }
 
         await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-      }
-      catch (error) {
+      } catch (error) {
         throw new CommandError(`Failed to search profiles: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
       }
 
@@ -237,7 +280,7 @@ export async function execute(interaction) {
         rpg: ['total_level', 'bosses_defeated', 'items_collected'],
         games: ['trivia_correct', 'hangman_wins', 'memory_games_completed'],
         social: ['guilds_created', 'trades_completed', 'reputation'],
-        activity: ['commands_used', 'messages_sent', 'streak_days']
+        activity: ['commands_used', 'messages_sent', 'streak_days'],
       };
 
       if (!validCategories.includes(category)) {
@@ -258,9 +301,7 @@ export async function execute(interaction) {
           return interaction.reply({ content: '📊 No data available for this leaderboard yet.', flags: MessageFlags.Ephemeral });
         }
 
-        const embed = new EmbedBuilder()
-          .setTitle(`🏆 ${category.toUpperCase()} Leaderboard - ${stat.replace('_', ' ').toUpperCase()}`)
-          .setColor(0xFF_D7_00);
+        const embed = new EmbedBuilder().setTitle(`🏆 ${category.toUpperCase()} Leaderboard - ${stat.replace('_', ' ').toUpperCase()}`).setColor(0xff_d7_00);
 
         for (const [index, entry] of leaderboard.entries()) {
           const rank = index + 1;
@@ -268,13 +309,12 @@ export async function execute(interaction) {
           embed.addFields({
             name: `${medal} #${rank} - ${entry.displayName}`,
             value: `**Value:** ${entry.value}\n**Level:** ${entry.level}`,
-            inline: true
+            inline: true,
           });
         }
 
         await interaction.reply({ embeds: [embed] });
-      }
-      catch (error) {
+      } catch (error) {
         throw new CommandError(`Failed to retrieve leaderboard: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
       }
 
@@ -291,28 +331,24 @@ export async function execute(interaction) {
           return interaction.reply({ content: '💡 Start using more bot features to get personalized insights!', flags: MessageFlags.Ephemeral });
         }
 
-        const embed = new EmbedBuilder()
-          .setTitle('💡 Profile Insights')
-          .setColor(0x99_32_CC)
-          .setDescription('AI-powered analysis of your bot usage patterns:');
+        const embed = new EmbedBuilder().setTitle('💡 Profile Insights').setColor(0x99_32_cc).setDescription('AI-powered analysis of your bot usage patterns:');
 
         for (const [index, insight] of insights.entries()) {
           embed.addFields({
             name: `Insight #${index + 1}`,
             value: insight,
-            inline: false
+            inline: false,
           });
         }
 
         await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-      }
-      catch (error) {
+      } catch (error) {
         throw new CommandError(`Failed to generate insights: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
       }
 
       break;
     }
-  // No default
+    // No default
   }
 }
 

@@ -6,7 +6,7 @@ import { safeExecuteCommand, CommandError, validateGuild, validatePermissions } 
 export const data = new SlashCommandBuilder()
   .setName('togglechat')
   .setDescription('Enable or disable the chat responder for this guild')
-  .addBooleanOption(opt => opt.setName('enabled').setDescription('Enable chat responder').setRequired(true));
+  .addBooleanOption((opt) => opt.setName('enabled').setDescription('Enable chat responder').setRequired(true));
 
 export async function execute(interaction) {
   validateGuild(interaction);
@@ -26,10 +26,9 @@ export async function execute(interaction) {
 
     await interaction.reply({
       content: `✅ Chat responder is now **${enabled ? 'enabled' : 'disabled'}** for this guild.`,
-      flags: MessageFlags.Ephemeral
+      flags: MessageFlags.Ephemeral,
     });
-  }
-  catch (error) {
+  } catch (error) {
     throw new CommandError(`Failed to toggle chat responder: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
   }
 }

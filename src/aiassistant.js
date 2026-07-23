@@ -37,7 +37,7 @@ class AIAssistantManager {
       description: 'Specialized in creative writing, stories, and artistic content',
       prompt: 'You are a creative writing AI. Write engaging, imaginative content with vivid descriptions and compelling narratives.',
       temperature: 0.8,
-      maxTokens: 800
+      maxTokens: 800,
     });
 
     this.aiModels.set('technical', {
@@ -45,7 +45,7 @@ class AIAssistantManager {
       description: 'Specialized in programming, technology, and technical explanations',
       prompt: 'You are a technical expert AI. Provide accurate, detailed technical information with code examples when relevant.',
       temperature: 0.3,
-      maxTokens: 600
+      maxTokens: 600,
     });
 
     this.aiModels.set('helpful', {
@@ -53,7 +53,7 @@ class AIAssistantManager {
       description: 'General purpose helpful AI for everyday questions',
       prompt: 'You are a helpful AI assistant. Provide clear, accurate, and useful responses to help users with their questions.',
       temperature: 0.5,
-      maxTokens: 500
+      maxTokens: 500,
     });
 
     this.aiModels.set('funny', {
@@ -61,7 +61,7 @@ class AIAssistantManager {
       description: 'Specialized in humor, jokes, and entertaining responses',
       prompt: 'You are a comedy AI. Make people laugh with witty, clever, and appropriate humor.',
       temperature: 0.7,
-      maxTokens: 400
+      maxTokens: 400,
     });
 
     this.aiModels.set('educational', {
@@ -69,37 +69,37 @@ class AIAssistantManager {
       description: 'Specialized in education and learning',
       prompt: 'You are an educational AI. Explain concepts clearly, provide examples, and help users learn new things.',
       temperature: 0.4,
-      maxTokens: 700
+      maxTokens: 700,
     });
 
     // Initialize personality profiles
     this.personalityProfiles.set('professional', {
       name: 'Professional',
       style: 'formal, precise, and business-like',
-      responses: 'structured and informative'
+      responses: 'structured and informative',
     });
 
     this.personalityProfiles.set('friendly', {
       name: 'Friendly',
       style: 'warm, approachable, and casual',
-      responses: 'conversational and engaging'
+      responses: 'conversational and engaging',
     });
 
     this.personalityProfiles.set('energetic', {
       name: 'Energetic',
       style: 'exciting, enthusiastic, and dynamic',
-      responses: 'lively and motivating'
+      responses: 'lively and motivating',
     });
 
     this.personalityProfiles.set('wise', {
       name: 'Wise Mentor',
       style: 'thoughtful, reflective, and insightful',
-      responses: 'profound and meaningful'
+      responses: 'profound and meaningful',
     });
 
     logger.info('AI initialization completed', {
       modelsCount: this.aiModels.size,
-      personalitiesCount: this.personalityProfiles.size
+      personalitiesCount: this.personalityProfiles.size,
     });
   }
 
@@ -111,12 +111,7 @@ class AIAssistantManager {
    * @returns {Promise<string>} AI response
    */
   async generateResponse(userId, message, options = {}) {
-    const {
-      model = 'helpful',
-      personality = 'friendly',
-      guildId = null,
-      context = ''
-    } = options;
+    const { model = 'helpful', personality = 'friendly', guildId = null, context = '' } = options;
 
     if (!message || typeof message !== 'string') {
       throw new Error('Invalid message provided');
@@ -152,7 +147,10 @@ Response style: ${personalityConfig.responses}
 
 Context: ${context}
 Previous conversation:
-${history.slice(-3).map(h => `${h.role}: ${h.content}`).join('\n')}
+${history
+  .slice(-3)
+  .map((h) => `${h.role}: ${h.content}`)
+  .join('\n')}
 
 User message: ${message}
 
@@ -191,14 +189,12 @@ Provide a response that matches the specified model and personality.`;
       // Cache response
       this.responseCache.set(cacheKey, {
         response,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       logger.debug('Response generated successfully', { userId, responseLength: response.length });
       return response;
-
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('AI Assistant error', error, { userId, model, personality });
       return this.generateFallbackResponse(message, model, personality);
     }
@@ -222,8 +218,8 @@ Provide a response that matches the specified model and personality.`;
           model: 'local-model',
           messages: [{ role: 'user', content: prompt }],
           max_tokens: config.maxTokens,
-          temperature: config.temperature
-        })
+          temperature: config.temperature,
+        }),
       });
 
       if (response.ok) {
@@ -233,8 +229,7 @@ Provide a response that matches the specified model and personality.`;
       }
 
       logger.warn('Local AI call failed with status', { status: response.status, url });
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Local AI call error', error, { url });
     }
     return null;
@@ -254,14 +249,14 @@ Provide a response that matches the specified model and personality.`;
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
           messages: [{ role: 'user', content: prompt }],
           max_tokens: config.maxTokens,
-          temperature: config.temperature
-        })
+          temperature: config.temperature,
+        }),
       });
 
       if (response.ok) {
@@ -271,8 +266,7 @@ Provide a response that matches the specified model and personality.`;
       }
 
       logger.warn('OpenAI call failed with status', { status: response.status });
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('OpenAI call error', error);
     }
     return null;
@@ -292,28 +286,28 @@ Provide a response that matches the specified model and personality.`;
       creative: [
         `🎨 Creatively speaking about "${message}" - I imagine a world where ideas flow like rivers of color!`,
         `✨ My artistic mind sees "${message}" as a canvas of infinite possibilities and beautiful expressions.`,
-        `🎭 In the theater of imagination, "${message}" becomes a masterpiece of creativity and wonder.`
+        `🎭 In the theater of imagination, "${message}" becomes a masterpiece of creativity and wonder.`,
       ],
       technical: [
         `🔧 Analyzing "${message}" from a technical perspective reveals interesting possibilities and considerations.`,
         `⚙️ From an engineering standpoint, "${message}" presents several technical angles worth exploring.`,
-        `💻 The technical analysis of "${message}" suggests multiple approaches and solutions.`
+        `💻 The technical analysis of "${message}" suggests multiple approaches and solutions.`,
       ],
       helpful: [
         `🤝 I'd be happy to help with "${message}". Let me provide you with some useful information and guidance.`,
         `💡 Regarding "${message}", here are some helpful insights and suggestions to consider.`,
-        `🌟 I'm here to assist with "${message}". Let's explore this together and find the best approach.`
+        `🌟 I'm here to assist with "${message}". Let's explore this together and find the best approach.`,
       ],
       funny: [
         `😂 "${message}"? That's hilarious! Let me respond with some witty commentary and humorous observations.`,
         `🤣 Oh man, "${message}" cracks me up! Here's my comedic take on this situation.`,
-        `😄 I love the humor in "${message}"! Let me match that energy with some clever wit.`
+        `😄 I love the humor in "${message}"! Let me match that energy with some clever wit.`,
       ],
       educational: [
         `📚 Let's learn about "${message}". This is a great opportunity to explore new concepts and understanding.`,
         `🎓 From an educational perspective, "${message}" offers valuable learning opportunities and insights.`,
-        `🔬 Scientifically examining "${message}" reveals fascinating principles and concepts to understand.`
-      ]
+        `🔬 Scientifically examining "${message}" reveals fascinating principles and concepts to understand.`,
+      ],
     };
 
     const modelResponses = responses[model] || responses.helpful;
@@ -340,7 +334,7 @@ Provide a response that matches the specified model and personality.`;
 
   async generateSummary(text, maxLength = 200) {
     // Simple text summarization
-    const sentences = text.split(/[!.?]+/).filter(s => s.trim().length > 0);
+    const sentences = text.split(/[!.?]+/).filter((s) => s.trim().length > 0);
     const summary = sentences.slice(0, 2).join('. ') + '.';
 
     return summary.length > maxLength ? summary.slice(0, Math.max(0, maxLength - 3)) + '...' : summary;
@@ -348,11 +342,11 @@ Provide a response that matches the specified model and personality.`;
 
   async translateText(text, targetLanguage = 'es') {
     const translations = {
-      'hello': { 'es': 'hola', 'fr': 'bonjour', 'de': 'hallo', 'it': 'ciao' },
-      'goodbye': { 'es': 'adiós', 'fr': 'au revoir', 'de': 'tschüss', 'it': 'ciao' },
-      'thank you': { 'es': 'gracias', 'fr': 'merci', 'de': 'danke', 'it': 'grazie' },
-      'yes': { 'es': 'sí', 'fr': 'oui', 'de': 'ja', 'it': 'sì' },
-      'no': { 'es': 'no', 'fr': 'non', 'de': 'nein', 'it': 'no' }
+      hello: { es: 'hola', fr: 'bonjour', de: 'hallo', it: 'ciao' },
+      goodbye: { es: 'adiós', fr: 'au revoir', de: 'tschüss', it: 'ciao' },
+      'thank you': { es: 'gracias', fr: 'merci', de: 'danke', it: 'grazie' },
+      yes: { es: 'sí', fr: 'oui', de: 'ja', it: 'sì' },
+      no: { es: 'no', fr: 'non', de: 'nein', it: 'no' },
     };
 
     const lowerText = text.toLowerCase();
@@ -370,7 +364,7 @@ Provide a response that matches the specified model and personality.`;
     return [...this.aiModels.entries()].map(([key, config]) => ({
       id: key,
       name: config.name,
-      description: config.description
+      description: config.description,
     }));
   }
 
@@ -378,7 +372,7 @@ Provide a response that matches the specified model and personality.`;
     return [...this.personalityProfiles.entries()].map(([key, config]) => ({
       id: key,
       name: config.name,
-      style: config.style
+      style: config.style,
     }));
   }
 
@@ -406,7 +400,7 @@ Provide a response that matches the specified model and personality.`;
       `Creative ${topic} solution that breaks traditional boundaries`,
       `Unique ${topic} approach combining multiple disciplines`,
       `Futuristic ${topic} design with cutting-edge technology`,
-      `Elegant ${topic} solution that simplifies complex problems`
+      `Elegant ${topic} solution that simplifies complex problems`,
     ];
 
     return ideas.slice(0, count);
@@ -414,16 +408,16 @@ Provide a response that matches the specified model and personality.`;
 
   async generateCodeSnippet(language, description) {
     const snippets = {
-      'javascript': this.generateJavaScriptSnippet(description),
-      'python': this.generatePythonSnippet(description),
-      'java': this.generateJavaSnippet(description),
-      'cpp': this.generateCppSnippet(description),
+      javascript: this.generateJavaScriptSnippet(description),
+      python: this.generatePythonSnippet(description),
+      java: this.generateJavaSnippet(description),
+      cpp: this.generateCppSnippet(description),
       'c#': this.generateCSharpSnippet(description),
-      'go': this.generateGoSnippet(description),
-      'rust': this.generateRustSnippet(description),
-      'php': this.generatePhpSnippet(description),
-      'ruby': this.generateRubySnippet(description),
-      'swift': this.generateSwiftSnippet(description)
+      go: this.generateGoSnippet(description),
+      rust: this.generateRustSnippet(description),
+      php: this.generatePhpSnippet(description),
+      ruby: this.generateRubySnippet(description),
+      swift: this.generateSwiftSnippet(description),
     };
 
     return snippets[language.toLowerCase()] || this.generateJavaScriptSnippet(description);
@@ -433,8 +427,7 @@ Provide a response that matches the specified model and personality.`;
     const lowerDesc = description.toLowerCase();
     if (lowerDesc.includes('function') || lowerDesc.includes('method')) {
       return `// ${description}\nfunction performTask(data) {\n  // Implementation for ${description.toLowerCase()}\n  try {\n    // Your logic here\n    return processData(data);\n  } catch (error) {\n    console.error('Error:', error.message);\n    throw error;\n  }\n}\n\n// Usage example\nconst result = performTask(inputData);`;
-    }
-    else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
+    } else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
       return `// ${description}\nclass DataProcessor {\n  constructor(options = {}) {\n    this.options = options;\n    this.cache = new Map();\n  }\n\n  // Main method implementation\n  process(data) {\n    // Implementation for ${description.toLowerCase()}\n    if (this.cache.has(data)) {\n      return this.cache.get(data);\n    }\n\n    const result = this.transformData(data);\n    this.cache.set(data, result);\n    return result;\n  }\n\n  transformData(data) {\n    // Transform logic here\n    return data;\n  }\n}`;
     }
     return `// ${description}\n// Implementation example\nconst ${description.replaceAll(/\s+/g, '').toLowerCase()} = (input) => {\n  // Your implementation here\n  return input;\n};\n\n// Usage\nconst result = ${description.replaceAll(/\s+/g, '').toLowerCase()}(inputValue);`;
@@ -444,8 +437,7 @@ Provide a response that matches the specified model and personality.`;
     const lowerDesc = description.toLowerCase();
     if (lowerDesc.includes('function') || lowerDesc.includes('method')) {
       return `# ${description}\ndef perform_task(data):\n    """\n    Implementation for ${description.lower()}\n    """\n    try:\n        # Your logic here\n        return process_data(data)\n    except Exception as e:\n        print(f"Error: {e}")\n        raise\n\n# Usage example\nresult = perform_task(input_data)`;
-    }
-    else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
+    } else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
       return `# ${description}\nclass DataProcessor:\n    def __init__(self, options=None):\n        self.options = options or {}\n        self.cache = {}\n\n    def process(self, data):\n        """\n        Implementation for ${description.lower()}\n        """\n        if data in self.cache:\n            return self.cache[data]\n\n        result = self.transform_data(data)\n        self.cache[data] = result\n        return result\n\n    def transform_data(self, data):\n        """Transform logic here"""\n        return data\n\n# Usage\nprocessor = DataProcessor()\nresult = processor.process(input_data)`;
     }
     return `# ${description}\ndef ${description.replaceAll(/\s+/g, '_').lower()}():\n    # Your implementation here\n    return input_value`;
@@ -455,8 +447,7 @@ Provide a response that matches the specified model and personality.`;
     const lowerDesc = description.toLowerCase();
     if (lowerDesc.includes('function') || lowerDesc.includes('method')) {
       return `// ${description}\npublic class TaskProcessor {\n    public static Object performTask(Object data) {\n        try {\n            // Implementation for ${description.toLowerCase()}\n            return processData(data);\n        } catch (Exception e) {\n            System.err.println("Error: " + e.getMessage());\n            throw e;\n        }\n    }\n\n    private static Object processData(Object data) {\n        // Your logic here\n        return data;\n    }\n\n    // Usage\n    public static void main(String[] args) {\n        Object result = performTask(inputData);\n    }\n}`;
-    }
-    else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
+    } else if (lowerDesc.includes('class') || lowerDesc.includes('object')) {
       return `// ${description}\npublic class DataProcessor {\n    private Map<Object, Object> cache;\n    private Map<String, Object> options;\n\n    public DataProcessor(Map<String, Object> options) {\n        this.options = options;\n        this.cache = new HashMap<>();\n    }\n\n    public Object process(Object data) {\n        // Implementation for ${description.toLowerCase()}\n        if (cache.containsKey(data)) {\n            return cache.get(data);\n        }\n\n        Object result = transformData(data);\n        cache.put(data, result);\n        return result;\n    }\n\n    private Object transformData(Object data) {\n        // Transform logic here\n        return data;\n    }\n}`;
     }
     return `// ${description}\n// Implementation example\npublic class ${description.replaceAll(/\s+/g, '')} {\n    public static void main(String[] args) {\n        // Your implementation here\n    }\n}`;
@@ -500,7 +491,7 @@ Provide a response that matches the specified model and personality.`;
       rating,
       timestamp: Date.now(),
       length: response.length,
-      complexity: this.calculateComplexity(response)
+      complexity: this.calculateComplexity(response),
     };
 
     // In a real implementation, this would be used to fine-tune models
@@ -515,7 +506,7 @@ Provide a response that matches the specified model and personality.`;
     return {
       wordCount: words,
       sentenceCount: sentences,
-      avgWordLength: Math.round(avgWordLength * 100) / 100
+      avgWordLength: Math.round(avgWordLength * 100) / 100,
     };
   }
 
@@ -527,8 +518,7 @@ Provide a response that matches the specified model and personality.`;
       try {
         const response = await this.generateResponse(userId, message, { model });
         responses[model] = response;
-      }
-      catch {
+      } catch {
         responses[model] = `Error generating response from ${model} model`;
       }
     }
@@ -545,7 +535,7 @@ Provide a response that matches the specified model and personality.`;
         'Try asking me about games - I have trivia, RPG adventures, and more!',
         'Ask me to tell you a joke or share a fun fact!',
         'Want to play a game? Try /tictactoe or /connect4!',
-        'Create an RPG character and start your adventure!'
+        'Create an RPG character and start your adventure!',
       ];
     }
 
@@ -554,26 +544,21 @@ Provide a response that matches the specified model and personality.`;
         '🎮 Try the new Connect Four game with AI opponents!',
         '🧠 Challenge yourself with a trivia quiz!',
         '⚔️ Continue your RPG adventure!',
-        '🎯 Play some strategy games!'
+        '🎯 Play some strategy games!',
       ],
       learning: [
         '📚 Ask me about programming or technology!',
         '🔢 Want to learn something new with fun facts?',
         '💻 I can help with coding questions!',
-        '🧪 Explore scientific concepts!'
+        '🧪 Explore scientific concepts!',
       ],
-      fun: [
-        '😂 Let me tell you a joke!',
-        '🎭 Generate a fun superhero name!',
-        '🔮 Ask the magic 8-ball a question!',
-        '📖 Want me to create a story for you?'
-      ],
+      fun: ['😂 Let me tell you a joke!', '🎭 Generate a fun superhero name!', '🔮 Ask the magic 8-ball a question!', '📖 Want me to create a story for you?'],
       social: [
         '👥 Check out the guild system!',
         '💰 Try the economy and trading features!',
         '🏆 View your achievements and profile!',
-        '🤝 Join a party for multiplayer fun!'
-      ]
+        '🤝 Join a party for multiplayer fun!',
+      ],
     };
 
     return recommendations[type] || recommendations.general;

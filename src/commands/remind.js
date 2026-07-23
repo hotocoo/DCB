@@ -6,22 +6,38 @@ import { safeExecuteCommand, CommandError, validateGuild, validateRange, validat
 export const data = new SlashCommandBuilder()
   .setName('remind')
   .setDescription('Advanced reminder and scheduling system')
-  .addSubcommand(sub => sub.setName('me').setDescription('Set a personal reminder')
-    .addStringOption(opt => opt.setName('when').setDescription('When to remind you (e.g., "in 30 minutes", "tomorrow 3pm")').setRequired(true))
-    .addStringOption(opt => opt.setName('what').setDescription('What to remind you about').setRequired(true))
-    .addStringOption(opt => opt.setName('title').setDescription('Reminder title').setRequired(false)))
-  .addSubcommand(sub => sub.setName('event').setDescription('Create a server event')
-    .addStringOption(opt => opt.setName('title').setDescription('Event title').setRequired(true))
-    .addStringOption(opt => opt.setName('description').setDescription('Event description').setRequired(true))
-    .addStringOption(opt => opt.setName('when').setDescription('When the event starts').setRequired(true))
-    .addIntegerOption(opt => opt.setName('duration').setDescription('Duration in minutes (default: 60)').setRequired(false))
-    .addIntegerOption(opt => opt.setName('max_participants').setDescription('Maximum participants (0 for unlimited)').setRequired(false)))
-  .addSubcommand(sub => sub.setName('list').setDescription('List your reminders and events'))
-  .addSubcommand(sub => sub.setName('upcoming').setDescription('View upcoming events and reminders')
-    .addIntegerOption(opt => opt.setName('days').setDescription('Days to look ahead (default: 7)').setRequired(false)))
-  .addSubcommand(sub => sub.setName('cancel').setDescription('Cancel a reminder or event')
-    .addStringOption(opt => opt.setName('type').setDescription('reminder or event').setRequired(true))
-    .addStringOption(opt => opt.setName('id').setDescription('ID to cancel').setRequired(true)));
+  .addSubcommand((sub) =>
+    sub
+      .setName('me')
+      .setDescription('Set a personal reminder')
+      .addStringOption((opt) => opt.setName('when').setDescription('When to remind you (e.g., "in 30 minutes", "tomorrow 3pm")').setRequired(true))
+      .addStringOption((opt) => opt.setName('what').setDescription('What to remind you about').setRequired(true))
+      .addStringOption((opt) => opt.setName('title').setDescription('Reminder title').setRequired(false)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('event')
+      .setDescription('Create a server event')
+      .addStringOption((opt) => opt.setName('title').setDescription('Event title').setRequired(true))
+      .addStringOption((opt) => opt.setName('description').setDescription('Event description').setRequired(true))
+      .addStringOption((opt) => opt.setName('when').setDescription('When the event starts').setRequired(true))
+      .addIntegerOption((opt) => opt.setName('duration').setDescription('Duration in minutes (default: 60)').setRequired(false))
+      .addIntegerOption((opt) => opt.setName('max_participants').setDescription('Maximum participants (0 for unlimited)').setRequired(false)),
+  )
+  .addSubcommand((sub) => sub.setName('list').setDescription('List your reminders and events'))
+  .addSubcommand((sub) =>
+    sub
+      .setName('upcoming')
+      .setDescription('View upcoming events and reminders')
+      .addIntegerOption((opt) => opt.setName('days').setDescription('Days to look ahead (default: 7)').setRequired(false)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('cancel')
+      .setDescription('Cancel a reminder or event')
+      .addStringOption((opt) => opt.setName('type').setDescription('reminder or event').setRequired(true))
+      .addStringOption((opt) => opt.setName('id').setDescription('ID to cancel').setRequired(true)),
+  );
 
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
@@ -46,7 +62,7 @@ export async function execute(interaction) {
           throw new CommandError('Cannot schedule reminders in the past!', 'INVALID_ARGUMENT');
         }
 
-        const maxReminderTime = Date.now() + (365 * 24 * 60 * 60 * 1000); // 1 year
+        const maxReminderTime = Date.now() + 365 * 24 * 60 * 60 * 1000; // 1 year
         if (scheduledTime > maxReminderTime) {
           throw new CommandError('Cannot schedule reminders more than 1 year in advance.', 'OUT_OF_RANGE');
         }
@@ -56,7 +72,7 @@ export async function execute(interaction) {
           message: what,
           scheduledFor: scheduledTime,
           channelId: interaction.channel.id,
-          guildId: interaction.guild?.id || null
+          guildId: interaction.guild?.id || null,
         };
 
         const reminder = createReminder(interaction.user.id, reminderData);
@@ -65,18 +81,16 @@ export async function execute(interaction) {
 
         const embed = new EmbedBuilder()
           .setTitle('⏰ Reminder Set!')
-          .setColor(0x00_FF_00)
+          .setColor(0x00_ff_00)
           .setDescription(`**${title}**`)
           .addFields(
             { name: '📝 Message', value: what, inline: false },
             { name: '⏱️ When', value: `In ${timeUntil} minutes (${new Date(scheduledTime).toLocaleString()})`, inline: true },
-            { name: '🆔 Reminder ID', value: `\`${reminder.id}\``, inline: true }
+            { name: '🆔 Reminder ID', value: `\`${reminder.id}\``, inline: true },
           );
 
         await interaction.reply({ embeds: [embed] });
-
-      }
-      catch (error) {
+      } catch (error) {
         throw new CommandError(`Failed to create reminder: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
       }
 
@@ -108,7 +122,7 @@ export async function execute(interaction) {
           throw new CommandError('Cannot schedule events in the past!', 'INVALID_ARGUMENT');
         }
 
-        const maxEventTime = Date.now() + (365 * 24 * 60 * 60 * 1000); // 1 year
+        const maxEventTime = Date.now() + 365 * 24 * 60 * 60 * 1000; // 1 year
         if (startTime > maxEventTime) {
           throw new CommandError('Cannot schedule events more than 1 year in advance.', 'OUT_OF_RANGE');
         }
@@ -122,7 +136,7 @@ export async function execute(interaction) {
           guildId: interaction.guild.id,
           creatorId: interaction.user.id,
           maxParticipants,
-          reminders: [600_000, 1_800_000] // 10 minutes and 30 minutes before
+          reminders: [600_000, 1_800_000], // 10 minutes and 30 minutes before
         };
 
         const event = createEvent(eventData);
@@ -131,19 +145,17 @@ export async function execute(interaction) {
 
         const embed = new EmbedBuilder()
           .setTitle('📅 Event Created!')
-          .setColor(0x00_99_FF)
+          .setColor(0x00_99_ff)
           .setDescription(`**${title}**`)
           .addFields(
             { name: '📝 Description', value: description, inline: false },
             { name: '⏱️ Starts In', value: `${timeUntil} minutes (${new Date(startTime).toLocaleString()})`, inline: true },
             { name: '⏳ Duration', value: `${duration} minutes`, inline: true },
-            { name: '👥 Max Participants', value: maxParticipants || 'Unlimited', inline: true }
+            { name: '👥 Max Participants', value: maxParticipants || 'Unlimited', inline: true },
           );
 
         await interaction.reply({ embeds: [embed] });
-
-      }
-      catch (error) {
+      } catch (error) {
         throw new CommandError(`Failed to create event: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
       }
 
@@ -159,48 +171,50 @@ export async function execute(interaction) {
         }
 
         if (userReminders.length === 0 && userEvents.length === 0) {
-          return interaction.reply({ content: '📅 No upcoming reminders or events. Use `/remind me` or `/remind event` to create some!', flags: MessageFlags.Ephemeral });
+          return interaction.reply({
+            content: '📅 No upcoming reminders or events. Use `/remind me` or `/remind event` to create some!',
+            flags: MessageFlags.Ephemeral,
+          });
         }
 
-        const embed = new EmbedBuilder()
-          .setTitle('📅 Your Schedule')
-          .setColor(0x00_99_FF)
-          .setDescription('Upcoming reminders and events');
+        const embed = new EmbedBuilder().setTitle('📅 Your Schedule').setColor(0x00_99_ff).setDescription('Upcoming reminders and events');
 
         if (userReminders.length > 0) {
-          const reminderList = userReminders.map(r => {
-            const timeUntil = Math.round((r.scheduledFor - Date.now()) / 60_000);
-            return `⏰ **${r.title}** - In ${timeUntil}m\n${r.message}`;
-          }).join('\n\n');
+          const reminderList = userReminders
+            .map((r) => {
+              const timeUntil = Math.round((r.scheduledFor - Date.now()) / 60_000);
+              return `⏰ **${r.title}** - In ${timeUntil}m\n${r.message}`;
+            })
+            .join('\n\n');
 
           embed.addFields({
             name: `⏰ Personal Reminders (${userReminders.length})`,
             value: reminderList,
-            inline: false
+            inline: false,
           });
         }
 
         if (userEvents.length > 0) {
-          const eventList = userEvents.map(e => {
-            const timeUntil = Math.round((e.scheduledFor - Date.now()) / 60_000);
-            return `📅 **${e.title}** - In ${timeUntil}m\n${e.description}`;
-          }).join('\n\n');
+          const eventList = userEvents
+            .map((e) => {
+              const timeUntil = Math.round((e.scheduledFor - Date.now()) / 60_000);
+              return `📅 **${e.title}** - In ${timeUntil}m\n${e.description}`;
+            })
+            .join('\n\n');
 
           embed.addFields({
             name: `📅 Server Events (${userEvents.length})`,
             value: eventList,
-            inline: false
+            inline: false,
           });
         }
 
         const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`remind_upcoming:${interaction.user.id}`).setLabel('📅 View All').setStyle(ButtonStyle.Primary)
+          new ButtonBuilder().setCustomId(`remind_upcoming:${interaction.user.id}`).setLabel('📅 View All').setStyle(ButtonStyle.Primary),
         );
 
         await interaction.reply({ embeds: [embed], components: [row] });
-
-      }
-      catch (error) {
+      } catch (error) {
         throw new CommandError(`Failed to list schedule: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
       }
 
@@ -221,10 +235,7 @@ export async function execute(interaction) {
           return interaction.reply({ content: `📅 No upcoming events or reminders in the next ${days} days.`, flags: MessageFlags.Ephemeral });
         }
 
-        const embed = new EmbedBuilder()
-          .setTitle(`📅 Upcoming (${days} days)`)
-          .setColor(0x00_99_FF)
-          .setDescription(`${upcoming.length} upcoming items`);
+        const embed = new EmbedBuilder().setTitle(`📅 Upcoming (${days} days)`).setColor(0x00_99_ff).setDescription(`${upcoming.length} upcoming items`);
 
         for (const [index, item] of upcoming.slice(0, 10).entries()) {
           const timeUntil = Math.round((item.scheduledFor - Date.now()) / 60_000);
@@ -233,14 +244,12 @@ export async function execute(interaction) {
           embed.addFields({
             name: `${type} ${item.title}`,
             value: `**In:** ${timeUntil} minutes\n**Description:** ${item.message || item.description}\n**When:** ${new Date(item.scheduledFor).toLocaleString()}`,
-            inline: false
+            inline: false,
           });
         }
 
         await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-
-      }
-      catch (error) {
+      } catch (error) {
         throw new CommandError(`Failed to get upcoming events: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
       }
 
@@ -264,31 +273,26 @@ export async function execute(interaction) {
 
           if (result) {
             await interaction.reply({ content: '✅ **Reminder cancelled successfully!**', flags: MessageFlags.Ephemeral });
-          }
-          else {
+          } else {
             throw new CommandError('Reminder not found or already executed.', 'NOT_FOUND');
           }
-
-        }
-        else if (type === 'event') {
+        } else if (type === 'event') {
           validateGuild(interaction);
           const result = cancelEvent(interaction.guild.id, id, interaction.user.id);
 
           if (result) {
             await interaction.reply({ content: '✅ **Event cancelled successfully!**', flags: MessageFlags.Ephemeral });
-          }
-          else {
+          } else {
             throw new CommandError('Event not found or you are not the creator.', 'NOT_FOUND');
           }
         }
-      }
-      catch (error) {
+      } catch (error) {
         throw new CommandError(`Failed to cancel ${type}: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
       }
 
       break;
     }
-  // No default
+    // No default
   }
 }
 

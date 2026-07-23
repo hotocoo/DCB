@@ -7,7 +7,7 @@ const RPS_CHOICES = ['rock', 'paper', 'scissors'];
 const RPS_RULES = {
   rock: { beats: 'scissors', losesTo: 'paper' },
   paper: { beats: 'rock', losesTo: 'scissors' },
-  scissors: { beats: 'paper', losesTo: 'rock' }
+  scissors: { beats: 'paper', losesTo: 'rock' },
 };
 
 /**
@@ -36,13 +36,13 @@ function formatResultMessage(playerChoice, botChoice, result, username) {
   const resultEmojis = {
     win: '🎉',
     lose: '😢',
-    tie: '🤝'
+    tie: '🤝',
   };
 
   const resultText = {
     win: 'You win!',
     lose: 'You lose!',
-    tie: 'It\'s a tie!'
+    tie: "It's a tie!",
   };
 
   return `${username} chose ${playerChoice}, I chose ${botChoice} — ${resultEmojis[result]} ${resultText[result]}`;
@@ -54,15 +54,12 @@ function formatResultMessage(playerChoice, botChoice, result, username) {
 export const data = new SlashCommandBuilder()
   .setName('rps')
   .setDescription('Play rock-paper-scissors against the bot')
-  .addStringOption(opt =>
-    opt.setName('choice')
+  .addStringOption((opt) =>
+    opt
+      .setName('choice')
       .setDescription('Your choice')
       .setRequired(true)
-      .addChoices(
-        { name: 'Rock 🪨', value: 'rock' },
-        { name: 'Paper 📄', value: 'paper' },
-        { name: 'Scissors ✂️', value: 'scissors' }
-      )
+      .addChoices({ name: 'Rock 🪨', value: 'rock' }, { name: 'Paper 📄', value: 'paper' }, { name: 'Scissors ✂️', value: 'scissors' }),
   );
 
 /**
@@ -71,7 +68,7 @@ export const data = new SlashCommandBuilder()
  * @returns {Promise<void>}
  */
 export async function execute(interaction) {
-  return safeExecuteCommand(interaction, async() => {
+  return safeExecuteCommand(interaction, async () => {
     // Validate interaction and user
     validateNotEmpty(interaction, 'interaction');
     validateNotEmpty(interaction.user, 'user');
@@ -86,10 +83,7 @@ export async function execute(interaction) {
     const normalizedChoice = choice.toLowerCase().trim();
 
     if (!RPS_CHOICES.includes(normalizedChoice)) {
-      throw new CommandError(
-        'Invalid choice. Please choose rock, paper, or scissors.',
-        'INVALID_ARGUMENT'
-      );
+      throw new CommandError('Invalid choice. Please choose rock, paper, or scissors.', 'INVALID_ARGUMENT');
     }
 
     // Generate bot's choice with proper randomization
@@ -99,12 +93,7 @@ export async function execute(interaction) {
     const result = determineWinner(normalizedChoice, botChoice);
 
     // Format and send response
-    const response = formatResultMessage(
-      normalizedChoice,
-      botChoice,
-      result,
-      interaction.user.username
-    );
+    const response = formatResultMessage(normalizedChoice, botChoice, result, interaction.user.username);
 
     await interaction.reply(response);
   });

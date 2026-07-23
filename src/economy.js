@@ -21,13 +21,16 @@ class EconomyManager {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(ECONOMY_FILE)) {
-      fs.writeFileSync(ECONOMY_FILE, JSON.stringify({
-        userBalances: {},
-        transactions: [],
-        marketItems: {},
-        businessData: {},
-        investments: {}
-      }));
+      fs.writeFileSync(
+        ECONOMY_FILE,
+        JSON.stringify({
+          userBalances: {},
+          transactions: [],
+          marketItems: {},
+          businessData: {},
+          investments: {},
+        }),
+      );
     }
   }
 
@@ -35,15 +38,14 @@ class EconomyManager {
     try {
       const data = JSON.parse(fs.readFileSync(ECONOMY_FILE));
       this.economyData = data;
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to load economy:', error);
       this.economyData = {
         userBalances: {},
         transactions: [],
         marketItems: {},
         businessData: {},
-        investments: {}
+        investments: {},
       };
     }
   }
@@ -51,8 +53,7 @@ class EconomyManager {
   saveEconomy() {
     try {
       fs.writeFileSync(ECONOMY_FILE, JSON.stringify(this.economyData, null, 2));
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to save economy:', error);
     }
   }
@@ -94,7 +95,7 @@ class EconomyManager {
       from: fromUserId,
       to: toUserId,
       amount,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     this.saveEconomy();
@@ -117,7 +118,7 @@ class EconomyManager {
 
   getTransactionHistory(userId, limit = 50) {
     return this.economyData.transactions
-      .filter(txn => txn.from === userId || txn.to === userId)
+      .filter((txn) => txn.from === userId || txn.to === userId)
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
   }
@@ -145,7 +146,7 @@ class EconomyManager {
       lastCollected: Date.now(),
       created: Date.now(),
       upgrades: 0,
-      employees: 1
+      employees: 1,
     };
 
     if (!this.economyData.businessData[userId]) {
@@ -163,12 +164,12 @@ class EconomyManager {
 
   getBusinessIncome(businessType, level) {
     const baseIncomes = {
-      'shop': 50,
-      'farm': 30,
-      'mine': 75,
-      'factory': 100,
-      'bank': 25,
-      'casino': 150
+      shop: 50,
+      farm: 30,
+      mine: 75,
+      factory: 100,
+      bank: 25,
+      casino: 150,
     };
 
     const baseIncome = baseIncomes[businessType] || 25;
@@ -184,7 +185,7 @@ class EconomyManager {
       return { success: false, reason: 'no_businesses' };
     }
 
-    const business = this.economyData.businessData[userId].find(b => b.id === businessId);
+    const business = this.economyData.businessData[userId].find((b) => b.id === businessId);
     if (!business) {
       return { success: false, reason: 'business_not_found' };
     }
@@ -205,7 +206,7 @@ class EconomyManager {
       businessId,
       amount: upgradeCost,
       newLevel: business.level,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     this.saveEconomy();
@@ -237,7 +238,7 @@ class EconomyManager {
         type: 'business_income',
         user: userId,
         amount: totalIncome,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       this.saveEconomy();
@@ -246,7 +247,7 @@ class EconomyManager {
     return {
       success: true,
       income: totalIncome,
-      businesses: this.economyData.businessData[userId].length
+      businesses: this.economyData.businessData[userId].length,
     };
   }
 
@@ -264,9 +265,9 @@ class EconomyManager {
       type: investmentType,
       amount,
       created: Date.now(),
-      maturity: Date.now() + (investmentType.duration * 24 * 60 * 60 * 1000),
+      maturity: Date.now() + investmentType.duration * 24 * 60 * 60 * 1000,
       rate: investmentType.rate,
-      status: 'active'
+      status: 'active',
     };
 
     if (!this.economyData.investments[userId]) {
@@ -287,12 +288,12 @@ class EconomyManager {
   // Define investment types
   getInvestmentTypes() {
     return {
-      'bank': { name: 'Bank Deposit', rate: 0.05, duration: 30, minAmount: 100 },
-      'stock': { name: 'Stock Market', rate: 0.1, duration: 30, minAmount: 500 },
-      'venture': { name: 'High Risk Venture', rate: 0.2, duration: 30, minAmount: 1000 },
-      'real_estate': { name: 'Real Estate', rate: 0.15, duration: 45, minAmount: 2000 },
-      'crypto': { name: 'Cryptocurrency', rate: 0.25, duration: 15, minAmount: 300, risk: 'high' },
-      'bond': { name: 'Government Bond', rate: 0.03, duration: 60, minAmount: 500, risk: 'low' }
+      bank: { name: 'Bank Deposit', rate: 0.05, duration: 30, minAmount: 100 },
+      stock: { name: 'Stock Market', rate: 0.1, duration: 30, minAmount: 500 },
+      venture: { name: 'High Risk Venture', rate: 0.2, duration: 30, minAmount: 1000 },
+      real_estate: { name: 'Real Estate', rate: 0.15, duration: 45, minAmount: 2000 },
+      crypto: { name: 'Cryptocurrency', rate: 0.25, duration: 15, minAmount: 300, risk: 'high' },
+      bond: { name: 'Government Bond', rate: 0.03, duration: 60, minAmount: 500, risk: 'low' },
     };
   }
 
@@ -318,7 +319,7 @@ class EconomyManager {
             user: userId,
             amount: returnAmount,
             investmentType: investment.type.name,
-            timestamp: now
+            timestamp: now,
           });
         }
       }
@@ -331,11 +332,11 @@ class EconomyManager {
   initializeMarket() {
     // Initialize market prices for various items
     const marketItems = {
-      'health_potion': { basePrice: 25, volatility: 0.1 },
-      'mana_potion': { basePrice: 40, volatility: 0.15 },
-      'iron_ore': { basePrice: 5, volatility: 0.2 },
-      'magic_crystal': { basePrice: 100, volatility: 0.3 },
-      'dragon_scale': { basePrice: 500, volatility: 0.1 }
+      health_potion: { basePrice: 25, volatility: 0.1 },
+      mana_potion: { basePrice: 40, volatility: 0.15 },
+      iron_ore: { basePrice: 5, volatility: 0.2 },
+      magic_crystal: { basePrice: 100, volatility: 0.3 },
+      dragon_scale: { basePrice: 500, volatility: 0.1 },
     };
 
     for (const [itemId, data] of Object.entries(marketItems)) {
@@ -380,9 +381,9 @@ class EconomyManager {
 
   getPriceHistory(itemId, days = 1) {
     const history = this.priceHistory.get(itemId) || [];
-    const cutoffTime = Date.now() - (days * 24 * 60 * 60 * 1000);
+    const cutoffTime = Date.now() - days * 24 * 60 * 60 * 1000;
 
-    return history.filter(h => h.timestamp >= cutoffTime);
+    return history.filter((h) => h.timestamp >= cutoffTime);
   }
 
   buyFromMarket(userId, itemId, quantity = 1) {
@@ -401,7 +402,7 @@ class EconomyManager {
       item: itemId,
       quantity,
       amount: totalCost,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     return {
@@ -409,7 +410,7 @@ class EconomyManager {
       item: itemId,
       quantity,
       totalCost,
-      pricePerUnit: price
+      pricePerUnit: price,
     };
   }
 
@@ -425,7 +426,7 @@ class EconomyManager {
       item: itemId,
       quantity,
       amount: totalEarnings,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     return {
@@ -433,7 +434,7 @@ class EconomyManager {
       item: itemId,
       quantity,
       totalEarnings,
-      pricePerUnit: price
+      pricePerUnit: price,
     };
   }
 
@@ -445,8 +446,8 @@ class EconomyManager {
     const investments = this.economyData.investments[userId] || [];
 
     // Calculate statistics
-    const incomeTransactions = transactions.filter(t => t.type === 'business_income' || t.type === 'investment_return');
-    const expenseTransactions = transactions.filter(t => t.type === 'market_purchase' || t.type === 'transfer' && t.from === userId);
+    const incomeTransactions = transactions.filter((t) => t.type === 'business_income' || t.type === 'investment_return');
+    const expenseTransactions = transactions.filter((t) => t.type === 'market_purchase' || (t.type === 'transfer' && t.from === userId));
 
     const totalIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
     const totalExpenses = expenseTransactions.reduce((sum, t) => sum + t.amount, 0);
@@ -457,9 +458,9 @@ class EconomyManager {
       totalExpenses,
       netWorth: balance + totalIncome - totalExpenses,
       businesses: businesses.length,
-      investments: investments.filter(i => i.status === 'active').length,
+      investments: investments.filter((i) => i.status === 'active').length,
       transactionCount: transactions.length,
-      averageTransaction: transactions.length > 0 ? Math.round((totalIncome + totalExpenses) / transactions.length) : 0
+      averageTransaction: transactions.length > 0 ? Math.round((totalIncome + totalExpenses) / transactions.length) : 0,
     };
   }
 
@@ -489,7 +490,7 @@ class EconomyManager {
       amount: isWinner ? winnings - ticketPrice : -ticketPrice,
       ticketPrice,
       isWinner,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     return {
@@ -497,7 +498,7 @@ class EconomyManager {
       isWinner,
       winnings,
       lotteryNumber,
-      winningNumber
+      winningNumber,
     };
   }
 
@@ -509,7 +510,7 @@ class EconomyManager {
 
     // Calculate market health
     const marketVolume = this.economyData.transactions
-      .filter(t => t.type === 'market_purchase' || t.type === 'market_sale')
+      .filter((t) => t.type === 'market_purchase' || t.type === 'market_sale')
       .reduce((sum, t) => sum + (t.amount || 0), 0);
 
     return {
@@ -518,7 +519,7 @@ class EconomyManager {
       uniqueUsers,
       marketVolume,
       averageBalance: uniqueUsers > 0 ? Math.round(totalMoney / uniqueUsers) : 0,
-      marketHealth: marketVolume > 10_000 ? 'excellent' : (marketVolume > 5000 ? 'good' : 'developing')
+      marketHealth: marketVolume > 10_000 ? 'excellent' : marketVolume > 5000 ? 'good' : 'developing',
     };
   }
 
@@ -531,7 +532,7 @@ class EconomyManager {
       userStats: stats,
       recentActivity: recentTransactions,
       recommendations: this.generateEconomyRecommendations(stats),
-      marketTrends: this.getMarketTrends()
+      marketTrends: this.getMarketTrends(),
     };
   }
 
@@ -571,7 +572,7 @@ class EconomyManager {
         trends.push({
           item: itemId,
           change: Math.round(change),
-          trend: change > 5 ? '📈' : (change < -5 ? '📉' : '➡️')
+          trend: change > 5 ? '📈' : change < -5 ? '📉' : '➡️',
         });
       }
     }
@@ -585,7 +586,8 @@ class EconomyManager {
 
     for (const userId in this.economyData.userBalances) {
       const balance = this.economyData.userBalances[userId];
-      if (balance > 1000) { // Only tax users with significant balance
+      if (balance > 1000) {
+        // Only tax users with significant balance
         const tax = Math.floor(balance * taxRate);
         this.subtractBalance(userId, tax);
         totalTaxed += tax;
@@ -597,7 +599,7 @@ class EconomyManager {
         type: 'tax_collection',
         guild: guildId,
         amount: totalTaxed,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
 
@@ -627,7 +629,7 @@ class EconomyManager {
     if (!this.economyData.dailyRewards) this.economyData.dailyRewards = {};
     this.economyData.dailyRewards[userId] = {
       lastClaim: now,
-      streak: streak + 1
+      streak: streak + 1,
     };
 
     this.logTransaction({
@@ -635,7 +637,7 @@ class EconomyManager {
       user: userId,
       amount: reward,
       streak: streak + 1,
-      timestamp: now
+      timestamp: now,
     });
 
     this.saveEconomy();
@@ -678,9 +680,7 @@ class EconomyManager {
 
     // Filter transactions involving this user.
     const before = this.economyData.transactions.length;
-    this.economyData.transactions = this.economyData.transactions.filter(
-      txn => txn.from !== userId && txn.to !== userId && txn.user !== userId
-    );
+    this.economyData.transactions = this.economyData.transactions.filter((txn) => txn.from !== userId && txn.to !== userId && txn.user !== userId);
     if (this.economyData.transactions.length !== before) removed = true;
 
     if (removed) this.saveEconomy();
@@ -693,8 +693,8 @@ class EconomyManager {
     this.processMatureInvestments();
 
     // Clean up old transaction history
-    const cutoffTime = Date.now() - (30 * 24 * 60 * 60 * 1000); // 30 days
-    this.economyData.transactions = this.economyData.transactions.filter(t => t.timestamp > cutoffTime);
+    const cutoffTime = Date.now() - 30 * 24 * 60 * 60 * 1000; // 30 days
+    this.economyData.transactions = this.economyData.transactions.filter((t) => t.timestamp > cutoffTime);
 
     // Clean up price history maps (keep only last 50 entries per item)
     for (const [itemId, history] of this.priceHistory.entries()) {
@@ -705,10 +705,8 @@ class EconomyManager {
     }
 
     // Clean up stale market prices (remove items with no recent activity)
-    const recentTransactions = this.economyData.transactions.filter(t =>
-      t.type === 'market_purchase' || t.type === 'market_sale'
-    );
-    const activeItems = new Set(recentTransactions.map(t => t.item).filter(Boolean));
+    const recentTransactions = this.economyData.transactions.filter((t) => t.type === 'market_purchase' || t.type === 'market_sale');
+    const activeItems = new Set(recentTransactions.map((t) => t.item).filter(Boolean));
 
     for (const [itemId] of this.marketPrices.entries()) {
       if (!activeItems.has(itemId)) {

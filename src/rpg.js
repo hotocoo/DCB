@@ -21,7 +21,7 @@ const CHARACTER_CLASSES = {
     baseStats: { hp: 25, maxHp: 25, mp: 10, maxMp: 10, atk: 7, def: 3, spd: 1 },
     statGrowth: { hp: 3, maxHp: 3, mp: 1, maxMp: 1, atk: 2, def: 1, spd: 0 },
     abilities: ['Power Strike', 'Shield Block', 'Battle Cry'],
-    color: 0xFF_00_00
+    color: 0xff_00_00,
   },
   mage: {
     name: 'Mage',
@@ -29,7 +29,7 @@ const CHARACTER_CLASSES = {
     baseStats: { hp: 15, maxHp: 15, mp: 30, maxMp: 30, atk: 10, def: 1, spd: 2 },
     statGrowth: { hp: 1, maxHp: 1, mp: 4, maxMp: 4, atk: 3, def: 0, spd: 1 },
     abilities: ['Fireball', 'Magic Shield', 'Mana Surge'],
-    color: 0x99_33_FF
+    color: 0x99_33_ff,
   },
   rogue: {
     name: 'Rogue',
@@ -37,7 +37,7 @@ const CHARACTER_CLASSES = {
     baseStats: { hp: 18, maxHp: 18, mp: 15, maxMp: 15, atk: 6, def: 2, spd: 4 },
     statGrowth: { hp: 2, maxHp: 2, mp: 2, maxMp: 2, atk: 2, def: 1, spd: 2 },
     abilities: ['Backstab', 'Dodge', 'Sprint'],
-    color: 0x33_33_33
+    color: 0x33_33_33,
   },
   paladin: {
     name: 'Paladin',
@@ -45,8 +45,8 @@ const CHARACTER_CLASSES = {
     baseStats: { hp: 22, maxHp: 22, mp: 20, maxMp: 20, atk: 5, def: 4, spd: 1 },
     statGrowth: { hp: 3, maxHp: 3, mp: 3, maxMp: 3, atk: 1, def: 2, spd: 0 },
     abilities: ['Holy Strike', 'Heal', 'Divine Shield'],
-    color: 0xFF_D7_00
-  }
+    color: 0xff_d7_00,
+  },
 };
 
 function ensureDir() {
@@ -133,15 +133,14 @@ function readAll() {
       fs.copyFileSync(oldFile, `${oldFile}.bak`);
       fs.unlinkSync(oldFile);
       logger.info('Migration completed, old file backed up');
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('Failed to migrate old RPG data', error);
     }
   }
 
   // Read all player files from data/players/
   if (fs.existsSync(PLAYERS_DIR)) {
-    const files = fs.readdirSync(PLAYERS_DIR).filter(f => f.endsWith('.json'));
+    const files = fs.readdirSync(PLAYERS_DIR).filter((f) => f.endsWith('.json'));
     for (const file of files) {
       const userId = path.basename(file, '.json');
       try {
@@ -175,8 +174,7 @@ function readAll() {
         if (char.lastSessionReset === undefined) char.lastSessionReset = Date.now();
         // eslint-disable-next-line security/detect-object-injection
         all[userId] = char;
-      }
-      catch (error) {
+      } catch (error) {
         logger.error(`Failed to read player data for ${userId}`, error);
       }
     }
@@ -207,8 +205,7 @@ function writeAll(obj) {
       fs.renameSync(tmp, filePath);
     }
     cache = obj;
-  }
-  catch (error) {
+  } catch (error) {
     // Roll back the in-memory cache to the pre-write snapshot so callers do
     // not see a successful mutation that was never persisted to disk.
     cache = previousCache;
@@ -225,8 +222,7 @@ function deepClonePlayers(players) {
   if (!players) return players;
   try {
     return JSON.parse(JSON.stringify(players));
-  }
-  catch (error) {
+  } catch (error) {
     logger.error('Failed to clone RPG players cache for rollback', error);
     // If clone fails, fall back to the original reference so callers see
     // the current (mutated) state. This is no worse than the pre-fix
@@ -241,7 +237,7 @@ export function createCharacter(userId, name, charClass = 'warrior') {
     throw new CommandError('Invalid user ID', 'INVALID_ARGUMENT');
   }
 
-  const sanitizedName = sanitizeInput(name || `Player${userId.slice(0,4)}`);
+  const sanitizedName = sanitizeInput(name || `Player${userId.slice(0, 4)}`);
   const nameValidation = validateString(sanitizedName, { minLength: 2, maxLength: 32 });
   if (!nameValidation.valid) {
     throw new CommandError(nameValidation.reason, 'INVALID_ARGUMENT');
@@ -283,7 +279,7 @@ export function createCharacter(userId, name, charClass = 'warrior') {
       equipped_weapon: undefined,
       equipped_armor: undefined,
       gold: 0,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     };
 
     // eslint-disable-next-line security/detect-object-injection
@@ -292,8 +288,7 @@ export function createCharacter(userId, name, charClass = 'warrior') {
 
     logger.info('Character created', { userId, name: sanitizedName, class: charClass });
     return char;
-  }
-  finally {
+  } finally {
     locks.delete(userId);
   }
 }
@@ -318,8 +313,7 @@ export function applyXp(userId, char, amount = 0) {
     char.hp = char.maxHp || 20;
     char.mp = char.maxMp || 10;
     logger.info('Level up', { userId, oldLvl, newLvl, gained, xp: char.xp });
-  }
-  else {
+  } else {
     char.lvl = newLvl;
   }
 
@@ -343,8 +337,7 @@ export function getCharacter(userId) {
   let filePath;
   try {
     filePath = playerPath(userId);
-  }
-  catch {
+  } catch {
     // Invalid user id — caller will get undefined below
     return;
   }
@@ -384,14 +377,12 @@ export function getCharacter(userId) {
     if (cache) {
       // eslint-disable-next-line security/detect-object-injection
       cache[userId] = char;
-    }
-    else {
+    } else {
       cache = { [userId]: char };
     }
 
     return char;
-  }
-  catch (error) {
+  } catch (error) {
     logger.error(`Failed to read character data for ${userId}`, error);
     return;
   }
@@ -420,8 +411,7 @@ export function saveCharacter(userId, char) {
       cache[userId] = char;
     }
     return true;
-  }
-  finally {
+  } finally {
     locks.delete(userId);
   }
 }
@@ -439,7 +429,7 @@ export function resetCharacter(userId, charClass = 'warrior') {
     // eslint-disable-next-line security/detect-object-injection
     const classData = CHARACTER_CLASSES[charClass];
     const def = {
-      name: `Player${userId.slice(0,4)}`,
+      name: `Player${userId.slice(0, 4)}`,
       class: charClass,
       ...classData.baseStats,
       lvl: 1,
@@ -450,14 +440,13 @@ export function resetCharacter(userId, charClass = 'warrior') {
       inventory: {},
       equipped_weapon: undefined,
       equipped_armor: undefined,
-      gold: 0
+      gold: 0,
     };
     // eslint-disable-next-line security/detect-object-injection
     all[userId] = def;
     writeAll(all);
     return def;
-  }
-  finally {
+  } finally {
     locks.delete(userId);
   }
 }
@@ -481,8 +470,7 @@ export function deleteCharacter(userId) {
     let filePath;
     try {
       filePath = playerPath(userId);
-    }
-    catch {
+    } catch {
       // Invalid user id — nothing to unlink.
       return true;
     }
@@ -491,8 +479,7 @@ export function deleteCharacter(userId) {
       fs.unlinkSync(filePath);
     }
     return true;
-  }
-  finally {
+  } finally {
     locks.delete(userId);
   }
 }
@@ -500,7 +487,11 @@ export function deleteCharacter(userId) {
 export function getLeaderboard(limit = 10, offset = 0) {
   const all = cache || readAll();
   const arr = Object.entries(all).map(([id, c]) => ({
-    id, name: c.name, lvl: c.lvl || 1, xp: c.xp || 0, atk: c.atk || 0
+    id,
+    name: c.name,
+    lvl: c.lvl || 1,
+    xp: c.xp || 0,
+    atk: c.atk || 0,
   }));
   arr.sort((a, b) => {
     if (b.lvl !== a.lvl) return b.lvl - a.lvl;
@@ -546,8 +537,7 @@ export async function narrate(guildId, prompt, fallback) {
   try {
     const out = await generate(guildId, prompt);
     return out || fallback || '';
-  }
-  catch (error) {
+  } catch (error) {
     logger.error('Narration failed', error);
     return fallback || '';
   }
@@ -570,72 +560,72 @@ export function getClassInfo(charClass) {
 // Item and Inventory System
 const ITEMS = {
   // Weapons
-  'rusty_sword': { name: 'Rusty Sword', type: 'weapon', rarity: 'common', atk: 3, value: 10, description: 'A worn but serviceable blade' },
-  'iron_sword': { name: 'Iron Sword', type: 'weapon', rarity: 'uncommon', atk: 7, value: 50, description: 'A well-crafted iron blade' },
-  'magic_staff': { name: 'Magic Staff', type: 'weapon', rarity: 'rare', atk: 12, value: 200, description: 'Channels magical energy' },
-  'legendary_blade': { name: 'Legendary Blade', type: 'weapon', rarity: 'legendary', atk: 20, value: 1000, description: 'A blade of ancient power' },
+  rusty_sword: { name: 'Rusty Sword', type: 'weapon', rarity: 'common', atk: 3, value: 10, description: 'A worn but serviceable blade' },
+  iron_sword: { name: 'Iron Sword', type: 'weapon', rarity: 'uncommon', atk: 7, value: 50, description: 'A well-crafted iron blade' },
+  magic_staff: { name: 'Magic Staff', type: 'weapon', rarity: 'rare', atk: 12, value: 200, description: 'Channels magical energy' },
+  legendary_blade: { name: 'Legendary Blade', type: 'weapon', rarity: 'legendary', atk: 20, value: 1000, description: 'A blade of ancient power' },
 
   // Armor
-  'leather_armor': { name: 'Leather Armor', type: 'armor', rarity: 'common', def: 2, value: 15, description: 'Basic protective gear' },
-  'chain_mail': { name: 'Chain Mail', type: 'armor', rarity: 'uncommon', def: 5, value: 75, description: 'Interlinked metal rings' },
-  'plate_armor': { name: 'Plate Armor', type: 'armor', rarity: 'rare', def: 10, value: 300, description: 'Heavy steel protection' },
-  'dragon_armor': { name: 'Dragon Armor', type: 'armor', rarity: 'legendary', def: 18, value: 1500, description: 'Forged from dragon scales' },
+  leather_armor: { name: 'Leather Armor', type: 'armor', rarity: 'common', def: 2, value: 15, description: 'Basic protective gear' },
+  chain_mail: { name: 'Chain Mail', type: 'armor', rarity: 'uncommon', def: 5, value: 75, description: 'Interlinked metal rings' },
+  plate_armor: { name: 'Plate Armor', type: 'armor', rarity: 'rare', def: 10, value: 300, description: 'Heavy steel protection' },
+  dragon_armor: { name: 'Dragon Armor', type: 'armor', rarity: 'legendary', def: 18, value: 1500, description: 'Forged from dragon scales' },
 
   // Consumables
-  'health_potion': { name: 'Health Potion', type: 'consumable', rarity: 'common', hp_restore: 20, value: 25, description: 'Restores 20 HP' },
-  'mana_potion': { name: 'Mana Potion', type: 'consumable', rarity: 'uncommon', mp_restore: 30, value: 40, description: 'Restores 30 MP' },
-  'revive_crystal': { name: 'Revive Crystal', type: 'consumable', rarity: 'rare', revive: true, value: 150, description: 'Brings you back from defeat' },
+  health_potion: { name: 'Health Potion', type: 'consumable', rarity: 'common', hp_restore: 20, value: 25, description: 'Restores 20 HP' },
+  mana_potion: { name: 'Mana Potion', type: 'consumable', rarity: 'uncommon', mp_restore: 30, value: 40, description: 'Restores 30 MP' },
+  revive_crystal: { name: 'Revive Crystal', type: 'consumable', rarity: 'rare', revive: true, value: 150, description: 'Brings you back from defeat' },
 
   // Materials
-  'iron_ore': { name: 'Iron Ore', type: 'material', rarity: 'common', value: 5, description: 'Raw iron for crafting' },
-  'magic_crystal': { name: 'Magic Crystal', type: 'material', rarity: 'rare', value: 100, description: 'Contains magical energy' },
-  'dragon_scale': { name: 'Dragon Scale', type: 'material', rarity: 'legendary', value: 500, description: 'Priceless crafting material' },
-  'gold_ore': { name: 'Gold Ore', type: 'material', rarity: 'uncommon', value: 50, description: 'Shiny gold for high-value crafting' },
-  'mithril_ingot': { name: 'Mithril Ingot', type: 'material', rarity: 'legendary', value: 2000, description: 'Lightweight and incredibly strong' },
-  'wood': { name: 'Wood', type: 'material', rarity: 'common', value: 2, description: 'Basic building material' },
-  'leather': { name: 'Leather', type: 'material', rarity: 'common', value: 3, description: 'Tough animal hide' },
-  'gemstone': { name: 'Gemstone', type: 'material', rarity: 'rare', value: 150, description: 'Sparkling precious stone' }
+  iron_ore: { name: 'Iron Ore', type: 'material', rarity: 'common', value: 5, description: 'Raw iron for crafting' },
+  magic_crystal: { name: 'Magic Crystal', type: 'material', rarity: 'rare', value: 100, description: 'Contains magical energy' },
+  dragon_scale: { name: 'Dragon Scale', type: 'material', rarity: 'legendary', value: 500, description: 'Priceless crafting material' },
+  gold_ore: { name: 'Gold Ore', type: 'material', rarity: 'uncommon', value: 50, description: 'Shiny gold for high-value crafting' },
+  mithril_ingot: { name: 'Mithril Ingot', type: 'material', rarity: 'legendary', value: 2000, description: 'Lightweight and incredibly strong' },
+  wood: { name: 'Wood', type: 'material', rarity: 'common', value: 2, description: 'Basic building material' },
+  leather: { name: 'Leather', type: 'material', rarity: 'common', value: 3, description: 'Tough animal hide' },
+  gemstone: { name: 'Gemstone', type: 'material', rarity: 'rare', value: 150, description: 'Sparkling precious stone' },
 };
 
 // Crafting recipes
 const CRAFTING_RECIPES = {
-  'iron_sword': {
-    materials: { 'iron_ore': 3, 'wood': 1 },
+  iron_sword: {
+    materials: { iron_ore: 3, wood: 1 },
     description: 'Craft an iron sword from iron ore and wood',
-    required_level: 3
+    required_level: 3,
   },
-  'chain_mail': {
-    materials: { 'iron_ore': 5, 'leather': 2 },
+  chain_mail: {
+    materials: { iron_ore: 5, leather: 2 },
     description: 'Craft chain mail armor from iron and leather',
-    required_level: 4
+    required_level: 4,
   },
-  'health_potion': {
-    materials: { 'magic_crystal': 1, 'wood': 1 },
+  health_potion: {
+    materials: { magic_crystal: 1, wood: 1 },
     description: 'Craft a health potion using magic and wood',
-    required_level: 1
+    required_level: 1,
   },
-  'mana_potion': {
-    materials: { 'magic_crystal': 2, 'gemstone': 1 },
+  mana_potion: {
+    materials: { magic_crystal: 2, gemstone: 1 },
     description: 'Craft a mana potion using crystals and gems',
-    required_level: 5
+    required_level: 5,
   },
-  'magic_staff': {
-    materials: { 'wood': 2, 'magic_crystal': 3, 'gemstone': 1 },
+  magic_staff: {
+    materials: { wood: 2, magic_crystal: 3, gemstone: 1 },
     description: 'Craft a powerful magic staff',
-    required_level: 8
+    required_level: 8,
   },
-  'plate_armor': {
-    materials: { 'iron_ore': 8, 'leather': 3, 'mithril_ingot': 1 },
+  plate_armor: {
+    materials: { iron_ore: 8, leather: 3, mithril_ingot: 1 },
     description: 'Craft heavy plate armor',
-    required_level: 10
-  }
+    required_level: 10,
+  },
 };
 
 const ITEM_RARITIES = {
-  common: { color: 0x8B_8B_8B, chance: 50 },
-  uncommon: { color: 0x4C_AF_50, chance: 25 },
-  rare: { color: 0x21_96_F3, chance: 15 },
-  legendary: { color: 0xFF_98_00, chance: 10 }
+  common: { color: 0x8b_8b_8b, chance: 50 },
+  uncommon: { color: 0x4c_af_50, chance: 25 },
+  rare: { color: 0x21_96_f3, chance: 15 },
+  legendary: { color: 0xff_98_00, chance: 10 },
 };
 
 export function generateRandomItem(level = 1) {
@@ -649,8 +639,7 @@ export function generateRandomItem(level = 1) {
     adjustedRarities.rare.chance += 5;
     adjustedRarities.uncommon.chance += 5;
     adjustedRarities.common.chance -= 15;
-  }
-  else if (level >= 10) {
+  } else if (level >= 10) {
     adjustedRarities.rare.chance += 3;
     adjustedRarities.uncommon.chance += 3;
     adjustedRarities.common.chance -= 6;
@@ -666,10 +655,7 @@ export function generateRandomItem(level = 1) {
   }
 
   // Filter items by rarity and level-appropriate types
-  const availableItems = Object.entries(ITEMS).filter(([key, item]) =>
-    item.rarity === selectedRarity &&
-    (level >= getItemLevelRequirement(key))
-  );
+  const availableItems = Object.entries(ITEMS).filter(([key, item]) => item.rarity === selectedRarity && level >= getItemLevelRequirement(key));
 
   if (availableItems.length === 0) {
     logger.warn(`No items available for rarity ${selectedRarity} at level ${level}, falling back to health_potion`);
@@ -682,12 +668,25 @@ export function generateRandomItem(level = 1) {
 
 function getItemLevelRequirement(itemKey) {
   const levelReqs = {
-    rusty_sword: 1, iron_sword: 3, magic_staff: 8, legendary_blade: 15,
-    leather_armor: 1, chain_mail: 4, plate_armor: 10, dragon_armor: 20,
-    health_potion: 1, mana_potion: 5, revive_crystal: 12,
-    iron_ore: 1, magic_crystal: 7, dragon_scale: 18,
-    gold_ore: 5, mithril_ingot: 25,
-    wood: 1, leather: 1, gemstone: 10
+    rusty_sword: 1,
+    iron_sword: 3,
+    magic_staff: 8,
+    legendary_blade: 15,
+    leather_armor: 1,
+    chain_mail: 4,
+    plate_armor: 10,
+    dragon_armor: 20,
+    health_potion: 1,
+    mana_potion: 5,
+    revive_crystal: 12,
+    iron_ore: 1,
+    magic_crystal: 7,
+    dragon_scale: 18,
+    gold_ore: 5,
+    mithril_ingot: 25,
+    wood: 1,
+    leather: 1,
+    gemstone: 10,
   };
   // eslint-disable-next-line security/detect-object-injection
   return levelReqs[itemKey] || 1;
@@ -885,8 +884,7 @@ export function unequipItem(userId, slot) {
       char.atk -= ITEMS[itemId].atk || 0;
     }
     char.equipped_weapon = undefined;
-  }
-  else if (slot === 'armor' && char.equipped_armor) {
+  } else if (slot === 'armor' && char.equipped_armor) {
     itemId = char.equipped_armor;
     // eslint-disable-next-line security/detect-object-injection
     if (ITEMS[itemId]) {
@@ -894,8 +892,7 @@ export function unequipItem(userId, slot) {
       char.def -= ITEMS[itemId].def || 0;
     }
     char.equipped_armor = undefined;
-  }
-  else {
+  } else {
     return { success: false, reason: 'no_item_equipped' };
   }
 
@@ -976,7 +973,7 @@ export function craftItem(userId, itemId) {
     char: character,
     xpGained: xpReward,
     // eslint-disable-next-line security/detect-object-injection
-    item: ITEMS[itemId]
+    item: ITEMS[itemId],
   };
 }
 
@@ -990,8 +987,7 @@ function readQuests() {
   if (!fs.existsSync(p)) return {};
   try {
     return JSON.parse(fs.readFileSync(p)) || {};
-  }
-  catch {
+  } catch {
     return {};
   }
 }
@@ -1016,11 +1012,21 @@ export function createQuest(userId, title, desc) {
 export function generateRandomQuest(userId, level = 1) {
   const questTypes = [
     { title: `Slay ${5 + level * 2} Goblins`, desc: `Defeat ${5 + level * 2} goblins in combat.`, requirement: 'goblins_defeated', amount: 5 + level * 2 },
-    { title: `Collect ${3 + level} Health Potions`, desc: `Gather ${3 + level} health potions from exploration.`, requirement: 'potions_collected', amount: 3 + level },
+    {
+      title: `Collect ${3 + level} Health Potions`,
+      desc: `Gather ${3 + level} health potions from exploration.`,
+      requirement: 'potions_collected',
+      amount: 3 + level,
+    },
     { title: `Reach Level ${level + 5}`, desc: `Gain enough XP to reach level ${level + 5}.`, requirement: 'level_reached', amount: level + 5 },
-    { title: `Earn ${100 + level * 50} Gold`, desc: `Accumulate ${100 + level * 50} gold through various activities.`, requirement: 'gold_earned', amount: 100 + level * 50 },
+    {
+      title: `Earn ${100 + level * 50} Gold`,
+      desc: `Accumulate ${100 + level * 50} gold through various activities.`,
+      requirement: 'gold_earned',
+      amount: 100 + level * 50,
+    },
     { title: `Explore ${2 + level} Locations`, desc: `Discover and explore ${2 + level} new locations.`, requirement: 'locations_explored', amount: 2 + level },
-    { title: `Craft ${1 + level} Items`, desc: `Use materials to craft ${1 + level} new items.`, requirement: 'items_crafted', amount: 1 + level }
+    { title: `Craft ${1 + level} Items`, desc: `Use materials to craft ${1 + level} new items.`, requirement: 'items_crafted', amount: 1 + level },
   ];
 
   const randomType = questTypes[Math.floor(Math.random() * questTypes.length)];
@@ -1032,7 +1038,7 @@ export function generateRandomQuest(userId, level = 1) {
   const all = readQuests();
   // eslint-disable-next-line security/detect-object-injection
   const userQuests = all[userId] || [];
-  const index = userQuests.findIndex(q => q.id === quest.id);
+  const index = userQuests.findIndex((q) => q.id === quest.id);
   if (index !== -1) {
     // eslint-disable-next-line security/detect-object-injection
     userQuests[index] = quest;
@@ -1053,12 +1059,12 @@ export function listQuests(userId) {
 function calculateQuestXpReward(quest) {
   const baseXp = 50; // Base XP for completing any quest
   const typeMultipliers = {
-    'goblins_defeated': 2,
-    'potions_collected': 1.5,
-    'level_reached': 3,
-    'gold_earned': 1,
-    'locations_explored': 2.5,
-    'items_crafted': 2
+    goblins_defeated: 2,
+    potions_collected: 1.5,
+    level_reached: 3,
+    gold_earned: 1,
+    locations_explored: 2.5,
+    items_crafted: 2,
   };
 
   const multiplier = typeMultipliers[quest.requirement] || 1;
@@ -1070,16 +1076,16 @@ function calculateQuestXpReward(quest) {
 function calculateQuestGoldReward(quest) {
   const baseGold = 25; // Base gold for completing any quest
   const typeMultipliers = {
-    'goblins_defeated': 1.5,
-    'potions_collected': 1,
-    'level_reached': 2,
-    'gold_earned': 0, // No gold for gold-earning quests
-    'locations_explored': 1.8,
-    'items_crafted': 1.2
+    goblins_defeated: 1.5,
+    potions_collected: 1,
+    level_reached: 2,
+    gold_earned: 0, // No gold for gold-earning quests
+    locations_explored: 1.8,
+    items_crafted: 1.2,
   };
 
   const multiplier = typeMultipliers[quest.requirement] || 1;
-  const levelBonus = (quest.amount || 1);
+  const levelBonus = quest.amount || 1;
 
   return Math.floor(baseGold * multiplier + levelBonus * 5);
 }
@@ -1088,7 +1094,7 @@ export function completeQuest(userId, questId) {
   const all = readQuests();
   // eslint-disable-next-line security/detect-object-injection
   const arr = all[userId] || [];
-  const q = arr.find(x => x.id === Number(questId));
+  const q = arr.find((x) => x.id === Number(questId));
   if (!q) return;
   q.status = 'completed';
   writeQuests(all);
@@ -1194,7 +1200,7 @@ export function spendSkillPoints(userId, stat, amount = 1) {
 
         break;
       }
-    // No default
+      // No default
     }
 
     char.skillPoints = pts - amount;
@@ -1205,8 +1211,7 @@ export function spendSkillPoints(userId, stat, amount = 1) {
     // eslint-disable-next-line security/detect-object-injection
     logger.info('Skill points spent', { userId, stat, amount, newValue: char[stat] });
     return { success: true, char };
-  }
-  finally {
+  } finally {
     locks.delete(userId);
   }
 }
@@ -1237,7 +1242,7 @@ export function checkDailyLimit(userId) {
     used,
     max: maxDaily,
     remaining: maxDaily - used,
-    resetTime: char.lastDailyReset
+    resetTime: char.lastDailyReset,
   };
 }
 
@@ -1286,7 +1291,6 @@ export function checkSessionXpCap(userId) {
     used,
     max: maxSessionXp,
     remaining: maxSessionXp - used,
-    resetTime: char.lastSessionReset
+    resetTime: char.lastSessionReset,
   };
 }
-

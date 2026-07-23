@@ -1,6 +1,17 @@
 import assert from 'node:assert';
 
-import { getRandomJoke, generateStory, getRiddle, getFunFact, getRandomQuote, magic8Ball, generateFunName, createFunChallenge, updateEntertainmentStats, getFunLeaderboard } from '../src/entertainment.js';
+import {
+  getRandomJoke,
+  generateStory,
+  getRiddle,
+  getFunFact,
+  getRandomQuote,
+  magic8Ball,
+  generateFunName,
+  createFunChallenge,
+  updateEntertainmentStats,
+  getFunLeaderboard,
+} from '../src/entertainment.js';
 
 class FunCommandTestSuite {
   constructor() {
@@ -45,9 +56,7 @@ class FunCommandTestSuite {
       const invalidCategoryJoke = getRandomJoke('invalid');
       assert(invalidCategoryJoke && invalidCategoryJoke.joke, 'Invalid category should fallback');
       this.log('Invalid category fallback: OK');
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Joke functionality test failed', error);
     }
   }
@@ -76,9 +85,7 @@ class FunCommandTestSuite {
         assert(genreStory.genre === genre, `Genre ${genre} should be set correctly`);
         this.log(`Story genre ${genre}: OK`);
       }
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Story functionality test failed', error);
     }
   }
@@ -101,9 +108,7 @@ class FunCommandTestSuite {
       const invalidDifficultyRiddle = getRiddle('invalid');
       assert(invalidDifficultyRiddle && invalidDifficultyRiddle.riddle, 'Invalid difficulty should fallback');
       this.log('Invalid difficulty fallback: OK');
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Riddle functionality test failed', error);
     }
   }
@@ -119,9 +124,7 @@ class FunCommandTestSuite {
         assert(fact.id, 'Fun fact should have an ID');
         this.log(`Fun fact category ${category}: OK`);
       }
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Fun fact functionality test failed', error);
     }
   }
@@ -139,9 +142,7 @@ class FunCommandTestSuite {
         assert(quote.id, 'Quote should have an ID');
         this.log(`Quote category ${category}: OK`);
       }
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Quote functionality test failed', error);
     }
   }
@@ -158,21 +159,32 @@ class FunCommandTestSuite {
 
       // Test that answers are from the predefined list
       const validResponses = [
-        'It is certain.', 'It is decidedly so.', 'Without a doubt.', 'Yes definitely.',
-        'You may rely on it.', 'As I see it, yes.', 'Most likely.', 'Outlook good.',
-        'Yes.', 'Signs point to yes.',
-        'Reply hazy, try again.', 'Ask again later.', 'Better not tell you now.',
-        'Cannot predict now.', 'Concentrate and ask again.',
-        "Don't count on it.", 'My reply is no.', 'My sources say no.', 'Outlook not so good.',
-        'Very doubtful.'
+        'It is certain.',
+        'It is decidedly so.',
+        'Without a doubt.',
+        'Yes definitely.',
+        'You may rely on it.',
+        'As I see it, yes.',
+        'Most likely.',
+        'Outlook good.',
+        'Yes.',
+        'Signs point to yes.',
+        'Reply hazy, try again.',
+        'Ask again later.',
+        'Better not tell you now.',
+        'Cannot predict now.',
+        'Concentrate and ask again.',
+        "Don't count on it.",
+        'My reply is no.',
+        'My sources say no.',
+        'Outlook not so good.',
+        'Very doubtful.',
       ];
 
       assert(validResponses.includes(result.answer), '8-ball answer should be from predefined list');
 
       this.log('Magic 8-ball: OK');
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Magic 8-ball functionality test failed', error);
     }
   }
@@ -189,9 +201,7 @@ class FunCommandTestSuite {
         assert(nameResult.id, 'Fun name should have an ID');
         this.log(`Fun name type ${type}: OK`);
       }
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Fun name functionality test failed', error);
     }
   }
@@ -209,9 +219,7 @@ class FunCommandTestSuite {
         assert(challenge.id, 'Challenge should have an ID');
         this.log(`Challenge type ${type}: OK`);
       }
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Challenge functionality test failed', error);
     }
   }
@@ -238,9 +246,7 @@ class FunCommandTestSuite {
       assert(stats.factsLearned >= 1, 'Facts learned should be incremented');
 
       this.log('Entertainment stats: OK');
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Entertainment stats test failed', error);
     }
   }
@@ -260,8 +266,8 @@ class FunCommandTestSuite {
       assert(Array.isArray(storyLeaderboard), 'Story leaderboard should be an array');
 
       // Check if our test user appears in leaderboard
-      const jokeEntry = jokeLeaderboard.find(entry => entry.userId === this.testUserId);
-      const storyEntry = storyLeaderboard.find(entry => entry.userId === this.testUserId);
+      const jokeEntry = jokeLeaderboard.find((entry) => entry.userId === this.testUserId);
+      const storyEntry = storyLeaderboard.find((entry) => entry.userId === this.testUserId);
 
       if (jokeEntry) {
         assert(typeof jokeEntry.score === 'number' && jokeEntry.score >= 1, 'Joke leaderboard entry should have valid score');
@@ -272,16 +278,14 @@ class FunCommandTestSuite {
       }
 
       this.log('Fun leaderboard: OK');
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Fun leaderboard test failed', error);
     }
   }
 
   async runAllTests() {
     console.log('🎪 Starting Fun Command Test Suite');
-    console.log('=' .repeat(50));
+    console.log('='.repeat(50));
 
     await this.testJokeFunctionality();
     await this.testStoryFunctionality();
@@ -294,7 +298,7 @@ class FunCommandTestSuite {
     await this.testEntertainmentStats();
     await this.testLeaderboard();
 
-    console.log('\n' + '=' .repeat(50));
+    console.log('\n' + '='.repeat(50));
     console.log('📊 Fun Command Test Results Summary:');
     console.log(`Total Tests: ${this.testCount}`);
     console.log(`✅ Passed: ${this.passCount}`);
@@ -305,7 +309,7 @@ class FunCommandTestSuite {
       total: this.testCount,
       passed: this.passCount,
       failed: this.failCount,
-      successRate: ((this.passCount / this.testCount) * 100).toFixed(1)
+      successRate: ((this.passCount / this.testCount) * 100).toFixed(1),
     };
   }
 }
@@ -313,13 +317,16 @@ class FunCommandTestSuite {
 // Run tests if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   const testSuite = new FunCommandTestSuite();
-  testSuite.runAllTests().then(results => {
-    console.log('\n🎪 Fun command test execution completed');
-    return process.exit(results.failed > 0 ? 1 : 0);
-  }).catch(error => {
-    console.error('Fun command test suite failed:', error);
-    return process.exit(1);
-  });
+  testSuite
+    .runAllTests()
+    .then((results) => {
+      console.log('\n🎪 Fun command test execution completed');
+      return process.exit(results.failed > 0 ? 1 : 0);
+    })
+    .catch((error) => {
+      console.error('Fun command test suite failed:', error);
+      return process.exit(1);
+    });
 }
 
 export default FunCommandTestSuite;

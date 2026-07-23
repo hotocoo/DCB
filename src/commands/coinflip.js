@@ -6,12 +6,7 @@ const coins = ['🪙', '💰', '🥇'];
 export const data = new SlashCommandBuilder()
   .setName('coinflip')
   .setDescription('Flip a coin and get heads or tails')
-  .addIntegerOption(option =>
-    option.setName('count')
-      .setDescription('Number of coins to flip (1-10)')
-      .setMinValue(1)
-      .setMaxValue(10)
-      .setRequired(false));
+  .addIntegerOption((option) => option.setName('count').setDescription('Number of coins to flip (1-10)').setMinValue(1).setMaxValue(10).setRequired(false));
 
 export async function execute(interaction) {
   const count = interaction.options.getInteger('count') || 1;
@@ -23,8 +18,8 @@ export async function execute(interaction) {
     results.push(`${coin} ${result}`);
   }
 
-  const headsCount = results.filter(r => r.includes('Heads')).length;
-  const tailsCount = results.filter(r => r.includes('Tails')).length;
+  const headsCount = results.filter((r) => r.includes('Heads')).length;
+  const tailsCount = results.filter((r) => r.includes('Tails')).length;
 
   let response = `**Coin Flip${count > 1 ? 's' : ''}:**\n${results.join('\n')}\n\n`;
   response += `**Results:** ${headsCount} Heads, ${tailsCount} Tails`;

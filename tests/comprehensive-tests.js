@@ -5,7 +5,17 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 
-import { getBalance, addBalance, transferBalance, buyFromMarket, sellToMarket, createInvestment, getUserInvestments, getMarketPrice, resetUserEconomyData } from '../src/economy.js';
+import {
+  getBalance,
+  addBalance,
+  transferBalance,
+  buyFromMarket,
+  sellToMarket,
+  createInvestment,
+  getUserInvestments,
+  getMarketPrice,
+  resetUserEconomyData,
+} from '../src/economy.js';
 import { warnUser, muteUser, isUserMuted, checkAutoMod, getUserModStats, resetUserModerationData } from '../src/moderation.js';
 import { createCharacter, getCharacter, applyXp, addItemToInventory, getInventory, deleteCharacter } from '../src/rpg.js';
 import { searchSongs, play, pause, stop, getQueue } from '../src/music.js';
@@ -19,11 +29,7 @@ class ComprehensiveTestSuite {
     this.passCount = 0;
     this.failCount = 0;
     // Generate unique user IDs for each test run to avoid conflicts
-    this.testUsers = [
-      `testuser_${Date.now()}_1`,
-      `testuser_${Date.now()}_2`,
-      `testuser_${Date.now()}_3`
-    ];
+    this.testUsers = [`testuser_${Date.now()}_1`, `testuser_${Date.now()}_2`, `testuser_${Date.now()}_3`];
     this.testGuild = 'testguild1';
   }
 
@@ -44,15 +50,14 @@ class ComprehensiveTestSuite {
   }
 
   async delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   cleanupTestCharacter(userId) {
     try {
       deleteCharacter(userId);
       this.log(`Cleaned up character for ${userId}`, true);
-    }
-    catch (error) {
+    } catch (error) {
       this.logError(`Failed to clean up character for ${userId}`, error);
     }
   }
@@ -87,15 +92,13 @@ class ComprehensiveTestSuite {
       this.log(`Sell successful: ${sellResult.success}`, sellResult.success);
 
       // Test investment
-      const investmentTypes = await import('../src/economy.js').then(m => m.getInvestmentTypes());
+      const investmentTypes = await import('../src/economy.js').then((m) => m.getInvestmentTypes());
       const invResult = createInvestment(this.testUsers[0], investmentTypes.bank, 100);
       this.log(`Investment created: ${invResult.success}`, invResult.success);
 
       const investments = getUserInvestments(this.testUsers[0]);
       this.log(`Investments count: ${investments.length}`, investments.length > 0);
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Economy test failed', error);
     }
   }
@@ -120,14 +123,15 @@ class ComprehensiveTestSuite {
       this.log(`Auto mod triggered: ${autoMod.triggered}`, !autoMod.triggered);
 
       const autoModSpam = checkAutoMod(this.testGuild, { content: 'SPAM SPAM SPAM' }, this.testUsers[0]);
-      this.log(`Auto mod spam detected: ${autoModSpam.triggered}`, autoModSpam.violations.some(v => v.type === 'caps'));
+      this.log(
+        `Auto mod spam detected: ${autoModSpam.triggered}`,
+        autoModSpam.violations.some((v) => v.type === 'caps'),
+      );
 
       // Test stats
       const stats = getUserModStats(this.testGuild, this.testUsers[0]);
       this.log(`User mod stats: warnings ${stats.warnings}`, stats.warnings > 0);
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Moderation test failed', error);
     }
   }
@@ -158,10 +162,11 @@ class ComprehensiveTestSuite {
       this.log(`Character retrieved: ${savedChar ? savedChar.name : 'null'}`, !!savedChar);
 
       // Verify character has proper structure after creation
-      this.log(`Character has required properties: ${savedChar.hp !== undefined && savedChar.maxHp !== undefined}`, savedChar.hp !== undefined && savedChar.maxHp !== undefined);
-
-    }
-    catch (error) {
+      this.log(
+        `Character has required properties: ${savedChar.hp !== undefined && savedChar.maxHp !== undefined}`,
+        savedChar.hp !== undefined && savedChar.maxHp !== undefined,
+      );
+    } catch (error) {
       this.logError('RPG test failed', error);
     }
   }
@@ -183,9 +188,7 @@ class ComprehensiveTestSuite {
 
       const stopResult = await stop(this.testGuild);
       this.log(`Stop executed: ${stopResult}`, true);
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Music test failed', error);
     }
   }
@@ -213,9 +216,7 @@ class ComprehensiveTestSuite {
       const sqlInjectionAttempt = "'; DROP TABLE users; --";
       const sanitizedSQL = sanitizeInput(sqlInjectionAttempt);
       this.log(`SQL injection attempt sanitized: ${sanitizedSQL.length < sqlInjectionAttempt.length}`, sanitizedSQL.length < sqlInjectionAttempt.length);
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Integration test failed', error);
     }
   }
@@ -255,24 +256,21 @@ class ComprehensiveTestSuite {
       for (let i = 0; i < 5; i++) {
         try {
           await rateLimiter.consume('test_user');
-        }
-        catch (error) {
+        } catch (error) {
           if (error instanceof CommandError && error.code === 'RATE_LIMITED') {
             rateLimitTriggered = true;
           }
         }
       }
       this.log(`Rate limiter working: ${rateLimitTriggered}`, rateLimitTriggered);
-
-    }
-    catch (error) {
+    } catch (error) {
       this.logError('Error handling test failed', error);
     }
   }
 
   async runAllTests() {
     console.log('🚀 Starting Comprehensive Bot System Test Suite');
-    console.log('=' .repeat(60));
+    console.log('='.repeat(60));
 
     try {
       await this.testEconomy();
@@ -281,15 +279,14 @@ class ComprehensiveTestSuite {
       await this.testMusic();
       await this.testIntegrations();
       await this.testErrorHandling();
-    }
-    finally {
+    } finally {
       // Always clean up test data so reruns (and CI) don't pollute the
       // committed data/ tree. If the suite crashes mid-run, we still
       // get the scrub.
       this.cleanupAllTestData();
     }
 
-    console.log('\n' + '=' .repeat(60));
+    console.log('\n' + '='.repeat(60));
     console.log('📊 Test Results Summary:');
     console.log(`Total Tests: ${this.testCount}`);
     console.log(`✅ Passed: ${this.passCount}`);
@@ -304,7 +301,7 @@ class ComprehensiveTestSuite {
       total: this.testCount,
       passed: this.passCount,
       failed: this.failCount,
-      successRate: ((this.passCount / this.testCount) * 100).toFixed(1)
+      successRate: ((this.passCount / this.testCount) * 100).toFixed(1),
     };
   }
 
@@ -318,16 +315,19 @@ class ComprehensiveTestSuite {
     for (const userId of this.testUsers) {
       try {
         deleteCharacter(userId);
+      } catch {
+        /* ignore */
       }
-      catch { /* ignore */ }
       try {
         resetUserEconomyData(userId);
+      } catch {
+        /* ignore */
       }
-      catch { /* ignore */ }
       try {
         resetUserModerationData(userId);
+      } catch {
+        /* ignore */
       }
-      catch { /* ignore */ }
     }
 
     // 2) Also scrub any pre-existing testuser_* rows that older runs
@@ -338,13 +338,12 @@ class ComprehensiveTestSuite {
     const playersDir = 'data/players';
     if (fs.existsSync(playersDir)) {
       for (const file of fs.readdirSync(playersDir)) {
-        if (file.startsWith('testuser_')
-          || file === '123456789012345678.json'
-          || file.startsWith('testuser1')) {
+        if (file.startsWith('testuser_') || file === '123456789012345678.json' || file.startsWith('testuser1')) {
           try {
             fs.unlinkSync(`${playersDir}/${file}`);
+          } catch {
+            /* ignore */
           }
-          catch { /* ignore */ }
         }
       }
     }
@@ -359,12 +358,14 @@ class ComprehensiveTestSuite {
     for (const userId of legacySweepIds) {
       try {
         resetUserEconomyData(userId);
+      } catch {
+        /* ignore */
       }
-      catch { /* ignore */ }
       try {
         resetUserModerationData(userId);
+      } catch {
+        /* ignore */
       }
-      catch { /* ignore */ }
     }
   }
 
@@ -381,8 +382,9 @@ class ComprehensiveTestSuite {
       try {
         const text = fs.readFileSync(file, 'utf8');
         for (const match of text.matchAll(testuserPattern)) ids.add(match[0]);
+      } catch {
+        /* ignore */
       }
-      catch { /* ignore */ }
     }
     return ids;
   }
@@ -391,13 +393,16 @@ class ComprehensiveTestSuite {
 // Run tests if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   const testSuite = new ComprehensiveTestSuite();
-  testSuite.runAllTests().then(results => {
-    console.log('\n🏁 Test execution completed');
-    return process.exit(results.failed > 0 ? 1 : 0);
-  }).catch(error => {
-    console.error('Test suite failed:', error);
-    return process.exit(1);
-  });
+  testSuite
+    .runAllTests()
+    .then((results) => {
+      console.log('\n🏁 Test execution completed');
+      return process.exit(results.failed > 0 ? 1 : 0);
+    })
+    .catch((error) => {
+      console.error('Test suite failed:', error);
+      return process.exit(1);
+    });
 }
 
 export default ComprehensiveTestSuite;

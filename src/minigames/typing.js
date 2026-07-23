@@ -18,7 +18,8 @@ export function checkTypingAttempt(userId, text) {
   const s = sessions.get(userId);
   if (!s) return undefined;
   if (Date.now() > s.endAt) {
-    sessions.delete(userId); return { ok: false, reason: 'timeout' };
+    sessions.delete(userId);
+    return { ok: false, reason: 'timeout' };
   }
   const success = text.trim().toLowerCase() === s.sentence.toLowerCase();
   sessions.delete(userId);

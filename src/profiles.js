@@ -40,7 +40,7 @@ class ProfileManager {
     this.profiles = {};
     if (!fs.existsSync(PROFILES_DIR)) return;
 
-    const files = fs.readdirSync(PROFILES_DIR).filter(f => f.endsWith('.json'));
+    const files = fs.readdirSync(PROFILES_DIR).filter((f) => f.endsWith('.json'));
     for (const file of files) {
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       const filePath = path.join(PROFILES_DIR, file);
@@ -53,8 +53,7 @@ class ProfileManager {
           // eslint-disable-next-line security/detect-object-injection
           this.profiles[userId] = data.profile;
         }
-      }
-      catch (error) {
+      } catch (error) {
         logger.error(`Failed to load profile for ${userId}`, error);
       }
     }
@@ -66,7 +65,7 @@ class ProfileManager {
     const data = {
       profile,
       exported: Date.now(),
-      version: '1.0'
+      version: '1.0',
     };
     try {
       // unicorn/no-null: JSON.stringify replacer is a no-op, use identity fn instead.
@@ -74,8 +73,7 @@ class ProfileManager {
       // userId is a Discord ID, not user-supplied filename — safe to construct path.
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       fs.writeFileSync(filePath, JSON.stringify(data, identity, 2));
-    }
-    catch (error) {
+    } catch (error) {
       logger.error(`Failed to save profile for ${userId}`, error);
     }
   }
@@ -120,8 +118,7 @@ class ProfileManager {
       if (data.profile) {
         this.profiles[userId] = data.profile;
       }
-    }
-    catch (error) {
+    } catch (error) {
       logger.error(`Failed to load profile for ${userId}`, error);
     }
   }
@@ -143,7 +140,7 @@ class ProfileManager {
         theme: 'default',
         privacy: 'public',
         notifications: true,
-        language: 'en'
+        language: 'en',
       },
       statistics: {
         // RPG Stats
@@ -156,7 +153,7 @@ class ProfileManager {
           gold_earned: 0,
           quests_completed: 0,
           locations_unlocked: 0,
-          guild_memberships: 0
+          guild_memberships: 0,
         },
         // Game Stats
         games: {
@@ -169,7 +166,7 @@ class ProfileManager {
           coin_flips: 0,
           coin_heads_streak: 0,
           polls_created: 0,
-          polls_votes_received: 0
+          polls_votes_received: 0,
         },
         // Social Stats
         social: {
@@ -179,7 +176,7 @@ class ProfileManager {
           trades_completed: 0,
           achievements_earned: 0,
           friends_added: 0,
-          reputation: 0
+          reputation: 0,
         },
         // Activity Stats
         activity: {
@@ -190,8 +187,8 @@ class ProfileManager {
           last_seen: Date.now(),
           total_session_time: 0,
           favorite_command: undefined,
-          streak_days: 0
-        }
+          streak_days: 0,
+        },
       },
       customization: {
         title: undefined,
@@ -200,12 +197,12 @@ class ProfileManager {
         card_style: 'modern',
         show_statistics: true,
         show_badges: true,
-        show_activity: false
+        show_activity: false,
       },
       achievements: [],
       milestones: [],
       created: Date.now(),
-      updated: Date.now()
+      updated: Date.now(),
     };
   }
 
@@ -286,11 +283,11 @@ class ProfileManager {
   awardBadge(userId, badgeId, badgeData) {
     const profile = this.getOrCreateProfile(userId);
 
-    if (!profile.badges.some(b => b.id === badgeId)) {
+    if (!profile.badges.some((b) => b.id === badgeId)) {
       profile.badges.push({
         id: badgeId,
         ...badgeData,
-        awarded: Date.now()
+        awarded: Date.now(),
       });
 
       this.saveProfile(userId, profile);
@@ -302,7 +299,7 @@ class ProfileManager {
 
   removeBadge(userId, badgeId) {
     const profile = this.getOrCreateProfile(userId);
-    const badgeIndex = profile.badges.findIndex(b => b.id === badgeId);
+    const badgeIndex = profile.badges.findIndex((b) => b.id === badgeId);
 
     if (badgeIndex !== -1) {
       profile.badges.splice(badgeIndex, 1);
@@ -319,11 +316,9 @@ class ProfileManager {
     const stats = profile.statistics;
 
     // Calculate activity score
-    const activityScore = Math.min(100,
-      (stats.activity.commands_used * 2) +
-      (stats.activity.messages_sent * 1) +
-      (stats.activity.buttons_clicked * 0.5) +
-      (stats.social.reputation * 0.1)
+    const activityScore = Math.min(
+      100,
+      stats.activity.commands_used * 2 + stats.activity.messages_sent * 1 + stats.activity.buttons_clicked * 0.5 + stats.social.reputation * 0.1,
     );
 
     // Calculate engagement level
@@ -331,14 +326,12 @@ class ProfileManager {
 
     // Find most active category
     const categoryActivity = {
-      rpg: stats.rpg.total_level + (stats.rpg.bosses_defeated * 10) + (stats.rpg.items_collected * 2),
-      games: (stats.games.trivia_correct * 3) + (stats.games.hangman_wins * 5)
-        + (stats.games.memory_games_completed * 4),
-      social: (stats.social.guilds_created * 20) + (stats.social.trades_completed * 8) + stats.social.reputation
+      rpg: stats.rpg.total_level + stats.rpg.bosses_defeated * 10 + stats.rpg.items_collected * 2,
+      games: stats.games.trivia_correct * 3 + stats.games.hangman_wins * 5 + stats.games.memory_games_completed * 4,
+      social: stats.social.guilds_created * 20 + stats.social.trades_completed * 8 + stats.social.reputation,
     };
 
-    const mostActiveCategory = Object.entries(categoryActivity)
-      .sort(([,a], [,b]) => b - a)[0]?.[0] || 'none';
+    const mostActiveCategory = Object.entries(categoryActivity).sort(([, a], [, b]) => b - a)[0]?.[0] || 'none';
 
     return {
       activityScore,
@@ -347,7 +340,7 @@ class ProfileManager {
       totalPlayTime: Math.round(stats.activity.total_session_time / 3_600_000), // Convert to hours
       accountAge: Math.round((Date.now() - stats.activity.first_seen) / (24 * 60 * 60 * 1000)), // Days
       favoriteCommand: stats.activity.favorite_command,
-      streakDays: stats.activity.streak_days
+      streakDays: stats.activity.streak_days,
     };
   }
 
@@ -375,13 +368,13 @@ class ProfileManager {
       rpg: this.compareCategory(stats1.rpg, stats2.rpg),
       games: this.compareCategory(stats1.games, stats2.games),
       social: this.compareCategory(stats1.social, stats2.social),
-      activity: this.compareCategory(stats1.activity, stats2.activity)
+      activity: this.compareCategory(stats1.activity, stats2.activity),
     };
 
     return {
       profiles: [profile1, profile2],
       comparison,
-      winner: this.determineWinner(comparison)
+      winner: this.determineWinner(comparison),
     };
   }
 
@@ -393,7 +386,7 @@ class ProfileManager {
         comparison[stat] = {
           user1: stats1[stat],
           user2: stats2[stat],
-          difference: stats1[stat] - stats2[stat]
+          difference: stats1[stat] - stats2[stat],
         };
       }
     }
@@ -425,11 +418,7 @@ class ProfileManager {
       if (profile.preferences.privacy === 'private') continue;
 
       // Search in username, display name, and bio
-      const searchFields = [
-        profile.username,
-        profile.displayName,
-        profile.bio
-      ].join(' ').toLowerCase();
+      const searchFields = [profile.username, profile.displayName, profile.bio].join(' ').toLowerCase();
 
       if (searchFields.includes(searchTerm.toLowerCase())) {
         matchingProfiles.push(profile);
@@ -453,21 +442,17 @@ class ProfileManager {
           username: profile.username,
           displayName: profile.displayName,
           value,
-          level: this.getUserLevel(profile)
+          level: this.getUserLevel(profile),
         });
       }
     }
 
-    return leaderboard
-      .sort((a, b) => b.value - a.value)
-      .slice(0, limit);
+    return leaderboard.sort((a, b) => b.value - a.value).slice(0, limit);
   }
 
   getUserLevel(profile) {
-    const totalPoints = profile.achievements.length * 10 +
-                       profile.statistics.rpg.total_level +
-                       profile.statistics.games.trivia_correct +
-                       profile.statistics.social.reputation;
+    const totalPoints =
+      profile.achievements.length * 10 + profile.statistics.rpg.total_level + profile.statistics.games.trivia_correct + profile.statistics.social.reputation;
 
     return Math.floor(totalPoints / 100) + 1;
   }
@@ -479,7 +464,7 @@ class ProfileManager {
     return {
       profile: profile,
       exported: Date.now(),
-      version: '1.0'
+      version: '1.0',
     };
   }
 
@@ -525,8 +510,7 @@ class ProfileManager {
     // Activity insights
     if (analytics.activityScore > 80) {
       insights.push("🌟 You're incredibly active in the community!");
-    }
-    else if (analytics.activityScore > 50) {
+    } else if (analytics.activityScore > 50) {
       insights.push("🎯 You're a dedicated bot user!");
     }
 
@@ -547,7 +531,7 @@ class ProfileManager {
 
         break;
       }
-    // No default
+      // No default
     }
 
     // Achievement insights
@@ -574,11 +558,11 @@ class ProfileManager {
       { id: 'social_butterfly', name: '🦋 Social Butterfly', description: 'Joined 5 guilds', requirement: 'social.guilds_joined >= 5' },
       { id: 'rpg_master', name: '🏅 RPG Master', description: 'Reached level 50 in RPG', requirement: 'rpg.highest_level >= 50' },
       { id: 'trivia_expert', name: '🧠 Trivia Expert', description: 'Answered 1000 questions correctly', requirement: 'games.trivia_correct >= 1000' },
-      { id: 'trading_mogul', name: '💎 Trading Mogul', description: 'Completed 100 trades', requirement: 'social.trades_completed >= 100' }
+      { id: 'trading_mogul', name: '💎 Trading Mogul', description: 'Completed 100 trades', requirement: 'social.trades_completed >= 100' },
     ];
 
     for (const milestone of milestones) {
-      const alreadyAchieved = profile.milestones.some(m => m.id === milestone.id);
+      const alreadyAchieved = profile.milestones.some((m) => m.id === milestone.id);
       // Requirement string is parsed by evaluateRequirement below — not executed.
       const meetsRequirement = alreadyAchieved ? false : this.evaluateRequirement(profile, milestone.requirement);
       if (!alreadyAchieved && meetsRequirement) {
@@ -586,7 +570,7 @@ class ProfileManager {
           id: milestone.id,
           name: milestone.name,
           description: milestone.description,
-          achieved: Date.now()
+          achieved: Date.now(),
         });
         newMilestones.push(milestone);
       }
@@ -619,8 +603,7 @@ class ProfileManager {
 
       // Use a safe evaluator for basic comparisons
       return this.safeEval(expression);
-    }
-    catch {
+    } catch {
       return false;
     }
   }
@@ -634,17 +617,23 @@ class ProfileManager {
       const l = Number.parseInt(left);
       const r = Number.parseInt(right);
       switch (op) {
-        case '==': { return l == r;
+        case '==': {
+          return l == r;
         }
-        case '!=': { return l != r;
+        case '!=': {
+          return l != r;
         }
-        case '>=': { return l >= r;
+        case '>=': {
+          return l >= r;
         }
-        case '<=': { return l <= r;
+        case '<=': {
+          return l <= r;
         }
-        case '>': { return l > r;
+        case '>': {
+          return l > r;
         }
-        case '<': { return l < r;
+        case '<': {
+          return l < r;
         }
       }
     }
@@ -659,7 +648,7 @@ class ProfileManager {
     }
 
     return this.updateProfile(userId, {
-      customization: { theme }
+      customization: { theme },
     });
   }
 

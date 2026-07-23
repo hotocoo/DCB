@@ -56,15 +56,15 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Athena/0.1.4'
+          'User-Agent': 'Athena/0.1.4',
         },
         body: JSON.stringify({
           model: 'gpt-oss-20b',
           messages: [{ role: 'user', content: prompt }],
           max_tokens: AI_MAX_TOKENS,
-          temperature: AI_TEMPERATURE
+          temperature: AI_TEMPERATURE,
         }),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -74,9 +74,7 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
 
       const data = await res.json();
       response = data.choices?.[0]?.message?.content ?? data.result ?? null;
-
-    }
-    else if (api === 'openwebui') {
+    } else if (api === 'openwebui') {
       const base = OPENWEBUI_BASE || url;
       if (!base) {
         throw new Error('OpenWebUI base URL not configured');
@@ -87,10 +85,10 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Athena/0.1.4'
+          'User-Agent': 'Athena/0.1.4',
         },
         body: JSON.stringify({ prompt }),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -100,18 +98,16 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
 
       const data = await res.json();
       response = data.response ?? data.output ?? data.result ?? null;
-
-    }
-    else {
+    } else {
       // Generic endpoint fallback
       const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Athena/0.1.4'
+          'User-Agent': 'Athena/0.1.4',
         },
         body: JSON.stringify({ prompt }),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -130,9 +126,7 @@ async function callLocalModel(prompt, url = LOCAL_MODEL_URL, api = LOCAL_MODEL_A
     }
 
     return response.trim();
-
-  }
-  catch (error) {
+  } catch (error) {
     clearTimeout(timeoutId);
 
     if (error.name === 'AbortError') {
@@ -183,7 +177,7 @@ const cleanupTimer = setInterval(() => {
     logger.warn('High conversation memory usage detected', {
       totalMemoryMB: (totalMemory / (1024 * 1024)).toFixed(2),
       conversations: conversationMap.size,
-      cooldowns: cooldownMap.size
+      cooldowns: cooldownMap.size,
     });
   }
 }, CLEANUP_INTERVAL_MS);
@@ -212,8 +206,8 @@ export async function respondWithOpenAI(messages) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_KEY}`,
-        'User-Agent': 'Athena/0.1.4'
+        Authorization: `Bearer ${OPENAI_KEY}`,
+        'User-Agent': 'Athena/0.1.4',
       },
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
@@ -221,7 +215,7 @@ export async function respondWithOpenAI(messages) {
         max_tokens: AI_MAX_TOKENS,
         temperature: AI_TEMPERATURE,
       }),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
@@ -240,9 +234,7 @@ export async function respondWithOpenAI(messages) {
 
     logger.debug('OpenAI response received', { contentLength: content.length });
     return content;
-
-  }
-  catch (error) {
+  } catch (error) {
     clearTimeout(timeoutId);
 
     if (error.name === 'AbortError') {
@@ -283,7 +275,7 @@ export async function handleMessage(message) {
       isDM,
       isMention,
       messageLength: message.content.length,
-      processedLength: raw.length
+      processedLength: raw.length,
     });
 
     // Handle special commands
@@ -302,7 +294,7 @@ export async function handleMessage(message) {
     if (now - lastInteraction < COOLDOWN_MS) {
       logger.debug('Chat cooldown active', {
         userId: message.author.id,
-        remainingMs: COOLDOWN_MS - (now - lastInteraction)
+        remainingMs: COOLDOWN_MS - (now - lastInteraction),
       });
       return null;
     }
@@ -334,7 +326,7 @@ export async function handleMessage(message) {
     const response = await generateChatResponse(prompt, message, history, {
       useLocalUrl,
       useLocalApi,
-      isDM
+      isDM,
     });
 
     // Update conversation history with response
@@ -344,15 +336,13 @@ export async function handleMessage(message) {
     }
 
     return response;
-
-  }
-  catch (error) {
+  } catch (error) {
     logger.error('Chat message handling failed', error, {
       userId: message.author.id,
       username: message.author.username,
       messageLength: message.content.length,
       channelName: message.channel.name,
-      isDM
+      isDM,
     });
 
     return '🤖 Oops! Something went wrong processing your message. Please try again.';
@@ -381,7 +371,7 @@ function handleSpecialCommands(command, message) {
   if (lowerCommand === '!status') {
     const guilds = message.client.guilds.cache.size;
     const users = message.client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0);
-    const aiStatus = OPENAI_KEY ? 'OpenAI ✓' : (LOCAL_MODEL_URL ? 'Local Model ✓' : 'Basic Chat ✓');
+    const aiStatus = OPENAI_KEY ? 'OpenAI ✓' : LOCAL_MODEL_URL ? 'Local Model ✓' : 'Basic Chat ✓';
 
     return `🤖 **Bot Status:**\n• Servers: ${guilds}\n• Users: ${users}\n• AI: ${aiStatus}\n• Version: Athena v0.1.4`;
   }
@@ -421,7 +411,10 @@ Current context:
 - Time: ${new Date().toLocaleString()}
 
 Previous conversation:
-${history.slice(-3).map(h => `${h.role}: ${h.content}`).join('\n')}
+${history
+  .slice(-3)
+  .map((h) => `${h.role}: ${h.content}`)
+  .join('\n')}
 
 User's message: ${prompt}
 
@@ -437,15 +430,14 @@ Respond naturally and helpfully. If they're asking about bot features, mention r
         logger.info('Local model chat response generated', {
           userId: message.author.id,
           responseLength: cleanResponse.length,
-          model: useLocalApi
+          model: useLocalApi,
         });
         return cleanResponse;
       }
-    }
-    catch (error) {
+    } catch (error) {
       logger.warn('Local model failed for chat, falling back to OpenAI', {
         error: error.message,
-        userId: message.author.id
+        userId: message.author.id,
       });
     }
   }
@@ -457,9 +449,10 @@ Respond naturally and helpfully. If they're asking about bot features, mention r
       const messages = [
         {
           role: 'system',
-          content: 'You are Athena, an advanced AI Discord bot with RPG games, trivia, music, trading, and many other features. Be friendly, helpful, and engaging. Keep responses under 2000 characters.'
+          content:
+            'You are Athena, an advanced AI Discord bot with RPG games, trivia, music, trading, and many other features. Be friendly, helpful, and engaging. Keep responses under 2000 characters.',
         },
-        ...history.map(h => ({ role: h.role, content: h.content }))
+        ...history.map((h) => ({ role: h.role, content: h.content })),
       ];
 
       const reply = await respondWithOpenAI(messages);
@@ -467,15 +460,14 @@ Respond naturally and helpfully. If they're asking about bot features, mention r
         const cleanReply = reply.trim().slice(0, Math.max(0, MAX_RESPONSE_LENGTH));
         logger.info('OpenAI chat response generated', {
           userId: message.author.id,
-          responseLength: cleanReply.length
+          responseLength: cleanReply.length,
         });
         return cleanReply;
       }
-    }
-    catch (error) {
+    } catch (error) {
       logger.error('OpenAI API failed for chat', error, {
         userId: message.author.id,
-        promptLength: prompt.length
+        promptLength: prompt.length,
       });
     }
   }
@@ -485,7 +477,7 @@ Respond naturally and helpfully. If they're asking about bot features, mention r
     `💭 I'm thinking... "${prompt}" is an interesting message! While my AI brain is loading, did you know you can use /rpg to start an adventure?`,
     `🤔 Processing your message: "${prompt.slice(0, 50)}${prompt.length > 50 ? '...' : ''}". My neural networks are warming up! Try /help to explore all features.`,
     `🧠 Analyzing: "${prompt}". I'm getting smarter every day! Meanwhile, you can play /trivia or start an RPG adventure with /rpg.`,
-    `⚡ "${prompt}" - fascinating input! While I'm connecting to my AI core, why not try /music to play some tunes?`
+    `⚡ "${prompt}" - fascinating input! While I'm connecting to my AI core, why not try /music to play some tunes?`,
   ];
 
   const fallbackResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
@@ -543,8 +535,13 @@ function handlePlayfulPrompt(text, message) {
  */
 function eightBallReply() {
   const answers = [
-    'It is certain.', 'Without a doubt.', 'You may rely on it.', 'Ask again later.',
-    'Better not tell you now.', 'My reply is no.', 'Very doubtful.'
+    'It is certain.',
+    'Without a doubt.',
+    'You may rely on it.',
+    'Ask again later.',
+    'Better not tell you now.',
+    'My reply is no.',
+    'Very doubtful.',
   ];
   return answers[Math.floor(Math.random() * answers.length)];
 }
@@ -560,12 +557,9 @@ function playRPS(userChoice, username) {
   const bot = choices[Math.floor(Math.random() * 3)];
   let result = 'tie';
 
-  if ((userChoice === 'rock' && bot === 'scissors') ||
-      (userChoice === 'paper' && bot === 'rock') ||
-      (userChoice === 'scissors' && bot === 'paper')) {
+  if ((userChoice === 'rock' && bot === 'scissors') || (userChoice === 'paper' && bot === 'rock') || (userChoice === 'scissors' && bot === 'paper')) {
     result = 'you win';
-  }
-  else if (userChoice !== bot) {
+  } else if (userChoice !== bot) {
     result = 'you lose';
   }
 
@@ -596,7 +590,7 @@ function randomJoke() {
   const jokes = [
     "I told my computer I needed a break, and it said: 'No problem — I'll go to sleep.'",
     'Why do programmers prefer dark mode? Because light attracts bugs!',
-    'Why did the developer go broke? Because he used up all his cache.'
+    'Why did the developer go broke? Because he used up all his cache.',
   ];
   return jokes[Math.floor(Math.random() * jokes.length)];
 }

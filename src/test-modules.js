@@ -15,7 +15,7 @@ console.log('✅ Token format valid');
 // Test 1: Basic Discord client only
 console.log('\n📋 Test 1: Basic Discord client only');
 const basicClient = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
 });
 
 basicClient.once('clientReady', () => {
@@ -35,8 +35,7 @@ async function testNext() {
     const { logger } = await import('./logger.js');
     console.log('✅ Logger loaded successfully');
     testNext2();
-  }
-  catch (error) {
+  } catch (error) {
     console.error('❌ Logger failed:', error.message);
     console.error('🔧 This is the issue! The logger module has ES6/CommonJS conflicts');
     return;
@@ -50,8 +49,7 @@ async function testNext2() {
     const { handleMessage } = await import('./chat.js');
     console.log('✅ Chat module loaded successfully');
     testNext3();
-  }
-  catch (error) {
+  } catch (error) {
     console.error('❌ Chat module failed:', error.message);
     return;
   }
@@ -64,8 +62,7 @@ async function testNext3() {
     const { isOnCooldown } = await import('./cooldowns.js');
     console.log('✅ Cooldowns module loaded successfully');
     testNext4();
-  }
-  catch (error) {
+  } catch (error) {
     console.error('❌ Cooldowns module failed:', error.message);
     return;
   }
@@ -78,8 +75,7 @@ async function testNext4() {
     const { getLocations } = await import('./locations.js');
     console.log('✅ Locations module loaded successfully');
     testNext5();
-  }
-  catch (error) {
+  } catch (error) {
     console.error('❌ Locations module failed:', error.message);
     return;
   }
@@ -91,8 +87,7 @@ async function testNext5() {
     const { getActiveAuctions } = await import('./trading.js');
     console.log('✅ Trading module loaded successfully');
     console.log('\n🎉 All core modules loaded successfully!');
-  }
-  catch (error) {
+  } catch (error) {
     console.error('❌ Trading module failed:', error.message);
     return;
   }

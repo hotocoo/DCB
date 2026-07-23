@@ -24,8 +24,7 @@ class LocationManager {
     try {
       const data = JSON.parse(fs.readFileSync(LOCATIONS_FILE));
       this.locations = data;
-    }
-    catch (error) {
+    } catch (error) {
       console.error('Failed to load locations:', error);
       this.locations = {};
     }
@@ -34,8 +33,7 @@ class LocationManager {
   saveLocations() {
     try {
       fs.writeFileSync(LOCATIONS_FILE, JSON.stringify(this.locations, null, 2));
-    }
-    catch (error) {
+    } catch (error) {
       console.error('Failed to save locations:', error);
     }
   }
@@ -44,7 +42,7 @@ class LocationManager {
   getLocations() {
     return {
       // Starting Areas
-      'whispering_woods': {
+      whispering_woods: {
         id: 'whispering_woods',
         name: '🌲 Whispering Woods',
         description: 'Ancient trees whisper secrets of old magic',
@@ -53,12 +51,12 @@ class LocationManager {
         encounters: ['friendly_npc', 'easy_monster', 'treasure_chest', 'magic_spring'],
         ai_prompt: 'Describe a mystical forest with ancient trees that seem to whisper secrets. Include ambient sounds and magical elements.',
         rewards: { xp: 5, gold: 10, items: ['health_potion', 'magic_crystal'] },
-        color: 0x22_8B_22,
+        color: 0x22_8b_22,
         emoji: '🌲',
-        unlocked: true
+        unlocked: true,
       },
 
-      'crystal_caverns': {
+      crystal_caverns: {
         id: 'crystal_caverns',
         name: '💎 Crystal Caverns',
         description: 'Shimmering crystals light the underground passages',
@@ -67,12 +65,12 @@ class LocationManager {
         encounters: ['crystal_golem', 'treasure_room', 'dark_pit', 'magic_circle'],
         ai_prompt: 'Describe a breathtaking cavern filled with glowing crystals of various colors. Include echoes and mystical energies.',
         rewards: { xp: 15, gold: 25, items: ['mana_potion', 'magic_staff', 'crystal_shard'] },
-        color: 0x93_70_DB,
+        color: 0x93_70_db,
         emoji: '💎',
-        unlocked: false
+        unlocked: false,
       },
 
-      'volcano_summit': {
+      volcano_summit: {
         id: 'volcano_summit',
         name: '🌋 Volcano Summit',
         description: 'The peak where fire and earth meet the sky',
@@ -81,12 +79,12 @@ class LocationManager {
         encounters: ['fire_elemental', 'lava_golem', 'phoenix_nest', 'ancient_altar'],
         ai_prompt: 'Describe a dramatic volcanic landscape with rivers of lava, intense heat, and the raw power of nature.',
         rewards: { xp: 50, gold: 100, items: ['fire_sword', 'phoenix_feather', 'dragon_scale'] },
-        color: 0xFF_45_00,
+        color: 0xff_45_00,
         emoji: '🌋',
-        unlocked: false
+        unlocked: false,
       },
 
-      'forgotten_temple': {
+      forgotten_temple: {
         id: 'forgotten_temple',
         name: '🏛️ Forgotten Temple',
         description: 'Ancient ruins holding divine secrets',
@@ -95,12 +93,12 @@ class LocationManager {
         encounters: ['stone_guardian', 'curse_trap', 'blessed_shrine', 'divine_relic'],
         ai_prompt: 'Describe mysterious ancient ruins overgrown with vines, filled with mystical symbols and divine energy.',
         rewards: { xp: 75, gold: 150, items: ['holy_amulet', 'ancient_scroll', 'divine_blessing'] },
-        color: 0xDA_A5_20,
+        color: 0xda_a5_20,
         emoji: '🏛️',
-        unlocked: false
+        unlocked: false,
       },
 
-      'shadow_realm': {
+      shadow_realm: {
         id: 'shadow_realm',
         name: '🌑 Shadow Realm',
         description: 'A dimension where light fears to tread',
@@ -109,12 +107,12 @@ class LocationManager {
         encounters: ['shadow_beast', 'void_walker', 'dark_portal', 'essence_crystal'],
         ai_prompt: 'Describe a terrifying realm of pure darkness where shadows come alive and whisper forbidden knowledge.',
         rewards: { xp: 200, gold: 500, items: ['shadow_blade', 'void_crystal', 'legendary_blade'] },
-        color: 0x2F_2F_4F,
+        color: 0x2f_2f_4f,
         emoji: '🌑',
-        unlocked: false
+        unlocked: false,
       },
 
-      'celestial_spire': {
+      celestial_spire: {
         id: 'celestial_spire',
         name: '⭐ Celestial Spire',
         description: 'The highest point where mortals meet the divine',
@@ -123,10 +121,10 @@ class LocationManager {
         encounters: ['celestial_guardian', 'star_dragon', 'divine_trial', 'cosmic_artifact'],
         ai_prompt: 'Describe a breathtaking tower reaching into the heavens, surrounded by stars and cosmic phenomena.',
         rewards: { xp: 500, gold: 1000, items: ['celestial_armor', 'star_fragment', 'godly_relic'] },
-        color: 0xFF_D7_00,
+        color: 0xff_d7_00,
         emoji: '⭐',
-        unlocked: false
-      }
+        unlocked: false,
+      },
     };
   }
 
@@ -150,7 +148,7 @@ class LocationManager {
       success: true,
       location,
       encounter,
-      narrative: this.generateLocationNarrative(location, encounter)
+      narrative: this.generateLocationNarrative(location, encounter),
     };
   }
 
@@ -162,37 +160,37 @@ class LocationManager {
       type: randomEncounter,
       difficulty: location.level,
       rewards: this.calculateEncounterRewards(randomEncounter, location.level),
-      description: this.getEncounterDescription(randomEncounter, location.level)
+      description: this.getEncounterDescription(randomEncounter, location.level),
     };
   }
 
   getEncounterDescription(encounterType, level) {
     const descriptions = {
       // Friendly encounters
-      'friendly_npc': 'A wise traveler offers guidance and shares ancient knowledge from their journeys.',
-      'magic_spring': 'Crystal-clear water glows with restorative magic, healing wounds and granting wisdom.',
-      'blessed_shrine': 'A sacred altar radiates divine energy, offering blessings to worthy adventurers.',
+      friendly_npc: 'A wise traveler offers guidance and shares ancient knowledge from their journeys.',
+      magic_spring: 'Crystal-clear water glows with restorative magic, healing wounds and granting wisdom.',
+      blessed_shrine: 'A sacred altar radiates divine energy, offering blessings to worthy adventurers.',
 
       // Combat encounters
-      'easy_monster': 'A curious forest creature emerges, more frightened than dangerous.',
-      'crystal_golem': 'Animated crystals form a humanoid shape, defending the cavern\'s treasures.',
-      'fire_elemental': 'Living flames dance with destructive beauty, born from the volcano\'s heart.',
-      'stone_guardian': 'An ancient statue awakens, sworn to protect the temple\'s secrets.',
-      'shadow_beast': 'Darkness coalesces into a terrifying creature from your deepest fears.',
-      'celestial_guardian': 'A being of pure starlight descends to test your worthiness.',
+      easy_monster: 'A curious forest creature emerges, more frightened than dangerous.',
+      crystal_golem: "Animated crystals form a humanoid shape, defending the cavern's treasures.",
+      fire_elemental: "Living flames dance with destructive beauty, born from the volcano's heart.",
+      stone_guardian: "An ancient statue awakens, sworn to protect the temple's secrets.",
+      shadow_beast: 'Darkness coalesces into a terrifying creature from your deepest fears.',
+      celestial_guardian: 'A being of pure starlight descends to test your worthiness.',
 
       // Treasure encounters
-      'treasure_chest': 'An ornate chest glows with magical energy, promising valuable rewards.',
-      'treasure_room': 'A chamber filled with precious artifacts and forgotten wealth.',
-      'ancient_altar': 'A mystical altar holds offerings from civilizations long past.',
+      treasure_chest: 'An ornate chest glows with magical energy, promising valuable rewards.',
+      treasure_room: 'A chamber filled with precious artifacts and forgotten wealth.',
+      ancient_altar: 'A mystical altar holds offerings from civilizations long past.',
 
       // Special encounters
-      'dark_pit': 'A seemingly bottomless pit exhales cold, malevolent air.',
-      'magic_circle': 'Glowing runes form a perfect circle of arcane power.',
-      'phoenix_nest': 'A magnificent nest made of golden flames and precious materials.',
-      'divine_relic': 'A holy artifact pulses with celestial energy.',
-      'dark_portal': 'A swirling vortex connects to realms beyond mortal comprehension.',
-      'cosmic_artifact': 'An otherworldly object defies the laws of reality.'
+      dark_pit: 'A seemingly bottomless pit exhales cold, malevolent air.',
+      magic_circle: 'Glowing runes form a perfect circle of arcane power.',
+      phoenix_nest: 'A magnificent nest made of golden flames and precious materials.',
+      divine_relic: 'A holy artifact pulses with celestial energy.',
+      dark_portal: 'A swirling vortex connects to realms beyond mortal comprehension.',
+      cosmic_artifact: 'An otherworldly object defies the laws of reality.',
     };
 
     return descriptions[encounterType] || 'An mysterious encounter awaits in this location.';
@@ -202,7 +200,7 @@ class LocationManager {
     const baseRewards = {
       xp: level * 5,
       gold: level * 3,
-      items: []
+      items: [],
     };
 
     // Add special rewards based on encounter type
@@ -223,7 +221,7 @@ class LocationManager {
     return {
       entry: `You arrive at ${location.name}. ${location.description}`,
       encounter: `As you explore deeper, you encounter: ${encounter.description}`,
-      rewards: `Completing this encounter may reward: ${encounter.rewards.xp} XP and ${encounter.rewards.gold} gold.`
+      rewards: `Completing this encounter may reward: ${encounter.rewards.xp} XP and ${encounter.rewards.gold} gold.`,
     };
   }
 
@@ -248,7 +246,7 @@ class LocationManager {
     return {
       success: true,
       location,
-      message: `🏆 **Location Unlocked!** ${location.emoji} ${location.name}\n${location.description}`
+      message: `🏆 **Location Unlocked!** ${location.emoji} ${location.name}\n${location.description}`,
     };
   }
 
@@ -274,14 +272,14 @@ class LocationManager {
       maxFloors: Math.min(10, location.level + 3),
       completed: false,
       startTime: Date.now(),
-      progress: []
+      progress: [],
     };
 
     return {
       success: true,
       dungeon: dungeonInstance,
       location,
-      firstRoom: this.generateDungeonRoom(location, 1)
+      firstRoom: this.generateDungeonRoom(location, 1),
     };
   }
 
@@ -294,7 +292,7 @@ class LocationManager {
       type: roomType,
       description: this.getRoomDescription(roomType, location, floor),
       challenge: this.generateRoomChallenge(roomType, location.level, floor),
-      rewards: this.calculateRoomRewards(roomType, location.level, floor)
+      rewards: this.calculateRoomRewards(roomType, location.level, floor),
     };
   }
 
@@ -304,7 +302,7 @@ class LocationManager {
       treasure: `Floor ${floor} holds ancient treasures waiting to be discovered.`,
       puzzle: `Floor ${floor} presents a mystical puzzle that must be solved.`,
       rest: `Floor ${floor} offers a safe haven to recover and prepare.`,
-      boss: `Floor ${floor} - The final challenge! A powerful guardian awaits.`
+      boss: `Floor ${floor} - The final challenge! A powerful guardian awaits.`,
     };
 
     return descriptions[roomType] || `Floor ${floor} presents an unknown challenge.`;
@@ -318,10 +316,10 @@ class LocationManager {
         return {
           type: 'monster',
           name: `Dungeon Guardian (Level ${level})`,
-          hp: 50 + (level * 10),
+          hp: 50 + level * 10,
           atk: 8 + level,
           def: 2 + Math.floor(level / 3),
-          spd: 2 + Math.floor(level / 4)
+          spd: 2 + Math.floor(level / 4),
         };
       }
 
@@ -329,7 +327,7 @@ class LocationManager {
         return {
           type: 'riddle',
           riddle: this.generateRiddle(level),
-          answer: this.getRiddleAnswer()
+          answer: this.getRiddleAnswer(),
         };
       }
 
@@ -337,7 +335,7 @@ class LocationManager {
         return {
           type: 'lock',
           difficulty: level,
-          trap_chance: Math.min(50, level * 5)
+          trap_chance: Math.min(50, level * 5),
         };
       }
 
@@ -375,7 +373,7 @@ class LocationManager {
       "I have keys but no locks. I have space but no room. You can enter, but you can't go outside. What am I?",
       'The more you take, the more you leave behind. What am I?',
       "I am not alive, but I grow; I don't have lungs, but I need air; I don't have a mouth, but water kills me. What am I?",
-      'I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?'
+      'I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?',
     ];
 
     return riddles[Math.floor(Math.random() * riddles.length)];
@@ -404,17 +402,17 @@ class LocationManager {
       success: true,
       location,
       requirements,
-      canUnlock
+      canUnlock,
     };
   }
 
   getDiscoveryRequirements(locationId) {
     const requirements = {
-      'crystal_caverns': { level: 3, achievements: ['first_character'] },
-      'volcano_summit': { level: 8, achievements: ['dragon_slayer'] },
-      'forgotten_temple': { level: 12, achievements: ['treasure_hunter'] },
-      'shadow_realm': { level: 20, achievements: ['class_master'] },
-      'celestial_spire': { level: 25, achievements: ['bot_friend'] }
+      crystal_caverns: { level: 3, achievements: ['first_character'] },
+      volcano_summit: { level: 8, achievements: ['dragon_slayer'] },
+      forgotten_temple: { level: 12, achievements: ['treasure_hunter'] },
+      shadow_realm: { level: 20, achievements: ['class_master'] },
+      celestial_spire: { level: 25, achievements: ['bot_friend'] },
     };
 
     return requirements[locationId] || {};
@@ -432,7 +430,7 @@ class LocationManager {
 
     if (requirements.achievements && requirements.achievements.length > 0) {
       const userAch = getAch(userId);
-      const hasRequired = requirements.achievements.every(achId => userAch.find(a => a.id === achId));
+      const hasRequired = requirements.achievements.every((achId) => userAch.find((a) => a.id === achId));
       if (!hasRequired) return false;
     }
 

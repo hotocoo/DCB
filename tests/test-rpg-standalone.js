@@ -28,8 +28,7 @@ function restoreData() {
   if (fs.existsSync(BACKUP)) {
     fs.copyFileSync(BACKUP, FILE);
     fs.unlinkSync(BACKUP);
-  }
-  else {
+  } else {
     // remove test file if created
     if (fs.existsSync(FILE)) fs.unlinkSync(FILE);
   }
@@ -82,23 +81,24 @@ async function run() {
     assert.equal(def.lvl, 1);
 
     console.log('All RPG tests passed');
-  }
-  finally {
+  } finally {
     // Always clean up the per-user file and any testuser_* leftovers
     // from previous runs. Without this, the new snowflake-based UID
     // leaves `data/players/123456789012345678.json` behind on every run.
     try {
       deleteCharacter('123456789012345678');
+    } catch {
+      /* ignore */
     }
-    catch { /* ignore */ }
     const playerDir = path.join(process.cwd(), 'data', 'players');
     if (fs.existsSync(playerDir)) {
       for (const file of fs.readdirSync(playerDir)) {
         if (file === '123456789012345678.json' || file.startsWith('testuser_') || file.startsWith('testuser1')) {
           try {
             fs.unlinkSync(path.join(playerDir, file));
+          } catch {
+            /* ignore */
           }
-          catch { /* ignore */ }
         }
       }
     }
@@ -106,6 +106,9 @@ async function run() {
   }
 }
 
-run().then(() => process.exit(0)).catch(error => {
-  console.error(error); process.exit(1);
-});
+run()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

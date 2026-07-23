@@ -1,4 +1,14 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags } from 'discord.js';
+import {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  MessageFlags,
+} from 'discord.js';
 
 import { updateUserStats } from '../achievements.js';
 import { guessGames } from '../game-states.js';
@@ -10,25 +20,21 @@ import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandl
 export const data = new SlashCommandBuilder()
   .setName('guess')
   .setDescription('Play number guessing game with multiple difficulty levels')
-  .addStringOption(option =>
-    option.setName('difficulty')
+  .addStringOption((option) =>
+    option
+      .setName('difficulty')
       .setDescription('Game difficulty')
       .addChoices(
         { name: 'Easy (1-50, 10 attempts)', value: 'easy' },
         { name: 'Medium (1-100, 8 attempts)', value: 'medium' },
         { name: 'Hard (1-200, 6 attempts)', value: 'hard' },
         { name: 'Expert (1-500, 5 attempts)', value: 'expert' },
-        { name: 'Master (1-1000, 4 attempts)', value: 'master' }
+        { name: 'Master (1-1000, 4 attempts)', value: 'master' },
       )
-      .setRequired(false))
-  .addIntegerOption(option =>
-    option.setName('custom_min')
-      .setDescription('Custom minimum number')
-      .setRequired(false))
-  .addIntegerOption(option =>
-    option.setName('custom_max')
-      .setDescription('Custom maximum number')
-      .setRequired(false));
+      .setRequired(false),
+  )
+  .addIntegerOption((option) => option.setName('custom_min').setDescription('Custom minimum number').setRequired(false))
+  .addIntegerOption((option) => option.setName('custom_max').setDescription('Custom maximum number').setRequired(false));
 
 /**
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
@@ -114,15 +120,14 @@ export async function execute(interaction) {
       guesses: [],
       gameActive: true,
       difficulty,
-      startTime: Date.now()
+      startTime: Date.now(),
     };
 
     // Store game state
     guessGames.set(gameId, gameState);
 
     await sendGuessPrompt(interaction, gameState);
-  }
-  catch (error) {
+  } catch (error) {
     await handleCommandError(interaction, /** @type {Error | CommandError} */ (error));
   }
 }
@@ -145,18 +150,20 @@ async function sendGuessPrompt(interaction, gameState) {
 
       const loseEmbed = new EmbedBuilder()
         .setTitle('❌ Game Over!')
-        .setColor(0xFF_00_00)
+        .setColor(0xff_00_00)
         .setDescription(`The secret number was **${gameState.secretNumber}**!\n\nYou used all ${attempts} attempts in ${timeElapsed} seconds.`)
         .addFields({
           name: 'Your Guesses',
-          value: guesses.length > 0 ? guesses.map(/** @param {Guess} g */ (g, /** @param {number} i */ i) => `${i + 1}. **${g.number}** - ${g.feedback}`).join('\n') : 'No guesses made',
-          inline: false
+          value:
+            guesses.length > 0
+              ? guesses.map(/** @param {Guess} g */ (g, /** @param {number} i */ i) => `${i + 1}. **${g.number}** - ${g.feedback}`).join('\n')
+              : 'No guesses made',
+          inline: false,
         });
 
       if (interaction.replied || interaction.deferred) {
         await safeInteractionUpdate(interaction, { embeds: [loseEmbed], components: [] });
-      }
-      else {
+      } else {
         await safeInteractionReply(interaction, { embeds: [loseEmbed] });
       }
       return;
@@ -164,29 +171,31 @@ async function sendGuessPrompt(interaction, gameState) {
 
     const embed = new EmbedBuilder()
       .setTitle('🔢 Number Guessing Game')
-      .setColor(0x00_99_FF)
+      .setColor(0x00_99_ff)
       .setDescription(`I'm thinking of a number between **${min}** and **${max}**.\n\nYou have **${attempts - attemptsUsed}** attempts remaining.`)
       .addFields({
         name: 'Previous Guesses',
-        value: guesses.length > 0 ?
-          guesses.slice(-5).map(/** @param {Guess} g */ (g, /** @param {number} i */ i) => `**${g.number}** - ${g.feedback}`).join('\n') :
-          'No guesses yet',
-        inline: false
+        value:
+          guesses.length > 0
+            ? guesses
+                .slice(-5)
+                .map(/** @param {Guess} g */ (g, /** @param {number} i */ i) => `**${g.number}** - ${g.feedback}`)
+                .join('\n')
+            : 'No guesses yet',
+        inline: false,
       });
 
     // Create guess button
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`guess_modal:${gameState.id}:${min}:${max}`).setLabel('🔢 Make Guess').setStyle(ButtonStyle.Primary)
+      new ButtonBuilder().setCustomId(`guess_modal:${gameState.id}:${min}:${max}`).setLabel('🔢 Make Guess').setStyle(ButtonStyle.Primary),
     );
 
     if (interaction.replied || interaction.deferred) {
       await safeInteractionUpdate(interaction, { embeds: [embed], components: [row] });
-    }
-    else {
+    } else {
       await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
     }
-  }
-  catch (error) {
+  } catch (error) {
     console.error('sendGuessPrompt error:', error);
     await handleCommandError(interaction, new CommandError('Failed to update game prompt.', 'UNKNOWN_ERROR', { originalError: String(error) }));
   }
@@ -244,15 +253,12 @@ async function processGuess(interaction, gameState, guess) {
       // Track win with error handling
       try {
         updateUserStats(interaction.user.id, { guess_wins: 1 });
-      }
-      catch (statsError) {
+      } catch (statsError) {
         console.error('Failed to update user stats:', statsError);
       }
-    }
-    else if (guessNum < gameState.secretNumber) {
+    } else if (guessNum < gameState.secretNumber) {
       feedback = '📈 Too low! Try a higher number.';
-    }
-    else {
+    } else {
       feedback = '📉 Too high! Try a lower number.';
     }
 
@@ -260,7 +266,7 @@ async function processGuess(interaction, gameState, guess) {
     gameState.guesses.push({
       number: guessNum,
       feedback,
-      attempt: gameState.attemptsUsed
+      attempt: gameState.attemptsUsed,
     });
 
     if (isCorrect) {
@@ -277,41 +283,40 @@ async function processGuess(interaction, gameState, guess) {
 
       const winEmbed = new EmbedBuilder()
         .setTitle('🎉 Congratulations!')
-        .setColor(0x00_FF_00)
+        .setColor(0x00_ff_00)
         .setDescription(`You guessed **${gameState.secretNumber}** correctly!\n\n${performanceRating}`)
         .addFields(
           {
             name: '📊 Game Stats',
             value: `**Attempts:** ${attemptsUsed}/${gameState.attempts}\n**Time:** ${timeElapsed}s\n**Difficulty:** ${gameState.difficulty.toUpperCase()}`,
-            inline: true
+            inline: true,
           },
           {
             name: '🏆 Performance',
             value: `**Range:** ${gameState.min}-${gameState.max}\n**Efficiency:** ${Math.round((1 - (attemptsUsed - 1) / gameState.attempts) * 100)}%`,
-            inline: true
-          }
+            inline: true,
+          },
         );
 
       if (gameState.guesses.length > 0) {
         winEmbed.addFields({
           name: '📝 Guess History',
           value: gameState.guesses.map(/** @param {Guess} g */ (g, /** @param {number} i */ i) => `${i + 1}. **${g.number}** - ${g.feedback}`).join('\n'),
-          inline: false
+          inline: false,
         });
       }
 
       await safeInteractionUpdate(interaction, { embeds: [winEmbed], components: [] });
-
-    }
-    else {
+    } else {
       // Continue game
       await sendGuessPrompt(interaction, gameState);
       await safeInteractionReply(interaction, { content: `**${guessNum}** - ${feedback}`, flags: MessageFlags.Ephemeral });
     }
-  }
-  catch (error) {
+  } catch (error) {
     console.error('processGuess error:', error);
-    await handleCommandError(interaction, error instanceof CommandError ? error :
-      new CommandError('Failed to process guess.', 'UNKNOWN_ERROR', { originalError: String(error) }));
+    await handleCommandError(
+      interaction,
+      error instanceof CommandError ? error : new CommandError('Failed to process guess.', 'UNKNOWN_ERROR', { originalError: String(error) }),
+    );
   }
 }

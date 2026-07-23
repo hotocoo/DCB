@@ -34,19 +34,14 @@ import { logError } from '../logger.js';
 export const data = new SlashCommandBuilder()
   .setName('connect4')
   .setDescription('Play Connect Four - strategic dropping game')
-  .addUserOption(option =>
-    option.setName('opponent')
-      .setDescription('Player to challenge')
-      .setRequired(true))
-  .addStringOption(option =>
-    option.setName('difficulty')
+  .addUserOption((option) => option.setName('opponent').setDescription('Player to challenge').setRequired(true))
+  .addStringOption((option) =>
+    option
+      .setName('difficulty')
       .setDescription('AI difficulty (if playing against AI)')
-      .addChoices(
-        { name: 'Easy', value: 'easy' },
-        { name: 'Medium', value: 'medium' },
-        { name: 'Hard', value: 'hard' }
-      )
-      .setRequired(false));
+      .addChoices({ name: 'Easy', value: 'easy' }, { name: 'Medium', value: 'medium' }, { name: 'Hard', value: 'hard' })
+      .setRequired(false),
+  );
 
 /**
  * @param {CommandInteraction} interaction
@@ -74,26 +69,23 @@ export async function execute(interaction) {
     /** @type {GameState} */
     const gameState = {
       id: gameId,
-      board: Array.from({ length: 6 }, () =>
-        /** @type {(undefined|'red'|'yellow')[]} */ (Array.from({ length: 7 }))
-      ),
+      board: Array.from({ length: 6 }, () => /** @type {(undefined|'red'|'yellow')[]} */ (Array.from({ length: 7 }))),
       players: {
         red: { id: interaction.user.id, name: interaction.user.username, symbol: '🔴' },
-        yellow: { id: opponent.id, name: opponent.username, symbol: '🟡' }
+        yellow: { id: opponent.id, name: opponent.username, symbol: '🟡' },
       },
       currentPlayer: /** @type {'red'|'yellow'} */ ('red'),
       status: /** @type {'active'|'completed'} */ ('active'),
       isAI: opponent.bot,
       difficulty: /** @type {'easy'|'medium'|'hard'} */ (difficulty || 'medium'),
-      created: Date.now()
+      created: Date.now(),
     };
 
     // Store game state
     connect4Games.set(gameId, gameState);
 
     await sendConnect4Board(interaction, gameState);
-  }
-  catch (error) {
+  } catch (error) {
     await handleCommandError(interaction, error instanceof Error ? error : new CommandError(String(error), 'UNKNOWN_ERROR'));
   }
 }
@@ -131,8 +123,7 @@ async function sendConnect4Board(interaction, gameState) {
         if (winnerPlayer && winnerPlayer.id !== 'ai' && winnerPlayer.id) {
           try {
             updateUserStats(winnerPlayer.id, { connect4_wins: 1 });
-          }
-          catch (statsError) {
+          } catch (statsError) {
             logError('Failed to update user stats', statsError, { userId: winnerPlayer.id });
           }
         }
@@ -146,21 +137,19 @@ async function sendConnect4Board(interaction, gameState) {
 
       const resultEmbed = new EmbedBuilder()
         .setTitle('🎯 Connect Four - Game Over!')
-        .setColor(winner === 'tie' ? 0xFF_A5_00 : 0x00_FF_00)
-        .setDescription(winner === 'tie' ? '🤝 **It\'s a tie!**' : `🎉 **${winnerName} wins!**`)
+        .setColor(winner === 'tie' ? 0xff_a5_00 : 0x00_ff_00)
+        .setDescription(winner === 'tie' ? "🤝 **It's a tie!**" : `🎉 **${winnerName} wins!**`)
         .addFields({
           name: 'Final Board',
           value: formatConnect4Board(board),
-          inline: false
+          inline: false,
         });
 
       if (interaction.replied || interaction.deferred) {
         await safeInteractionUpdate(interaction, { embeds: [resultEmbed], components: [] });
-      }
-      else {
+      } else {
         await safeInteractionReply(interaction, { embeds: [resultEmbed] });
       }
-
     }
 
     // Update game state in storage
@@ -174,12 +163,12 @@ async function sendConnect4Board(interaction, gameState) {
 
     const embed = new EmbedBuilder()
       .setTitle('🎯 Connect Four')
-      .setColor(currentPlayer === 'red' ? 0xFF_00_00 : 0xFF_FF_00)
+      .setColor(currentPlayer === 'red' ? 0xff_00_00 : 0xff_ff_00)
       .setDescription(`${playerName}'s turn ${playerSymbol}`)
       .addFields({
         name: 'Game Board',
         value: formatConnect4Board(board),
-        inline: false
+        inline: false,
       });
 
     // Create column buttons (0-6) - Split into two rows since max 5 per row.
@@ -202,39 +191,38 @@ async function sendConnect4Board(interaction, gameState) {
 
       if (col < 5) {
         row1.addComponents(button);
-      }
-      else {
+      } else {
         row2.addComponents(button);
       }
     }
 
     if (interaction.replied || interaction.deferred) {
       await safeInteractionUpdate(interaction, { embeds: [embed], components: [row1, row2] });
-    }
-    else {
+    } else {
       await safeInteractionReply(interaction, { embeds: [embed], components: [row1, row2] });
     }
 
     // AI move if it's AI's turn
     if (isAI && currentPlayer === 'yellow' && status === 'active') {
-      setTimeout(async() => {
+      setTimeout(async () => {
         try {
           const aiMove = getConnect4AIMove(board, difficulty);
           if (aiMove !== undefined) {
             await makeConnect4Move(gameState, aiMove);
             await sendConnect4Board(interaction, gameState);
           }
-        }
-        catch (aiError) {
+        } catch (aiError) {
           logError('AI move error', aiError);
         }
       }, 1500);
     }
     /* eslint-enable security/detect-object-injection */
-  }
-  catch (error) {
+  } catch (error) {
     logError('sendConnect4Board error', error);
-    await handleCommandError(interaction, new CommandError('Failed to update game board.', 'UNKNOWN_ERROR', { originalError: error instanceof Error ? error.message : String(error) }));
+    await handleCommandError(
+      interaction,
+      new CommandError('Failed to update game board.', 'UNKNOWN_ERROR', { originalError: error instanceof Error ? error.message : String(error) }),
+    );
   }
 }
 
@@ -252,7 +240,7 @@ function formatConnect4Board(board) {
   const symbols = {
     red: '🔴',
     yellow: '🟡',
-    empty: '⬜'
+    empty: '⬜',
   };
 
   let formatted = '';
@@ -287,10 +275,7 @@ function checkConnect4Winner(board) {
     if (!boardRow) continue;
     for (let col = 0; col < 4; col++) {
       const cell = boardRow[col];
-      if (cell
-        && boardRow[col + 1] === cell
-        && boardRow[col + 2] === cell
-        && boardRow[col + 3] === cell) {
+      if (cell && boardRow[col + 1] === cell && boardRow[col + 2] === cell && boardRow[col + 3] === cell) {
         return cell;
       }
     }
@@ -305,10 +290,7 @@ function checkConnect4Winner(board) {
     if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 0; col < 7; col++) {
       const cell = boardRow0[col];
-      if (cell
-        && boardRow1[col] === cell
-        && boardRow2[col] === cell
-        && boardRow3[col] === cell) {
+      if (cell && boardRow1[col] === cell && boardRow2[col] === cell && boardRow3[col] === cell) {
         return cell;
       }
     }
@@ -323,10 +305,7 @@ function checkConnect4Winner(board) {
     if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 0; col < 4; col++) {
       const cell = boardRow0[col];
-      if (cell
-        && boardRow1[col + 1] === cell
-        && boardRow2[col + 2] === cell
-        && boardRow3[col + 3] === cell) {
+      if (cell && boardRow1[col + 1] === cell && boardRow2[col + 2] === cell && boardRow3[col + 3] === cell) {
         return cell;
       }
     }
@@ -341,10 +320,7 @@ function checkConnect4Winner(board) {
     if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 3; col < 7; col++) {
       const cell = boardRow0[col];
-      if (cell
-        && boardRow1[col - 1] === cell
-        && boardRow2[col - 2] === cell
-        && boardRow3[col - 3] === cell) {
+      if (cell && boardRow1[col - 1] === cell && boardRow2[col - 2] === cell && boardRow3[col - 3] === cell) {
         return cell;
       }
     }
@@ -355,7 +331,6 @@ function checkConnect4Winner(board) {
   if (topRow && topRow.every(Boolean)) {
     return 'tie';
   }
-
 }
 /* eslint-enable security/detect-object-injection */
 
@@ -388,8 +363,7 @@ async function makeConnect4Move(gameState, column) {
     }
 
     return false; // Column is full
-  }
-  catch (error) {
+  } catch (error) {
     logError('makeConnect4Move error', error, { column });
     return false;
   }
@@ -421,7 +395,7 @@ function getConnect4AIMove(board, difficulty) {
     switch (difficulty) {
       case 'easy': {
         // Random move, but prefer center columns
-        const centerColumns = availableColumns.filter(col => col >= 2 && col <= 4);
+        const centerColumns = availableColumns.filter((col) => col >= 2 && col <= 4);
         const preferredColumns = centerColumns.length > 0 ? centerColumns : availableColumns;
         return preferredColumns[Math.floor(Math.random() * preferredColumns.length)];
       }
@@ -435,7 +409,7 @@ function getConnect4AIMove(board, difficulty) {
         if (blockingCol !== undefined) return blockingCol;
 
         // Prefer center
-        const center = [3, 2, 4, 1, 5, 0, 6].find(col => availableColumns.includes(col));
+        const center = [3, 2, 4, 1, 5, 0, 6].find((col) => availableColumns.includes(col));
         if (center !== undefined) return center;
         return availableColumns[Math.floor(Math.random() * availableColumns.length)];
       }
@@ -449,8 +423,7 @@ function getConnect4AIMove(board, difficulty) {
         return availableColumns[Math.floor(Math.random() * availableColumns.length)];
       }
     }
-  }
-  catch (error) {
+  } catch (error) {
     logError('getConnect4AIMove error', error, { difficulty });
     // Fallback to random move
     const fallbackColumns = [];
@@ -480,7 +453,7 @@ function findConnect4WinningMove(board, player) {
     if (topRow && topRow[col] !== undefined) continue;
 
     // Test the move
-    const testBoard = board.map(/** @param {(undefined|'red'|'yellow')[]} row */ row => [...row]);
+    const testBoard = board.map(/** @param {(undefined|'red'|'yellow')[]} row */ (row) => [...row]);
     for (let row = 5; row >= 0; row--) {
       const testRow = testBoard[row];
       if (testRow && testRow[col] === undefined) {
@@ -492,7 +465,6 @@ function findConnect4WinningMove(board, player) {
       }
     }
   }
-
 }
 /* eslint-enable security/detect-object-injection */
 
@@ -512,7 +484,7 @@ function getConnect4BestMove(board, player) {
       const topRow = board[0];
       if (topRow && topRow[col] !== undefined) continue;
 
-      const testBoard = board.map(/** @param {(undefined|'red'|'yellow')[]} row */ row => [...row]);
+      const testBoard = board.map(/** @param {(undefined|'red'|'yellow')[]} row */ (row) => [...row]);
       let moveValid = false;
 
       for (let row = 5; row >= 0; row--) {
@@ -534,8 +506,7 @@ function getConnect4BestMove(board, player) {
 
     // Fallback to center column if no best move found
     return bestCol !== undefined ? bestCol : 3;
-  }
-  catch (error) {
+  } catch (error) {
     logError('getConnect4BestMove error', error, { player });
     return 3; // Return center column as fallback
   }
@@ -564,8 +535,7 @@ function evaluateConnect4Position(board, depth, player) {
     const boardRow = board[row];
     if (!boardRow) continue;
     for (let col = 0; col < 4; col++) {
-      const window = [boardRow[col], boardRow[col + 1], boardRow[col + 2], boardRow[col + 3]]
-        .filter(cell => cell !== undefined);
+      const window = [boardRow[col], boardRow[col + 1], boardRow[col + 2], boardRow[col + 3]].filter((cell) => cell !== undefined);
       score += evaluateWindow(window, player);
     }
   }
@@ -578,8 +548,7 @@ function evaluateConnect4Position(board, depth, player) {
     const boardRow3 = board[row + 3];
     if (!boardRow0 || !boardRow1 || !boardRow2 || !boardRow3) continue;
     for (let col = 0; col < 7; col++) {
-      const window = [boardRow0[col], boardRow1[col], boardRow2[col], boardRow3[col]]
-        .filter(cell => cell !== undefined);
+      const window = [boardRow0[col], boardRow1[col], boardRow2[col], boardRow3[col]].filter((cell) => cell !== undefined);
       score += evaluateWindow(window, player);
     }
   }
@@ -616,7 +585,7 @@ function evaluateWindow(window, player) {
 
         break;
       }
-    // No default
+      // No default
     }
   }
 

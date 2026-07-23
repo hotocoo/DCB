@@ -28,15 +28,15 @@ function isValidLocation(location) {
  */
 function getWeatherEmoji(condition) {
   const emojis = {
-    'Clear': '☀️',
-    'Clouds': '☁️',
-    'Rain': '🌧️',
-    'Drizzle': '🌦️',
-    'Thunderstorm': '⛈️',
-    'Snow': '❄️',
-    'Mist': '🌫️',
-    'Fog': '🌫️',
-    'Haze': '🌫️'
+    Clear: '☀️',
+    Clouds: '☁️',
+    Rain: '🌧️',
+    Drizzle: '🌦️',
+    Thunderstorm: '⛈️',
+    Snow: '❄️',
+    Mist: '🌫️',
+    Fog: '🌫️',
+    Haze: '🌫️',
   };
   return emojis[condition] || '🌤️';
 }
@@ -56,10 +56,7 @@ function getWindDirection(degrees) {
 export const data = new SlashCommandBuilder()
   .setName('weather')
   .setDescription('Get current weather information for a location')
-  .addStringOption(option =>
-    option.setName('location')
-      .setDescription('City name or location')
-      .setRequired(true));
+  .addStringOption((option) => option.setName('location').setDescription('City name or location').setRequired(true));
 
 /**
  * Executes the weather command.
@@ -82,18 +79,20 @@ export async function execute(interaction) {
     // Rate limiting for weather API
     try {
       await weatherRateLimiter.consume(interaction.user.id);
-    }
-    catch (error) {
+    } catch (error) {
       return await interaction.reply({
         content: `⏰ **Rate limit exceeded!** Please wait ${Math.round(error.msBeforeNext / 1000)} seconds before trying again.`,
-        flags: MessageFlags.Ephemeral
+        flags: MessageFlags.Ephemeral,
       });
     }
 
     // Using a free weather API (you may want to replace with a paid one for production)
-    const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`, {
-      timeout: 10_000 // 10 second timeout
-    });
+    const response = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`,
+      {
+        timeout: 10_000, // 10 second timeout
+      },
+    );
 
     if (!response.ok) {
       switch (response.status) {
@@ -101,7 +100,10 @@ export async function execute(interaction) {
           return await interaction.reply({ content: '❌ Weather API key not configured. Please contact an administrator.', flags: MessageFlags.Ephemeral });
         }
         case 404: {
-          return await interaction.reply({ content: `❌ Location "${location}" not found. Please check the spelling and try again.`, flags: MessageFlags.Ephemeral });
+          return await interaction.reply({
+            content: `❌ Location "${location}" not found. Please check the spelling and try again.`,
+            flags: MessageFlags.Ephemeral,
+          });
         }
         case 429: {
           return await interaction.reply({ content: '❌ Weather API rate limit exceeded. Please try again later.', flags: MessageFlags.Ephemeral });
@@ -121,54 +123,50 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setTitle(`🌤️ Weather in ${data.name}, ${data.sys.country}`)
-      .setColor(0x00_99_FF)
+      .setColor(0x00_99_ff)
       .addFields(
         {
           name: '🌡️ Temperature',
           value: `**${Math.round(data.main.temp)}°C** (Feels like ${Math.round(data.main.feels_like)}°C)`,
-          inline: true
+          inline: true,
         },
         {
           name: '💧 Humidity',
           value: `**${data.main.humidity}%**`,
-          inline: true
+          inline: true,
         },
         {
           name: '🌬️ Wind',
           value: `**${Math.round(data.wind.speed * 3.6)} km/h** ${getWindDirection(data.wind.deg)}`,
-          inline: true
+          inline: true,
         },
         {
           name: '🌥️ Conditions',
           value: `${getWeatherEmoji(data.weather[0].main)} **${data.weather[0].description}**`,
-          inline: true
+          inline: true,
         },
         {
           name: '📊 Pressure',
           value: `**${data.main.pressure} hPa**`,
-          inline: true
+          inline: true,
         },
         {
           name: '👁️ Visibility',
           value: `**${(data.visibility / 1000).toFixed(1)} km**`,
-          inline: true
-        }
+          inline: true,
+        },
       )
       .setFooter({ text: 'Data provided by OpenWeatherMap' })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
-
-  }
-  catch (error) {
+  } catch (error) {
     console.error('Weather command error:', error);
     if (error.name === 'AbortError') {
       await interaction.reply({ content: '❌ Request timed out. Please try again later.', flags: MessageFlags.Ephemeral });
-    }
-    else if (error.message.includes('fetch')) {
+    } else if (error.message.includes('fetch')) {
       await interaction.reply({ content: '❌ Network error. Please check your connection and try again.', flags: MessageFlags.Ephemeral });
-    }
-    else {
+    } else {
       await interaction.reply({ content: '❌ An error occurred while fetching weather data. Please try again later.', flags: MessageFlags.Ephemeral });
     }
   }

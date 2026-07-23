@@ -8,11 +8,7 @@ import { safeExecuteCommand, CommandError, validateRange, validateNotEmpty } fro
 export const data = new SlashCommandBuilder()
   .setName('roll')
   .setDescription('Roll dice in NdM format, e.g., 2d6')
-  .addStringOption(opt =>
-    opt.setName('dice')
-      .setDescription('Dice expression (e.g., 2d6, 1d20)')
-      .setRequired(false)
-  );
+  .addStringOption((opt) => opt.setName('dice').setDescription('Dice expression (e.g., 2d6, 1d20)').setRequired(false));
 
 /**
  * Executes the roll command to simulate dice rolls.
@@ -20,7 +16,7 @@ export const data = new SlashCommandBuilder()
  * @returns {Promise<void>}
  */
 export async function execute(interaction) {
-  return safeExecuteCommand(interaction, async() => {
+  return safeExecuteCommand(interaction, async () => {
     // Validate interaction and user
     validateNotEmpty(interaction, 'interaction');
     validateNotEmpty(interaction.user, 'user');
@@ -33,10 +29,7 @@ export async function execute(interaction) {
     const match = expr.match(diceRegex);
 
     if (!match) {
-      throw new CommandError(
-        'Invalid dice format. Please use NdM format (e.g., 2d6, 1d20).',
-        'INVALID_FORMAT'
-      );
+      throw new CommandError('Invalid dice format. Please use NdM format (e.g., 2d6, 1d20).', 'INVALID_FORMAT');
     }
 
     // Extract and validate dice count and sides

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-(async() => {
+(async () => {
   console.log('🔍 Testing command loading...\n');
 
   const commandsPath = path.join(process.cwd(), 'src', 'commands');
@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url';
     process.exit(1);
   }
 
-  const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+  const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'));
   console.log(`📁 Found ${commandFiles.length} command files`);
 
   let loadedCount = 0;
@@ -43,9 +43,7 @@ import { pathToFileURL } from 'node:url';
       }
 
       console.log(`✅ ${file}: Loaded successfully (${module.data.name})`);
-
-    }
-    catch (error) {
+    } catch (error) {
       console.error(`❌ ${file}: Failed to load`);
       console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`);
       failedCommands.push(file);
@@ -59,8 +57,7 @@ import { pathToFileURL } from 'node:url';
   if (failedCommands.length > 0) {
     console.log('\n❌ Failed commands:');
     for (const cmd of failedCommands) console.log(`   - ${cmd}`);
-  }
-  else {
+  } else {
     console.log('\n🎉 All commands loaded successfully!');
   }
 })();

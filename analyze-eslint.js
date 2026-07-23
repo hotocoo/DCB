@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const reportPath = path.join(__dirname, 'eslint-report.json');
-const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+const report = JSON.parse(fs.readFileSync(reportPath));
 
 // Categorize issues by file and type
 const issuesByFile = {};
@@ -65,10 +65,12 @@ Object.entries(issuesByFile).forEach(([file, messages]) => {
           msg.rule === 'no-undef' ||
           msg.rule === 'import/no-unresolved') {
         criticalErrors.push(issue);
-      } else {
+      }
+      else {
         otherErrors.push(issue);
       }
-    } else {
+    }
+    else {
       warnings.push(issue);
     }
   });
