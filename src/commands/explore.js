@@ -47,7 +47,6 @@ function writeAll(obj) {
   try {
     // atomic write: write to temp file then rename
     const tmp = `${FILE}.tmp`;
-    console.log(`[EXPLORE DEBUG] Writing to RPG file: ${FILE}`);
     fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8');
     fs.renameSync(tmp, FILE);
     cache = obj;
