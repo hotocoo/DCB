@@ -236,6 +236,12 @@ client.on('messageCreate', async (message) => {
       await message.reply({ content: reply });
     }
 
+    // Record messages_sent stat for bot_friend achievement (only real user messages, not bots/system).
+    try {
+      const { updateUserStats } = await import('./achievements.js');
+      updateUserStats(message.author.id, { messages_sent: 1 });
+    } catch (_ignore) { /* achievements optional */ }
+
     // Log message processing time for performance monitoring
     const processingTime = Date.now() - startTime;
     if (processingTime > 1000) {

@@ -30,8 +30,8 @@
     "install-deps": "npm install @discordjs/voice @discordjs/opus ytdl-core ffmpeg-static",
     "clean": "rm -rf node_modules package-lock.json && npm install",
     "logs:clean": "rm -rf logs/*.log",
-    "docker:build": "docker build -t pulsebot .",
-    "docker:run": "docker run -d --name pulse-bot --env-file .env pulsebot"
+    "docker:build": "docker build -t athena-bot .",
+    "docker:run": "docker run -d --name athena-bot --env-file .env athena-bot"
   },
   "engines": {
     "node": ">=18.0.0",

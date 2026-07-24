@@ -128,6 +128,12 @@ export async function execute(interaction) {
         await interaction.reply({ embeds: [updatedEmbed] });
 
         if (gameState.isGameOver) {
+          if (gameState.isWon) {
+            try {
+              const { updateUserStats } = await import('../achievements.js');
+              updateUserStats(interaction.user.id, { hangman_wins: 1 });
+            } catch (_ignore) { /* achievements optional */ }
+          }
           interaction.client.games.delete(interaction.user.id);
         }
       }

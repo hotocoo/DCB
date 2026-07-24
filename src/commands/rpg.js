@@ -115,6 +115,7 @@ export async function execute(interaction) {
     // Track achievements
     const achievementResult = updateUserStats(userId, {
       characters_created: 1,
+      classes_tried: 1,
       features_tried: 1,
     });
 

@@ -506,10 +506,17 @@ class SchedulerManager {
 
   // Advanced Features
   startScheduler() {
+    const now = Date.now();
     // Load existing schedules and set up timers
     for (const userId in this.schedules.reminders) {
       for (const reminder of this.schedules.reminders[userId]) {
-        if (reminder.active && !reminder.executed && reminder.scheduledFor > Date.now()) {
+        if (!reminder.active || reminder.executed) continue;
+
+        if (now > reminder.scheduledFor) {
+          // Overdue while offline: fire immediately instead of orphaning
+          logger.warn('Executing overdue reminder on startup', { reminderId: reminder.id, dueAt: new Date(reminder.scheduledFor).toISOString() });
+          this.executeReminder(reminder);
+        } else {
           this.scheduleReminder(reminder);
         }
       }
@@ -517,7 +524,12 @@ class SchedulerManager {
 
     for (const guildId in this.schedules.events) {
       for (const event of this.schedules.events[guildId]) {
-        if (event.active && event.scheduledFor > Date.now()) {
+        if (!event.active || event.executedAt) continue;
+
+        if (now > event.scheduledFor) {
+          logger.warn('Executing overdue event on startup', { eventId: event.id, dueAt: new Date(event.scheduledFor).toISOString() });
+          this.executeEvent(event);
+        } else {
           this.scheduleEvent(event);
         }
       }

@@ -104,6 +104,12 @@ export async function execute(interaction) {
 
     const message = await interaction.reply({ embeds: [embed], components: rows });
 
+    // Record poll creation stat so the poll_creator achievement can actually be earned.
+    try {
+      const { updateUserStats } = await import('../achievements.js');
+      updateUserStats(interaction.user.id, { polls_created: 1 });
+    } catch (_ignore) { /* achievements optional */ }
+
     // Store poll data for tracking votes globally
     const pollData = {
       question,

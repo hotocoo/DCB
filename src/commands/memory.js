@@ -57,10 +57,11 @@ async function sendMemoryBoard(interaction, gameState) {
   if (matchedPairs === totalPairs) {
     gameState.gameActive = false;
     const timeElapsed = Math.round((Date.now() - startTime) / 1000);
-    return sendWinEmbed(interaction, gameState, {
+    await sendWinEmbed(interaction, gameState, {
       moves,
       totalPairs,
       timeElapsed,
+      userId: interaction.user.id,
     });
   }
 
@@ -74,27 +75,25 @@ async function sendMemoryBoard(interaction, gameState) {
   });
 }
 
-async function sendWinEmbed(interaction, gameState, { moves, totalPairs, timeElapsed }) {
+async function sendWinEmbed(interaction, gameState, { moves, totalPairs, timeElapsed, userId }) {
   const winEmbed = new EmbedBuilder()
     .setTitle('🎉 Memory Master!')
-    .setDescription(`Congratulations! You matched all ${totalPairs} pairs in ${moves} moves ` + `and ${timeElapsed} seconds! 🏆`)
+    .setDescription(`Congratulations! You matched all ${totalPairs} pairs in ${moves} moves and ${timeElapsed} seconds! 🏆`)
     .setColor(0x00_ff_00)
     .addFields(
-      {
-        name: '📊 Stats',
-        value: `**Moves:** ${moves}\n**Time:** ${timeElapsed}s\n` + `**Efficiency:** ${((totalPairs / moves) * 100).toFixed(1)}%`,
-        inline: true,
-      },
-      {
-        name: '🏆 Rating',
-        value: getPerformanceRating(moves, totalPairs, timeElapsed),
-        inline: true,
-      },
+      { name: '📊 Stats', value: `**Moves:** ${moves}\n**Time:** ${timeElapsed}s\n**Efficiency:** ${((totalPairs / moves) * 100).toFixed(1)}%`, inline: true },
+      { name: '🏆 Rating', value: getPerformanceRating(moves, totalPairs, timeElapsed), inline: true },
     );
 
-  await (interaction.replied || interaction.deferred
-    ? interaction.editReply({ embeds: [winEmbed], components: [] })
-    : interaction.reply({ embeds: [winEmbed] }));
+  await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [winEmbed], components: [] }) : interaction.reply({ embeds: [winEmbed] }));
+
+  // Record achievement stat so memory_games_completed can actually be earned
+  if (userId) {
+    try {
+      const { updateUserStats } = await import('../achievements.js');
+      updateUserStats(userId, { memory_games_completed: 1 });
+    } catch (_ignore) { /* achievements optional */ }
+  }
 
   // Clean up game state
   const { memoryGames } = await import('../game-states.js');

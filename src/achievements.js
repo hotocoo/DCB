@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { logger } from './logger.js';
+
 const ACHIEVEMENTS_FILE = path.join(process.cwd(), 'data', 'achievements.json');
 
 // Achievement definitions with wholesome and creative themes
@@ -132,7 +134,7 @@ const ACHIEVEMENT_DEFINITIONS = {
     category: 'fun',
     rarity: 'epic',
     points: 90,
-    condition: (stats) => stats.coin_streak >= 10,
+    condition: (stats) => stats.coin_heads_streak >= 10,
   },
   weather_watcher: {
     id: 'weather_watcher',
@@ -174,7 +176,7 @@ class AchievementManager {
       const data = JSON.parse(fs.readFileSync(ACHIEVEMENTS_FILE));
       this.userAchievements = data;
     } catch (error) {
-      console.error('Failed to load achievements:', error);
+      logger.error('Failed to load achievements:', error);
       this.userAchievements = {};
     }
   }
