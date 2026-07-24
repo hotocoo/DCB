@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { logger } from './logger.js';
+
 const COOLDOWNS_FILE = path.join(process.cwd(), 'data', 'cooldowns.json');
 
 // Advanced Cooldown Management System
@@ -26,7 +28,7 @@ class CooldownManager {
       const data = JSON.parse(fs.readFileSync(COOLDOWNS_FILE));
       this.persistentCooldowns = data;
     } catch (error) {
-      console.error('Failed to load cooldowns:', error);
+      logger.error('Failed to load cooldowns:', error instanceof Error ? error : new Error(String(error)));
       this.persistentCooldowns = {};
     }
   }
@@ -35,7 +37,7 @@ class CooldownManager {
     try {
       fs.writeFileSync(COOLDOWNS_FILE, JSON.stringify(this.persistentCooldowns, null, 2));
     } catch (error) {
-      console.error('Failed to save cooldowns:', error);
+      logger.error('Failed to save cooldowns:', error instanceof Error ? error : new Error(String(error)));
     }
   }
 

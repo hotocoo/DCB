@@ -185,7 +185,7 @@ class AchievementManager {
     try {
       fs.writeFileSync(ACHIEVEMENTS_FILE, JSON.stringify(this.userAchievements, null, 2));
     } catch (error) {
-      console.error('Failed to save achievements:', error);
+      logger.error('Failed to save achievements:', error instanceof Error ? error : new Error(String(error)));
     }
   }
 

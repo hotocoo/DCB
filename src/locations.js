@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { logger } from './logger.js';
+
 const LOCATIONS_FILE = path.join(process.cwd(), 'data', 'locations.json');
 
 // Epic RPG Locations and Dungeons System
@@ -25,7 +27,7 @@ class LocationManager {
       const data = JSON.parse(fs.readFileSync(LOCATIONS_FILE));
       this.locations = data;
     } catch (error) {
-      console.error('Failed to load locations:', error);
+      logger.error('Failed to load locations:', error instanceof Error ? error : new Error(String(error)));
       this.locations = {};
     }
   }
@@ -34,7 +36,7 @@ class LocationManager {
     try {
       fs.writeFileSync(LOCATIONS_FILE, JSON.stringify(this.locations, null, 2));
     } catch (error) {
-      console.error('Failed to save locations:', error);
+      logger.error('Failed to save locations:', error instanceof Error ? error : new Error(String(error)));
     }
   }
 
