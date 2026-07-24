@@ -5,6 +5,21 @@ import { logger } from './logger.js';
 
 const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
 
+// Helper to mutate balances in-place without immediate persistence (for batching).
+function _setBalanceInPlace(data, userId, amount) {
+  data.userBalances[userId] = Math.max(0, Number(amount) || 0);
+}
+
+function _addBalanceInPlace(data, userId, amount) {
+  const cur = data.userBalances[userId] ?? 0;
+  _setBalanceInPlace(data, userId, cur + Number(amount));
+}
+
+function _subBalanceInPlace(data, userId, amount) {
+  const cur = data.userBalances[userId] ?? 0;
+  _setBalanceInPlace(data, userId, cur - Number(amount));
+}
+
 // Advanced Economy System with Banking and Marketplace
 class EconomyManager {
   constructor() {
@@ -190,17 +205,20 @@ class EconomyManager {
       return { success: false, reason: 'business_not_found' };
     }
 
-    const upgradeCost = business.level * 500; // Cost increases with level
+    const upgradeCost = business.level * 500;
     if (this.getBalance(userId) < upgradeCost) {
       return { success: false, reason: 'insufficient_funds' };
     }
 
-    this.subtractBalance(userId, upgradeCost);
+    // Single atomic write: balance + business update + transaction log all in one save.
+    _subBalanceInPlace(this.economyData, userId, upgradeCost);
     business.level++;
     business.income = this.getBusinessIncome(business.type, business.level);
     business.upgrades++;
 
-    this.logTransaction({
+    const txnId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    this.economyData.transactions.push({
+      id: txnId,
       type: 'business_upgrade',
       user: userId,
       businessId,
@@ -208,6 +226,11 @@ class EconomyManager {
       newLevel: business.level,
       timestamp: Date.now(),
     });
+
+    // Keep only last 10000 transactions (same limit as logTransaction)
+    if (this.economyData.transactions.length > 10_000) {
+      this.economyData.transactions = this.economyData.transactions.slice(-10_000);
+    }
 
     this.saveEconomy();
     return { success: true, business };
@@ -232,14 +255,22 @@ class EconomyManager {
     }
 
     if (totalIncome > 0) {
-      this.addBalance(userId, totalIncome);
+      // Single atomic write: balance + lastCollected timestamps + transaction log.
+      _addBalanceInPlace(this.economyData, userId, totalIncome);
 
-      this.logTransaction({
+      const txnId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      this.economyData.transactions.push({
+        id: txnId,
         type: 'business_income',
         user: userId,
         amount: totalIncome,
         timestamp: Date.now(),
       });
+
+      // Keep only last 10000 transactions (same limit as logTransaction)
+      if (this.economyData.transactions.length > 10_000) {
+        this.economyData.transactions = this.economyData.transactions.slice(-10_000);
+      }
 
       this.saveEconomy();
     }
@@ -274,8 +305,9 @@ class EconomyManager {
       this.economyData.investments[userId] = [];
     }
 
+    // Single atomic write: balance + investment record together.
+    _subBalanceInPlace(this.economyData, userId, amount);
     this.economyData.investments[userId].push(investment);
-    this.subtractBalance(userId, amount);
     this.saveEconomy();
 
     return { success: true, investment };
@@ -299,6 +331,7 @@ class EconomyManager {
 
   processMatureInvestments() {
     const now = Date.now();
+    let anyChanged = false;
 
     for (const userId in this.economyData.investments) {
       const userInvestments = this.economyData.investments[userId];
@@ -307,14 +340,18 @@ class EconomyManager {
         const investment = userInvestments[i];
 
         if (investment.status === 'active' && now >= investment.maturity) {
+          anyChanged = true;
           const returnAmount = Math.floor(investment.amount * (1 + investment.rate));
-          this.addBalance(userId, returnAmount);
+          // Atomic-ish: update balance in-place so we save once at end.
+          _addBalanceInPlace(this.economyData, userId, returnAmount);
 
           investment.status = 'matured';
           investment.returned = returnAmount;
           investment.maturedAt = now;
 
-          this.logTransaction({
+          const txnId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+          this.economyData.transactions.push({
+            id: txnId,
             type: 'investment_return',
             user: userId,
             amount: returnAmount,
@@ -325,7 +362,14 @@ class EconomyManager {
       }
     }
 
-    this.saveEconomy();
+    // Keep only last 10000 transactions (same limit as logTransaction)
+    if (this.economyData.transactions.length > 10_000) {
+      this.economyData.transactions = this.economyData.transactions.slice(-10_000);
+    }
+
+    if (anyChanged) {
+      this.saveEconomy();
+    }
   }
 
   // Advanced Marketplace
@@ -394,9 +438,12 @@ class EconomyManager {
       return { success: false, reason: 'insufficient_funds' };
     }
 
-    this.subtractBalance(userId, totalCost);
+    // Single atomic write: balance + transaction log together.
+    _subBalanceInPlace(this.economyData, userId, totalCost);
 
-    this.logTransaction({
+    const txnId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    this.economyData.transactions.push({
+      id: txnId,
       type: 'market_purchase',
       user: userId,
       item: itemId,
@@ -404,6 +451,13 @@ class EconomyManager {
       amount: totalCost,
       timestamp: Date.now(),
     });
+
+    // Keep only last 10000 transactions (same limit as logTransaction)
+    if (this.economyData.transactions.length > 10_000) {
+      this.economyData.transactions = this.economyData.transactions.slice(-10_000);
+    }
+
+    this.saveEconomy();
 
     return {
       success: true,
@@ -418,9 +472,12 @@ class EconomyManager {
     const price = Math.floor(this.getMarketPrice(itemId) * 0.8); // Sell for 80% of market price
     const totalEarnings = price * quantity;
 
-    this.addBalance(userId, totalEarnings);
+    // Single atomic write: balance + transaction log together.
+    _addBalanceInPlace(this.economyData, userId, totalEarnings);
 
-    this.logTransaction({
+    const txnId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    this.economyData.transactions.push({
+      id: txnId,
       type: 'market_sale',
       user: userId,
       item: itemId,
@@ -428,6 +485,13 @@ class EconomyManager {
       amount: totalEarnings,
       timestamp: Date.now(),
     });
+
+    // Keep only last 10000 transactions (same limit as logTransaction)
+    if (this.economyData.transactions.length > 10_000) {
+      this.economyData.transactions = this.economyData.transactions.slice(-10_000);
+    }
+
+    this.saveEconomy();
 
     return {
       success: true,
@@ -470,21 +534,23 @@ class EconomyManager {
       return { success: false, reason: 'insufficient_funds' };
     }
 
-    this.subtractBalance(userId, ticketPrice);
-
-    // Simple lottery system
     const lotteryNumber = Math.floor(Math.random() * 1000);
     const winningNumber = Math.floor(Math.random() * 1000);
 
     const isWinner = lotteryNumber === winningNumber;
     let winnings = 0;
 
+    // Single atomic write: balance + transaction log together.
+    _subBalanceInPlace(this.economyData, userId, ticketPrice);
+
     if (isWinner) {
       winnings = prizePool;
-      this.addBalance(userId, winnings);
+      _addBalanceInPlace(this.economyData, userId, winnings);
     }
 
-    this.logTransaction({
+    const txnId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    this.economyData.transactions.push({
+      id: txnId,
       type: 'lottery',
       user: userId,
       amount: isWinner ? winnings - ticketPrice : -ticketPrice,
@@ -492,6 +558,13 @@ class EconomyManager {
       isWinner,
       timestamp: Date.now(),
     });
+
+    // Keep only last 10000 transactions (same limit as logTransaction)
+    if (this.economyData.transactions.length > 10_000) {
+      this.economyData.transactions = this.economyData.transactions.slice(-10_000);
+    }
+
+    this.saveEconomy();
 
     return {
       success: true,
@@ -589,18 +662,27 @@ class EconomyManager {
       if (balance > 1000) {
         // Only tax users with significant balance
         const tax = Math.floor(balance * taxRate);
-        this.subtractBalance(userId, tax);
+        _subBalanceInPlace(this.economyData, userId, tax);
         totalTaxed += tax;
       }
     }
 
     if (totalTaxed > 0) {
-      this.logTransaction({
+      const txnId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      this.economyData.transactions.push({
+        id: txnId,
         type: 'tax_collection',
         guild: guildId,
         amount: totalTaxed,
         timestamp: Date.now(),
       });
+
+      // Keep only last 10000 transactions (same limit as logTransaction)
+      if (this.economyData.transactions.length > 10_000) {
+        this.economyData.transactions = this.economyData.transactions.slice(-10_000);
+      }
+
+      this.saveEconomy();
     }
 
     return totalTaxed;
@@ -623,22 +705,29 @@ class EconomyManager {
     const streakBonus = Math.min(streak * 10, 100);
     const reward = baseReward + streakBonus;
 
-    this.addBalance(userId, reward);
+    // Single atomic write: balance + streak record + transaction log.
+    _addBalanceInPlace(this.economyData, userId, reward);
 
-    // Update streak
     if (!this.economyData.dailyRewards) this.economyData.dailyRewards = {};
     this.economyData.dailyRewards[userId] = {
       lastClaim: now,
       streak: streak + 1,
     };
 
-    this.logTransaction({
+    const txnId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    this.economyData.transactions.push({
+      id: txnId,
       type: 'daily_reward',
       user: userId,
       amount: reward,
       streak: streak + 1,
       timestamp: now,
     });
+
+    // Keep only last 10000 transactions (same limit as logTransaction)
+    if (this.economyData.transactions.length > 10_000) {
+      this.economyData.transactions = this.economyData.transactions.slice(-10_000);
+    }
 
     this.saveEconomy();
 
