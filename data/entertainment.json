@@ -8,27 +8,27 @@
       "gamesPlayed": 0
     },
     "general": {
-      "jokesTold": 3,
+      "jokesTold": 4,
       "ratings": []
     },
     "programming": {
-      "jokesTold": 2,
+      "jokesTold": 3,
       "ratings": []
     },
     "dad": {
-      "jokesTold": 2,
+      "jokesTold": 3,
       "ratings": []
     },
     "math": {
-      "jokesTold": 2,
+      "jokesTold": 3,
       "ratings": []
     },
     "science": {
-      "jokesTold": 2,
+      "jokesTold": 3,
       "ratings": []
     },
     "invalid": {
-      "jokesTold": 2,
+      "jokesTold": 3,
       "ratings": []
     },
     "testuser_fun_1784909355614": {
@@ -39,6 +39,13 @@
       "gamesPlayed": 0
     },
     "testuser_fun_1784915338596": {
+      "jokesHeard": 2,
+      "riddlesSolved": 1,
+      "storiesGenerated": 2,
+      "factsLearned": 1,
+      "gamesPlayed": 0
+    },
+    "testuser_fun_1784915654637": {
       "jokesHeard": 2,
       "riddlesSolved": 1,
       "storiesGenerated": 2,

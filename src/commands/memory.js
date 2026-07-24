@@ -85,14 +85,18 @@ async function sendWinEmbed(interaction, gameState, { moves, totalPairs, timeEla
       { name: '🏆 Rating', value: getPerformanceRating(moves, totalPairs, timeElapsed), inline: true },
     );
 
-  await (interaction.replied || interaction.deferred ? interaction.editReply({ embeds: [winEmbed], components: [] }) : interaction.reply({ embeds: [winEmbed] }));
+  if (interaction.replied || interaction.deferred) {
+    await interaction.editReply({ embeds: [winEmbed], components: [] });
+  } else {
+    await interaction.reply({ embeds: [winEmbed] });
+  }
 
   // Record achievement stat so memory_games_completed can actually be earned
   if (userId) {
     try {
       const { updateUserStats } = await import('../achievements.js');
       updateUserStats(userId, { memory_games_completed: 1 });
-    } catch (_ignore) { /* achievements optional */ }
+    } catch (error) { /* achievements optional */ }
   }
 
   // Clean up game state

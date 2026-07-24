@@ -165,7 +165,7 @@ export async function execute(interaction) {
     try {
       const { updateUserStats } = await import('../achievements.js');
       updateUserStats(interaction.user.id, { weather_checks: 1 });
-    } catch (_ignore) { /* achievements optional */ }
+    } catch (error) { /* achievements optional */ }
   } catch (error) {
     console.error('Weather command error:', error);
     if (error.name === 'AbortError') {
