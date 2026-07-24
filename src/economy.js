@@ -340,24 +340,27 @@ class EconomyManager {
         const investment = userInvestments[i];
 
         if (investment.status === 'active' && now >= investment.maturity) {
-          anyChanged = true;
-          const returnAmount = Math.floor(investment.amount * (1 + investment.rate));
-          // Atomic-ish: update balance in-place so we save once at end.
-          _addBalanceInPlace(this.economyData, userId, returnAmount);
+          try {
+            anyChanged = true;
+            const returnAmount = Math.floor(investment.amount * (1 + investment.rate));
+            _addBalanceInPlace(this.economyData, userId, returnAmount);
 
-          investment.status = 'matured';
-          investment.returned = returnAmount;
-          investment.maturedAt = now;
+            investment.status = 'matured';
+            investment.returned = returnAmount;
+            investment.maturedAt = now;
 
-          const txnId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-          this.economyData.transactions.push({
-            id: txnId,
-            type: 'investment_return',
-            user: userId,
-            amount: returnAmount,
-            investmentType: investment.type.name,
-            timestamp: now,
-          });
+            const txnId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+            this.economyData.transactions.push({
+              id: txnId,
+              type: 'investment_return',
+              user: userId,
+              amount: returnAmount,
+              investmentType: typeof investment.type === 'object' && investment.type.name ? investment.type.name : String(investment.type),
+              timestamp: now,
+            });
+          } catch (error) {
+            logger.error('[ECONOMY] Failed to process mature investment, skipping:', error instanceof Error ? error : new Error(String(error)), { userId, investmentId: investment.id });
+          }
         }
       }
     }
@@ -889,5 +892,12 @@ export function getUserInvestments(userId) {
 export function resetUserEconomyData(userId) {
   return economyManager.resetUser(userId);
 }
+
+// Scheduled cleanup: process mature investments + trim transactions/history every 5 minutes.
+// `unref()` so this timer doesn't keep the Node event loop alive in one-shot scripts / CI tests.
+const economyCleanupInterval = setInterval(() => {
+  economyManager.cleanup();
+}, 5 * 60 * 1000); // every 5 minutes
+if (typeof economyCleanupInterval.unref === 'function') economyCleanupInterval.unref();
 
 // End of file
