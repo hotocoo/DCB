@@ -19,7 +19,11 @@ class GuildManager {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(GUILDS_FILE)) {
-      fs.writeFileSync(GUILDS_FILE, JSON.stringify({}));
+      const tmp = GUILDS_FILE + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify({}), 'utf8');
+
+      fs.renameSync(tmp, GUILDS_FILE);
     }
   }
 
@@ -35,7 +39,11 @@ class GuildManager {
 
   saveGuilds() {
     try {
-      fs.writeFileSync(GUILDS_FILE, JSON.stringify(this.guilds, undefined, 2));
+      const tmp = GUILDS_FILE + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.guilds, undefined, 2), 'utf8');
+
+      fs.renameSync(tmp, GUILDS_FILE);
     } catch (error) {
       logger.error('Failed to save guilds:', error);
     }

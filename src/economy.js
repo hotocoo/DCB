@@ -67,9 +67,11 @@ class EconomyManager {
 
   saveEconomy() {
     try {
-      fs.writeFileSync(ECONOMY_FILE, JSON.stringify(this.economyData, null, 2));
+      const tmp = ECONOMY_FILE + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(this.economyData, null, 2), 'utf8');
+      fs.renameSync(tmp, ECONOMY_FILE);
     } catch (error) {
-      logger.error('Failed to save economy:', error);
+      logger.error('Failed to save economy:', error instanceof Error ? error : new Error(String(error)));
     }
   }
 

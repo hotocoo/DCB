@@ -22,7 +22,11 @@ class TradingManager {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(TRADES_FILE)) {
-      fs.writeFileSync(TRADES_FILE, JSON.stringify({ completed: [], stats: {} }, undefined, 2));
+      const tmp = TRADES_FILE + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify({ completed: [], stats: {} }, undefined, 2), 'utf8');
+
+      fs.renameSync(tmp, TRADES_FILE);
     }
   }
 
@@ -47,7 +51,11 @@ class TradingManager {
       };
       // unicorn/no-null: JSON.stringify replacer is a no-op (identity) here, so we use a typed placeholder.
       const identity = (_key, value) => value;
-      fs.writeFileSync(TRADES_FILE, JSON.stringify(data, identity, 2));
+      const tmp = TRADES_FILE + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(data, identity, 2), 'utf8');
+
+      fs.renameSync(tmp, TRADES_FILE);
     } catch (error) {
       logger.error('Failed to save trades', error);
     }

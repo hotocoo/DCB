@@ -58,7 +58,11 @@ class ModerationManager {
 
   saveModerationData() {
     try {
-      fs.writeFileSync(MODERATION_FILE, JSON.stringify(this.moderationData, undefined, 2));
+      const tmp = MODERATION_FILE + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.moderationData, undefined, 2), 'utf8');
+
+      fs.renameSync(tmp, MODERATION_FILE);
     } catch (error) {
       logger.error('Failed to save moderation data', error);
     }

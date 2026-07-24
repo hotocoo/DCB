@@ -46,7 +46,11 @@ class CustomCommandManager {
 
   saveCustomCommands() {
     try {
-      fs.writeFileSync(CUSTOM_COMMANDS_FILE, JSON.stringify(this.customCommands, undefined, 2));
+      const tmp = CUSTOM_COMMANDS_FILE + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.customCommands, undefined, 2), 'utf8');
+
+      fs.renameSync(tmp, CUSTOM_COMMANDS_FILE);
     } catch (error) {
       logger.error('Failed to save custom commands', error);
     }

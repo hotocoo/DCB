@@ -18,7 +18,11 @@ class LocationManager {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(LOCATIONS_FILE)) {
-      fs.writeFileSync(LOCATIONS_FILE, JSON.stringify({}));
+      const tmp = LOCATIONS_FILE + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify({}), 'utf8');
+
+      fs.renameSync(tmp, LOCATIONS_FILE);
     }
   }
 
@@ -34,7 +38,11 @@ class LocationManager {
 
   saveLocations() {
     try {
-      fs.writeFileSync(LOCATIONS_FILE, JSON.stringify(this.locations, null, 2));
+      const tmp = LOCATIONS_FILE + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.locations, null, 2), 'utf8');
+
+      fs.renameSync(tmp, LOCATIONS_FILE);
     } catch (error) {
       logger.error('Failed to save locations:', error instanceof Error ? error : new Error(String(error)));
     }

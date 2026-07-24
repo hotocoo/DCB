@@ -167,7 +167,11 @@ class AchievementManager {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(ACHIEVEMENTS_FILE)) {
-      fs.writeFileSync(ACHIEVEMENTS_FILE, JSON.stringify({}));
+      const tmp = ACHIEVEMENTS_FILE + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify({}), 'utf8');
+
+      fs.renameSync(tmp, ACHIEVEMENTS_FILE);
     }
   }
 
@@ -183,7 +187,11 @@ class AchievementManager {
 
   saveAchievements() {
     try {
-      fs.writeFileSync(ACHIEVEMENTS_FILE, JSON.stringify(this.userAchievements, null, 2));
+      const tmp = ACHIEVEMENTS_FILE + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.userAchievements, null, 2), 'utf8');
+
+      fs.renameSync(tmp, ACHIEVEMENTS_FILE);
     } catch (error) {
       logger.error('Failed to save achievements:', error instanceof Error ? error : new Error(String(error)));
     }

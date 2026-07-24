@@ -49,7 +49,11 @@ class IntegrationManager {
 
   saveIntegrations() {
     try {
-      fs.writeFileSync(INTEGRATIONS_FILE, JSON.stringify(this.integrations, null, 2));
+      const tmp = INTEGRATIONS_FILE + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.integrations, null, 2), 'utf8');
+
+      fs.renameSync(tmp, INTEGRATIONS_FILE);
     } catch (error) {
       logger.error('Failed to save integrations:', error);
     }
