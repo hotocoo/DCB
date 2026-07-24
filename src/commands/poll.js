@@ -108,7 +108,7 @@ export async function execute(interaction) {
     try {
       const { updateUserStats } = await import('../achievements.js');
       updateUserStats(interaction.user.id, { polls_created: 1 });
-    } catch (error) { /* achievements optional */ }
+    } catch (_ignore) { /* achievements optional */ }
 
     // Store poll data for tracking votes globally
     const pollData = {

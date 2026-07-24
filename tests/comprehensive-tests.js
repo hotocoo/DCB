@@ -91,9 +91,8 @@ class ComprehensiveTestSuite {
       const sellResult = sellToMarket(this.testUsers[1], 'health_potion', 1);
       this.log(`Sell successful: ${sellResult.success}`, sellResult.success);
 
-      // Test investment
-      const investmentTypes = await import('../src/economy.js').then((m) => m.getInvestmentTypes());
-      const invResult = createInvestment(this.testUsers[0], investmentTypes.bank, 100);
+      // Test investment — use type KEY, not raw config object
+      const invResult = createInvestment(this.testUsers[0], 'bank', 100);
       this.log(`Investment created: ${invResult.success}`, invResult.success);
 
       const investments = getUserInvestments(this.testUsers[0]);

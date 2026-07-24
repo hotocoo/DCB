@@ -113,7 +113,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('News fetch error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('News fetch error:', error);
           await interaction.reply({
             content: '❌ Failed to fetch news. Please try again later.',
             flags: MessageFlags.Ephemeral,
@@ -145,7 +145,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Joke fetch error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Joke fetch error:', error);
           await interaction.reply({
             content: '❌ Failed to get joke. Please try again later.',
             flags: MessageFlags.Ephemeral,
@@ -172,7 +172,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Cat fact fetch error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Cat fact fetch error:', error);
           await interaction.reply({
             content: '❌ Failed to get cat fact. Please try again later.',
             flags: MessageFlags.Ephemeral,
@@ -209,7 +209,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Number fact fetch error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Number fact fetch error:', error);
           await interaction.reply({
             content: '❌ Failed to get number fact. Please try again later.',
             flags: MessageFlags.Ephemeral,
@@ -236,7 +236,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Dad joke fetch error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Dad joke fetch error:', error);
           await interaction.reply({
             content: '❌ Failed to get dad joke. Please try again later.',
             flags: MessageFlags.Ephemeral,
@@ -272,7 +272,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Programming quote fetch error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Programming quote fetch error:', error);
           await interaction.reply({
             content: '❌ Failed to get programming quote. Please try again later.',
             flags: MessageFlags.Ephemeral,
@@ -325,7 +325,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('GitHub stats fetch error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('GitHub stats fetch error:', error);
           await interaction.reply({
             content: `❌ Failed to get GitHub stats for ${username}. Please try again later.`,
             flags: MessageFlags.Ephemeral,
@@ -383,7 +383,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Weather fetch error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Weather fetch error:', error);
           await interaction.reply({
             content: '❌ Failed to get weather data. Please try again later.',
             flags: MessageFlags.Ephemeral,
@@ -423,7 +423,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         } catch (error) {
-          logger.error('Stats fetch error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Stats fetch error:', error);
           await interaction.reply({
             content: '❌ Failed to fetch API statistics. Please try again later.',
             flags: MessageFlags.Ephemeral,
@@ -435,7 +435,7 @@ export async function execute(interaction) {
       // No default
     }
   } catch (error) {
-    logger.error('API command error:', error instanceof Error ? error : new Error(String(error)));
+    console.error('API command error:', error);
     try {
       if (interaction && typeof interaction.reply === 'function') {
         await interaction.reply({
@@ -444,7 +444,7 @@ export async function execute(interaction) {
         });
       }
     } catch (replyError) {
-      logger.error('Failed to send error reply:', replyError instanceof Error ? replyError : new Error(String(replyError)));
+      console.error('Failed to send error reply:', replyError);
     }
   }
 }

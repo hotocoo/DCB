@@ -165,9 +165,9 @@ export async function execute(interaction) {
     try {
       const { updateUserStats } = await import('../achievements.js');
       updateUserStats(interaction.user.id, { weather_checks: 1 });
-    } catch (error) { /* achievements optional */ }
+    } catch (_ignore) { /* achievements optional */ }
   } catch (error) {
-    logger.error('Weather command error:', error instanceof Error ? error : new Error(String(error)));
+    console.error('Weather command error:', error);
     if (error.name === 'AbortError') {
       await interaction.reply({ content: '❌ Request timed out. Please try again later.', flags: MessageFlags.Ephemeral });
     } else if (error.message.includes('fetch')) {

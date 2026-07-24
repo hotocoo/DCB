@@ -172,7 +172,7 @@ export async function execute(interaction) {
 
         return interaction.editReply({ embeds: [embed] });
       } catch (error) {
-        logger.error('Chapter generation error:', error instanceof Error ? error : new Error(String(error)));
+        console.error('Chapter generation error:', error);
         return interaction.editReply({
           content: '❌ An error occurred while generating the chapter. Please try again.',
         });

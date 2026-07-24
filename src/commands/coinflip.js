@@ -41,5 +41,5 @@ export async function execute(interaction) {
       // Streak broken on any non-heads result. We can't directly reset here without a setter,
       // but the achievement check uses >= threshold so an occasional increment won't fake it.
     }
-  } catch (error) { /* achievements optional */ }
+  } catch (_ignore) { /* achievements optional */ }
 }

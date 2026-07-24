@@ -37,7 +37,7 @@ function readAll() {
     cache = raw;
     return raw;
   } catch (error) {
-    logger.error('Failed to read rpg storage', error instanceof Error ? error : new Error(String(error)));
+    console.error('Failed to read rpg storage', error);
     return {};
   }
 }
@@ -51,7 +51,7 @@ function writeAll(obj) {
     fs.renameSync(tmp, FILE);
     cache = obj;
   } catch (error) {
-    logger.error('Failed to write RPG data:', error instanceof Error ? error : new Error(String(error)));
+    console.error('Failed to write RPG data:', error);
     // Attempt to restore from cache if available
     if (cache) {
       console.log('Restoring from cache after write failure');
@@ -305,7 +305,7 @@ export async function execute(interaction) {
               `You enter ${location.name}. ${narrative.entry}`,
             );
           } catch (narrativeError) {
-            logger.warn('[EXPLORE] AI narrative generation failed, using fallback:', { message: narrativeError?.message });
+            console.warn('[EXPLORE] AI narrative generation failed, using fallback:', narrativeError.message);
             locationNarrative = `You enter ${location.name}. ${narrative.entry}`;
           }
 

@@ -132,7 +132,7 @@ export async function execute(interaction) {
             try {
               const { updateUserStats } = await import('../achievements.js');
               updateUserStats(interaction.user.id, { hangman_wins: 1 });
-            } catch (error) { /* achievements optional */ }
+            } catch (_ignore) { /* achievements optional */ }
           }
           interaction.client.games.delete(interaction.user.id);
         }

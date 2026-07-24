@@ -58,5 +58,65 @@
     },
     "total_points": 0,
     "level": 1
+  },
+  "u_1784915336977": {
+    "achievements": [],
+    "stats": {
+      "characters_created": 0,
+      "classes_tried": 0,
+      "bosses_defeated": 0,
+      "items_found": 0,
+      "trivia_correct": 0,
+      "memory_games_completed": 0,
+      "hangman_wins": 0,
+      "polls_created": 0,
+      "help_actions": 0,
+      "messages_sent": 0,
+      "features_tried": 0,
+      "coin_streak": 0,
+      "weather_checks": 0
+    },
+    "total_points": 0,
+    "level": 1
+  },
+  "u_1784915336978": {
+    "achievements": [],
+    "stats": {
+      "characters_created": 0,
+      "classes_tried": 0,
+      "bosses_defeated": 0,
+      "items_found": 0,
+      "trivia_correct": 0,
+      "memory_games_completed": 0,
+      "hangman_wins": 0,
+      "polls_created": 0,
+      "help_actions": 0,
+      "messages_sent": 0,
+      "features_tried": 0,
+      "coin_streak": 0,
+      "weather_checks": 0
+    },
+    "total_points": 0,
+    "level": 1
+  },
+  "u_1784915336979": {
+    "achievements": [],
+    "stats": {
+      "characters_created": 0,
+      "classes_tried": 0,
+      "bosses_defeated": 0,
+      "items_found": 0,
+      "trivia_correct": 0,
+      "memory_games_completed": 0,
+      "hangman_wins": 0,
+      "polls_created": 1,
+      "help_actions": 0,
+      "messages_sent": 0,
+      "features_tried": 0,
+      "coin_streak": 0,
+      "weather_checks": 0
+    },
+    "total_points": 0,
+    "level": 1
   }
 }

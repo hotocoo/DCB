@@ -176,7 +176,7 @@ export async function execute(interaction) {
         try {
           updateEntertainmentStats(interaction.user.id, 'jokesHeard');
         } catch (error) {
-          logger.warn('Failed to update joke stats:', error instanceof Error ? error.message : String(error));
+          console.warn('Failed to update joke stats:', error instanceof Error ? error.message : String(error));
         }
 
         const row = new ActionRowBuilder().addComponents(
@@ -220,7 +220,7 @@ export async function execute(interaction) {
         try {
           updateEntertainmentStats(interaction.user.id, 'storiesGenerated');
         } catch (error) {
-          logger.warn('Failed to update story stats:', error instanceof Error ? error.message : String(error));
+          console.warn('Failed to update story stats:', error instanceof Error ? error.message : String(error));
         }
 
         const row = new ActionRowBuilder().addComponents(
@@ -250,7 +250,7 @@ export async function execute(interaction) {
         try {
           updateEntertainmentStats(interaction.user.id, 'riddlesAttempted');
         } catch (error) {
-          logger.warn('Failed to update riddle stats:', error instanceof Error ? error.message : String(error));
+          console.warn('Failed to update riddle stats:', error instanceof Error ? error.message : String(error));
         }
 
         const row = new ActionRowBuilder().addComponents(
@@ -283,7 +283,7 @@ export async function execute(interaction) {
         try {
           updateEntertainmentStats(interaction.user.id, 'factsLearned');
         } catch (error) {
-          logger.warn('Failed to update fact stats:', error instanceof Error ? error.message : String(error));
+          console.warn('Failed to update fact stats:', error instanceof Error ? error.message : String(error));
         }
 
         const row = new ActionRowBuilder().addComponents(
@@ -425,7 +425,7 @@ export async function execute(interaction) {
 
         for (const [index, entry] of leaderboard.entries()) {
           if (!entry || typeof entry.score !== 'number') {
-            logger.warn('Invalid leaderboard entry:', { entry });
+            console.warn('Invalid leaderboard entry:', entry);
             continue;
           }
           const rank = index + 1;
@@ -444,7 +444,7 @@ export async function execute(interaction) {
       // No default
     }
   } catch (error) {
-    logger.error('Error in fun command execution:', error instanceof Error ? error : new Error(String(error)));
+    console.error('Error in fun command execution:', error);
     await handleCommandError(
       interaction,
       error instanceof CommandError

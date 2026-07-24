@@ -115,7 +115,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed], components: [row] });
         } catch (error) {
-          logger.error('Error fetching achievements:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Error fetching achievements:', error);
           await interaction.reply({
             content: '❌ Failed to load achievements. Please try again later.',
             flags: MessageFlags.Ephemeral,
@@ -164,7 +164,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Error fetching leaderboard:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Error fetching leaderboard:', error);
           await interaction.reply({
             content: '❌ Failed to load leaderboard. Please try again later.',
             flags: MessageFlags.Ephemeral,
@@ -207,7 +207,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         } catch (error) {
-          logger.error('Error fetching stats:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Error fetching stats:', error);
           await interaction.reply({
             content: '❌ Failed to load statistics. Please try again later.',
             flags: MessageFlags.Ephemeral,
@@ -219,7 +219,7 @@ export async function execute(interaction) {
       // No default
     }
   } catch (error) {
-    logger.error('Achievement command error:', error instanceof Error ? error : new Error(String(error)));
+    console.error('Achievement command error:', error);
     try {
       if (interaction && typeof interaction.reply === 'function') {
         await interaction.reply({
@@ -228,7 +228,7 @@ export async function execute(interaction) {
         });
       }
     } catch (replyError) {
-      logger.error('Failed to send error reply:', replyError instanceof Error ? replyError : new Error(String(replyError)));
+      console.error('Failed to send error reply:', replyError);
     }
   }
 }

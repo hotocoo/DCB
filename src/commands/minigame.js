@@ -104,7 +104,7 @@ export async function execute(interaction) {
             });
           }
         } catch (error) {
-          logger.error('Failed to load novel for typing:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Failed to load novel for typing:', error);
           return interaction.reply({
             content: '❌ Failed to load novel data.',
             flags: MessageFlags.Ephemeral,

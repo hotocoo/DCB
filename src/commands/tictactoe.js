@@ -64,7 +64,7 @@ export async function execute(interaction) {
 
     await sendTicTacToeBoard(interaction, gameState);
   } catch (error) {
-    logger.error('Error in tictactoe execute:', error instanceof Error ? error : new Error(String(error)));
+    console.error('Error in tictactoe execute:', error);
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({ content: '❌ An error occurred while starting the game.', flags: MessageFlags.Ephemeral });
     }
@@ -197,7 +197,7 @@ async function sendTicTacToeBoard(interaction, gameState) {
       }, 1000);
     }
   } catch (error) {
-    logger.error('Error in sendTicTacToeBoard:', error instanceof Error ? error : new Error(String(error)));
+    console.error('Error in sendTicTacToeBoard:', error);
   }
 }
 

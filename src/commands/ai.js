@@ -12,7 +12,6 @@ import {
   generateCodeSnippet,
   generateRecommendations,
 } from '../aiassistant.js';
-import { logger } from '../logger.js';
 
 export const data = new SlashCommandBuilder()
   .setName('ai')
@@ -169,7 +168,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed], components: [row] });
         } catch (error) {
-          logger.error('AI chat error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('AI chat error:', error);
           await interaction.reply({
             content: '❌ Failed to generate AI response. Please try again.',
             flags: MessageFlags.Ephemeral,
@@ -215,7 +214,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Sentiment analysis error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Sentiment analysis error:', error);
           await interaction.reply({
             content: '❌ Failed to analyze sentiment.',
             flags: MessageFlags.Ephemeral,
@@ -276,7 +275,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Summarization error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Summarization error:', error);
           await interaction.reply({
             content: '❌ Failed to summarize text.',
             flags: MessageFlags.Ephemeral,
@@ -332,7 +331,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Translation error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Translation error:', error);
           await interaction.reply({
             content: '❌ Failed to translate text.',
             flags: MessageFlags.Ephemeral,
@@ -382,7 +381,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Idea generation error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Idea generation error:', error);
           await interaction.reply({
             content: '❌ Failed to generate ideas.',
             flags: MessageFlags.Ephemeral,
@@ -436,7 +435,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Code generation error:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Code generation error:', error);
           await interaction.reply({
             content: '❌ Failed to generate code.',
             flags: MessageFlags.Ephemeral,
@@ -466,7 +465,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Error fetching models:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Error fetching models:', error);
           await interaction.reply({
             content: '❌ Failed to fetch available models.',
             flags: MessageFlags.Ephemeral,
@@ -496,5 +495,70 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          logger.error('Error fetching personalities:', error instanceof Error ? error : new Error(String(error)));
+          console.error('Error fetching personalities:', error);
           await interaction.reply({
+            content: '❌ Failed to fetch available personalities.',
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        break;
+      }
+      case 'recommend': {
+        try {
+          const recommendations = await generateRecommendations(interaction.user.id, 'general');
+
+          if (!Array.isArray(recommendations)) {
+            throw new TypeError('Invalid recommendations result');
+          }
+
+          const validRecommendations = recommendations.filter((rec) => rec && typeof rec === 'string').slice(0, 10);
+          const embed = new EmbedBuilder()
+            .setTitle('💡 Personalized Recommendations')
+            .setColor(0xff_c1_07)
+            .setDescription(validRecommendations.map((rec, index) => `${index + 1}. ${rec.slice(0, 200)}`).join('\n'));
+
+          await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        } catch (error) {
+          console.error('Recommendation error:', error);
+          await interaction.reply({
+            content: '❌ Failed to generate recommendations.',
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        break;
+      }
+      case 'clear': {
+        try {
+          clearUserHistory(interaction.user.id);
+          await interaction.reply({
+            content: '🧹 **AI conversation history cleared!** Starting fresh.',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (error) {
+          console.error('Error clearing history:', error);
+          await interaction.reply({
+            content: '❌ Failed to clear conversation history.',
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        break;
+      }
+      // No default
+    }
+  } catch (error) {
+    console.error('AI command error:', error);
+    try {
+      if (interaction && typeof interaction.reply === 'function') {
+        await interaction.reply({
+          content: '❌ An unexpected error occurred. Please try again later.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    } catch (replyError) {
+      console.error('Failed to send error reply:', replyError);
+    }
+  }
+}

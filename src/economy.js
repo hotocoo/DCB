@@ -284,6 +284,21 @@ class EconomyManager {
 
   // Investment System
   createInvestment(userId, investmentType, amount) {
+    if (!userId || typeof userId !== 'string') {
+      return { success: false, reason: 'invalid_user' };
+    }
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+      return { success: false, reason: 'invalid_amount' };
+    }
+    const types = this.getInvestmentTypes();
+    const typeKey = typeof investmentType === 'string' ? investmentType : Object.keys(types).find((k) => types[k] === investmentType);
+    if (!typeKey || !types[typeKey]) {
+      return { success: false, reason: 'invalid_investment_type' };
+    }
+    const typeConfig = types[typeKey];
+    if (amount < typeConfig.minAmount) {
+      return { success: false, reason: 'below_minimum_amount', minimum: typeConfig.minAmount };
+    }
     if (this.getBalance(userId) < amount) {
       return { success: false, reason: 'insufficient_funds' };
     }
@@ -293,11 +308,11 @@ class EconomyManager {
     const investment = {
       id: investmentId,
       user: userId,
-      type: investmentType,
+      type: typeConfig.name || typeKey,
       amount,
       created: Date.now(),
-      maturity: Date.now() + investmentType.duration * 24 * 60 * 60 * 1000,
-      rate: investmentType.rate,
+      maturity: Date.now() + typeConfig.duration * 24 * 60 * 60 * 1000,
+      rate: typeConfig.rate,
       status: 'active',
     };
 

@@ -196,7 +196,7 @@ async function sendGuessPrompt(interaction, gameState) {
       await safeInteractionReply(interaction, { embeds: [embed], components: [row] });
     }
   } catch (error) {
-    logger.error('sendGuessPrompt error:', error instanceof Error ? error : new Error(String(error)));
+    console.error('sendGuessPrompt error:', error);
     await handleCommandError(interaction, new CommandError('Failed to update game prompt.', 'UNKNOWN_ERROR', { originalError: String(error) }));
   }
 }
@@ -254,7 +254,7 @@ async function processGuess(interaction, gameState, guess) {
       try {
         updateUserStats(interaction.user.id, { guess_wins: 1 });
       } catch (statsError) {
-        logger.error('Failed to update user stats:', statsError instanceof Error ? statsError : new Error(String(statsError)));
+        console.error('Failed to update user stats:', statsError);
       }
     } else if (guessNum < gameState.secretNumber) {
       feedback = '📈 Too low! Try a higher number.';
@@ -313,7 +313,7 @@ async function processGuess(interaction, gameState, guess) {
       await safeInteractionReply(interaction, { content: `**${guessNum}** - ${feedback}`, flags: MessageFlags.Ephemeral });
     }
   } catch (error) {
-    logger.error('processGuess error:', error instanceof Error ? error : new Error(String(error)));
+    console.error('processGuess error:', error);
     await handleCommandError(
       interaction,
       error instanceof CommandError ? error : new CommandError('Failed to process guess.', 'UNKNOWN_ERROR', { originalError: String(error) }),

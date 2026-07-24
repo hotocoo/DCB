@@ -230,7 +230,7 @@ async function sendQuestion(interaction, gameState) {
         sendQuestion(interaction, gameState);
       }, 2000);
     } catch (error) {
-      logger.error('Error in trivia collector:', error instanceof Error ? error : new Error(String(error)));
+      console.error('Error in trivia collector:', error);
       await i.reply({ content: 'An error occurred while processing your answer.', flags: MessageFlags.Ephemeral });
     }
   });
@@ -285,7 +285,7 @@ async function sendResults(interaction, gameState) {
       features_tried: 1,
     });
   } catch (error) {
-    logger.warn('Failed to update trivia achievements:', { message: error?.message });
+    console.warn('Failed to update trivia achievements:', error.message);
   }
 
   const embed = new EmbedBuilder()
