@@ -2,6 +2,7 @@ import { SlashCommandBuilder, MessageFlags, EmbedBuilder } from 'discord.js';
 
 import { createNovel, listNovels, getNovel, generateChapter } from '../novel.js';
 import { CommandError, handleCommandError } from '../errorHandler.js';
+import { logger } from '../logger.js';
 
 export const data = new SlashCommandBuilder()
   .setName('novel')
@@ -172,7 +173,7 @@ export async function execute(interaction) {
 
         return interaction.editReply({ embeds: [embed] });
       } catch (error) {
-        console.error('Chapter generation error:', error);
+        logger.error('[NOVEL] Chapter generation error', error instanceof Error ? error : new Error(String(error)));
         return interaction.editReply({
           content: '❌ An error occurred while generating the chapter. Please try again.',
         });

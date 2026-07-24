@@ -72,7 +72,11 @@ class ProfileManager {
       const identity = (_key, value) => value;
       // userId is a Discord ID, not user-supplied filename — safe to construct path.
       // eslint-disable-next-line security/detect-non-literal-fs-filename
-      fs.writeFileSync(filePath, JSON.stringify(data, identity, 2));
+      const tmp = filePath + '.tmp';
+
+      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(data, identity, 2), 'utf8');
+
+      fs.renameSync(tmp, filePath);
     } catch (error) {
       logger.error(`Failed to save profile for ${userId}`, error);
     }
