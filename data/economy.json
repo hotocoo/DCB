@@ -594,7 +594,28 @@
       "id": "txn_1784773480942_ax0tpj1mq"
     }
   ],
-  "marketItems": {},
+  "marketItems": {
+    "health_potion": {
+      "basePrice": 25,
+      "volatility": 0.1
+    },
+    "mana_potion": {
+      "basePrice": 40,
+      "volatility": 0.15
+    },
+    "iron_ore": {
+      "basePrice": 5,
+      "volatility": 0.2
+    },
+    "magic_crystal": {
+      "basePrice": 100,
+      "volatility": 0.3
+    },
+    "dragon_scale": {
+      "basePrice": 500,
+      "volatility": 0.1
+    }
+  },
   "businessData": {},
   "investments": {
     "testuser1": [

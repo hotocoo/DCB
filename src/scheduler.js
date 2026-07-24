@@ -113,46 +113,86 @@ class SchedulerManager {
   }
 
   async executeReminder(reminder) {
-    // Mark as executed
-    reminder.executed = true;
-    reminder.executedAt = Date.now();
+    const message = `⏰ **Reminder: ${reminder.title}**\n${reminder.message}`;
 
-    // Update stats
-    if (!this.schedules.stats[reminder.userId]) {
-      this.schedules.stats[reminder.userId] = { reminders_sent: 0, events_executed: 0 };
+    // Retry delivery with exponential backoff (3 attempts)
+    const maxRetries = 3;
+    const baseDelayMs = 5_000;
+    let sendSuccess = false;
+    let lastError;
+
+    if (this.client) {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          await this._sendDiscordMessage(reminder, message);
+          sendSuccess = true;
+          break;
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          const isRetryable =
+            lastError.message.includes('502') ||
+            lastError.message.includes('503') ||
+            lastError.message.includes('504') ||
+            lastError.message.includes('rate limit') ||
+            lastError.message.includes('timeout');
+
+          logger.error(`Failed to send reminder (attempt ${attempt}/${maxRetries}):`, lastError, {
+            reminderId: reminder.id,
+            userId: reminder.userId,
+            retryable: isRetryable,
+          });
+
+          if (!isRetryable || attempt === maxRetries) {
+            break;
+          }
+
+          const delay = Math.min(baseDelayMs * Math.pow(3, attempt - 1), 60_000);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    } else {
+      logger.warn('Reminder not sent — no Discord client attached', { reminderId: reminder.id });
     }
-    this.schedules.stats[reminder.userId].reminders_sent++;
 
-    // Handle recurring reminders
-    if (reminder.recurring) {
-      this.createRecurringReminder(reminder);
+    this.activeTimers.delete(reminder.id);
+
+    if (sendSuccess) {
+      reminder.executed = true;
+      reminder.executedAt = Date.now();
+
+      if (!this.schedules.stats[reminder.userId]) {
+        this.schedules.stats[reminder.userId] = { reminders_sent: 0, events_executed: 0 };
+      }
+      this.schedules.stats[reminder.userId].reminders_sent++;
+
+      if (reminder.recurring) {
+        this.createRecurringReminder(reminder);
+      }
+    } else {
+      reminder.active = false;
+      reminder.failedToDeliver = true;
+      reminder.failedAt = Date.now();
+      logger.warn('Reminder failed to deliver after all retries, marked as inactive', {
+        reminderId: reminder.id,
+        userId: reminder.userId,
+        lastError: lastError?.message,
+      });
     }
 
     this.saveSchedules();
-    this.activeTimers.delete(reminder.id);
-
-    // Send the reminder via Discord
-    if (this.client) {
-      try {
-        const message = `⏰ **Reminder: ${reminder.title}**\n${reminder.message}`;
-        if (reminder.guildId) {
-          const guild = await this.client.guilds.fetch(reminder.guildId);
-          const channel = await guild.channels.fetch(reminder.channelId);
-          await channel.send(message);
-        } else {
-          const channel = await this.client.channels.fetch(reminder.channelId);
-          await channel.send(message);
-        }
-      } catch (error) {
-        logger.error('Failed to send reminder:', error);
-      }
-    }
 
     return {
-      success: true,
+      success: sendSuccess,
       reminder,
-      message: `⏰ **Reminder: ${reminder.title}**\n${reminder.message}`,
+      message,
     };
+  }
+
+  async _sendDiscordMessage({ guildId, channelId }, message) {
+    const channel = await (guildId
+      ? (await this.client.guilds.fetch(guildId)).channels.fetch(channelId)
+      : this.client.channels.fetch(channelId));
+    await channel.send(message);
   }
 
   createRecurringReminder(originalReminder) {
@@ -262,22 +302,12 @@ class SchedulerManager {
   }
 
   async executeEvent(event) {
-    event.active = false;
-    event.executedAt = Date.now();
+    const message = `📅 **Event Started: ${event.title}**\n${event.description}`;
 
-    // Update stats
-    if (!this.schedules.stats[event.creatorId]) {
-      this.schedules.stats[event.creatorId] = { reminders_sent: 0, events_executed: 0 };
-    }
-    this.schedules.stats[event.creatorId].events_executed++;
-
-    this.saveSchedules();
-    this.activeTimers.delete(event.id);
-
-    // Send the event via Discord
+    // Send the event via Discord FIRST — only mark executed after success
+    let sendSuccess = false;
     if (this.client) {
       try {
-        const message = `📅 **Event Started: ${event.title}**\n${event.description}`;
         if (event.guildId) {
           const guild = await this.client.guilds.fetch(event.guildId);
           const channel = await guild.channels.fetch(event.channelId);
@@ -286,15 +316,43 @@ class SchedulerManager {
           const channel = await this.client.channels.fetch(event.channelId);
           await channel.send(message);
         }
+        sendSuccess = true;
       } catch (error) {
-        logger.error('Failed to send event:', error);
+        logger.error('Failed to send event:', error instanceof Error ? error : new Error(String(error)), {
+          eventId: event.id,
+          guildId: event.guildId,
+          channelId: event.channelId,
+        });
       }
+    } else {
+      logger.warn('Event not sent — no Discord client attached', { eventId: event.id });
     }
 
+    this.activeTimers.delete(event.id);
+
+    if (sendSuccess) {
+      event.active = false;
+      event.executedAt = Date.now();
+
+      // Update stats
+      if (!this.schedules.stats[event.creatorId]) {
+        this.schedules.stats[event.creatorId] = { reminders_sent: 0, events_executed: 0 };
+      }
+      this.schedules.stats[event.creatorId].events_executed++;
+    } else {
+      // Failed to deliver — mark as inactive but track failure
+      event.active = false;
+      event.failedToDeliver = true;
+      event.failedAt = Date.now();
+      logger.warn('Event failed to deliver, marked as inactive', { eventId: event.id });
+    }
+
+    this.saveSchedules();
+
     return {
-      success: true,
+      success: sendSuccess,
       event,
-      message: `📅 **Event Started: ${event.title}**\n${event.description}`,
+      message,
     };
   }
 

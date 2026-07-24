@@ -377,7 +377,8 @@ class EconomyManager {
 
   // Advanced Marketplace
   initializeMarket() {
-    // Initialize market prices for various items
+    // Initialize market prices for various items. Persist item metadata to
+    // economyData.marketItems so updateMarketPrices can read volatility values.
     const marketItems = {
       health_potion: { basePrice: 25, volatility: 0.1 },
       mana_potion: { basePrice: 40, volatility: 0.15 },
@@ -387,6 +388,8 @@ class EconomyManager {
     };
 
     for (const [itemId, data] of Object.entries(marketItems)) {
+      // Persist metadata to economyData so price updates use real volatilities
+      this.economyData.marketItems[itemId] = data;
       const currentPrice = data.basePrice + (Math.random() - 0.5) * data.basePrice * data.volatility;
       this.marketPrices.set(itemId, Math.max(1, Math.round(currentPrice)));
     }
@@ -400,24 +403,25 @@ class EconomyManager {
   updateMarketPrices() {
     for (const [itemId, currentPrice] of this.marketPrices) {
       const itemData = this.economyData.marketItems[itemId];
-      if (itemData) {
-        const change = (Math.random() - 0.5) * itemData.volatility * currentPrice;
-        const newPrice = Math.max(1, Math.round(currentPrice + change));
+      // Fallback to default volatility if metadata missing (shouldn't happen after initializeMarket fix)
+      if (!itemData) continue;
 
-        this.marketPrices.set(itemId, newPrice);
+      const change = (Math.random() - 0.5) * itemData.volatility * currentPrice;
+      const newPrice = Math.max(1, Math.round(currentPrice + change));
 
-        // Store price history
-        if (!this.priceHistory.has(itemId)) {
-          this.priceHistory.set(itemId, []);
-        }
+      this.marketPrices.set(itemId, newPrice);
 
-        const history = this.priceHistory.get(itemId);
-        history.push({ price: newPrice, timestamp: Date.now() });
+      // Store price history
+      if (!this.priceHistory.has(itemId)) {
+        this.priceHistory.set(itemId, []);
+      }
 
-        // Keep only last 100 price points
-        if (history.length > 100) {
-          history.shift();
-        }
+      const history = this.priceHistory.get(itemId);
+      history.push({ price: newPrice, timestamp: Date.now() });
+
+      // Keep only last 100 price points
+      if (history.length > 100) {
+        history.shift();
       }
     }
   }
@@ -434,6 +438,10 @@ class EconomyManager {
   }
 
   buyFromMarket(userId, itemId, quantity = 1) {
+    if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0 || Math.floor(quantity) !== quantity) {
+      return { success: false, reason: 'invalid_quantity' };
+    }
+
     const price = this.getMarketPrice(itemId);
     const totalCost = price * quantity;
 
@@ -472,6 +480,10 @@ class EconomyManager {
   }
 
   sellToMarket(userId, itemId, quantity = 1) {
+    if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0 || Math.floor(quantity) !== quantity) {
+      return { success: false, reason: 'invalid_quantity' };
+    }
+
     const price = Math.floor(this.getMarketPrice(itemId) * 0.8); // Sell for 80% of market price
     const totalEarnings = price * quantity;
 

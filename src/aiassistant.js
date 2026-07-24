@@ -495,7 +495,7 @@ Provide a response that matches the specified model and personality.`;
     };
 
     // In a real implementation, this would be used to fine-tune models
-    console.log('Response quality data:', qualityData);
+    logger.debug('Response quality data:', { qualityData });
   }
 
   calculateComplexity(text) {

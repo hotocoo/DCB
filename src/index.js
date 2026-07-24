@@ -84,7 +84,7 @@ let status;
 if (validStatuses.includes(botStatus.toLowerCase())) {
   status = botStatus.toLowerCase();
 } else {
-  console.warn(`Invalid BOT_STATUS: ${botStatus}. Defaulting to 'online'.`);
+  logger.warn(`Invalid BOT_STATUS: ${botStatus}. Defaulting to 'online'.`);
   status = 'online';
 }
 

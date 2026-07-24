@@ -170,12 +170,6 @@ async function safeInteractionReply(interaction, options) {
     validateNotEmpty(interaction.user, 'interaction.user');
     validateUserId(interaction.user.id);
     if (interaction.replied || interaction.deferred) {
-      console.error(`[SAFE_INTERACTION_REPLY] Interaction ${interactionId} already replied/deferred`, {
-        userId: interaction.user.id,
-        interactionId,
-        replied: interaction.replied,
-        deferred: interaction.deferred,
-      });
       logger.warn(`Interaction ${interactionId} already replied/deferred`, {
         userId: interaction.user.id,
         interactionId,
@@ -194,9 +188,8 @@ async function safeInteractionReply(interaction, options) {
     if (options && 'content' in options && options.content) {
       options.content = sanitizeInput(options.content);
     }
-    console.error(`[SAFE_INTERACTION_REPLY] Attempting to reply to interaction ${interactionId}`);
+    logger.debug(`Replying to interaction ${interactionId}`, { interactionId });
     await interaction.reply(options);
-    console.error(`[SAFE_INTERACTION_REPLY] Successfully replied to interaction ${interactionId}`);
     return true;
   } catch (error) {
     recordErrorAttempt(interactionId);
@@ -215,7 +208,6 @@ async function safeInteractionReply(interaction, options) {
 async function safeInteractionUpdate(interaction, options) {
   const interactionId = interaction.id;
   if (!checkCircuitBreaker(interactionId)) {
-    console.error(`[SAFE_INTERACTION_UPDATE] Circuit breaker tripped for interaction ${interactionId}, skipping update`);
     logger.error(`Circuit breaker tripped - too many error attempts for interaction ${interactionId}`, new Error('Circuit breaker activated'), {
       interactionId,
       userId: interaction.user?.id,
@@ -990,9 +982,7 @@ async function handleInteraction(interaction, client) {
     }
   } catch (error) {
     const executionTime = Date.now() - startTime;
-    console.error('[HANDLE_INTERACTION] Error in handleInteraction:', error instanceof Error ? error.message : String(error));
-    console.error('[HANDLE_INTERACTION] Error stack:', error instanceof Error ? error.stack : void 0);
-    console.error('[HANDLE_INTERACTION] Interaction state at error:', {
+    logError('[HANDLE_INTERACTION] Error in handleInteraction', error instanceof Error ? error : new Error(String(error)), {
       id: interaction?.id,
       replied: interaction?.replied,
       deferred: interaction?.deferred,
@@ -1640,7 +1630,7 @@ async function handleButtonInteraction(interaction, client) {
           }
         } else {
           if (interaction.replied || interaction.deferred) {
-            console.error('[MUSIC_PLAY_BUTTON] Interaction already handled, cannot reply', {
+            logger.warn('[MUSIC_PLAY_BUTTON] Interaction already handled, cannot reply', {
               interactionId: interaction.id,
               replied: interaction.replied,
               deferred: interaction.deferred,
@@ -1655,7 +1645,7 @@ async function handleButtonInteraction(interaction, client) {
           songIndex,
         });
         if (interaction.replied || interaction.deferred) {
-          console.error('[MUSIC_PLAY_BUTTON_ERROR] Interaction already handled, cannot reply', {
+          logger.warn('[MUSIC_PLAY_BUTTON_ERROR] Interaction already handled, cannot reply', {
             interactionId: interaction.id,
             replied: interaction.replied,
             deferred: interaction.deferred,
@@ -3424,7 +3414,7 @@ Correct answer: **${currentQuestion.options[currentQuestion.correct]}**`,
               features_tried: 1,
             });
           } catch (error) {
-            console.warn('Failed to update trivia achievements:', error instanceof Error ? error.message : String(error));
+            logger.warn('Failed to update trivia achievements:', error instanceof Error ? error.message : String(error));
           }
           const resultEmbed = new EmbedBuilder()
             .setTitle('\u{1F3AF} Trivia Quiz Complete!')
