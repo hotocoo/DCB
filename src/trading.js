@@ -431,21 +431,32 @@ class TradingManager {
     };
   }
 
-  // Trade Security and Validation
-  // eslint-disable-next-line no-unused-vars -- reserved for future inventory/balance integration
-  validateTradeOffer(_userId, _offeredItems, _offeredGold) {
-    // Check if user has the items and gold they're offering
-    // This would integrate with inventory and character systems
-    return {
-      valid: true,
-      missingItems: [],
-      insufficientGold: false,
-    };
+  // Trade Security and Validation — REAL validation (no more stubs)
+  validateTradeOffer(userId, offeredItems, offeredGold) {
+    const result = { valid: true, missingItems: [], insufficientGold: false };
+
+    // Check gold
+    if (offeredGold > 0 && getBalance(userId) < offeredGold) {
+      result.insufficientGold = true;
+      result.valid = false;
+    }
+
+    // Check items are actually owned
+    const char = getCharacter(userId);
+    if (!char || !char.inventory) return { valid: false, missingItems: offeredItems || [], reason: 'no_character' };
+
+    for (const itemId of (offeredItems || [])) {
+      if (!char.inventory[itemId]) {
+        result.missingItems.push(itemId);
+        result.valid = false;
+      }
+    }
+
+    return result;
   }
 
-  // eslint-disable-next-line no-unused-vars -- reserved for future item validation rules
+  // eslint-disable-next-line no-unused-vars -- reserved for future item validation rules (e.g., banned items)
   validateTradeRequest(_userId, _requestedItems, _requestedGold) {
-    // Check if requested items are reasonable (not asking for impossible items)
     return { valid: true };
   }
 
