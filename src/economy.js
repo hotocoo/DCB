@@ -778,34 +778,33 @@ class EconomyManager {
 
   // Cleanup and Maintenance
   cleanup() {
-    // Process mature investments
-    this.processMatureInvestments();
+    try {
+      // Process mature investments (handles its own save internally when needed)
+      this.processMatureInvestments();
 
-    // Clean up old transaction history
-    const cutoffTime = Date.now() - 30 * 24 * 60 * 60 * 1000; // 30 days
-    this.economyData.transactions = this.economyData.transactions.filter((t) => t.timestamp > cutoffTime);
+      let changed = false;
 
-    // Clean up price history maps (keep only last 50 entries per item)
-    for (const [itemId, history] of this.priceHistory.entries()) {
-      if (history.length > 50) {
-        this.priceHistory.set(itemId, history.slice(-50));
-        logger.debug(`[ECONOMY] Cleaned up price history for ${itemId}: ${history.length} -> 50 entries`);
+      // Clean up old transaction history (keep only last 30 days)
+      const cutoffTime = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const beforeLen = this.economyData.transactions.length;
+      this.economyData.transactions = this.economyData.transactions.filter((t) => t.timestamp > cutoffTime);
+      if (this.economyData.transactions.length !== beforeLen) changed = true;
+
+      // Clean up price history maps (keep only last 50 entries per item) — do NOT delete market prices.
+      for (const [itemId, history] of this.priceHistory.entries()) {
+        if (history.length > 50) {
+          this.priceHistory.set(itemId, history.slice(-50));
+          changed = true;
+          logger.debug(`[ECONOMY] Cleaned up price history for ${itemId}: ${history.length} -> 50 entries`);
+        }
       }
-    }
 
-    // Clean up stale market prices (remove items with no recent activity)
-    const recentTransactions = this.economyData.transactions.filter((t) => t.type === 'market_purchase' || t.type === 'market_sale');
-    const activeItems = new Set(recentTransactions.map((t) => t.item).filter(Boolean));
-
-    for (const [itemId] of this.marketPrices.entries()) {
-      if (!activeItems.has(itemId)) {
-        this.marketPrices.delete(itemId);
-        this.priceHistory.delete(itemId);
-        logger.debug(`[ECONOMY] Cleaned up stale market data for ${itemId}`);
+      if (changed) {
+        this.saveEconomy();
       }
+    } catch (error) {
+      logger.error('[ECONOMY] cleanup() failed:', error instanceof Error ? error : new Error(String(error)));
     }
-
-    this.saveEconomy();
   }
 }
 
