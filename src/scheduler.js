@@ -107,6 +107,7 @@ class SchedulerManager {
     const timerId = setTimeout(() => {
       this.executeReminder(reminder);
     }, delay);
+    if (typeof timerId.unref === 'function') timerId.unref(); // don't keep process alive for reminders
 
     this.activeTimers.set(reminder.id, timerId);
   }
@@ -242,6 +243,7 @@ class SchedulerManager {
     const timerId = setTimeout(() => {
       this.executeEvent(event);
     }, delay);
+    if (typeof timerId.unref === 'function') timerId.unref(); // don't keep process alive for events
 
     this.activeTimers.set(event.id, timerId);
 
@@ -252,6 +254,7 @@ class SchedulerManager {
         const reminderTimerId = setTimeout(() => {
           this.sendEventReminder(event, reminderOffset);
         }, reminderTime - Date.now());
+        if (typeof reminderTimerId.unref === 'function') reminderTimerId.unref();
 
         this.activeTimers.set(`${event.id}_reminder_${index}`, reminderTimerId);
       }
@@ -513,11 +516,18 @@ class SchedulerManager {
         if (!reminder.active || reminder.executed) continue;
 
         if (now > reminder.scheduledFor) {
-          // Overdue while offline: fire immediately instead of orphaning
           logger.warn('Executing overdue reminder on startup', { reminderId: reminder.id, dueAt: new Date(reminder.scheduledFor).toISOString() });
-          this.executeReminder(reminder);
+          try {
+            this.executeReminder(reminder);
+          } catch (error) {
+            logger.error('[SCHEDULER] Failed to execute overdue reminder at startup, continuing:', error instanceof Error ? error : new Error(String(error)), { reminderId: reminder.id });
+          }
         } else {
-          this.scheduleReminder(reminder);
+          try {
+            this.scheduleReminder(reminder);
+          } catch (error) {
+            logger.error('[SCHEDULER] Failed to schedule reminder at startup, continuing:', error instanceof Error ? error : new Error(String(error)), { reminderId: reminder.id });
+          }
         }
       }
     }
@@ -528,9 +538,17 @@ class SchedulerManager {
 
         if (now > event.scheduledFor) {
           logger.warn('Executing overdue event on startup', { eventId: event.id, dueAt: new Date(event.scheduledFor).toISOString() });
-          this.executeEvent(event);
+          try {
+            this.executeEvent(event);
+          } catch (error) {
+            logger.error('[SCHEDULER] Failed to execute overdue event at startup, continuing:', error instanceof Error ? error : new Error(String(error)), { eventId: event.id });
+          }
         } else {
-          this.scheduleEvent(event);
+          try {
+            this.scheduleEvent(event);
+          } catch (error) {
+            logger.error('[SCHEDULER] Failed to schedule event at startup, continuing:', error instanceof Error ? error : new Error(String(error)), { eventId: event.id });
+          }
         }
       }
     }
