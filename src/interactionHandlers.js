@@ -1001,9 +1001,9 @@ async function handleInteraction(interaction, client) {
           }),
       {
         command: interaction instanceof ChatInputCommandInteraction ? interaction.commandName : 'unknown',
-        userId: interaction.user.id,
-        guild: interaction.guild?.name || 'DM',
-        channel: interaction.channel && 'name' in interaction.channel ? interaction.channel.name : 'Unknown',
+        userId: interaction?.user?.id,
+        guild: interaction?.guild?.name || 'DM',
+        channel: interaction?.channel && 'name' in interaction.channel ? interaction.channel.name : 'Unknown',
         executionTime,
       },
     );

@@ -193,10 +193,20 @@ class SchedulerManager {
   }
 
   async _sendDiscordMessage({ guildId, channelId }, message) {
-    const channel = await (guildId
-      ? (await this.client.guilds.fetch(guildId)).channels.fetch(channelId)
-      : this.client.channels.fetch(channelId));
-    await channel.send(message);
+    let channel;
+    try {
+      channel = await (guildId
+        ? (await this.client.guilds.fetch(guildId)).channels.fetch(channelId)
+        : this.client.channels.fetch(channelId));
+    } catch (error) {
+      logger.error('Failed to fetch channel for scheduled message', error instanceof Error ? error : new Error(String(error)), { guildId, channelId });
+      return;
+    }
+    try {
+      await channel.send(message);
+    } catch (error) {
+      logger.error('Failed to send scheduled message', error instanceof Error ? error : new Error(String(error)), { guildId, channelId });
+    }
   }
 
   createRecurringReminder(originalReminder) {

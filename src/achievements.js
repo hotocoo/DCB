@@ -215,6 +215,10 @@ class AchievementManager {
           features_tried: 0,
           coin_streak: 0,
           weather_checks: 0,
+          games: {
+            tictactoe_wins: 0,
+            tictactoe_games: 0,
+          },
         },
         total_points: 0,
         level: 1,
@@ -226,10 +230,31 @@ class AchievementManager {
   updateStats(userId, statUpdates) {
     const userData = this.getUserStats(userId);
 
-    // Update stats
-    for (const [stat, value] of Object.entries(statUpdates)) {
-      if (typeof userData.stats[stat] === 'number') {
-        userData.stats[stat] += value;
+    // Update stats — supports both flat { messages_sent: 1 } and nested { games: { tictactoe_wins: 1 } } shapes.
+    for (const [key, value] of Object.entries(statUpdates)) {
+      if (typeof value === 'number') {
+        if (typeof userData.stats[key] === 'number') {
+          // eslint-disable-next-line security/detect-object-injection -- key from statUpdates param guarded by type check
+          userData.stats[key] += value;
+        }
+      } else if (value && typeof value === 'object') {
+        // Nested update: ensure container exists, then recurse.
+        // eslint-disable-next-line security/detect-object-injection -- key from statUpdates param
+        if (!userData.stats[key] || typeof userData.stats[key] !== 'object') {
+          // eslint-disable-next-line security/detect-object-injection
+          userData.stats[key] = {};
+        }
+        for (const [subKey, subValue] of Object.entries(value)) {
+          if (typeof subValue === 'number') {
+            // eslint-disable-next-line security/detect-object-injection -- guarded by type checks above
+            if (typeof userData.stats[key][subKey] !== 'number') {
+              // eslint-disable-next-line security/detect-object-injection
+              userData.stats[key][subKey] = 0;
+            }
+            // eslint-disable-next-line security/detect-object-injection
+            userData.stats[key][subKey] += subValue;
+          }
+        }
       }
     }
 
