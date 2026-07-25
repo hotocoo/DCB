@@ -147,7 +147,9 @@ async function sendTicTacToeBoard(interaction, gameState) {
 
     // AI move if it's AI's turn
     if (isAI && currentPlayer === 'O' && status === 'active') {
-      setTimeout(async () => {
+      setTimeout(() => {
+        (async () => {
+          try {
         const aiMove = getAIMove(board, difficulty);
         if (aiMove !== null) {
           gameState.board[aiMove] = 'O';
@@ -194,6 +196,11 @@ async function sendTicTacToeBoard(interaction, gameState) {
           }
           await sendTicTacToeBoard(interaction, gameState);
         }
+      
+          } catch (err) {
+            console.error('TicTacToe AI move error:', err);
+          }
+        })();
       }, 1000);
     }
   } catch (error) {

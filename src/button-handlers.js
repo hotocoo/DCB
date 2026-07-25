@@ -2334,11 +2334,11 @@ ${answer.isCorrect ? 'Your answer: ' + answer.userChoice : 'Your answer: ' + ans
             });
           }
           triviaGames.delete(gameId);
-          setTimeout(async () => {
-            await safeInteractionReply(interaction, { embeds: [resultEmbed], flags: MessageFlags.Ephemeral });
+          setTimeout(() => {
+            safeInteractionReply(interaction, { embeds: [resultEmbed], flags: MessageFlags.Ephemeral }).catch((err) => logger.error('Trivia result reply failed', err));
           }, 2e3);
         } else {
-          setTimeout(async () => {
+          setTimeout(() => {
             const nextQuestion = gameState.questions[gameState.currentQuestion];
             if (!nextQuestion) {
               return safeInteractionReply(interaction, {
@@ -2368,7 +2368,7 @@ ${answer.isCorrect ? 'Your answer: ' + answer.userChoice : 'Your answer: ' + ans
               const row = new ActionRowBuilder().addComponents(buttons.slice(i, i + 2));
               rows.push(row);
             }
-            await safeInteractionReply(interaction, { embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
+            safeInteractionReply(interaction, { embeds: [embed], components: rows, flags: MessageFlags.Ephemeral }).catch((err) => logger.error('Trivia next question reply failed', err));
           }, 2e3);
         }
       }
@@ -2401,14 +2401,4 @@ This button is not implemented yet. Please contact the bot administrator if this
     });
   }
 }
-export {
-  circuitBreakerMap,
-  handleButtonInteraction,
-  handleInteraction,
-  safeInteractionReply,
-  safeInteractionUpdate,
-  sendWordleGuessModal,
-  spendCooldowns,
-  updateInventoryEmbed,
-  wordleWords,
-};
+export { handleButtonInteraction, safeInteractionUpdate };
