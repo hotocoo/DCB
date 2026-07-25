@@ -1,718 +1,299 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { getDb } from './database.js';
 import { logger } from './logger.js';
 
-const PROFILES_DIR = path.join(process.cwd(), 'data', 'players');
+const OLD_PROFILES_DIR = path.join(process.cwd(), 'data', 'players');
 
-// Validate userId before using it in a file path. userId accepts Discord snowflake
-// IDs (17-19 digits) — anything else is either a malformed input or a path-traversal
-// attempt. Mirrors safeUserId()/playerPath() in src/rpg.js for defense-in-depth.
 function safeUserId(userId) {
-  if (typeof userId !== 'string' || userId.length === 0 || userId.length > 64) {
-    throw new Error('Invalid user id');
-  }
-  if (!/^[\w-]+$/.test(userId)) {
-    throw new Error('Invalid user id');
-  }
+  if (typeof userId !== 'string' || !userId || userId.length > 64) throw new Error('Invalid user id');
+  if (!/^[\w-]+$/.test(userId)) throw new Error('Invalid user id');
   return userId;
 }
 
-function profilePath(userId) {
-  return path.join(PROFILES_DIR, `${safeUserId(userId)}.json`);
-}
+let migrated = false;
 
-// Advanced User Profile and Statistics System
-class ProfileManager {
-  constructor() {
-    this.ensureStorage();
-    this.loadProfiles();
-    this.profileCache = new Map();
-  }
+function migrateFromJson() {
+  if (migrated) return;
+  migrated = true;
 
-  ensureStorage() {
-    if (!fs.existsSync(PROFILES_DIR)) {
-      fs.mkdirSync(PROFILES_DIR, { recursive: true });
-    }
-  }
+  const db = getDb();
+  let count = 0;
 
-  loadProfiles() {
-    this.profiles = {};
-    if (!fs.existsSync(PROFILES_DIR)) return;
+  try {
+    if (!fs.existsSync(OLD_PROFILES_DIR)) return;
 
-    const files = fs.readdirSync(PROFILES_DIR).filter((f) => f.endsWith('.json'));
-    for (const file of files) {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename
-      const filePath = path.join(PROFILES_DIR, file);
-      const userId = path.basename(file, '.json');
+    for (const file of fs.readdirSync(OLD_PROFILES_DIR).filter((f) => f.endsWith('.json'))) {
+      const uid = path.basename(file, '.json');
+      const filePath = path.join(OLD_PROFILES_DIR, file);
       try {
-        // eslint-disable-next-line security/detect-non-literal-fs-filename
-        const data = JSON.parse(fs.readFileSync(filePath));
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
         if (data.profile) {
-          // Discord userId from filename, not user-supplied key — safe to bracket-index.
-          // eslint-disable-next-line security/detect-object-injection
-          this.profiles[userId] = data.profile;
+          db.prepare('INSERT OR REPLACE INTO profiles (user_id, profile_data) VALUES (?, ?)').run(uid, JSON.stringify(data.profile));
+          count++;
         }
-      } catch (error) {
-        logger.error(`Failed to load profile for ${userId}`, error);
-      }
-    }
-  }
-
-  saveProfile(userId, profile) {
-    this.ensureStorage();
-    const filePath = profilePath(userId);
-    const data = {
-      profile,
-      exported: Date.now(),
-      version: '1.0',
-    };
-    try {
-      // unicorn/no-null: JSON.stringify replacer is a no-op, use identity fn instead.
-      const identity = (_key, value) => value;
-      // userId is a Discord ID, not user-supplied filename — safe to construct path.
-      // eslint-disable-next-line security/detect-non-literal-fs-filename
-      const tmp = filePath + '.tmp';
-
-      fs.writeFileSync(tmp, JSON.stringify(data, identity, 2), 'utf8');
-
-      fs.renameSync(tmp, filePath);
-    } catch (error) {
-      logger.error(`Failed to save profile for ${userId}`, error);
-    }
-  }
-
-  saveProfiles() {
-    // Profiles are now saved individually by saveProfile
-    // This method can be kept for compatibility but doesn't need to do anything
-  }
-
-  // Advanced Profile Creation and Management
-  getOrCreateProfile(userId, username) {
-    if (!this.hasProfile(userId)) {
-      this._loadProfileFromDisk(userId);
+      } catch (err) { logger.error(`Failed to migrate profile ${uid}`, err); }
     }
 
-    if (!this.hasProfile(userId)) {
-      this._createDefaultProfile(userId, username);
+    if (count > 0) {
+      fs.copyFileSync(OLD_PROFILES_DIR + '/.migrated', OLD_PROFILES_DIR + '/.migrated' || null);
+      logger.info(`Migrated ${count} profiles to SQLite`);
     }
-
-    // Discord userId is the cache key — not a user-supplied property name.
-    // eslint-disable-next-line security/detect-object-injection
-    const profile = this.profiles[userId];
-    if (profile.username !== username) {
-      profile.username = username;
-      profile.updated = Date.now();
-      this.saveProfile(userId, profile);
-    }
-
-    return profile;
-  }
-
-  hasProfile(userId) {
-    return Object.hasOwn(this.profiles, userId);
-  }
-
-  _loadProfileFromDisk(userId) {
-    this.ensureStorage();
-    const filePath = profilePath(userId);
-    if (!fs.existsSync(filePath)) return;
-    try {
-      const data = JSON.parse(fs.readFileSync(filePath));
-      if (data.profile) {
-        this.profiles[userId] = data.profile;
-      }
-    } catch (error) {
-      logger.error(`Failed to load profile for ${userId}`, error);
-    }
-  }
-
-  // Builds a fresh default profile for a user. Long because it enumerates the
-  // full statistics schema; splitting it would just split the data.
-  // eslint-disable-next-line max-lines-per-function
-  _createDefaultProfile(userId, username) {
-    // userId is a Discord ID, not user-supplied key — safe to bracket-index.
-    // eslint-disable-next-line security/detect-object-injection
-    this.profiles[userId] = {
-      userId,
-      username,
-      displayName: username,
-      bio: '',
-      avatar: undefined,
-      badges: [],
-      preferences: {
-        theme: 'default',
-        privacy: 'public',
-        notifications: true,
-        language: 'en',
-      },
-      statistics: {
-        // RPG Stats
-        rpg: {
-          characters_created: 0,
-          total_level: 0,
-          highest_level: 0,
-          bosses_defeated: 0,
-          items_collected: 0,
-          gold_earned: 0,
-          quests_completed: 0,
-          locations_unlocked: 0,
-          guild_memberships: 0,
-        },
-        // Game Stats
-        games: {
-          trivia_correct: 0,
-          trivia_games_played: 0,
-          hangman_wins: 0,
-          hangman_games_played: 0,
-          memory_games_completed: 0,
-          memory_best_score: 0,
-          coin_flips: 0,
-          coin_heads_streak: 0,
-          polls_created: 0,
-          polls_votes_received: 0,
-        },
-        // Social Stats
-        social: {
-          guilds_created: 0,
-          guilds_joined: 0,
-          parties_created: 0,
-          trades_completed: 0,
-          achievements_earned: 0,
-          friends_added: 0,
-          reputation: 0,
-        },
-        // Activity Stats
-        activity: {
-          commands_used: 0,
-          messages_sent: 0,
-          buttons_clicked: 0,
-          first_seen: Date.now(),
-          last_seen: Date.now(),
-          total_session_time: 0,
-          favorite_command: undefined,
-          streak_days: 0,
-        },
-      },
-      customization: {
-        title: undefined,
-        border_color: '#0099FF',
-        profile_banner: undefined,
-        card_style: 'modern',
-        show_statistics: true,
-        show_badges: true,
-        show_activity: false,
-      },
-      achievements: [],
-      milestones: [],
-      created: Date.now(),
-      updated: Date.now(),
-    };
-  }
-
-  updateProfile(userId, updates) {
-    const profile = this.getOrCreateProfile(userId);
-
-    // Deep merge updates
-    if (updates.preferences) {
-      profile.preferences = { ...profile.preferences, ...updates.preferences };
-    }
-    if (updates.customization) {
-      profile.customization = { ...profile.customization, ...updates.customization };
-    }
-    if (updates.displayName !== undefined) {
-      profile.displayName = updates.displayName;
-    }
-    if (updates.bio !== undefined) {
-      profile.bio = updates.bio;
-    }
-
-    profile.updated = Date.now();
-    this.saveProfile(userId, profile);
-    return profile;
-  }
-
-  // Statistics Tracking
-  updateStatistics(userId, category, statUpdates) {
-    const profile = this.getOrCreateProfile(userId);
-
-    /* eslint-disable security/detect-object-injection -- category/stat keys come from the same module's own callers */
-    for (const [stat, value] of Object.entries(statUpdates)) {
-      if (profile.statistics[category] && typeof profile.statistics[category][stat] === 'number') {
-        profile.statistics[category][stat] += value;
-
-        // Update derived statistics
-        this.updateDerivedStats(profile, category, stat, value);
-      }
-    }
-    /* eslint-enable security/detect-object-injection */
-
-    profile.updated = Date.now();
-    this.saveProfile(userId, profile);
-    return profile;
-  }
-
-  updateDerivedStats(profile, category, stat, value) {
-    switch (category) {
-      case 'rpg': {
-        if (stat === 'characters_created') {
-          // Update total characters across all classes
-        }
-        if (stat === 'bosses_defeated') {
-          profile.statistics.social.reputation += value * 2;
-        }
-        break;
-      }
-
-      case 'games': {
-        if (stat === 'trivia_correct') {
-          const totalGames = profile.statistics.games.trivia_games_played;
-          if (totalGames > 0) {
-            profile.statistics.games.trivia_accuracy = (profile.statistics.games.trivia_correct / totalGames) * 100;
-          }
-        }
-        break;
-      }
-
-      case 'social': {
-        if (stat === 'trades_completed') {
-          profile.statistics.social.reputation += value;
-        }
-        break;
-      }
-    }
-  }
-
-  // Badge System
-  awardBadge(userId, badgeId, badgeData) {
-    const profile = this.getOrCreateProfile(userId);
-
-    if (!profile.badges.some((b) => b.id === badgeId)) {
-      profile.badges.push({
-        id: badgeId,
-        ...badgeData,
-        awarded: Date.now(),
-      });
-
-      this.saveProfile(userId, profile);
-      return true;
-    }
-
-    return false;
-  }
-
-  removeBadge(userId, badgeId) {
-    const profile = this.getOrCreateProfile(userId);
-    const badgeIndex = profile.badges.findIndex((b) => b.id === badgeId);
-
-    if (badgeIndex !== -1) {
-      profile.badges.splice(badgeIndex, 1);
-      this.saveProfile(userId, profile);
-      return true;
-    }
-
-    return false;
-  }
-
-  // Profile Analytics
-  getProfileAnalytics(userId) {
-    const profile = this.getOrCreateProfile(userId);
-    const stats = profile.statistics;
-
-    // Calculate activity score
-    const activityScore = Math.min(
-      100,
-      stats.activity.commands_used * 2 + stats.activity.messages_sent * 1 + stats.activity.buttons_clicked * 0.5 + stats.social.reputation * 0.1,
-    );
-
-    // Calculate engagement level
-    const engagementLevel = this.calculateEngagementLevel(stats);
-
-    // Find most active category
-    const categoryActivity = {
-      rpg: stats.rpg.total_level + stats.rpg.bosses_defeated * 10 + stats.rpg.items_collected * 2,
-      games: stats.games.trivia_correct * 3 + stats.games.hangman_wins * 5 + stats.games.memory_games_completed * 4,
-      social: stats.social.guilds_created * 20 + stats.social.trades_completed * 8 + stats.social.reputation,
-    };
-
-    const mostActiveCategory = Object.entries(categoryActivity).sort(([, a], [, b]) => b - a)[0]?.[0] || 'none';
-
-    return {
-      activityScore,
-      engagementLevel,
-      mostActiveCategory,
-      totalPlayTime: Math.round(stats.activity.total_session_time / 3_600_000), // Convert to hours
-      accountAge: Math.round((Date.now() - stats.activity.first_seen) / (24 * 60 * 60 * 1000)), // Days
-      favoriteCommand: stats.activity.favorite_command,
-      streakDays: stats.activity.streak_days,
-    };
-  }
-
-  calculateEngagementLevel(stats) {
-    const totalActions = stats.activity.commands_used + stats.activity.messages_sent + stats.activity.buttons_clicked;
-
-    if (totalActions > 1000) return 'Legendary';
-    if (totalActions > 500) return 'Expert';
-    if (totalActions > 200) return 'Advanced';
-    if (totalActions > 100) return 'Intermediate';
-    if (totalActions > 50) return 'Active';
-    if (totalActions > 10) return 'Casual';
-    return 'Newcomer';
-  }
-
-  // Profile Comparison System
-  compareProfiles(userId1, userId2) {
-    const profile1 = this.getOrCreateProfile(userId1);
-    const profile2 = this.getOrCreateProfile(userId2);
-
-    const stats1 = profile1.statistics;
-    const stats2 = profile2.statistics;
-
-    const comparison = {
-      rpg: this.compareCategory(stats1.rpg, stats2.rpg),
-      games: this.compareCategory(stats1.games, stats2.games),
-      social: this.compareCategory(stats1.social, stats2.social),
-      activity: this.compareCategory(stats1.activity, stats2.activity),
-    };
-
-    return {
-      profiles: [profile1, profile2],
-      comparison,
-      winner: this.determineWinner(comparison),
-    };
-  }
-
-  compareCategory(stats1, stats2) {
-    const comparison = {};
-
-    for (const stat of Object.keys(stats1)) {
-      if (typeof stats1[stat] === 'number' && typeof stats2[stat] === 'number') {
-        comparison[stat] = {
-          user1: stats1[stat],
-          user2: stats2[stat],
-          difference: stats1[stat] - stats2[stat],
-        };
-      }
-    }
-
-    return comparison;
-  }
-
-  determineWinner(comparison) {
-    let score1 = 0;
-    let score2 = 0;
-
-    for (const category of Object.values(comparison)) {
-      for (const stat of Object.values(category)) {
-        if (stat.difference > 0) score1++;
-        else if (stat.difference < 0) score2++;
-      }
-    }
-
-    if (score1 > score2) return 'user1';
-    if (score2 > score1) return 'user2';
-    return 'tie';
-  }
-
-  // Profile Search and Discovery
-  searchProfiles(searchTerm, limit = 10) {
-    const matchingProfiles = [];
-
-    for (const profile of Object.values(this.profiles)) {
-      if (profile.preferences.privacy === 'private') continue;
-
-      // Search in username, display name, and bio
-      const searchFields = [profile.username, profile.displayName, profile.bio].join(' ').toLowerCase();
-
-      if (searchFields.includes(searchTerm.toLowerCase())) {
-        matchingProfiles.push(profile);
-      }
-    }
-
-    return matchingProfiles.slice(0, limit);
-  }
-
-  // Profile Leaderboards
-  getLeaderboard(category, stat, limit = 10) {
-    const leaderboard = [];
-
-    for (const profile of Object.values(this.profiles)) {
-      if (profile.preferences.privacy === 'private') continue;
-
-      const value = profile.statistics[category]?.[stat];
-      if (typeof value === 'number' && value > 0) {
-        leaderboard.push({
-          userId: profile.userId,
-          username: profile.username,
-          displayName: profile.displayName,
-          value,
-          level: this.getUserLevel(profile),
-        });
-      }
-    }
-
-    return leaderboard.sort((a, b) => b.value - a.value).slice(0, limit);
-  }
-
-  getUserLevel(profile) {
-    const totalPoints =
-      profile.achievements.length * 10 + profile.statistics.rpg.total_level + profile.statistics.games.trivia_correct + profile.statistics.social.reputation;
-
-    return Math.floor(totalPoints / 100) + 1;
-  }
-
-  // Profile Export and Backup
-  exportProfile(userId) {
-    const profile = this.getOrCreateProfile(userId);
-
-    return {
-      profile: profile,
-      exported: Date.now(),
-      version: '1.0',
-    };
-  }
-
-  importProfile(userId, profileData) {
-    if (profileData.version !== '1.0') {
-      return { success: false, reason: 'incompatible_version' };
-    }
-
-    this.profiles[userId] = profileData.profile;
-    this.saveProfile(userId, profileData.profile);
-
-    return { success: true };
-  }
-
-  // Profile Privacy and Security
-  setPrivacySettings(userId, privacySettings) {
-    const profile = this.getOrCreateProfile(userId);
-
-    if (privacySettings.privacy) {
-      profile.preferences.privacy = privacySettings.privacy;
-    }
-
-    if (privacySettings.show_statistics !== undefined) {
-      profile.customization.show_statistics = privacySettings.show_statistics;
-    }
-
-    if (privacySettings.show_badges !== undefined) {
-      profile.customization.show_badges = privacySettings.show_badges;
-    }
-
-    profile.updated = Date.now();
-    this.saveProfile(userId, profile);
-    return profile;
-  }
-
-  // Advanced Profile Features
-  generateProfileInsights(userId) {
-    const profile = this.getOrCreateProfile(userId);
-    const analytics = this.getProfileAnalytics(userId);
-
-    const insights = [];
-
-    // Activity insights
-    if (analytics.activityScore > 80) {
-      insights.push("🌟 You're incredibly active in the community!");
-    } else if (analytics.activityScore > 50) {
-      insights.push("🎯 You're a dedicated bot user!");
-    }
-
-    // Category insights
-    switch (analytics.mostActiveCategory) {
-      case 'rpg': {
-        insights.push('⚔️ You love RPG adventures!');
-
-        break;
-      }
-      case 'games': {
-        insights.push('🎮 Games are your passion!');
-
-        break;
-      }
-      case 'social': {
-        insights.push('🤝 You thrive on social interactions!');
-
-        break;
-      }
-      // No default
-    }
-
-    // Achievement insights
-    const achievementCount = profile.achievements.length;
-    if (achievementCount >= 10) {
-      insights.push(`🏆 Achievement Hunter! You've earned ${achievementCount} achievements!`);
-    }
-
-    // Streak insights
-    if (analytics.streakDays > 7) {
-      insights.push(`🔥 ${analytics.streakDays} day streak! You're on fire!`);
-    }
-
-    return insights;
-  }
-
-  // Profile Milestones
-  checkMilestones(userId) {
-    const profile = this.getOrCreateProfile(userId);
-    const newMilestones = [];
-
-    const milestones = [
-      { id: 'first_command', name: '🚀 First Steps', description: 'Used your first command', requirement: 'activity.commands_used >= 1' },
-      { id: 'social_butterfly', name: '🦋 Social Butterfly', description: 'Joined 5 guilds', requirement: 'social.guilds_joined >= 5' },
-      { id: 'rpg_master', name: '🏅 RPG Master', description: 'Reached level 50 in RPG', requirement: 'rpg.highest_level >= 50' },
-      { id: 'trivia_expert', name: '🧠 Trivia Expert', description: 'Answered 1000 questions correctly', requirement: 'games.trivia_correct >= 1000' },
-      { id: 'trading_mogul', name: '💎 Trading Mogul', description: 'Completed 100 trades', requirement: 'social.trades_completed >= 100' },
-    ];
-
-    for (const milestone of milestones) {
-      const alreadyAchieved = profile.milestones.some((m) => m.id === milestone.id);
-      // Requirement string is parsed by evaluateRequirement below — not executed.
-      const meetsRequirement = alreadyAchieved ? false : this.evaluateRequirement(profile, milestone.requirement);
-      if (!alreadyAchieved && meetsRequirement) {
-        profile.milestones.push({
-          id: milestone.id,
-          name: milestone.name,
-          description: milestone.description,
-          achieved: Date.now(),
-        });
-        newMilestones.push(milestone);
-      }
-    }
-
-    if (newMilestones.length > 0) {
-      profile.updated = Date.now();
-      this.saveProfile(userId, profile);
-    }
-
-    return newMilestones;
-  }
-
-  evaluateRequirement(profile, requirement) {
-    try {
-      // Improved requirement evaluator with basic expression parsing
-      const stats = profile.statistics;
-
-      // Replace stat paths with actual values, e.g., 'rpg.highest_level' -> stats.rpg.highest_level
-      // Safe regex: validates identifier-segmented paths (not ReDoS-vulnerable)
-      // eslint-disable-next-line security/detect-unsafe-regex
-      const expression = requirement.replaceAll(/(\w+(?:\.\w+)*)/g, (match) => {
-        const keys = match.split('.');
-        let value = stats;
-        for (const key of keys) {
-          value = value?.[key];
-        }
-        return typeof value === 'number' ? value : `'${value}'`;
-      });
-
-      // Use a safe evaluator for basic comparisons
-      return this.safeEval(expression);
-    } catch {
-      return false;
-    }
-  }
-
-  safeEval(expr) {
-    // Basic safe evaluator for simple expressions like '>= 5', '== 100', etc.
-    // This is still limited but safer than full eval
-    const match = expr.match(/^(\d+)(==|!=|>=|<=|>|<)(\d+)$/);
-    if (match) {
-      const [, left, op, right] = match;
-      const l = Number.parseInt(left);
-      const r = Number.parseInt(right);
-      switch (op) {
-        case '==': {
-          return l == r;
-        }
-        case '!=': {
-          return l != r;
-        }
-        case '>=': {
-          return l >= r;
-        }
-        case '<=': {
-          return l <= r;
-        }
-        case '>': {
-          return l > r;
-        }
-        case '<': {
-          return l < r;
-        }
-      }
-    }
-    return false;
-  }
-
-  // Profile Customization
-  setProfileTheme(userId, theme) {
-    const validThemes = ['default', 'dark', 'light', 'colorful', 'minimal'];
-    if (!validThemes.includes(theme)) {
-      return { success: false, reason: 'invalid_theme' };
-    }
-
-    return this.updateProfile(userId, {
-      customization: { theme },
-    });
-  }
-
-  setProfileTitle(userId, title) {
-    if (title.length > 50) {
-      return { success: false, reason: 'title_too_long' };
-    }
-
-    return this.updateProfile(userId, { title });
-  }
+  } catch (err) { logger.error('Profile JSON migration failed', err); }
 }
 
-// Export singleton instance
-export const profileManager = new ProfileManager();
+function ensureUser(uid) {
+  const db = getDb();
+  db.prepare('INSERT OR IGNORE INTO users (id) VALUES (?)').run(uid);
+}
 
-// Convenience functions
+// Default profile factory - returns fresh stats structure
+function createDefaultProfile(userId, username) {
+  return {
+    userId,
+    username: username || 'Player',
+    displayName: username || 'Player',
+    bio: '',
+    avatar: undefined,
+    badges: [],
+    preferences: { theme: 'default', privacy: 'public', notifications: true, language: 'en' },
+    statistics: {
+      rpg: { characters_created: 0, total_level: 0, highest_level: 0, bosses_defeated: 0, items_collected: 0, gold_earned: 0, quests_completed: 0, locations_unlocked: 0, guild_memberships: 0 },
+      games: { trivia_correct: 0, trivia_games_played: 0, hangman_wins: 0, hangman_games_played: 0, memory_games_completed: 0, memory_best_score: 0, coin_flips: 0, coin_heads_streak: 0, polls_created: 0, polls_votes_received: 0 },
+      social: { guilds_created: 0, guilds_joined: 0, parties_created: 0, trades_completed: 0, achievements_earned: 0, friends_added: 0, reputation: 0 },
+      activity: { commands_used: 0, messages_sent: 0, buttons_clicked: 0, first_seen: Date.now(), last_seen: Date.now(), total_session_time: 0, favorite_command: undefined, streak_days: 0 },
+    },
+    customization: { title: undefined, border_color: '#0099FF', profile_banner: undefined, card_style: 'modern', show_statistics: true, show_badges: true, show_activity: false },
+    achievements: [],
+    milestones: [],
+    created: Date.now(),
+    updated: Date.now(),
+  };
+}
+
 export function getOrCreateProfile(userId, username) {
-  return profileManager.getOrCreateProfile(userId, username);
+  migrateFromJson();
+  const uid = safeUserId(userId);
+  ensureUser(uid);
+  const db = getDb();
+  let row = db.prepare('SELECT profile_data FROM profiles WHERE user_id = ?').get(uid);
+
+  if (!row) {
+    const profile = createDefaultProfile(uid, username);
+    db.prepare('INSERT INTO profiles (user_id, profile_data) VALUES (?, ?)').run(uid, JSON.stringify(profile));
+    row = { profile_data: JSON.stringify(profile) };
+  } else {
+    let profile;
+    try { profile = JSON.parse(row.profile_data); } catch { profile = createDefaultProfile(uid, username); }
+
+    if (!profile || !profile.userId) { profile = createDefaultProfile(uid, username); }
+    else if (username && profile.username !== username) { profile.username = username; profile.updated = Date.now(); db.prepare('UPDATE profiles SET profile_data = ? WHERE user_id = ?').run(JSON.stringify(profile), uid); }
+
+    return profile || createDefaultProfile(uid, username);
+  }
+
+  try { return JSON.parse(row.profile_data); } catch { return createDefaultProfile(uid, username); }
+}
+
+export function hasProfile(userId) {
+  migrateFromJson();
+  const uid = safeUserId(userId);
+  const db = getDb();
+  return !!db.prepare('SELECT user_id FROM profiles WHERE user_id = ?').get(uid);
 }
 
 export function updateProfile(userId, updates) {
-  return profileManager.updateProfile(userId, updates);
+  migrateFromJson();
+  const uid = safeUserId(userId);
+  const profile = getOrCreateProfile(uid);
+  if (updates.preferences) profile.preferences = { ...profile.preferences, ...updates.preferences };
+  if (updates.customization) profile.customization = { ...profile.customization, ...updates.customization };
+  if (updates.displayName !== undefined) profile.displayName = updates.displayName;
+  if (updates.bio !== undefined) profile.bio = updates.bio;
+  profile.updated = Date.now();
+  const db = getDb();
+  db.prepare('UPDATE profiles SET profile_data = ? WHERE user_id = ?').run(JSON.stringify(profile), uid);
+  return profile;
 }
 
 export function updateStatistics(userId, category, statUpdates) {
-  return profileManager.updateStatistics(userId, category, statUpdates);
+  migrateFromJson();
+  const uid = safeUserId(userId);
+  const profile = getOrCreateProfile(uid);
+  for (const [stat, value] of Object.entries(statUpdates)) {
+    if (profile.statistics[category] && typeof profile.statistics[category][stat] === 'number') {
+      profile.statistics[category][stat] += value;
+      updateDerivedStats(profile, category, stat, value);
+    }
+  }
+  profile.updated = Date.now();
+  const db = getDb();
+  db.prepare('UPDATE profiles SET profile_data = ? WHERE user_id = ?').run(JSON.stringify(profile), uid);
+  return profile;
+}
+
+function updateDerivedStats(profile, category, stat, value) {
+  switch (category) {
+    case 'rpg':
+      if (stat === 'bosses_defeated') profile.statistics.social.reputation += value * 2;
+      break;
+    case 'games':
+      if (stat === 'trivia_correct') {
+        const totalGames = profile.statistics.games.trivia_games_played;
+        if (totalGames > 0) profile.statistics.games.trivia_accuracy = (profile.statistics.games.trivia_correct / totalGames) * 100;
+      }
+      break;
+    case 'social':
+      if (stat === 'trades_completed') profile.statistics.social.reputation += value;
+      break;
+  }
 }
 
 export function awardBadge(userId, badgeId, badgeData) {
-  return profileManager.awardBadge(userId, badgeId, badgeData);
+  migrateFromJson();
+  const uid = safeUserId(userId);
+  const profile = getOrCreateProfile(uid);
+  if (!profile.badges.some((b) => b.id === badgeId)) {
+    profile.badges.push({ id: badgeId, ...badgeData, awarded: Date.now() });
+    profile.updated = Date.now();
+    const db = getDb();
+    db.prepare('UPDATE profiles SET profile_data = ? WHERE user_id = ?').run(JSON.stringify(profile), uid);
+    return true;
+  }
+  return false;
+}
+
+export function removeBadge(userId, badgeId) {
+  migrateFromJson();
+  const uid = safeUserId(userId);
+  const profile = getOrCreateProfile(uid);
+  const idx = profile.badges.findIndex((b) => b.id === badgeId);
+  if (idx !== -1) {
+    profile.badges.splice(idx, 1);
+    profile.updated = Date.now();
+    const db = getDb();
+    db.prepare('UPDATE profiles SET profile_data = ? WHERE user_id = ?').run(JSON.stringify(profile), uid);
+    return true;
+  }
+  return false;
 }
 
 export function getProfileAnalytics(userId) {
-  return profileManager.getProfileAnalytics(userId);
+  migrateFromJson();
+  const profile = getOrCreateProfile(safeUserId(userId));
+  const stats = profile.statistics;
+  const activityScore = Math.min(100, stats.activity.commands_used * 2 + stats.activity.messages_sent * 1 + stats.activity.buttons_clicked * 0.5 + stats.social.reputation * 0.1);
+  const engagementLevel = calculateEngagementLevel(stats);
+  const mostActiveCategory = Object.entries({
+    rpg: stats.rpg.total_level + stats.rpg.bosses_defeated * 10 + stats.rpg.items_collected * 2,
+    games: stats.games.trivia_correct * 3 + stats.games.hangman_wins * 5 + stats.games.memory_games_completed * 4,
+    social: stats.social.guilds_created * 20 + stats.social.trades_completed * 8 + stats.social.reputation,
+  }).sort(([, a], [, b]) => b - a)[0]?.[0] || 'none';
+
+  return { activityScore, engagementLevel, mostActiveCategory, totalPlayTime: Math.round(stats.activity.total_session_time / 3_600_000), accountAge: Math.round((Date.now() - stats.activity.first_seen) / (24 * 60 * 60 * 1000)), favoriteCommand: stats.activity.favorite_command, streakDays: stats.activity.streak_days };
+}
+
+function calculateEngagementLevel(stats) {
+  const total = stats.activity.commands_used + stats.activity.messages_sent + stats.activity.buttons_clicked;
+  if (total > 1000) return 'Legendary';
+  if (total > 500) return 'Expert';
+  if (total > 200) return 'Advanced';
+  if (total > 100) return 'Intermediate';
+  if (total > 50) return 'Active';
+  if (total > 10) return 'Casual';
+  return 'Newcomer';
 }
 
 export function compareProfiles(userId1, userId2) {
-  return profileManager.compareProfiles(userId1, userId2);
+  migrateFromJson();
+  const profile1 = getOrCreateProfile(safeUserId(userId1));
+  const profile2 = getOrCreateProfile(safeUserId(userId2));
+  const comparison = { rpg: compareCategory(profile1.statistics.rpg, profile2.statistics.rpg), games: compareCategory(profile1.statistics.games, profile2.statistics.games), social: compareCategory(profile1.statistics.social, profile2.statistics.social) };
+
+  let score1 = 0, score2 = 0;
+  for (const cat of Object.values(comparison)) {
+    for (const stat of Object.values(cat)) { if (stat.difference > 0) score1++; else if (stat.difference < 0) score2++; }
+  }
+
+  return { profiles: [profile1, profile2], comparison, winner: score1 > score2 ? 'user1' : score2 > score1 ? 'user2' : 'tie' };
+}
+
+function compareCategory(s1, s2) {
+  const cmp = {};
+  for (const k of Object.keys(s1)) { if (typeof s1[k] === 'number' && typeof s2[k] === 'number') cmp[k] = { user1: s1[k], user2: s2[k], difference: s1[k] - s2[k] }; }
+  return cmp;
 }
 
 export function searchProfiles(searchTerm, limit = 10) {
-  return profileManager.searchProfiles(searchTerm, limit);
+  migrateFromJson();
+  const db = getDb();
+  const term = searchTerm.toLowerCase();
+  const profiles = [];
+  for (const row of db.prepare('SELECT * FROM profiles').all()) {
+    try {
+      const p = JSON.parse(row.profile_data);
+      if (p.preferences.privacy === 'private') continue;
+      if ([p.username, p.displayName, p.bio].join(' ').toLowerCase().includes(term)) profiles.push(p);
+      if (profiles.length >= limit) break;
+    } catch {}
+  }
+  return profiles;
 }
 
 export function getLeaderboard(category, stat, limit = 10) {
-  return profileManager.getLeaderboard(category, stat, limit);
+  migrateFromJson();
+  const db = getDb();
+  const results = [];
+  for (const row of db.prepare('SELECT * FROM profiles').all()) {
+    try {
+      const p = JSON.parse(row.profile_data);
+      if (p.preferences.privacy === 'private') continue;
+      const val = p.statistics[category]?.[stat];
+      if (typeof val === 'number' && val > 0) results.push({ userId: p.userId, username: p.username, displayName: p.displayName, value: val, level: getUserLevel(p) });
+    } catch {}
+  }
+  return results.sort((a, b) => b.value - a.value).slice(0, limit);
+}
+
+function getUserLevel(profile) {
+  return Math.floor((profile.achievements.length * 10 + profile.statistics.rpg.total_level + profile.statistics.games.trivia_correct + profile.statistics.social.reputation) / 100) + 1;
 }
 
 export function exportProfile(userId) {
-  return profileManager.exportProfile(userId);
+  migrateFromJson();
+  const profile = getOrCreateProfile(safeUserId(userId));
+  return { profile, exported: Date.now(), version: '1.0' };
 }
 
 export function importProfile(userId, profileData) {
-  return profileManager.importProfile(userId, profileData);
+  migrateFromJson();
+  if (profileData.version !== '1.0') return { success: false, reason: 'incompatible_version' };
+  const uid = safeUserId(userId);
+  ensureUser(uid);
+  const db = getDb();
+  db.prepare('INSERT OR REPLACE INTO profiles (user_id, profile_data) VALUES (?, ?)').run(uid, JSON.stringify(profileData.profile));
+  return { success: true };
 }
 
-export function generateProfileInsights(userId) {
-  return profileManager.generateProfileInsights(userId);
+export function setPrivacySettings(userId, privacySettings) {
+  migrateFromJson();
+  const uid = safeUserId(userId);
+  const profile = getOrCreateProfile(uid);
+  if (privacySettings.privacy) profile.preferences.privacy = privacySettings.privacy;
+  if (privacySettings.show_statistics !== undefined) profile.customization.show_statistics = privacySettings.show_statistics;
+  if (privacySettings.show_badges !== undefined) profile.customization.show_badges = privacySettings.show_badges;
+  profile.updated = Date.now();
+  const db = getDb();
+  db.prepare('UPDATE profiles SET profile_data = ? WHERE user_id = ?').run(JSON.stringify(profile), uid);
+  return profile;
 }
 
-export function checkMilestones(userId) {
-  return profileManager.checkMilestones(userId);
+// Test helper: reset a user's profile to default
+export function resetUserProfilesData(userId) {
+  migrateFromJson();
+  const uid = safeUserId(userId);
+  const db = getDb();
+  db.prepare('DELETE FROM profiles WHERE user_id = ?').run(uid);
+  return true;
 }
