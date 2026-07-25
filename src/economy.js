@@ -120,6 +120,10 @@ class EconomyManager {
   }
 
   // Advanced Transaction System
+  // NOTE: logTransaction deliberately does NOT call saveEconomy(). Callers are responsible
+  // for batching their mutations (balance changes + this transaction log) into a single save.
+  // This prevents double writes and partial-save scenarios where balances are persisted but
+  // the transaction log is lost (or vice versa). See transferBalance for usage example.
   logTransaction(transaction) {
     transaction.id = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     this.economyData.transactions.push(transaction);
@@ -129,7 +133,6 @@ class EconomyManager {
       this.economyData.transactions = this.economyData.transactions.slice(-10_000);
     }
 
-    this.saveEconomy();
     return transaction;
   }
 
