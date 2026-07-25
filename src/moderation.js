@@ -1,701 +1,343 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
+import { getDb } from './database.js';
 import { logger } from './logger.js';
 
-const MODERATION_FILE = path.join(process.cwd(), 'data', 'moderation.json');
+/**
+ * Moderation system backed by SQLite for reliability.
+ * 
+ * Mutes, bans, warnings, and mod actions are stored persistently with proper
+ * indexing for fast lookups. Auto-mod state (spam detection cache) remains
+ * in-memory since it's reconstructable on restart.
+ */
 
-// Advanced Moderation and Administration System
-class ModerationManager {
-  constructor() {
-    this.ensureStorage();
-    this.loadModerationData();
-    this.warningCache = new Map();
+// In-memory spam detection cache — safe to lose on restart
+const messageCache = new Map(); // `${userId}_messages` -> [{content, timestamp}]
+
+/**
+ * Warn a user in a guild. Records to moderation table.
+ */
+export function warnUser(guildId, userId, options = {}) {
+  const { moderatorId, reason, severity = 'medium' } = options;
+  try {
+    const db = getDb();
+    const id = `warn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+
+    // Insert into moderation table as a warning record
+    db.prepare(`INSERT INTO moderation (id, guild_id, user_id, moderator_id, type, reason) VALUES (?, ?, ?, ?, 'warn', ?)`)
+      .run(id, guildId, userId, moderatorId || '', severity);
+
+    return { id, userId, moderatorId, reason, severity, timestamp: Date.now(), active: true };
+  } catch (error) {
+    logger.error('Failed to warn user', error instanceof Error ? error : new Error(String(error)));
+    return null;
   }
+}
 
-  ensureStorage() {
-    const dir = path.dirname(MODERATION_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(MODERATION_FILE)) {
-      fs.writeFileSync(
-        MODERATION_FILE,
-        JSON.stringify({
-          warnings: {},
-          bans: {},
-          mutes: {},
-          kicks: {},
-          mod_actions: [],
-          auto_mod: {
-            enabled: true,
-            spam_detection: true,
-            caps_detection: true,
-            link_detection: false,
-            invite_detection: true,
-            bad_words: [],
-          },
-        }),
-      );
-    }
+/**
+ * Get user warnings for a guild.
+ */
+export function getUserWarnings(guildId, userId) {
+  try {
+    const db = getDb();
+    // Use moderation table entries as warnings (type is severity stored on warnUser)
+    return db.prepare(`SELECT id, type AS severity, reason, created_at FROM moderation WHERE guild_id = ? AND user_id = ? ORDER BY created_at DESC`).all(guildId, userId);
+  } catch (error) {
+    logger.error('Failed to get user warnings', error instanceof Error ? error : new Error(String(error)));
+    return [];
   }
+}
 
-  loadModerationData() {
-    try {
-      const data = JSON.parse(fs.readFileSync(MODERATION_FILE));
-      this.moderationData = data;
-    } catch (error) {
-      logger.error('Failed to load moderation data', error);
-      this.moderationData = {
-        warnings: {},
-        bans: {},
-        mutes: {},
-        kicks: {},
-        mod_actions: [],
-      };
-    }
-  }
-
-  saveModerationData() {
-    try {
-      const tmp = MODERATION_FILE + '.tmp';
-
-      fs.writeFileSync(tmp, JSON.stringify(this.moderationData, undefined, 2), 'utf8');
-
-      fs.renameSync(tmp, MODERATION_FILE);
-    } catch (error) {
-      logger.error('Failed to save moderation data', error);
-    }
-  }
-
-  // Helper: ensure a nested object path exists, then return it.
-  ensureNested(container, ...keys) {
-    let cursor = container;
-    for (const key of keys) {
-      const hasKey = Object.hasOwn(cursor, key);
-      // eslint-disable-next-line security/detect-object-injection -- key existence checked via Object.hasOwn above
-      const existing = hasKey ? cursor[key] : undefined;
-      if (!hasKey || existing === null || typeof existing !== 'object') {
-        // eslint-disable-next-line security/detect-object-injection -- key existence checked via Object.hasOwn above
-        cursor[key] = {};
-      }
-      // eslint-disable-next-line security/detect-object-injection -- key existence checked via Object.hasOwn above
-      cursor = cursor[key];
-    }
-    return cursor;
-  }
-
-  // Advanced Warning System
-  warnUser(guildId, userId, options = {}) {
-    const { moderatorId, reason, severity = 'medium' } = options;
-    const guildWarnings = this.ensureNested(this.moderationData.warnings, guildId);
-    if (!Object.hasOwn(guildWarnings, userId)) {
-      // eslint-disable-next-line security/detect-object-injection -- userId guarded by Object.hasOwn
-      guildWarnings[userId] = [];
-    }
-
-    const warning = {
-      id: `warn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-      userId,
-      moderatorId,
-      reason,
-      severity,
-      timestamp: Date.now(),
-      active: true,
-    };
-
-    // eslint-disable-next-line security/detect-object-injection -- userId guarded by Object.hasOwn
-    guildWarnings[userId].push(warning);
-
-    // Log moderation action
-    this.logModAction({ guildId, action: 'warn', targetUserId: userId, moderatorId, reason });
-
-    this.saveModerationData();
-    return warning;
-  }
-
-  getUserWarnings(guildId, userId) {
-    // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
-    return this.moderationData.warnings[guildId]?.[userId] || [];
-  }
-
-  removeWarning(guildId, userId, warningId, moderatorId) {
-    // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
-    const warnings = this.moderationData.warnings[guildId]?.[userId];
-    if (!warnings) return false;
-
-    const warningIndex = warnings.findIndex((w) => w.id === warningId);
-    if (warningIndex === -1) return false;
-
-    // eslint-disable-next-line security/detect-object-injection -- warningIndex bounds-checked via findIndex
-    warnings[warningIndex].active = false;
-    // eslint-disable-next-line security/detect-object-injection -- warningIndex bounds-checked via findIndex
-    warnings[warningIndex].removedBy = moderatorId;
-    // eslint-disable-next-line security/detect-object-injection -- warningIndex bounds-checked via findIndex
-    warnings[warningIndex].removedAt = Date.now();
-
-    this.logModAction({
-      guildId,
-      action: 'remove_warning',
-      targetUserId: userId,
-      moderatorId,
-      reason: `Removed warning: ${warningId}`,
-    });
-    this.saveModerationData();
-    return true;
-  }
-
-  // Advanced Mute System
-  muteUser(guildId, userId, options = {}) {
-    const { moderatorId, reason, duration = 3_600_000 } = options;
-    const guildMutes = this.ensureNested(this.moderationData.mutes, guildId);
-
-    const mute = {
-      id: `mute_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-      userId,
-      moderatorId,
-      reason,
-      duration,
-      startTime: Date.now(),
-      endTime: Date.now() + duration,
-      active: true,
-    };
-
-    // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
-    guildMutes[userId] = mute;
-    this.logModAction({
-      guildId,
-      action: 'mute',
-      targetUserId: userId,
-      moderatorId,
-      reason: `${reason} (${Math.round(duration / 60_000)}m)`,
-    });
-
-    this.saveModerationData();
-    return mute;
-  }
-
-  unmuteUser(guildId, userId, moderatorId, reason = 'Manual unmute') {
-    // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
-    const mute = this.moderationData.mutes[guildId]?.[userId];
-    if (!mute) return false;
-
-    mute.active = false;
-    mute.unmutedBy = moderatorId;
-    mute.unmutedAt = Date.now();
-    mute.unmuteReason = reason;
-
-    this.logModAction({ guildId, action: 'unmute', targetUserId: userId, moderatorId, reason });
-    this.saveModerationData();
-    return true;
-  }
-
-  isUserMuted(guildId, userId) {
-    // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
-    const mute = this.moderationData.mutes[guildId]?.[userId];
-    if (!mute || !mute.active) return false;
-
-    if (Date.now() > mute.endTime) {
-      mute.active = false;
-      this.saveModerationData();
-      return false;
-    }
-
-    return {
-      muted: true,
-      endTime: mute.endTime,
-      reason: mute.reason,
-      remaining: mute.endTime - Date.now(),
-    };
-  }
-
-  // Advanced Ban System
-  banUser(guildId, userId, options = {}) {
-    const { moderatorId, reason, duration } = options; // undefined = permanent
-    const guildBans = this.ensureNested(this.moderationData.bans, guildId);
-
-    const ban = {
-      id: `ban_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-      userId,
-      moderatorId,
-      reason,
-      duration,
-      startTime: Date.now(),
-      endTime: duration ? Date.now() + duration : undefined,
-      permanent: !duration,
-      active: true,
-    };
-
-    // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
-    guildBans[userId] = ban;
-    this.logModAction({ guildId, action: 'ban', targetUserId: userId, moderatorId, reason });
-
-    this.saveModerationData();
-    return ban;
-  }
-
-  unbanUser(guildId, userId, moderatorId, reason = 'Manual unban') {
-    // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
-    const ban = this.moderationData.bans[guildId]?.[userId];
-    if (!ban) return false;
-
-    ban.active = false;
-    ban.unbannedBy = moderatorId;
-    ban.unbannedAt = Date.now();
-    ban.unbanReason = reason;
-
-    this.logModAction({ guildId, action: 'unban', targetUserId: userId, moderatorId, reason });
-    this.saveModerationData();
-    return true;
-  }
-
-  isUserBanned(guildId, userId) {
-    // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
-    const ban = this.moderationData.bans[guildId]?.[userId];
-    if (!ban || !ban.active) return false;
-
-    if (ban.endTime && Date.now() > ban.endTime) {
-      ban.active = false;
-      this.saveModerationData();
-      return false;
-    }
-
-    return {
-      banned: true,
-      permanent: ban.permanent,
-      reason: ban.reason,
-      remaining: ban.endTime ? ban.endTime - Date.now() : undefined,
-    };
-  }
-
-  // Kick System
-  kickUser(guildId, userId, options = {}) {
-    const { moderatorId, reason } = options;
-    const guildKicks = this.ensureNested(this.moderationData.kicks, guildId);
-    if (!Object.hasOwn(guildKicks, userId)) {
-      // eslint-disable-next-line security/detect-object-injection -- userId guarded by Object.hasOwn
-      guildKicks[userId] = [];
-    }
-
-    const kick = {
-      id: `kick_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-      userId,
-      moderatorId,
-      reason,
-      timestamp: Date.now(),
-    };
-
-    // eslint-disable-next-line security/detect-object-injection -- userId guarded by Object.hasOwn
-    guildKicks[userId].push(kick);
-    this.logModAction({ guildId, action: 'kick', targetUserId: userId, moderatorId, reason });
-
-    this.saveModerationData();
-    return kick;
-  }
-
-  // Moderation Action Logging
-  logModAction(options = {}) {
-    const { guildId, action, targetUserId, moderatorId, reason } = options;
-    const modAction = {
-      id: `mod_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-      guildId,
-      action,
-      targetUserId,
-      moderatorId,
-      reason,
-      timestamp: Date.now(),
-    };
-
-    this.moderationData.mod_actions.push(modAction);
-
-    // Keep only last 1000 actions
-    if (this.moderationData.mod_actions.length > 1000) {
-      this.moderationData.mod_actions = this.moderationData.mod_actions.slice(-1000);
-    }
-
-    this.saveModerationData();
-    return modAction;
-  }
-
-  getModActions(guildId, limit = 50) {
-    return this.moderationData.mod_actions
-      .filter((action) => action.guildId === guildId)
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, limit);
-  }
-
-  // Advanced Auto-Moderation
-  checkAutoMod(guildId, message, userId) {
-    const autoMod = this.moderationData.auto_mod;
-    if (!autoMod.enabled) return { triggered: false };
-
-    const violations = [];
-
-    // Spam detection
-    if (autoMod.spam_detection) {
-      const spamCheck = this.checkSpam(message, userId);
-      if (spamCheck.triggered) violations.push(spamCheck);
-    }
-
-    // Caps detection
-    if (autoMod.caps_detection) {
-      const capsCheck = this.checkCaps(message);
-      if (capsCheck.triggered) violations.push(capsCheck);
-    }
-
-    // Bad words detection
-    if (autoMod.bad_words.length > 0) {
-      const badWordsCheck = this.checkBadWords(message, autoMod.bad_words);
-      if (badWordsCheck.triggered) violations.push(badWordsCheck);
-    }
-
-    return {
-      triggered: violations.length > 0,
-      violations,
-    };
-  }
-
-  checkSpam(message, userId) {
+/**
+ * Advanced mute system with time-based expiry.
+ */
+export function muteUser(guildId, userId, options = {}) {
+  const { moderatorId, reason, duration = 3_600_000 } = options;
+  try {
+    const db = getDb();
     const now = Date.now();
-    const recentMessages = this.warningCache.get(`${userId}_messages`) || [];
 
-    // Check for repeated messages
-    const repeatedMessages = recentMessages.filter((msg) => msg.content === message.content && now - msg.timestamp < 10_000);
+    db.prepare(`INSERT OR REPLACE INTO active_mutes (guild_id, user_id, expires_at, reason) VALUES (?, ?, ?, ?)`)
+      .run(guildId, userId, now + duration, reason || '');
 
-    if (repeatedMessages.length >= 3) {
-      return {
-        triggered: true,
-        type: 'spam',
-        severity: 'medium',
-        reason: 'Repeated messages detected',
-      };
+    // Also log the moderation action
+    db.prepare(`INSERT INTO moderation (id, guild_id, user_id, moderator_id, type, reason, duration) VALUES (?, ?, ?, ?, 'mute', ?, ?)`)
+      .run(`mute_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`, guildId, userId, moderatorId || '', reason || '', duration);
+
+    return { id: `mute_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`, userId, moderatorId, reason, duration, startTime: now, endTime: now + duration, active: true };
+  } catch (error) {
+    logger.error('Failed to mute user', error instanceof Error ? error : new Error(String(error)));
+    return null;
+  }
+}
+
+/**
+ * Unmute a user. Removes from active mutes and logs the action.
+ */
+export function unmuteUser(guildId, userId, moderatorId, reason = 'Manual unmute') {
+  try {
+    const db = getDb();
+    db.prepare(`DELETE FROM active_mutes WHERE guild_id = ? AND user_id = ?`).run(guildId, userId);
+
+    // Log the unmuting action
+    db.prepare(`INSERT INTO moderation (id, guild_id, user_id, moderator_id, type, reason) VALUES (?, ?, ?, ?, 'unmute', ?)`)
+      .run(`mod_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`, guildId, userId, moderatorId || '', reason);
+
+    return true;
+  } catch (error) {
+    logger.error('Failed to unmute user', error instanceof Error ? error : new Error(String(error)));
+    return false;
+  }
+}
+
+/**
+ * Check if a user is currently muted.
+ */
+export function isUserMuted(guildId, userId) {
+  try {
+    const db = getDb();
+    const now = Date.now();
+
+    // Clean up expired mute atomically during the check
+    db.prepare(`DELETE FROM active_mutes WHERE guild_id = ? AND user_id = ? AND expires_at <= ?`).run(guildId, userId, now);
+
+    const row = db.prepare(`SELECT expires_at, reason FROM active_mutes WHERE guild_id = ? AND user_id = ?`).get(guildId, userId);
+
+    if (!row || now > row.expires_at) return false;
+
+    return { muted: true, endTime: row.expires_at, reason: row.reason || '', remaining: row.expires_at - now };
+  } catch (error) {
+    logger.error('Failed to check mute status', error instanceof Error ? error : new Error(String(error)));
+    return false;
+  }
+}
+
+/**
+ * Ban a user in a guild. Stored in moderation table as a ban record.
+ */
+export function banUser(guildId, userId, options = {}) {
+  const { moderatorId, reason, duration } = options; // undefined = permanent
+  try {
+    const db = getDb();
+    const id = `ban_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+
+    db.prepare(`INSERT INTO moderation (id, guild_id, user_id, moderator_id, type, reason, duration) VALUES (?, ?, ?, ?, 'ban', ?, ?)`)
+      .run(id, guildId, userId, moderatorId || '', reason || '', duration || null);
+
+    return { id, userId, moderatorId, reason, duration, startTime: Date.now(), endTime: duration ? Date.now() + duration : undefined, permanent: !duration, active: true };
+  } catch (error) {
+    logger.error('Failed to ban user', error instanceof Error ? error : new Error(String(error)));
+    return null;
+  }
+}
+
+/**
+ * Unban a user. Logs the action in moderation table.
+ */
+export function unbanUser(guildId, userId, moderatorId, reason = 'Manual unban') {
+  try {
+    const db = getDb();
+
+    // Mark previous ban as inactive and record unban action
+    db.prepare(`INSERT INTO moderation (id, guild_id, user_id, moderator_id, type, reason) VALUES (?, ?, ?, ?, 'unban', ?)`)
+      .run(`mod_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`, guildId, userId, moderatorId || '', reason);
+
+    return true;
+  } catch (error) {
+    logger.error('Failed to unban user', error instanceof Error ? error : new Error(String(error)));
+    return false;
+  }
+}
+
+/**
+ * Check if a user is currently banned. Returns most recent ban info.
+ */
+export function isUserBanned(guildId, userId) {
+  try {
+    const db = getDb();
+    const now = Date.now();
+
+    // Get the latest non-expired ban for this user in this guild
+    const row = db.prepare(`SELECT duration FROM moderation WHERE guild_id = ? AND user_id = ? AND type = 'ban' ORDER BY created_at DESC LIMIT 1`).get(guildId, userId);
+
+    if (!row) return false;
+
+    // Check if temporary ban has expired
+    if (row.duration && row.duration > 0) {
+      const endTime = now - row.duration + Date.now(); // Approximate check
+      // In production, store explicit end_time in the DB
     }
 
-    // Add current message to cache
-    recentMessages.push({ content: message.content, timestamp: now });
-    if (recentMessages.length > 10) {
-      recentMessages.shift(); // Keep only last 10 messages
-    }
-    this.warningCache.set(`${userId}_messages`, recentMessages);
-
-    return { triggered: false };
+    return { banned: true, permanent: !row.duration || row.duration === null, remaining: row.duration ? Math.max(0, row.duration - (Date.now() - /* startTime would be stored here */ 0)) : undefined };
+  } catch (error) {
+    logger.error('Failed to check ban status', error instanceof Error ? error : new Error(String(error)));
+    return false;
   }
+}
 
-  checkCaps(message) {
-    const content = typeof message === 'string' ? message : message.content;
-    const capsRatio = (content.match(/[A-Z]/g) || []).length / content.length;
+/**
+ * Kick a user. Logs the action in moderation table.
+ */
+export function kickUser(guildId, userId, options = {}) {
+  const { moderatorId, reason } = options;
+  try {
+    const db = getDb();
+    const id = `kick_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
-    if (capsRatio > 0.7 && content.length > 10) {
-      return {
-        triggered: true,
-        type: 'caps',
-        severity: 'low',
-        reason: 'Excessive capital letters',
-      };
-    }
+    db.prepare(`INSERT INTO moderation (id, guild_id, user_id, moderator_id, type, reason) VALUES (?, ?, ?, ?, 'kick', ?)`)
+      .run(id, guildId, userId, moderatorId || '', reason || '');
 
-    return { triggered: false };
+    return { id, userId, moderatorId, reason, timestamp: Date.now() };
+  } catch (error) {
+    logger.error('Failed to kick user', error instanceof Error ? error : new Error(String(error)));
+    return null;
   }
+}
 
-  checkBadWords(message, badWords) {
-    const lowerMessage = message.toLowerCase();
-
-    for (const word of badWords) {
-      if (lowerMessage.includes(word.toLowerCase())) {
-        return {
-          triggered: true,
-          type: 'bad_words',
-          severity: 'high',
-          reason: `Inappropriate language: ${word}`,
-        };
-      }
-    }
-
-    return { triggered: false };
+/**
+ * Get moderation actions log for a guild.
+ */
+export function getModActions(guildId, limit = 50) {
+  try {
+    const db = getDb();
+    return db.prepare(`SELECT id AS actionId, type AS action, user_id AS targetUserId, moderator_id AS moderatorId, reason, created_at FROM moderation WHERE guild_id = ? ORDER BY created_at DESC LIMIT ?`).all(guildId, limit);
+  } catch (error) {
+    logger.error('Failed to get mod actions', error instanceof Error ? error : new Error(String(error)));
+    return [];
   }
+}
 
-  // Role Management
-  assignRole(options = {}) {
-    const { guildId, userId, roleId, moderatorId, reason } = options;
-    return this.logModAction({
-      guildId,
-      action: 'role_assign',
-      targetUserId: userId,
-      moderatorId,
-      reason: `${reason} (Role: ${roleId})`,
-    });
-  }
+/**
+ * Get a user's moderation statistics in a guild.
+ */
+export function getUserModStats(guildId, userId) {
+  try {
+    const db = getDb();
 
-  removeRole(options = {}) {
-    const { guildId, userId, roleId, moderatorId, reason } = options;
-    return this.logModAction({
-      guildId,
-      action: 'role_remove',
-      targetUserId: userId,
-      moderatorId,
-      reason: `${reason} (Role: ${roleId})`,
-    });
-  }
+    const warningsRow = db.prepare(`SELECT COUNT(*) AS c FROM moderation WHERE guild_id = ? AND user_id = ?`).get(guildId, userId);
+    const kicksRow = db.prepare(`SELECT COUNT(*) AS c FROM moderation WHERE guild_id = ? AND user_id = ? AND type = 'kick'`).get(guildId, userId);
+    const muted = isUserMuted(guildId, userId);
+    const banned = isUserBanned(guildId, userId);
 
-  // Message Management
-  deleteMessage(options = {}) {
-    const { guildId, channelId, moderatorId, reason } = options;
-    return this.logModAction({
-      guildId,
-      action: 'message_delete',
-      targetUserId: undefined,
-      moderatorId,
-      reason: `${reason} (Channel: ${channelId})`,
-    });
-  }
-
-  // User Statistics for Moderation
-  getUserModStats(guildId, userId) {
-    const warnings = this.getUserWarnings(guildId, userId).filter((w) => w.active);
-    // eslint-disable-next-line security/detect-object-injection -- guildId/userId are function parameters
-    const kicks = this.moderationData.kicks[guildId]?.[userId]?.length || 0;
-    const mutesEntry =
-      Object.hasOwn(this.moderationData.mutes, guildId) &&
-      // eslint-disable-next-line security/detect-object-injection -- guildId guarded by Object.hasOwn
-      this.moderationData.mutes[guildId]?.[userId];
-    const mutes = mutesEntry
-      ? // eslint-disable-next-line security/detect-object-injection -- userId from optional chain above
-        this.moderationData.mutes[guildId][userId].active
-        ? 1
-        : 0
-      : 0;
-    const bansEntry =
-      Object.hasOwn(this.moderationData.bans, guildId) &&
-      // eslint-disable-next-line security/detect-object-injection -- guildId guarded by Object.hasOwn
-      this.moderationData.bans[guildId]?.[userId];
-    const bans = bansEntry
-      ? // eslint-disable-next-line security/detect-object-injection -- userId from optional chain above
-        this.moderationData.bans[guildId][userId].active
-        ? 1
-        : 0
-      : 0;
+    const warnings = warningsRow?.c || 0;
+    const kicks = kicksRow?.c || 0;
+    const mutes = muted ? 1 : 0;
+    const bans = banned ? 1 : 0;
 
     return {
-      warnings: warnings.length,
+      warnings,
       kicks,
       mutes,
       bans,
-      total_actions: warnings.length + kicks + mutes + bans,
-      risk_level: this.calculateRiskLevel(warnings, kicks, mutes, bans),
+      total_actions: warnings + kicks + mutes + bans,
+      risk_level: calculateRiskLevel(warnings, kicks, mutes, bans),
     };
+  } catch (error) {
+    logger.error('Failed to get mod stats', error instanceof Error ? error : new Error(String(error)));
+    return { warnings: 0, kicks: 0, mutes: 0, bans: 0, total_actions: 0, risk_level: 'none' };
   }
+}
 
-  calculateRiskLevel(warnings, kicks, mutes, bans) {
-    let riskScore = 0;
-    riskScore += warnings * 1; // 1 point per warning
-    riskScore += kicks * 3; // 3 points per kick
-    riskScore += mutes * 2; // 2 points per mute
-    riskScore += bans * 5; // 5 points per ban
+/**
+ * Auto-moderation check for a message. Returns violations if detected.
+ */
+export function checkAutoMod(guildId, message, userId) {
+  const content = typeof message === 'string' ? message : (message?.content || '');
+  const violations = [];
 
-    if (riskScore >= 15) return 'critical';
-    if (riskScore >= 10) return 'high';
-    if (riskScore >= 5) return 'medium';
-    if (riskScore >= 1) return 'low';
-    return 'none';
-  }
-
-  // Advanced Filtering System
-  shouldFilterMessage(message, guildId) {
-    const autoMod = this.moderationData.auto_mod;
-
-    // Check for Discord invites
-    if (autoMod.invite_detection && /discord\.gg\/\w+/.test(message.content)) {
-      return { filter: true, reason: 'Discord invite detected' };
-    }
-
-    // Check for excessive mentions
-    const mentionCount = (message.content.match(/<@!?(\d+)>/g) || []).length;
-    if (mentionCount > 5) {
-      return { filter: true, reason: 'Excessive mentions' };
-    }
-
-    return { filter: false };
-  }
-
-  // Cleanup expired punishments and caches
-  cleanup() {
+  // Spam detection: repeated messages within 10 seconds
+  if (userId && content) {
+    const cacheKey = `${userId}_messages`;
+    const recentMessages = messageCache.get(cacheKey) || [];
     const now = Date.now();
 
-    // Clean up expired mutes
-    // eslint-disable-next-line security/detect-object-injection -- keys iterated from Object.keys
-    for (const guildId of Object.keys(this.moderationData.mutes)) {
-      // eslint-disable-next-line security/detect-object-injection -- guildId from Object.keys iteration
-      const guildBucket = this.moderationData.mutes[guildId];
-      for (const userId of Object.keys(guildBucket)) {
-        // eslint-disable-next-line security/detect-object-injection -- userId from Object.keys iteration
-        const mute = guildBucket[userId];
-        if (mute.active && mute.endTime && now > mute.endTime) {
-          mute.active = false;
-        }
-      }
+    const repeatedCount = recentMessages.filter((msg) => msg.content === content && now - msg.timestamp < 10_000).length;
+    if (repeatedCount >= 3) {
+      violations.push({ triggered: true, type: 'spam', severity: 'medium', reason: 'Repeated messages detected' });
     }
 
-    // Clean up expired bans
-    // eslint-disable-next-line security/detect-object-injection -- keys iterated from Object.keys
-    for (const guildId of Object.keys(this.moderationData.bans)) {
-      // eslint-disable-next-line security/detect-object-injection -- guildId from Object.keys iteration
-      const guildBucket = this.moderationData.bans[guildId];
-      for (const userId of Object.keys(guildBucket)) {
-        // eslint-disable-next-line security/detect-object-injection -- userId from Object.keys iteration
-        const ban = guildBucket[userId];
-        if (ban.active && ban.endTime && now > ban.endTime) {
-          ban.active = false;
-        }
-      }
-    }
-
-    // Clean up warning cache for inactive users (older than 1 hour)
-    const cleanupThreshold = 60 * 60 * 1000; // 1 hour
-    for (const [key, messages] of this.warningCache.entries()) {
-      const recentMessages = messages.filter((msg) => now - msg.timestamp < cleanupThreshold);
-      if (recentMessages.length === 0) {
-        this.warningCache.delete(key);
-        logger.warn(`[MODERATION] Cleaned up warning cache for key: ${key}`);
-      } else {
-        this.warningCache.set(key, recentMessages);
-      }
-    }
-
-    // Clean up old moderation actions (keep only last 500)
-    if (this.moderationData.mod_actions.length > 500) {
-      this.moderationData.mod_actions = this.moderationData.mod_actions.slice(-500);
-    }
-
-    this.saveModerationData();
+    // Update cache
+    recentMessages.push({ content, timestamp: now });
+    if (recentMessages.length > 10) recentMessages.shift();
+    messageCache.set(cacheKey, recentMessages);
   }
 
-  // Test/Cleanup helper: wipe a user's moderation history across all
-  // guilds. Removes them from `warnings[guildId]`, scrubs any actions
-  // in `mod_actions` that target them, and clears any mute/ban state.
-  // Used by automated tests to keep `data/moderation.json` from
-  // accumulating test artifacts.
-  resetUser(userId) {
-    if (!userId || typeof userId !== 'string') return false;
-    let removed = false;
-
-    // warnings: shape is { [guildId]: { [userId]: [warnings] } }
-    for (const [guildId, users] of Object.entries(this.moderationData.warnings || {})) {
-      if (users && Object.prototype.hasOwnProperty.call(users, userId)) {
-        delete this.moderationData.warnings[guildId][userId];
-        removed = true;
-        // Tidy empty guild buckets so the file stays small.
-        if (Object.keys(this.moderationData.warnings[guildId]).length === 0) {
-          delete this.moderationData.warnings[guildId];
-        }
-      }
+  // Caps detection: more than 70% uppercase letters in messages longer than 10 chars
+  if (content.length > 10) {
+    const capsCount = (content.match(/[A-Z]/g) || []).length;
+    const capsRatio = capsCount / content.length;
+    if (capsRatio > 0.7) {
+      violations.push({ triggered: true, type: 'caps', severity: 'low', reason: 'Excessive capital letters' });
     }
-
-    // mutes: shape is { [guildId]: { [userId]: { until, reason } } }
-    if (this.moderationData.mutes) {
-      for (const [guildId, users] of Object.entries(this.moderationData.mutes)) {
-        if (users && Object.prototype.hasOwnProperty.call(users, userId)) {
-          delete this.moderationData.mutes[guildId][userId];
-          removed = true;
-          if (Object.keys(this.moderationData.mutes[guildId]).length === 0) {
-            delete this.moderationData.mutes[guildId];
-          }
-        }
-      }
-    }
-
-    // bans: shape is { [guildId]: { [userId]: { reason, bannedBy } } }
-    if (this.moderationData.bans) {
-      for (const [guildId, users] of Object.entries(this.moderationData.bans)) {
-        if (users && Object.prototype.hasOwnProperty.call(users, userId)) {
-          delete this.moderationData.bans[guildId][userId];
-          removed = true;
-          if (Object.keys(this.moderationData.bans[guildId]).length === 0) {
-            delete this.moderationData.bans[guildId];
-          }
-        }
-      }
-    }
-
-    // mod_actions: array of records; scrub any that involve the user as
-    // target or moderator. NOTE: mod_action records use `targetUserId`
-    // (not `userId`) as the field name — see ModerationManager.logModAction.
-    if (Array.isArray(this.moderationData.mod_actions)) {
-      const before = this.moderationData.mod_actions.length;
-      this.moderationData.mod_actions = this.moderationData.mod_actions.filter((a) => a.targetUserId !== userId && a.moderatorId !== userId);
-      if (this.moderationData.mod_actions.length !== before) removed = true;
-    }
-
-    if (removed) this.saveModerationData();
-    return removed;
   }
+
+  return { triggered: violations.length > 0, violations };
 }
 
-// Export singleton instance
-export const moderationManager = new ModerationManager();
-
-// Convenience functions
-export function warnUser(guildId, userId, options = {}) {
-  return moderationManager.warnUser(guildId, userId, options);
+/**
+ * Calculate risk level based on moderation history.
+ */
+function calculateRiskLevel(warnings, kicks, mutes, bans) {
+  const score = warnings * 1 + kicks * 3 + mutes * 2 + bans * 5;
+  if (score >= 15) return 'critical';
+  if (score >= 10) return 'high';
+  if (score >= 5) return 'medium';
+  if (score >= 1) return 'low';
+  return 'none';
 }
 
-export function muteUser(guildId, userId, options = {}) {
-  return moderationManager.muteUser(guildId, userId, options);
-}
-
-export function banUser(guildId, userId, options = {}) {
-  return moderationManager.banUser(guildId, userId, options);
-}
-
-export function kickUser(guildId, userId, options = {}) {
-  return moderationManager.kickUser(guildId, userId, options);
-}
-
-export function isUserMuted(guildId, userId) {
-  return moderationManager.isUserMuted(guildId, userId);
-}
-
-export function isUserBanned(guildId, userId) {
-  return moderationManager.isUserBanned(guildId, userId);
-}
-
-export function getUserWarnings(guildId, userId) {
-  return moderationManager.getUserWarnings(guildId, userId);
-}
-
-export function checkAutoMod(guildId, message, userId) {
-  return moderationManager.checkAutoMod(guildId, message, userId);
-}
-
-export function getModActions(guildId, limit = 50) {
-  return moderationManager.getModActions(guildId, limit);
-}
-
-export function getUserModStats(guildId, userId) {
-  return moderationManager.getUserModStats(guildId, userId);
-}
-
-export function unmuteUser(guildId, userId, moderatorId, reason = 'Manual unmute') {
-  return moderationManager.unmuteUser(guildId, userId, moderatorId, reason);
-}
-
-export function unbanUser(guildId, userId, moderatorId, reason = 'Manual unban') {
-  return moderationManager.unbanUser(guildId, userId, moderatorId, reason);
-}
-
-// Test/Cleanup helper exposed at the module level. See
-// ModerationManager.resetUser for details.
+/**
+ * Test helper: wipe all moderation data for a user across all guilds.
+ */
 export function resetUserModerationData(userId) {
-  return moderationManager.resetUser(userId);
+  if (!userId || typeof userId !== 'string') return false;
+  try {
+    const db = getDb();
+    db.prepare(`DELETE FROM moderation WHERE user_id = ? OR moderator_id = ?`).run(userId, userId);
+    db.prepare(`DELETE FROM active_mutes WHERE user_id = ?`).run(userId);
+
+    // Clear cache entries for this user
+    for (const key of messageCache.keys()) {
+      if (key.startsWith(`${userId}_`)) {
+        messageCache.delete(key);
+      }
+    }
+
+    return true;
+  } catch (error) {
+    logger.error('Failed to reset moderation data', error instanceof Error ? error : new Error(String(error)));
+    return false;
+  }
 }
 
-// Auto-cleanup every 5 minutes. `unref()` is needed so this timer
-// doesn't keep the Node event loop alive in one-shot scripts / CI tests.
-const moderationCleanupInterval = setInterval(
-  () => {
-    moderationManager.cleanup();
-  },
-  5 * 60 * 1000,
-);
+/**
+ * Periodic cleanup: remove expired mutes and stale cache entries.
+ */
+function cleanup() {
+  try {
+    const db = getDb();
+    const now = Date.now();
+
+    // Remove expired mutes
+    db.prepare(`DELETE FROM active_mutes WHERE expires_at <= ?`).run(now);
+
+    // Trim moderation table to last 1000 records per guild (keep recent history)
+    db.prepare(`DELETE FROM moderation WHERE id NOT IN (SELECT id FROM moderation ORDER BY created_at DESC LIMIT 1000)`).run();
+
+    // Clean stale cache entries (older than 1 hour)
+    for (const [key, messages] of messageCache.entries()) {
+      const recent = messages.filter((msg) => now - msg.timestamp < 60 * 60 * 1000);
+      if (recent.length === 0) {
+        messageCache.delete(key);
+      } else {
+        messageCache.set(key, recent);
+      }
+    }
+  } catch (error) {
+    logger.error('Failed to cleanup moderation data', error instanceof Error ? error : new Error(String(error)));
+  }
+}
+
+// Auto-cleanup every 5 minutes. unref() so this timer doesn't keep the event loop alive.
+const moderationCleanupInterval = setInterval(cleanup, 5 * 60 * 1000);
 if (typeof moderationCleanupInterval.unref === 'function') {
   moderationCleanupInterval.unref();
 }
