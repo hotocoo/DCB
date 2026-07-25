@@ -1,4 +1,5 @@
 import {
+import { sanitizeInput } from '../validation.js'
   SlashCommandBuilder,
   ActionRowBuilder,
   ButtonBuilder,

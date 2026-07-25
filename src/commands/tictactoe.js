@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+import { sanitizeInput } from '../validation.js'
 
 import { updateUserStats } from '../achievements.js';
 import { tttGames } from '../game-states.js';

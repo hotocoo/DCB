@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { sanitizeInput } from '../validation.js'
 import path from 'node:path';
 
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';

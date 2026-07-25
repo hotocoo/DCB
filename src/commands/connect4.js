@@ -24,6 +24,7 @@
  */
 
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { sanitizeInput } from '../validation.js'
 
 import { updateUserStats } from '../achievements.js';
 import { connect4Games } from '../game-states.js';
