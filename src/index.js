@@ -188,8 +188,70 @@ if (!process[Symbol.for('athena.shutdown.handlersInstalled')]) {
 }
 
 client.on('interactionCreate', async (interaction) => {
-  if (interaction.isChatInputCommand() || interaction.isButton() || interaction.isModalSubmit()) {
+  if (!interaction.isChatInputCommand() && !interaction.isButton() && !interaction.isModalSubmit()) {
+    return;
+  }
+
+  // CRITICAL: wrap in try/catch so interaction errors don't become unhandled rejections
+  // and crash the entire bot. Previously, a single failed interaction would trigger
+  // gracefulShutdown via the process.on('unhandledRejection') handler at line 184.
+  try {
     await handleInteraction(interaction, client);
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+
+    const _cmd = /** @type {any} */ (interaction);
+    logError('Interaction handling failed', err, {
+      userId: interaction.user?.id,
+      commandName: _cmd.commandName || 'button/modal',
+      customId: _cmd.customId,
+      guildId: interaction.guild?.id,
+      interactionType: interaction.constructor.name,
+    });
+
+    // Acknowledge/reply with error if the interaction hasn't been responded to yet.
+    // Discord enforces a 3s reply window — after that we can only followUp or edit.
+    try {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: '❌ An error occurred while processing your request.',
+          flags: 64, // Ephemeral
+        });
+      } else if (!interaction.replied && interaction.deferred) {
+        await interaction.followUp({
+          content: '❌ An error occurred while processing your request.',
+          flags: 64, // Ephemeral
+        });
+      }
+    } catch (replyErr) {
+      logger.error('Failed to send error reply for interaction', replyErr instanceof Error ? replyErr : new Error(String(replyErr)));
+    }
+  }
+});
+
+/**
+ * Voice state change handler — leaves empty voice channels.
+ * Prevents bot from staying connected forever when users disconnect.
+ */
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  try {
+    const guildId = newState.guild.id;
+    const channel = newState.channel;
+
+    // If user left a voice channel entirely and was the only one there (besides bot), leave too.
+    if (!channel && oldState.channel) {
+      const memberCount = oldState.channel.members.filter((m) => !m.user.bot).size;
+      if (memberCount === 0) {
+        logger.info('Leaving empty voice channel', { guildId, channelId: oldState.channel.id });
+        // Use dynamic import to avoid tight coupling; music module exports cleanup functions.
+        try {
+          const { stop } = await import('./music.js');
+          await stop(guildId);
+        } catch (_ignore) { /* music module not available or no active player */ }
+      }
+    }
+  } catch (error) {
+    logger.error('Voice state update handler failed', error instanceof Error ? error : new Error(String(error)));
   }
 });
 /**

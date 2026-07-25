@@ -60,7 +60,7 @@ class ModerationManager {
     try {
       const tmp = MODERATION_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.moderationData, undefined, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(this.moderationData, undefined, 2), 'utf8');
 
       fs.renameSync(tmp, MODERATION_FILE);
     } catch (error) {

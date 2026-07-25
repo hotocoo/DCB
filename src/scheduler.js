@@ -60,7 +60,7 @@ class SchedulerManager {
     try {
       const tmp = SCHEDULES_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.schedules, null, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(this.schedules, null, 2), 'utf8');
 
       fs.renameSync(tmp, SCHEDULES_FILE);
     } catch (error) {

@@ -20,7 +20,7 @@ class LocationManager {
     if (!fs.existsSync(LOCATIONS_FILE)) {
       const tmp = LOCATIONS_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify({}), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify({}), 'utf8');
 
       fs.renameSync(tmp, LOCATIONS_FILE);
     }
@@ -40,7 +40,7 @@ class LocationManager {
     try {
       const tmp = LOCATIONS_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.locations, null, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(this.locations, null, 2), 'utf8');
 
       fs.renameSync(tmp, LOCATIONS_FILE);
     } catch (error) {

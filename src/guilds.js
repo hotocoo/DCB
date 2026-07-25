@@ -21,7 +21,7 @@ class GuildManager {
     if (!fs.existsSync(GUILDS_FILE)) {
       const tmp = GUILDS_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify({}), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify({}), 'utf8');
 
       fs.renameSync(tmp, GUILDS_FILE);
     }
@@ -41,7 +41,7 @@ class GuildManager {
     try {
       const tmp = GUILDS_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.guilds, undefined, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(this.guilds, undefined, 2), 'utf8');
 
       fs.renameSync(tmp, GUILDS_FILE);
     } catch (error) {

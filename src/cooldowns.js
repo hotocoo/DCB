@@ -21,7 +21,7 @@ class CooldownManager {
     if (!fs.existsSync(COOLDOWNS_FILE)) {
       const tmp = COOLDOWNS_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify({}), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify({}), 'utf8');
 
       fs.renameSync(tmp, COOLDOWNS_FILE);
     }
@@ -41,7 +41,7 @@ class CooldownManager {
     try {
       const tmp = COOLDOWNS_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.persistentCooldowns, null, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(this.persistentCooldowns, null, 2), 'utf8');
 
       fs.renameSync(tmp, COOLDOWNS_FILE);
     } catch (error) {

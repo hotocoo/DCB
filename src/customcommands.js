@@ -48,7 +48,7 @@ class CustomCommandManager {
     try {
       const tmp = CUSTOM_COMMANDS_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.customCommands, undefined, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(this.customCommands, undefined, 2), 'utf8');
 
       fs.renameSync(tmp, CUSTOM_COMMANDS_FILE);
     } catch (error) {

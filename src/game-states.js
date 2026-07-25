@@ -34,3 +34,32 @@ export const memoryGames = new Map();
 
 // Typing game attempts for minigame
 export const typingAttempts = new Map();
+
+/**
+ * Cleanup expired game states. Games with no activity for >2 hours are removed.
+ */
+export function cleanupExpiredGameStates() {
+  const now = Date.now();
+  const maxAge = 2 * 60 * 60 * 1000; // 2 hours
+
+  const maps = [
+    hangmanGames, wordleGames, guessGames, combatGames, explorationGames,
+    connect4Games, triviaGames, tttGames, pollGames, memoryGames, typingAttempts,
+  ];
+
+  let cleaned = 0;
+  for (const map of maps) {
+    for (const [key, state] of map.entries()) {
+      const lastActivity = state.lastActivity || state.createdAt || state.startTime || state.timestamp || 0;
+      if (lastActivity > 0 && now - lastActivity > maxAge) {
+        map.delete(key);
+        cleaned++;
+      }
+    }
+  }
+  return cleaned;
+}
+
+// Auto-cleanup every 30 minutes. unref() so this doesn't block process exit in tests/scripts.
+const gameStatesCleanupInterval = setInterval(cleanupExpiredGameStates, 30 * 60 * 1000);
+if (typeof gameStatesCleanupInterval.unref === 'function') gameStatesCleanupInterval.unref();

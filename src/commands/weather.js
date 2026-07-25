@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
+import { RateLimiterMemory } from 'rate-limiter-flexible';
 
 import { logger } from '../logger.js';
-import { RateLimiterMemory } from 'rate-limiter-flexible';
 
 // Rate limiter for weather API (60 requests per minute per user)
 const weatherRateLimiter = new RateLimiterMemory({

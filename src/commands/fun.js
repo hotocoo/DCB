@@ -1,7 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 
 import { logger } from '../logger.js';
-
 import { CommandError, handleCommandError } from '../errorHandler.js';
 import { safeInteractionReply, safeInteractionUpdate } from '../interactionHandlers.js';
 import {

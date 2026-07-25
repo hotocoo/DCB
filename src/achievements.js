@@ -169,7 +169,7 @@ class AchievementManager {
     if (!fs.existsSync(ACHIEVEMENTS_FILE)) {
       const tmp = ACHIEVEMENTS_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify({}), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify({}), 'utf8');
 
       fs.renameSync(tmp, ACHIEVEMENTS_FILE);
     }
@@ -189,7 +189,7 @@ class AchievementManager {
     try {
       const tmp = ACHIEVEMENTS_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.userAchievements, null, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(this.userAchievements, null, 2), 'utf8');
 
       fs.renameSync(tmp, ACHIEVEMENTS_FILE);
     } catch (error) {

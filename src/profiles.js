@@ -74,7 +74,7 @@ class ProfileManager {
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       const tmp = filePath + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(data, identity, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(data, identity, 2), 'utf8');
 
       fs.renameSync(tmp, filePath);
     } catch (error) {

@@ -51,7 +51,7 @@ class IntegrationManager {
     try {
       const tmp = INTEGRATIONS_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(this.integrations, null, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(this.integrations, null, 2), 'utf8');
 
       fs.renameSync(tmp, INTEGRATIONS_FILE);
     } catch (error) {

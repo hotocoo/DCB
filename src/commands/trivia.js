@@ -1,7 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
 
 import { logger } from '../logger.js';
-
 import { updateUserStats } from '../achievements.js';
 import { safeExecuteCommand, CommandError, validateRange } from '../errorHandler.js';
 

@@ -1,10 +1,29 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+const RPG_DIR = path.join(process.cwd(), 'data', 'characters');
+
 // eslint-disable-next-line import/no-cycle -- errorHandler -> interactionHandlers cycle is pre-existing
 import { getCharacter, addItemToInventory, removeItemFromInventory } from './rpg.js';
 import { getBalance, subtractBalance, addBalance } from './economy.js';
+import { economyManager } from './economy.js';
 import { logger } from './logger.js';
+
+function _ensureRpgDir() {
+  if (!fs.existsSync(RPG_DIR)) fs.mkdirSync(RPG_DIR, { recursive: true });
+}
+
+function _saveCharacterFile(userId, character) {
+  try {
+    _ensureRpgDir();
+    const filePath = path.join(RPG_DIR, `${userId}.json`);
+    const tmp = `${filePath}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(character, null, 2), 'utf8');
+    fs.renameSync(tmp, filePath);
+  } catch (err) {
+    logger.error('Failed to save character file', err instanceof Error ? err : new Error(String(err)), { userId });
+  }
+}
 
 const TRADES_FILE = path.join(process.cwd(), 'data', 'trades.json');
 
@@ -24,7 +43,7 @@ class TradingManager {
     if (!fs.existsSync(TRADES_FILE)) {
       const tmp = TRADES_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify({ completed: [], stats: {} }, undefined, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify({ completed: [], stats: {} }, undefined, 2), 'utf8');
 
       fs.renameSync(tmp, TRADES_FILE);
     }
@@ -53,7 +72,7 @@ class TradingManager {
       const identity = (_key, value) => value;
       const tmp = TRADES_FILE + '.tmp';
 
-      fs.writeFileSync(tmp, JSON.stringifyJSON.stringify(data, identity, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(data, identity, 2), 'utf8');
 
       fs.renameSync(tmp, TRADES_FILE);
     } catch (error) {
@@ -180,18 +199,15 @@ class TradingManager {
 
   _rollbackTrade(trade, initGold, tgtGold, initInv, tgtInv) {
     try {
-      const econ = require('./economy.js');
-      if (!econ.economyManager) throw new Error('economyManager unavailable');
-      const ed = econ.economyManager.economyData;
+      const ed = economyManager.economyData;
       ed.userBalances[trade.initiator] = Math.max(0, initGold);
       ed.userBalances[trade.target] = Math.max(0, tgtGold);
 
-      const rpg = require('./rpg.js');
       for (const [uid, inv] of [[trade.initiator, initInv], [trade.target, tgtInv]]) {
-        const c = rpg.getCharacter(uid);
+        const c = getCharacter(uid);
         if (c) {
           c.inventory = JSON.parse(JSON.stringify(inv));
-          rpg.saveCharacter(uid, c);
+          _saveCharacterFile(uid, c);
         }
       }
 

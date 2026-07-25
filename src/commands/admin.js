@@ -1,7 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, MessageFlags } from 'discord.js';
 
 import { logger } from '../logger.js';
-
 import { warnUser, muteUser, banUser, kickUser, getUserWarnings, getModActions, getUserModStats, checkAutoMod } from '../moderation.js';
 import { updateUserStats } from '../achievements.js';
 
