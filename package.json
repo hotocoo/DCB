@@ -31,7 +31,8 @@
     "clean": "rm -rf node_modules package-lock.json && npm install",
     "logs:clean": "rm -rf logs/*.log",
     "docker:build": "docker build -t athena-bot .",
-    "docker:run": "docker run -d --name athena-bot --env-file .env athena-bot"
+    "docker:run": "docker run -d --name athena-bot --env-file .env athena-bot",
+    "rebuild": "node-gyp rebuild"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -58,7 +59,7 @@
     "@discordjs/voice": "^0.16.1",
     "@distube/ytdl-core": "^4.16.12",
     "axios": "^1.6.0",
-    "better-sqlite3": "^9.4.3",
+    "better-sqlite3": "^13.0.1",
     "discord.js": "^14.16.0",
     "dotenv": "^16.3.1",
     "ffmpeg-static": "^5.2.0",
