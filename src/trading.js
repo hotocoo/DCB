@@ -1,593 +1,317 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const RPG_DIR = path.join(process.cwd(), 'data', 'characters');
-
-// eslint-disable-next-line import/no-cycle -- errorHandler -> interactionHandlers cycle is pre-existing
+import { getDb } from './database.js';
 import { getCharacter, addItemToInventory, removeItemFromInventory } from './rpg.js';
 import { getBalance, subtractBalance, addBalance } from './economy.js';
-import { economyManager } from './economy.js';
 import { logger } from './logger.js';
 
-function _ensureRpgDir() {
-  if (!fs.existsSync(RPG_DIR)) fs.mkdirSync(RPG_DIR, { recursive: true });
-}
+const OLD_TRADES_FILE = path.join(process.cwd(), 'data', 'trades.json');
+const OLD_RPG_DIR = path.join(process.cwd(), 'data', 'characters');
 
-function _saveCharacterFile(userId, character) {
+// Ephemeral in-memory stores — safe to lose on restart
+const activeTrades = new Map(); // short-lived trade sessions
+const auctions = new Map(); // auction house listings
+
+function migrateFromJson() {
+  const db = getDb();
+  if (!db.prepare('SELECT name FROM sqlite_master WHERE type="table" AND name="trades"').get()) return;
+  if (!fs.existsSync(OLD_TRADES_FILE)) return;
+
   try {
-    _ensureRpgDir();
-    const filePath = path.join(RPG_DIR, `${userId}.json`);
-    const tmp = `${filePath}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(character, null, 2), 'utf8');
-    fs.renameSync(tmp, filePath);
-  } catch (err) {
-    logger.error('Failed to save character file', err instanceof Error ? err : new Error(String(err)), { userId });
-  }
+    const data = JSON.parse(fs.readFileSync(OLD_TRADES_FILE, 'utf8')) || {};
+
+    for (const t of Array.isArray(data.completed) ? data.completed : []) {
+      db.prepare('INSERT INTO trades (id, trade_data) VALUES (?, ?)').run(t.id, JSON.stringify(t));
+    }
+
+    // Migrate stats into user_settings table
+    for (const [uid, stats] of Object.entries(data.stats || {})) {
+      let settings;
+      try { settings = JSON.parse(db.prepare('SELECT settings_data FROM user_settings WHERE user_id = ?').get(uid)?.settings_data || '{}'); } catch { settings = {}; }
+      if (!settings.tradeStats) settings.tradeStats = stats;
+      db.prepare('INSERT OR REPLACE INTO user_settings (user_id, settings_data) VALUES (?, ?)').run(uid, JSON.stringify(settings));
+    }
+
+    logger.info(`Migrated ${data.completed?.length || 0} completed trades to SQLite`);
+  } catch (err) { logger.error('Trade migration failed', err instanceof Error ? err : new Error(String(err))); }
 }
 
-const TRADES_FILE = path.join(process.cwd(), 'data', 'trades.json');
+function updateStat(userId, key, delta) {
+  const db = getDb();
+  let settings;
+  try { settings = JSON.parse(db.prepare('SELECT settings_data FROM user_settings WHERE user_id = ?').get(userId)?.settings_data || '{}'); } catch { settings = {}; }
+  if (!settings.tradeStats) settings.tradeStats = { trades_completed: 0, gold_traded: 0, items_traded: 0 };
+  settings.tradeStats[key] = (settings.tradeStats[key] || 0) + delta;
+  db.prepare('INSERT OR REPLACE INTO user_settings (user_id, settings_data) VALUES (?, ?)').run(userId, JSON.stringify(settings));
+}
 
-// Advanced Trading System for Player Economy
-class TradingManager {
-  constructor() {
-    this.ensureStorage();
-    this.loadTrades();
-    this.activeTrades = new Map(); // In-memory storage for active trade sessions
-  }
+function getTradeStat(userId) {
+  const db = getDb();
+  let settings;
+  try { settings = JSON.parse(db.prepare('SELECT settings_data FROM user_settings WHERE user_id = ?').get(userId)?.settings_data || '{}'); } catch { settings = {}; }
+  return settings.tradeStats || { trades_completed: 0, gold_traded: 0, items_traded: 0 };
+}
 
-  ensureStorage() {
-    const dir = path.dirname(TRADES_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(TRADES_FILE)) {
-      const tmp = TRADES_FILE + '.tmp';
+// Save completed trade to SQLite
+function saveTrade(trade) {
+  const db = getDb();
+  db.prepare('INSERT INTO trades (id, trade_data) VALUES (?, ?)').run(trade.id, JSON.stringify(trade));
+}
 
-      fs.writeFileSync(tmp, JSON.stringify({ completed: [], stats: {} }, undefined, 2), 'utf8');
+export function createTradeRequest(initiatorId, targetUserId, offeredItems, requestedItems, offeredGold = 0, requestedGold = 0) {
+  if (!initiatorId || !targetUserId || typeof initiatorId !== 'string' || typeof targetUserId !== 'string') return { success: false, reason: 'invalid_user_ids' };
+  if (initiatorId === targetUserId) return { success: false, reason: 'cannot_trade_with_self' };
+  if (!Number.isFinite(offeredGold) || offeredGold < 0) return { success: false, reason: 'invalid_offered_gold' };
+  if (!Number.isFinite(requestedGold) || requestedGold < 0) return { success: false, reason: 'invalid_requested_gold' };
 
-      fs.renameSync(tmp, TRADES_FILE);
-    }
-  }
+  const trade = {
+    id: `trade_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`, initiator: initiatorId, target: targetUserId, status: 'pending', created: Date.now(),
+    offer: { items: Array.isArray(offeredItems) ? offeredItems : [], gold: offeredGold }, request: { items: Array.isArray(requestedItems) ? requestedItems : [], gold: requestedGold }, responses: {},
+  };
 
-  loadTrades() {
-    try {
-      // readFileSync without encoding returns a Buffer; JSON.parse accepts it.
-      const data = JSON.parse(fs.readFileSync(TRADES_FILE));
-      this.completedTrades = data.completed || [];
-      this.tradeStats = data.stats || {};
-    } catch (error) {
-      logger.error('Failed to load trades', error);
-      this.completedTrades = [];
-      this.tradeStats = {};
-    }
-  }
+  activeTrades.set(trade.id, trade);
+  return { success: true, trade };
+}
 
-  saveTrades() {
-    try {
-      const data = {
-        completed: this.completedTrades,
-        stats: this.tradeStats,
-      };
-      // unicorn/no-null: JSON.stringify replacer is a no-op (identity) here, so we use a typed placeholder.
-      const identity = (_key, value) => value;
-      const tmp = TRADES_FILE + '.tmp';
+export function acceptTrade(tradeId, userId) {
+  const trade = activeTrades.get(tradeId);
+  if (!trade) return { success: false, reason: 'trade_not_found' };
+  if (trade.target !== userId) return { success: false, reason: 'not_trade_target' };
+  if (trade.status !== 'pending') return { success: false, reason: 'trade_not_pending' };
+  trade.status = 'accepted';
+  trade.acceptedAt = Date.now();
+  return { success: true, trade };
+}
 
-      fs.writeFileSync(tmp, JSON.stringify(data, identity, 2), 'utf8');
+export function declineTrade(tradeId, userId) {
+  const trade = activeTrades.get(tradeId);
+  if (!trade) return { success: false, reason: 'trade_not_found' };
+  if (trade.target !== userId && trade.initiator !== userId) return { success: false, reason: 'not_involved_in_trade' };
+  trade.status = 'declined';
+  trade.declinedAt = Date.now();
+  saveTrade(trade);
+  activeTrades.delete(tradeId);
+  return { success: true };
+}
 
-      fs.renameSync(tmp, TRADES_FILE);
-    } catch (error) {
-      logger.error('Failed to save trades', error);
-    }
-  }
+export function cancelTrade(tradeId, userId) {
+  const trade = activeTrades.get(tradeId);
+  if (!trade) return { success: false, reason: 'trade_not_found' };
+  if (trade.initiator !== userId) return { success: false, reason: 'not_trade_initiator' };
+  trade.status = 'cancelled';
+  trade.cancelledAt = Date.now();
+  saveTrade(trade);
+  activeTrades.delete(tradeId);
+  return { success: true };
+}
 
-  // Trade Creation and Management
-  // eslint-disable-next-line max-params -- public API: offer/request pair is the documented contract
-  createTradeRequest(initiatorId, targetUserId, offeredItems, requestedItems, offeredGold = 0, requestedGold = 0) {
-    if (!initiatorId || !targetUserId || typeof initiatorId !== 'string' || typeof targetUserId !== 'string') {
-      return { success: false, reason: 'invalid_user_ids' };
-    }
-    if (initiatorId === targetUserId) {
-      return { success: false, reason: 'cannot_trade_with_self' };
-    }
-    if (!Number.isFinite(offeredGold) || offeredGold < 0) {
-      return { success: false, reason: 'invalid_offered_gold' };
-    }
-    if (!Number.isFinite(requestedGold) || requestedGold < 0) {
-      return { success: false, reason: 'invalid_requested_gold' };
-    }
+// Atomic execute with snapshot+rollback on failure
+export function executeTrade(tradeId) {
+  const trade = activeTrades.get(tradeId);
+  if (!trade) return { success: false, reason: 'trade_not_found' };
+  if (trade.status !== 'accepted') return { success: false, reason: 'trade_not_accepted' };
 
-    const tradeId = `trade_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  const iChar = getCharacter(trade.initiator);
+  const tChar = getCharacter(trade.target);
+  if (!iChar || !tChar) return { success: false, reason: 'character_not_found' };
 
-    const trade = {
-      id: tradeId,
-      initiator: initiatorId,
-      target: targetUserId,
-      status: 'pending',
-      created: Date.now(),
-      offer: {
-        items: Array.isArray(offeredItems) ? offeredItems : [],
-        gold: offeredGold,
-      },
-      request: {
-        items: Array.isArray(requestedItems) ? requestedItems : [],
-        gold: requestedGold,
-      },
-      responses: {},
-    };
+  // Snapshots for rollback
+  const initGoldBefore = getBalance(trade.initiator);
+  const tgtGoldBefore = getBalance(trade.target);
+  const initInvBefore = JSON.parse(JSON.stringify(iChar.inventory || {}));
+  const tgtInvBefore = JSON.parse(JSON.stringify(tChar.inventory || {}));
 
-    this.activeTrades.set(tradeId, trade);
-    return { success: true, trade };
-  }
-
-  acceptTrade(tradeId, userId) {
-    const trade = this.activeTrades.get(tradeId);
-    if (!trade) return { success: false, reason: 'trade_not_found' };
-    if (trade.target !== userId) return { success: false, reason: 'not_trade_target' };
-    if (trade.status !== 'pending') return { success: false, reason: 'trade_not_pending' };
-
-    trade.status = 'accepted';
-    trade.acceptedAt = Date.now();
-    return { success: true, trade };
-  }
-
-  declineTrade(tradeId, userId) {
-    const trade = this.activeTrades.get(tradeId);
-    if (!trade) return { success: false, reason: 'trade_not_found' };
-    if (trade.target !== userId && trade.initiator !== userId) {
-      return { success: false, reason: 'not_involved_in_trade' };
-    }
-
-    trade.status = 'declined';
-    trade.declinedAt = Date.now();
-
-    // Move to completed trades
-    this.completedTrades.push({ ...trade });
-    this.activeTrades.delete(tradeId);
-
-    this.saveTrades();
-    return { success: true };
-  }
-
-  cancelTrade(tradeId, userId) {
-    const trade = this.activeTrades.get(tradeId);
-    if (!trade) return { success: false, reason: 'trade_not_found' };
-    if (trade.initiator !== userId) return { success: false, reason: 'not_trade_initiator' };
-
-    trade.status = 'cancelled';
-    trade.cancelledAt = Date.now();
-
-    // Move to completed trades
-    this.completedTrades.push({ ...trade });
-    this.activeTrades.delete(tradeId);
-
-    this.saveTrades();
-    return { success: true };
-  }
-
-  executeTrade(tradeId) {
-    const trade = this.activeTrades.get(tradeId);
-    if (!trade) return { success: false, reason: 'trade_not_found' };
-    if (trade.status !== 'accepted') return { success: false, reason: 'trade_not_accepted' };
-
-    // CRITICAL FIX: atomic all-or-nothing with snapshot+rollback.
-    // Old version transferred gold first THEN items — if item transfer failed halfway,
-    // gold was lost permanently. Now we restore everything on any failure.
-    const characters = this._resolveTradeCharacters(trade);
-    if (!characters.ok) return characters;
-
-    const initiatorChar = getCharacter(trade.initiator);
-    const targetChar = getCharacter(trade.target);
-    const initGoldBefore = getBalance(trade.initiator);
-    const tgtGoldBefore = getBalance(trade.target);
-    const initInvBefore = JSON.parse(JSON.stringify(initiatorChar.inventory || {}));
-    const tgtInvBefore = JSON.parse(JSON.stringify(targetChar.inventory || {}));
-
-    try {
-      const goldResult = this._transferGoldForTrade(trade);
-      if (!goldResult.ok) return goldResult;
-
-      const itemResult = this._transferItemsForTrade(trade);
-      if (!itemResult.ok) return itemResult;
-
-      return this._finalizeTrade(tradeId, trade);
-    } catch (error) {
-      logger.error('executeTrade failed — full rollback', error instanceof Error ? error : new Error(String(error)), { tradeId });
-      this._rollbackTrade(trade, initGoldBefore, tgtGoldBefore, initInvBefore, tgtInvBefore);
-      return { success: false, reason: 'trade_rolled_back_on_error' };
-    }
-  }
-
-  _rollbackTrade(trade, initGold, tgtGold, initInv, tgtInv) {
-    try {
-      const ed = economyManager.economyData;
-      ed.userBalances[trade.initiator] = Math.max(0, initGold);
-      ed.userBalances[trade.target] = Math.max(0, tgtGold);
-
-      for (const [uid, inv] of [[trade.initiator, initInv], [trade.target, tgtInv]]) {
-        const c = getCharacter(uid);
-        if (c) {
-          c.inventory = JSON.parse(JSON.stringify(inv));
-          _saveCharacterFile(uid, c);
-        }
-      }
-
-      trade.status = 'failed';
-      trade.failedAt = Date.now();
-      this.completedTrades.push({ ...trade });
-      this.activeTrades.delete(trade.id);
-      this.saveTrades();
-    } catch (rbErr) {
-      logger.error('CRITICAL: trade rollback failed — manual intervention needed', rbErr instanceof Error ? rbErr : new Error(String(rbErr)), { tradeId: trade.id });
-    }
-  }
-
-  _resolveTradeCharacters(trade) {
-    const initiatorChar = getCharacter(trade.initiator);
-    const targetChar = getCharacter(trade.target);
-    if (!initiatorChar || !targetChar) {
-      return { success: false, reason: 'character_not_found' };
-    }
-    return { ok: true };
-  }
-
-  _transferGoldForTrade(trade) {
+  try {
+    // Transfer gold
     if (trade.offer.gold > 0) {
-      if (getBalance(trade.initiator) < trade.offer.gold) {
-        return { success: false, reason: 'insufficient_gold_initiator' };
-      }
+      if (getBalance(trade.initiator) < trade.offer.gold) return { success: false, reason: 'insufficient_gold_initiator' };
       subtractBalance(trade.initiator, trade.offer.gold);
       addBalance(trade.target, trade.offer.gold);
     }
     if (trade.request.gold > 0) {
-      if (getBalance(trade.target) < trade.request.gold) {
-        return { success: false, reason: 'insufficient_gold_target' };
-      }
+      if (getBalance(trade.target) < trade.request.gold) return { success: false, reason: 'insufficient_gold_target' };
       subtractBalance(trade.target, trade.request.gold);
       addBalance(trade.initiator, trade.request.gold);
     }
-    return { ok: true };
-  }
 
-  _transferItemsForTrade(trade) {
-    for (const itemId of trade.offer.items) {
-      const result = removeItemFromInventory(trade.initiator, itemId, 1);
-      if (!result.success) {
-        return { success: false, reason: 'item_transfer_failed' };
-      }
-      addItemToInventory(trade.target, itemId, 1);
-    }
-    for (const itemId of trade.request.items) {
-      const result = removeItemFromInventory(trade.target, itemId, 1);
-      if (!result.success) {
-        return { success: false, reason: 'item_transfer_failed' };
-      }
-      addItemToInventory(trade.initiator, itemId, 1);
-    }
-    return { ok: true };
-  }
+    // Transfer items (offer goes to target, request goes to initiator)
+    for (const itemId of trade.offer.items) { if (!removeItemFromInventory(trade.initiator, itemId)) return rollbackAndFail(trade, initGoldBefore, tgtGoldBefore, initInvBefore, tgtInvBefore); addItemToInventory(trade.target, itemId); }
+    for (const itemId of trade.request.items) { if (!removeItemFromInventory(trade.target, itemId)) return rollbackAndFail(trade, initGoldBefore, tgtGoldBefore, initInvBefore, tgtInvBefore); addItemToInventory(trade.initiator, itemId); }
 
-  _finalizeTrade(tradeId, trade) {
+    // Success — finalize
     trade.status = 'completed';
     trade.completedAt = Date.now();
+    saveTrade(trade);
+    activeTrades.delete(tradeId);
 
-    // Move to completed trades
-    this.completedTrades.push({ ...trade });
-    this.activeTrades.delete(tradeId);
+    updateStat(trade.initiator, 'trades_completed', 1);
+    updateStat(trade.initiator, 'gold_traded', trade.offer.gold + trade.request.gold);
+    updateStat(trade.initiator, 'items_traded', trade.offer.items.length + trade.request.items.length);
+    updateStat(trade.target, 'trades_completed', 1);
+    updateStat(trade.target, 'gold_traded', trade.offer.gold + trade.request.gold);
+    updateStat(trade.target, 'items_traded', trade.offer.items.length + trade.request.items.length);
 
-    // Update trade statistics
-    this.updateTradeStats(trade);
-
-    this.saveTrades();
     return { success: true, trade };
-  }
-
-  updateTradeStats(trade) {
-    const initiatorId = trade.initiator;
-    const targetId = trade.target;
-
-    // Trade IDs originate from authenticated trade sessions, not user input — safe to bracket-index.
-    /* eslint-disable security/detect-object-injection */
-    if (!this.tradeStats[initiatorId]) {
-      this.tradeStats[initiatorId] = { trades_completed: 0, gold_traded: 0, items_traded: 0 };
-    }
-    if (!this.tradeStats[targetId]) {
-      this.tradeStats[targetId] = { trades_completed: 0, gold_traded: 0, items_traded: 0 };
-    }
-
-    const initiatorStats = this.tradeStats[initiatorId];
-    const targetStats = this.tradeStats[targetId];
-    /* eslint-enable security/detect-object-injection */
-
-    initiatorStats.trades_completed++;
-    initiatorStats.gold_traded += trade.offer.gold + trade.request.gold;
-    initiatorStats.items_traded += trade.offer.items.length + trade.request.items.length;
-
-    targetStats.trades_completed++;
-    targetStats.gold_traded += trade.offer.gold + trade.request.gold;
-    targetStats.items_traded += trade.offer.items.length + trade.request.items.length;
-  }
-
-  // Trade Browsing and Market System
-  getTradeListings(limit = 20) {
-    // Return recent completed trades for market research
-    return this.completedTrades
-      .filter((trade) => trade.status === 'completed')
-      .sort((a, b) => b.completedAt - a.completedAt)
-      .slice(0, limit);
-  }
-
-  getUserTradeHistory(userId, limit = 10) {
-    return this.completedTrades
-      .filter((trade) => (trade.initiator === userId || trade.target === userId) && trade.status === 'completed')
-      .sort((a, b) => b.completedAt - a.completedAt)
-      .slice(0, limit);
-  }
-
-  getTradeStats(userId) {
-    // userId is a Discord ID, not a user-supplied property name — safe to bracket-index.
-    // eslint-disable-next-line security/detect-object-injection
-    return this.tradeStats[userId] || { trades_completed: 0, gold_traded: 0, items_traded: 0 };
-  }
-
-  // Auction House System
-  createAuction(itemId, startingBid, durationHours = 24, sellerId) {
-    if (!sellerId || typeof sellerId !== 'string') return { success: false, reason: 'invalid_seller' };
-    if (!itemId || typeof itemId !== 'string') return { success: false, reason: 'invalid_item' };
-    if (!Number.isFinite(startingBid) || startingBid <= 0) return { success: false, reason: 'invalid_starting_bid' };
-    if (!Number.isFinite(durationHours) || durationHours < 1 || durationHours > 720) return { success: false, reason: 'invalid_duration' };
-
-    const auctionId = `auction_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-
-    const auction = {
-      id: auctionId,
-      itemId,
-      seller: sellerId,
-      startingBid,
-      currentBid: startingBid,
-      highestBidder: undefined,
-      bids: [],
-      status: 'active',
-      created: Date.now(),
-      ends: Date.now() + durationHours * 60 * 60 * 1000,
-      buyoutPrice: startingBid * 3, // Buyout at 3x starting price
-    };
-
-    this.auctions = this.auctions || new Map();
-    this.auctions.set(auctionId, auction);
-
-    return { success: true, auction };
-  }
-
-  placeBid(auctionId, bidderId, bidAmount) {
-    const auction = this.auctions?.get(auctionId);
-    if (!auction) return { success: false, reason: 'auction_not_found' };
-    if (auction.status !== 'active') return { success: false, reason: 'auction_ended' };
-    if (Date.now() > auction.ends) {
-      auction.status = 'ended';
-      return { success: false, reason: 'auction_expired' };
-    }
-    if (!Number.isFinite(bidAmount) || bidAmount <= 0) return { success: false, reason: 'invalid_bid_amount' };
-    if (bidderId === auction.highestBidder) return { success: false, reason: 'already_highest_bidder' };
-    if (bidAmount <= auction.currentBid) return { success: false, reason: 'bid_too_low' };
-    // Bidder must actually have the gold they are committing.
-    if (getBalance(bidderId) < bidAmount) return { success: false, reason: 'insufficient_funds' };
-
-    // Refund previous highest bidder if exists (atomic-ish: do all updates before any external IO)
-    if (auction.highestBidder && auction.highestBidder !== bidderId) {
-      addBalance(auction.highestBidder, auction.currentBid);
-    }
-    // Deduct the new bidder's bid amount up front (refunded when outbid or paid at settlement).
-    subtractBalance(bidderId, bidAmount);
-
-    auction.currentBid = bidAmount;
-    auction.highestBidder = bidderId;
-    auction.bids.push({
-      bidder: bidderId,
-      amount: bidAmount,
-      timestamp: Date.now(),
-    });
-
-    return { success: true, auction };
-  }
-
-  buyoutAuction(auctionId, buyerId) {
-    const auction = this.auctions?.get(auctionId);
-    if (!auction) return { success: false, reason: 'auction_not_found' };
-    if (auction.status !== 'active') return { success: false, reason: 'auction_ended' };
-
-    // Buyer must have the gold. Refund any prior high bidder (their held bid), then debit buyer.
-    const price = auction.buyoutPrice;
-    if (getBalance(buyerId) < price) return { success: false, reason: 'insufficient_funds' };
-    if (auction.highestBidder && auction.highestBidder !== buyerId) {
-      addBalance(auction.highestBidder, auction.currentBid);
-    }
-    subtractBalance(buyerId, price);
-
-    auction.status = 'sold';
-    auction.buyer = buyerId;
-    auction.finalPrice = price;
-    auction.soldAt = Date.now();
-
-    return { success: true, auction };
-  }
-
-  getActiveAuctions(limit = 20) {
-    if (!this.auctions) return [];
-
-    const now = Date.now();
-    return [...this.auctions.values()]
-      .filter((auction) => auction.status === 'active' && auction.ends > now)
-      .sort((a, b) => b.currentBid - a.currentBid)
-      .slice(0, limit);
-  }
-
-  // Market Price Tracking
-  getMarketPrices(itemId, days = 7) {
-    const cutoffTime = Date.now() - days * 24 * 60 * 60 * 1000;
-
-    const relevantTrades = this.completedTrades.filter((trade) => {
-      const tradeTime = trade.completedAt || trade.created;
-      return tradeTime > cutoffTime && (trade.offer.items.includes(itemId) || trade.request.items.includes(itemId));
-    });
-
-    if (relevantTrades.length === 0) {
-      return { average: 0, min: 0, max: 0, trades: 0 };
-    }
-
-    const prices = relevantTrades.map((trade) => {
-      // Calculate price based on gold involved in trade
-      return trade.offer.gold + trade.request.gold || 50; // Use gold amount or default
-    });
-
-    return {
-      average: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length),
-      min: Math.min(...prices),
-      max: Math.max(...prices),
-      trades: prices.length,
-    };
-  }
-
-  // Trade Security and Validation — REAL validation (no more stubs)
-  validateTradeOffer(userId, offeredItems, offeredGold) {
-    const result = { valid: true, missingItems: [], insufficientGold: false };
-
-    // Check gold
-    if (offeredGold > 0 && getBalance(userId) < offeredGold) {
-      result.insufficientGold = true;
-      result.valid = false;
-    }
-
-    // Check items are actually owned
-    const char = getCharacter(userId);
-    if (!char || !char.inventory) return { valid: false, missingItems: offeredItems || [], reason: 'no_character' };
-
-    for (const itemId of (offeredItems || [])) {
-      if (!char.inventory[itemId]) {
-        result.missingItems.push(itemId);
-        result.valid = false;
-      }
-    }
-
-    return result;
-  }
-
-  // eslint-disable-next-line no-unused-vars -- reserved for future item validation rules (e.g., banned items)
-  validateTradeRequest(_userId, _requestedItems, _requestedGold) {
-    return { valid: true };
-  }
-
-  // Trade Analytics
-  getTradeAnalytics(userId) {
-    const userTrades = this.completedTrades.filter((trade) => trade.initiator === userId || trade.target === userId);
-
-    const successfulTrades = userTrades.filter((t) => t.status === 'completed');
-    const totalValue = successfulTrades.reduce((sum, trade) => sum + trade.offer.gold + trade.request.gold, 0);
-
-    return {
-      totalTrades: userTrades.length,
-      successfulTrades: successfulTrades.length,
-      totalValueTraded: totalValue,
-      successRate: userTrades.length > 0 ? (successfulTrades.length / userTrades.length) * 100 : 0,
-      averageTradeValue: successfulTrades.length > 0 ? totalValue / successfulTrades.length : 0,
-    };
-  }
-
-  // Cleanup expired trades and auctions
-  cleanup() {
-    const now = Date.now();
-
-    // Clean up expired active trades (older than 24 hours)
-    for (const [tradeId, trade] of this.activeTrades) {
-      if (now - trade.created > 24 * 60 * 60 * 1000) {
-        trade.status = 'expired';
-        this.completedTrades.push({ ...trade });
-        this.activeTrades.delete(tradeId);
-      }
-    }
-
-    // Clean up ended auctions — must NOT auto-mark sold here.
-    // Seller payment + item transfer happens at settlement time, not in background cleanup which cannot handle partial failures safely.
-    if (this.auctions) {
-      for (const [, auction] of this.auctions.entries()) {
-        if (auction.status === 'active' && now > auction.ends) {
-          auction.status = 'ended';
-        }
-      }
-    }
-
-    this.saveTrades();
+  } catch (error) {
+    logger.error('executeTrade failed — rolling back', error instanceof Error ? error : new Error(String(error)), { tradeId });
+    return rollbackAndFail(trade, initGoldBefore, tgtGoldBefore, initInvBefore, tgtInvBefore);
   }
 }
 
-// Export singleton instance
-export const tradingManager = new TradingManager();
+function rollbackAndFail(trade, iGold, tGold, iInv, tInv) {
+  try {
+    // Restore gold via direct economy calls (bypass to ensure rollback works even if normal path fails)
+    const db = getDb();
+    db.prepare('INSERT OR REPLACE INTO balances (user_id, amount) VALUES (?, ?)').run(trade.initiator, Math.max(0, iGold));
+    db.prepare('INSERT OR REPLACE INTO balances (user_id, amount) VALUES (?, ?)').run(trade.target, Math.max(0, tGold));
 
-// Convenience functions
-// eslint-disable-next-line max-params -- mirrors class method createTradeRequest
-export function createTradeRequest(initiatorId, targetUserId, offeredItems, requestedItems, offeredGold = 0, requestedGold = 0) {
-  return tradingManager.createTradeRequest(initiatorId, targetUserId, offeredItems, requestedItems, offeredGold, requestedGold);
+    // Restore inventories via RPG saveCharacter (uses SQLite now)
+    const { saveCharacter } = require('./rpg.js');
+    const iChar = getCharacter(trade.initiator); if (iChar) { iChar.inventory = JSON.parse(JSON.stringify(iInv)); saveCharacter(trade.initiator, iChar); }
+    const tChar = getCharacter(trade.target); if (tChar) { tChar.inventory = JSON.parse(JSON.stringify(tInv)); saveCharacter(trade.target, tChar); }
+
+    trade.status = 'failed';
+    trade.failedAt = Date.now();
+    saveTrade(trade);
+    activeTrades.delete(trade.id);
+  } catch (rbErr) { logger.error('CRITICAL: trade rollback failed — manual intervention needed', rbErr instanceof Error ? rbErr : new Error(String(rbErr)), { tradeId: trade.id }); }
+
+  return { success: false, reason: 'trade_rolled_back_on_error' };
 }
 
-export function acceptTrade(tradeId, userId) {
-  return tradingManager.acceptTrade(tradeId, userId);
-}
-
-export function declineTrade(tradeId, userId) {
-  return tradingManager.declineTrade(tradeId, userId);
-}
-
-export function cancelTrade(tradeId, userId) {
-  return tradingManager.cancelTrade(tradeId, userId);
-}
-
-export function executeTrade(tradeId) {
-  return tradingManager.executeTrade(tradeId);
-}
-
+// Market queries
 export function getTradeListings(limit = 20) {
-  return tradingManager.getTradeListings(limit);
+  migrateFromJson();
+  const db = getDb();
+  const rows = db.prepare('SELECT trade_data FROM trades ORDER BY id DESC LIMIT ?').all(limit);
+  return rows.map((r) => JSON.parse(r.trade_data)).filter((t) => t.status === 'completed');
 }
 
 export function getUserTradeHistory(userId, limit = 10) {
-  return tradingManager.getUserTradeHistory(userId, limit);
+  migrateFromJson();
+  const db = getDb();
+  const all = db.prepare('SELECT trade_data FROM trades').all().map((r) => JSON.parse(r.trade_data));
+  return all.filter((t) => (t.initiator === userId || t.target === userId) && t.status === 'completed')
+    .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0)).slice(0, limit);
 }
 
-export function getTradeStats(userId) {
-  return tradingManager.getTradeStats(userId);
-}
+export function getTradeStats(userId) { return getTradeStat(userId); }
 
-export function createAuction(itemId, startingBid, durationHours, sellerId) {
-  return tradingManager.createAuction(itemId, startingBid, durationHours, sellerId);
+// Auction house
+export function createAuction(itemId, startingBid, durationHours = 24, sellerId) {
+  if (!sellerId || typeof sellerId !== 'string') return { success: false, reason: 'invalid_seller' };
+  if (!itemId || typeof itemId !== 'string') return { success: false, reason: 'invalid_item' };
+  if (!Number.isFinite(startingBid) || startingBid <= 0) return { success: false, reason: 'invalid_starting_bid' };
+  if (!Number.isFinite(durationHours) || durationHours < 1 || durationHours > 720) return { success: false, reason: 'invalid_duration' };
+
+  const auction = {
+    id: `auction_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`, itemId, seller: sellerId, startingBid, currentBid: startingBid, highestBidder: undefined,
+    bids: [], status: 'active', created: Date.now(), ends: Date.now() + durationHours * 3_600_000, buyoutPrice: startingBid * 3,
+  };
+
+  auctions.set(auction.id, auction);
+  return { success: true, auction };
 }
 
 export function placeBid(auctionId, bidderId, bidAmount) {
-  return tradingManager.placeBid(auctionId, bidderId, bidAmount);
+  const auction = auctions.get(auctionId);
+  if (!auction) return { success: false, reason: 'auction_not_found' };
+  if (auction.status !== 'active') return { success: false, reason: 'auction_ended' };
+  if (Date.now() > auction.ends) { auction.status = 'ended'; return { success: false, reason: 'auction_expired' }; }
+  if (!Number.isFinite(bidAmount) || bidAmount <= 0) return { success: false, reason: 'invalid_bid_amount' };
+  if (bidderId === auction.highestBidder) return { success: false, reason: 'already_highest_bidder' };
+  if (bidAmount <= auction.currentBid) return { success: false, reason: 'bid_too_low' };
+  if (getBalance(bidderId) < bidAmount) return { success: false, reason: 'insufficient_funds' };
+
+  // Refund previous high bidder and deduct new bid up front
+  if (auction.highestBidder && auction.highestBidder !== bidderId) addBalance(auction.highestBidder, auction.currentBid);
+  subtractBalance(bidderId, bidAmount);
+
+  auction.currentBid = bidAmount;
+  auction.highestBidder = bidderId;
+  auction.bids.push({ bidder: bidderId, amount: bidAmount, timestamp: Date.now() });
+  return { success: true, auction };
 }
 
 export function buyoutAuction(auctionId, buyerId) {
-  return tradingManager.buyoutAuction(auctionId, buyerId);
+  const auction = auctions.get(auctionId);
+  if (!auction) return { success: false, reason: 'auction_not_found' };
+  if (auction.status !== 'active') return { success: false, reason: 'auction_ended' };
+
+  const price = auction.buyoutPrice;
+  if (getBalance(buyerId) < price) return { success: false, reason: 'insufficient_funds' };
+
+  if (auction.highestBidder && auction.highestBidder !== buyerId) addBalance(auction.highestBidder, auction.currentBid);
+  subtractBalance(buyerId, price);
+
+  auction.status = 'sold';
+  auction.buyer = buyerId;
+  auction.finalPrice = price;
+  auction.soldAt = Date.now();
+  return { success: true, auction };
 }
 
 export function getActiveAuctions(limit = 20) {
-  return tradingManager.getActiveAuctions(limit);
+  const now = Date.now();
+  return [...auctions.values()].filter((a) => a.status === 'active' && a.ends > now).sort((a, b) => b.currentBid - a.currentBid).slice(0, limit);
 }
 
+// Market price tracking from historical trades
 export function getMarketPrices(itemId, days = 7) {
-  return tradingManager.getMarketPrices(itemId, days);
+  migrateFromJson();
+  const cutoff = Date.now() - days * 86_400_000;
+  const all = db.prepare('SELECT trade_data FROM trades').all().map((r) => JSON.parse(r.trade_data));
+  const relevant = all.filter((t) => {
+    const time = t.completedAt || t.created;
+    return time > cutoff && (t.offer?.items.includes(itemId) || t.request?.items.includes(itemId));
+  });
+
+  if (!relevant.length) return { average: 0, min: 0, max: 0, trades: 0 };
+
+  const prices = relevant.map((t) => t.offer.gold + t.request.gold || 50);
+  return { average: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length), min: Math.min(...prices), max: Math.max(...prices), trades: prices.length };
 }
 
+// Trade validation — real checks (not stubs)
+export function validateTradeOffer(userId, offeredItems, offeredGold) {
+  const result = { valid: true, missingItems: [], insufficientGold: false };
+  if (offeredGold > 0 && getBalance(userId) < offeredGold) { result.insufficientGold = true; result.valid = false; }
+
+  const char = getCharacter(userId);
+  if (!char || !char.inventory) return { valid: false, missingItems: offeredItems || [], reason: 'no_character' };
+  for (const itemId of (offeredItems || [])) { if (!char.inventory[itemId]) { result.missingItems.push(itemId); result.valid = false; } }
+
+  return result;
+}
+
+export function validateTradeRequest(_userId, _requestedItems, _requestedGold) { return { valid: true }; } // Future expansion point
+
+// Trade analytics per user
 export function getTradeAnalytics(userId) {
-  return tradingManager.getTradeAnalytics(userId);
+  migrateFromJson();
+  const all = db.prepare('SELECT trade_data FROM trades').all().map((r) => JSON.parse(r.trade_data));
+  const userTrades = all.filter((t) => t.initiator === userId || t.target === userId);
+  const successful = userTrades.filter((t) => t.status === 'completed');
+  const totalValue = successful.reduce((s, t) => s + (t.offer?.gold || 0) + (t.request?.gold || 0), 0);
+
+  return { totalTrades: userTrades.length, successfulTrades: successful.length, totalValueTraded: totalValue, successRate: userTrades.length > 0 ? (successful.length / userTrades.length) * 100 : 0, averageTradeValue: successful.length > 0 ? totalValue / successful.length : 0 };
 }
 
-// Auto-cleanup every 5 minutes. `unref()` is needed so this timer
-// doesn't keep the Node event loop alive in one-shot scripts / CI tests.
-const tradingCleanupInterval = setInterval(
-  () => {
-    tradingManager.cleanup();
-  },
-  5 * 60 * 1000,
-);
-if (typeof tradingCleanupInterval.unref === 'function') {
-  tradingCleanupInterval.unref();
+// Cleanup expired trades and ended auctions every 5 minutes
+function cleanup() {
+  const now = Date.now();
+
+  // Expire active trades older than 24 hours
+  for (const [id, t] of activeTrades.entries()) {
+    if (now - t.created > 86_400_000) { t.status = 'expired'; saveTrade(t); activeTrades.delete(id); }
+  }
+
+  // Mark expired auctions as ended (no auto-settlement — seller/item handling requires user interaction)
+  for (const [, a] of auctions.entries()) { if (a.status === 'active' && now > a.ends) a.status = 'ended'; }
 }
+
+setInterval(cleanup, 300_000).unref?.();
+
+// Backward-compatible singleton API
+export const tradingManager = { createTradeRequest, acceptTrade, declineTrade, cancelTrade, executeTrade, getTradeListings, getUserTradeHistory, getTradeStats, createAuction, placeBid, buyoutAuction, getActiveAuctions, getMarketPrices, validateTradeOffer, validateTradeRequest, getTradeAnalytics };
