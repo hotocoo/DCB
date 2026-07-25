@@ -10,8 +10,35 @@ const PLAYERS_DIR = path.join(process.cwd(), 'data', 'players');
 
 // in-memory cache to reduce fs reads/writes
 let cache;
-// simple per-user locks to avoid concurrent writes
-const locks = new Set();
+// per-user write locks with expiry to prevent deadlocks from forgotten unlocks.
+// Each entry: { lockedUntil: timestamp }
+const locks = new Map();
+const LOCK_TIMEOUT_MS = 5_000; // stale locks auto-release after 5s
+
+/**
+ * Try to acquire a lock for userId. Returns true if acquired, false if already locked.
+ */
+function tryLock(userId) {
+  const now = Date.now();
+  const existing = locks.get(userId);
+  // Auto-release stale locks (prevents deadlock from crashed/hung operations)
+  if (existing && now > existing.lockedUntil) {
+    logger.warn('Releasing stale lock', { userId });
+    locks.delete(userId);
+  }
+  if (!locks.has(userId)) {
+    locks.set(userId, { lockedUntil: now + LOCK_TIMEOUT_MS });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Release lock for userId. Safe to call even if not locked.
+ */
+function unlock(userId) {
+  locks.delete(userId);
+}
 
 // Character classes with unique abilities and stat bonuses
 const CHARACTER_CLASSES = {
@@ -254,11 +281,11 @@ export function createCharacter(userId, name, charClass = 'warrior') {
     throw new CommandError(`Invalid character class: ${charClass}. Available classes: warrior, mage, rogue, paladin`, 'INVALID_ARGUMENT');
   }
 
-  if (locks.has(userId)) {
+  if (!tryLock(userId)) {
     throw new CommandError('Character creation already in progress', 'RATE_LIMITED');
   }
 
-  locks.add(userId);
+  
   try {
     const all = cache || readAll();
     // eslint-disable-next-line security/detect-object-injection
@@ -289,7 +316,7 @@ export function createCharacter(userId, name, charClass = 'warrior') {
     logger.info('Character created', { userId, name: sanitizedName, class: charClass });
     return char;
   } finally {
-    locks.delete(userId);
+    unlock(userId);
   }
 }
 
@@ -389,11 +416,11 @@ export function getCharacter(userId) {
 }
 
 export function saveCharacter(userId, char) {
-  if (locks.has(userId)) {
+  if (!tryLock(userId)) {
     logger.warn(`Save operation blocked for user ${userId} - already locked`);
     return false;
   }
-  locks.add(userId);
+  
   try {
     // Save directly to individual file
     ensureDir();
@@ -412,7 +439,7 @@ export function saveCharacter(userId, char) {
     }
     return true;
   } finally {
-    locks.delete(userId);
+    unlock(userId);
   }
 }
 
@@ -421,9 +448,9 @@ export function getAllCharacters() {
 }
 
 export function resetCharacter(userId, charClass = 'warrior') {
-  if (locks.has(userId)) return;
+  if (!tryLock(userId)) return;
 
-  locks.add(userId);
+  
   try {
     const all = cache || readAll();
     // eslint-disable-next-line security/detect-object-injection
@@ -447,14 +474,14 @@ export function resetCharacter(userId, charClass = 'warrior') {
     writeAll(all);
     return def;
   } finally {
-    locks.delete(userId);
+    unlock(userId);
   }
 }
 
 export function deleteCharacter(userId) {
-  if (locks.has(userId)) return false;
+  if (!tryLock(userId)) return false;
 
-  locks.add(userId);
+  
   try {
     const all = cache || readAll();
     // eslint-disable-next-line security/detect-object-injection
@@ -480,7 +507,7 @@ export function deleteCharacter(userId) {
     }
     return true;
   } finally {
-    locks.delete(userId);
+    unlock(userId);
   }
 }
 
@@ -1138,11 +1165,11 @@ export function spendSkillPoints(userId, stat, amount = 1) {
     throw new CommandError(`Invalid stat. Must be one of: ${validStats.join(', ')}`, 'INVALID_ARGUMENT');
   }
 
-  if (locks.has(userId)) {
+  if (!tryLock(userId)) {
     throw new CommandError('Character update already in progress', 'RATE_LIMITED');
   }
 
-  locks.add(userId);
+  
   try {
     const all = cache || readAll();
     // eslint-disable-next-line security/detect-object-injection
@@ -1212,7 +1239,7 @@ export function spendSkillPoints(userId, stat, amount = 1) {
     logger.info('Skill points spent', { userId, stat, amount, newValue: char[stat] });
     return { success: true, char };
   } finally {
-    locks.delete(userId);
+    unlock(userId);
   }
 }
 

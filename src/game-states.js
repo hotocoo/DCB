@@ -36,20 +36,44 @@ export const memoryGames = new Map();
 export const typingAttempts = new Map();
 
 /**
- * Cleanup expired game states. Games with no activity for >2 hours are removed.
+ * Cleanup expired game states. Games with no activity past their timeout are removed.
  */
 export function cleanupExpiredGameStates() {
   const now = Date.now();
-  const maxAge = 2 * 60 * 60 * 1000; // 2 hours
+
+  // Per-type timeouts (ms): interactive games expire faster than passive state
+  const timeouts = {
+    hangman: 30 * 60 * 1000,       // 30 min
+    wordle: 30 * 60 * 1000,        // 30 min
+    guess: 15 * 60 * 1000,         // 15 min
+    combat: 20 * 60 * 1000,        // 20 min
+    exploration: 15 * 60 * 1000,   // 15 min
+    connect4: 30 * 60 * 1000,      // 30 min
+    trivia: 10 * 60 * 1000,        // 10 min
+    ttt: 15 * 60 * 1000,           // 15 min
+    poll: 120 * 60 * 1000,         // 2 hours (polls are passive)
+    memory: 15 * 60 * 1000,        // 15 min
+    typing: 5 * 60 * 1000,         // 5 min
+  };
 
   const maps = [
-    hangmanGames, wordleGames, guessGames, combatGames, explorationGames,
-    connect4Games, triviaGames, tttGames, pollGames, memoryGames, typingAttempts,
+    { map: hangmanGames, type: 'hangman' }, { map: wordleGames, type: 'wordle' },
+    { map: guessGames, type: 'guess' }, { map: combatGames, type: 'combat' },
+    { map: explorationGames, type: 'exploration' }, { map: connect4Games, type: 'connect4' },
+    { map: triviaGames, type: 'trivia' }, { map: tttGames, type: 'ttt' },
+    { map: pollGames, type: 'poll' }, { map: memoryGames, type: 'memory' },
+    { map: typingAttempts, type: 'typing' },
   ];
 
   let cleaned = 0;
-  for (const map of maps) {
+  for (const { map, type } of maps) {
+    const maxAge = timeouts[type] || 2 * 60 * 60 * 1000; // fallback 2h
     for (const [key, state] of map.entries()) {
+      if (!state) {
+        map.delete(key);
+        cleaned++;
+        continue;
+      }
       const lastActivity = state.lastActivity || state.createdAt || state.startTime || state.timestamp || 0;
       if (lastActivity > 0 && now - lastActivity > maxAge) {
         map.delete(key);
@@ -60,6 +84,6 @@ export function cleanupExpiredGameStates() {
   return cleaned;
 }
 
-// Auto-cleanup every 30 minutes. unref() so this doesn't block process exit in tests/scripts.
-const gameStatesCleanupInterval = setInterval(cleanupExpiredGameStates, 30 * 60 * 1000);
+// Auto-cleanup every 5 minutes (more frequent for shorter timeouts). unref() so this doesn't block process exit in tests/scripts.
+const gameStatesCleanupInterval = setInterval(cleanupExpiredGameStates, 5 * 60 * 1000);
 if (typeof gameStatesCleanupInterval.unref === 'function') gameStatesCleanupInterval.unref();

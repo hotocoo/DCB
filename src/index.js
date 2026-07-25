@@ -114,27 +114,43 @@ const client = new Client({
 // Initialize commands collection with proper typing
 client.commands = /** @type {import('discord.js').Collection<string, Command>} */ (new Collection());
 
-// Initialize database connection and commands
+/**
+ * Bootstrap sequence: initialize DB → load commands → init scheduler.
+ * This promise must be awaited before calling client.login() to avoid a race
+ * where interactions arrive before commands are registered in-memory.
+ */
+let bootstrapPromise;
 let commandStats = { total: 0, loaded: 0 };
-(async () => {
-  try {
-    logger.info('Initializing database connection...');
-    await initializeDatabase();
-    logger.success('Database initialized successfully');
 
-    // Load commands using the new module
-    logger.info('Loading commands...');
-    commandStats = await loadCommands(client);
-    logger.success(`Loaded ${commandStats.loaded} out of ${commandStats.total} commands successfully`);
+try {
+  // Initialize database connection
+  logger.info('Initializing database connection...');
+  await initializeDatabase();
+  logger.success('Database initialized successfully');
 
-    // Initialize scheduler if available
-    await schedulerManager.setClient(client);
-    logger.success('Scheduler initialized successfully');
-  } catch (error) {
-    logger.error('Failed to initialize database', error instanceof Error ? error : new Error(String(error)));
-    process.exit(1);
+  // Load commands using the new module
+  logger.info('Loading commands...');
+  commandStats = await loadCommands(client);
+  logger.success(`Loaded ${commandStats.loaded} out of ${commandStats.total} commands successfully`);
+
+  if (commandStats.loaded === 0 && commandStats.total > 0) {
+    logger.error('No commands were loaded successfully. Bot may not respond to commands.');
   }
-})();
+} catch (error) {
+  const err = error instanceof Error ? error : new Error(String(error));
+  logger.error('Failed during bootstrap', err);
+  process.exit(1);
+}
+
+// Initialize scheduler after commands are loaded
+try {
+  await schedulerManager.setClient(client);
+  logger.success('Scheduler initialized successfully');
+} catch (error) {
+  const err = error instanceof Error ? error : new Error(String(error));
+  logger.error('Failed to initialize scheduler', err);
+  // Non-fatal: bot can run without scheduler
+}
 
 // Event listeners
 client.on('error', (error) => {

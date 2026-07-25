@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { spawn, execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import fs from 'node:fs';
 import path from 'node:path';
 
 import ffmpeg from 'ffmpeg-static';
@@ -28,33 +28,36 @@ import { CommandError, handleCommandError } from './errorHandler.js';
 
 // FFmpeg binary path resolution and validation
 let ffmpegPath = ffmpeg;
-if (typeof ffmpeg === 'string' && existsSync(ffmpeg)) {
-  ffmpegPath = ffmpeg;
-} else {
+if (typeof ffmpeg !== 'string' || !fs.existsSync(ffmpeg)) {
   // Fallback: try to find ffmpeg in system PATH
   try {
-    ffmpegPath = execSync('where ffmpeg 2>nul || which ffmpeg 2>/dev/undefined || echo ""', { encoding: 'utf8' }).trim();
-    if (!ffmpegPath || !existsSync(ffmpegPath)) {
-      // Last resort: use the static binary directly
-      ffmpegPath = path.resolve('ffmpeg-static');
-    }
+    ffmpegPath = execSync('where ffmpeg 2>nul || which ffmpeg 2>/dev/null || echo ""', { encoding: 'utf8' }).trim();
   } catch {
-    ffmpegPath = path.resolve('ffmpeg-static');
+    /* empty */
   }
-}
 
-// Ensure absolute path
-if (ffmpegPath && !path.isAbsolute(ffmpegPath)) {
-  ffmpegPath = path.resolve(ffmpegPath);
+  if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
+    // Last resort: use the static binary path directly from npm package
+    ffmpegPath = path.join(process.cwd(), 'node_modules', 'ffmpeg-static', 'bin', process.platform, process.arch === 'arm64' ? 'arm64' : 'x64', 'ffmpeg');
+  }
+
+  // Ensure executable permission on non-Windows platforms
+  if (process.platform !== 'win32') {
+    try {
+      fs.chmodSync(ffmpegPath, 0o755);
+    } catch (_ignore) {
+      /* empty */
+    }
+  }
 }
 
 // Diagnostic logs for debugging
 logger.info('FFmpeg path resolved', { ffmpegPath });
-logger.info('FFmpeg exists at resolved path', { ffmpegExists: existsSync(ffmpegPath) });
+logger.info('FFmpeg exists at resolved path', { ffmpegExists: fs.existsSync(ffmpegPath) });
 logger.info('MusicManager initialization diagnostics', {
   originalFfmpegPath: ffmpeg,
   resolvedFfmpegPath: ffmpegPath,
-  ffmpegExists: existsSync(ffmpegPath),
+  ffmpegExists: fs.existsSync(ffmpegPath),
   nodeVersion: process.version,
   platform: process.platform,
 });
@@ -1293,7 +1296,7 @@ class MusicManager {
           guildId,
           songTitle: song.title,
           ffmpegPath: ffmpegPath,
-          ffmpegExists: existsSync(ffmpegPath),
+          ffmpegExists: fs.existsSync(ffmpegPath),
           options: {
             filter: 'audioonly',
             highWaterMark: 1 << 62,
@@ -1305,7 +1308,7 @@ class MusicManager {
         });
 
         // Check for FFmpeg availability before attempting stream
-        if (!existsSync(ffmpegPath)) {
+        if (!fs.existsSync(ffmpegPath)) {
           logger.error('FFmpeg binary not found', {
             guildId,
             songTitle: song.title,
@@ -1378,7 +1381,7 @@ class MusicManager {
           guildId,
           songTitle: song.title,
           ffmpegPath: ffmpegPath,
-          ffmpegExists: existsSync(ffmpegPath),
+          ffmpegExists: fs.existsSync(ffmpegPath),
           ffmpegArgs: ['-hide_banner', '-loglevel', 'error', '-analyzeduration', '0', '-i', 'pipe:0', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1'],
         });
         const ffmpegProcess = spawn(ffmpegPath, [
@@ -1442,7 +1445,7 @@ class MusicManager {
             error: error.message,
             stack: error.stack,
             ffmpegPath: ffmpegPath,
-            ffmpegExists: existsSync(ffmpegPath),
+            ffmpegExists: fs.existsSync(ffmpegPath),
             errorCode: error.code,
           });
           streamError = error;
@@ -1579,7 +1582,7 @@ class MusicManager {
           error: streamError.message,
           stack: streamError.stack,
           ffmpegPath: ffmpegPath,
-          ffmpegAccessible: existsSync(ffmpegPath),
+          ffmpegAccessible: fs.existsSync(ffmpegPath),
           errorDuration,
           timestamp: new Date().toISOString(),
         });
@@ -1591,7 +1594,7 @@ class MusicManager {
             songTitle: song.title,
             ffmpegPath: ffmpegPath,
             resolvedPath: path.resolve(ffmpegPath),
-            ffmpegExists: existsSync(ffmpegPath),
+            ffmpegExists: fs.existsSync(ffmpegPath),
             errorCode: streamError.code,
             timestamp: new Date().toISOString(),
           });
@@ -2692,7 +2695,7 @@ logger.info('MusicManager initialized', {
   hasDeezzerAccess: true, // axios available
   ffmpegStaticAvailable: !!ffmpeg,
   resolvedFfmpegPath: ffmpegPath,
-  ffmpegPathExists: existsSync(ffmpegPath),
+  ffmpegPathExists: fs.existsSync(ffmpegPath),
 });
 
 // Convenience functions for external use
