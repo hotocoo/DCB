@@ -30,6 +30,20 @@ export const data = new SlashCommandBuilder()
   .addStringOption((opt) => opt.setName('question').setDescription('Your question').setRequired(true));
 
 export async function execute(interaction) {
-  const ans = answers[Math.floor(Math.random() * answers.length)];
-  await interaction.reply(`${ans}`);
+  try {
+    const question = interaction.options.getString('question');
+    if (!question || question.trim().length === 0) {
+      return await interaction.reply({ content: '❌ Please ask a question.', flags: 64 });
+    }
+
+    const ans = answers[Math.floor(Math.random() * answers.length)];
+    await interaction.reply(`🎱 ${ans}`);
+  } catch (error) {
+    console.error('Error in /8ball:', error);
+    try {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: '❌ Something went wrong.', flags: 64 });
+      }
+    } catch (_) {}
+  }
 }

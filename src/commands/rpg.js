@@ -13,409 +13,347 @@ import {
 import {
   createCharacter,
   getCharacter,
-  saveCharacter,
-  encounterMonster,
-  fightTurn,
-  narrate,
-  randomEventType,
-  applyXp,
-  getLeaderboard,
-  getLeaderboardCount,
-  resetCharacter,
-  getCharacterClasses,
-  getClassInfo,
-  bossEncounter,
-  getCraftingRecipes,
+  upgradeStat,
+  gainXp,
+  addItemToInventory,
+  removeItemFromInventory,
+  equipItem,
+  useItem,
+  getItemsByRarity,
+  combatRound,
+  exploreLocation,
+  findQuest,
+  acceptQuest,
+  completeQuest,
+  startQuest,
+  listQuests,
+  createQuest,
   canCraftItem,
   craftItem,
-  createQuest,
-  listQuests,
-  completeQuest,
-  spendSkillPoints,
+  getCraftingRecipes,
 } from '../rpg.js';
 import { updateUserStats } from '../achievements.js';
-import { exploreLocation } from '../locations.js';
 
 export const data = new SlashCommandBuilder()
   .setName('rpg')
-  .setDescription('Play an enhanced RPG with character classes')
+  .setDescription('RPG character management and adventure system')
   .addSubcommand((sub) =>
     sub
       .setName('start')
-      .setDescription('Create your character')
-      .addStringOption((opt) => opt.setName('name').setDescription('Character name'))
+      .setDescription('Create your first RPG character')
+      .addStringOption((opt) => opt.setName('name').setDescription('Character name').setRequired(true))
       .addStringOption((opt) =>
         opt
           .setName('class')
-          .setDescription('Character class')
+          .setDescription('Character class (warrior/mage/rogue/cleric/ranger)')
           .addChoices(
-            { name: '🛡️ Warrior', value: 'warrior' },
-            { name: '🔮 Mage', value: 'mage' },
+            { name: '⚔️ Warrior', value: 'warrior' },
+            { name: '🧙 Mage', value: 'mage' },
             { name: '🗡️ Rogue', value: 'rogue' },
-            { name: '⚔️ Paladin', value: 'paladin' },
+            { name: '⛪ Cleric', value: 'cleric' },
+            { name: '🏹 Ranger', value: 'ranger' },
           ),
       ),
   )
-  .addSubcommand((sub) => sub.setName('fight').setDescription('Fight a monster'))
-  .addSubcommand((sub) => sub.setName('explore').setDescription('Explore and encounter random events'))
+  .addSubcommand((sub) => sub.setName('stats').setDescription('View your character stats'))
+  .addSubcommand((sub) =>
+    sub
+      .setName('inventory')
+      .setDescription('View or manage your inventory')
+      .addStringOption((opt) => opt.setName('action').setDescription('view/use/equip/drop')).addStringOption((opt) => opt.setName('item').setDescription('Item name')))
+  .addSubcommand((sub) => sub.setName('explore').setDescription('Explore and find loot!'))
+  .addSubcommand((sub) =>
+    sub
+      .setName('upgrade')
+      .setDescription('Upgrade a stat with gold (costs vary)')
+      .addStringOption((opt) => opt.setName('stat').setDescription('hp/atk/def/spd/mp').setRequired(true)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('battle')
+      .setDescription('Fight an enemy!')
+      .addStringOption((opt) =>
+        opt.setName('enemy').setDescription('slime/goblin/skeleton/dragon/boss'),
+      ),
+  )
+  .addSubcommand((sub) => sub.setName('classes').setDescription('View available character classes'))
   .addSubcommand((sub) =>
     sub
       .setName('quest')
-      .setDescription('Quest actions (create/list/complete)')
-      .addStringOption((opt) => opt.setName('action').setDescription('create|list|complete').setRequired(true))
+      .setDescription('Quest management')
+      .addStringOption((opt) => opt.setName('action').setDescription('create/list/complete').setRequired(true))
       .addStringOption((opt) => opt.setName('title').setDescription('Quest title'))
-      .addStringOption((opt) => opt.setName('id').setDescription('Quest id to complete'))
-      .addStringOption((opt) => opt.setName('desc').setDescription('Quest description')),
+      .addStringOption((opt) => opt.setName('desc').setDescription('Quest description'))
+      .addStringOption((opt) => opt.setName('id').setDescription('Quest ID')),
   )
-  .addSubcommand((sub) => sub.setName('boss').setDescription('Face a boss (dangerous)'))
-  .addSubcommand((sub) =>
-    sub
-      .setName('levelup')
-      .setDescription('Spend skill points to increase stats')
-      .addStringOption((opt) => opt.setName('stat').setDescription('hp|mp|maxhp|maxmp|atk|def|spd').setRequired(true))
-      .addIntegerOption((opt) => opt.setName('amount').setDescription('How many points to spend').setRequired(true)),
-  )
-  .addSubcommand((sub) => sub.setName('stats').setDescription('Show your character stats'))
-  .addSubcommand((sub) => sub.setName('leaderboard').setDescription('Show top players'))
-  .addSubcommand((sub) =>
-    sub
-      .setName('reset')
-      .setDescription('Reset your character to defaults')
-      .addStringOption((opt) =>
-        opt
-          .setName('class')
-          .setDescription('New character class')
-          .addChoices(
-            { name: '🛡️ Warrior', value: 'warrior' },
-            { name: '🔮 Mage', value: 'mage' },
-            { name: '🗡️ Rogue', value: 'rogue' },
-            { name: '⚔️ Paladin', value: 'paladin' },
-          ),
-      ),
-  )
-  .addSubcommand((sub) => sub.setName('class').setDescription('View information about character classes'))
-  .addSubcommand((sub) => sub.setName('inventory').setDescription('View and manage your inventory'))
   .addSubcommand((sub) =>
     sub
       .setName('craft')
-      .setDescription('Craft items using materials')
-      .addStringOption((opt) => opt.setName('item').setDescription('Item to craft').setRequired(true)),
+      .setDescription('Craft items from materials')
+      .addStringOption((opt) => opt.setName('item').setDescription('health_potion/mana_potion/fire_sword/ice_staff').setRequired(true)),
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('reset')
+      .setDescription('Reset character (keeps class, resets stats/items)'),
   );
 
 export async function execute(interaction) {
-  const sub = interaction.options.getSubcommand();
-  const userId = interaction.user.id;
+  try {
+    const sub = interaction.options.getSubcommand();
+    const userId = interaction.user.id;
 
-  if (sub === 'start') {
-    const name = interaction.options.getString('name');
-    const charClass = interaction.options.getString('class') || 'warrior';
-    const char = createCharacter(userId, name, charClass);
-    if (!char) return interaction.reply({ content: 'You already have a character.', flags: MessageFlags.Ephemeral });
+    if (sub === 'start') {
+      const name = interaction.options.getString('name');
+      const charClass = interaction.options.getString('class') || 'warrior';
+      const char = createCharacter(userId, name, charClass);
+      if (!char) return interaction.reply({ content: 'You already have a character.', flags: MessageFlags.Ephemeral });
 
-    // Track achievements
-    const achievementResult = updateUserStats(userId, {
-      characters_created: 1,
-      classes_tried: 1,
-      features_tried: 1,
-    });
+      // Track achievements
+      const achievementResult = updateUserStats(userId, {
+        characters_created: 1,
+        classes_tried: 1,
+        features_tried: 1,
+      });
 
-    // Check if user earned "Born to Adventure" achievement
-    if (achievementResult.newAchievements.length > 0) {
-      const newAchievement = achievementResult.newAchievements[0];
-      await interaction.reply({
-        content: `🎉 **Achievement Unlocked!** ${newAchievement.icon} ${newAchievement.name}\n${newAchievement.description}\n💎 +${newAchievement.points} points!`,
+      // Check if user earned "Born to Adventure" achievement
+      if (achievementResult.newAchievements.length > 0) {
+        const newAchievement = achievementResult.newAchievements[0];
+        await interaction.reply({
+          content: `🎉 **Achievement Unlocked!** ${newAchievement.icon} ${newAchievement.name}\n${newAchievement.description}\n💎 +${newAchievement.points} points!`,
+        });
+      } else {
+        const embed = new EmbedBuilder()
+          .setTitle('⚔️ Character Created!')
+          .setColor(0xff_a5_00)
+          .setDescription(`Welcome, ${name} the ${charClass}!\n\n❤ HP: ${char.hp}/${char.maxHp}\n⚔ ATK: ${char.atk}\n🛡 DEF: ${char.def}\n💨 SPD: ${char.spd}\n💎 Gold: ${char.gold}`);
+        await interaction.reply({ embeds: [embed] });
+      }
+      return;
+    }
+
+    if (sub === 'reset') {
+      const char = getCharacter(userId);
+      if (!char) return interaction.reply({ content: 'You have no character to reset.', flags: MessageFlags.Ephemeral });
+
+      const modal = new ModalBuilder().setCustomId(`rpg_reset_confirm:${userId}`).setTitle('Confirm Character Reset');
+      const textInput = new TextInputBuilder()
+        .setCustomId('confirm_text')
+        .setLabel('Type RESET to confirm')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      modal.addComponents(new ActionRowBuilder().addComponents(textInput));
+      await interaction.showModal(modal);
+      return;
+    }
+
+    const char = getCharacter(userId);
+    if (!char && sub !== 'start') {
+      return interaction.reply({
+        content: 'You don\'t have a character! Use `/rpg start` to create one.',
+        flags: MessageFlags.Ephemeral,
       });
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle('🎮 Character Created!')
-      .setColor(char.color)
-      .setDescription(`**${char.name}** - Level ${char.lvl} ${char.class.charAt(0).toUpperCase() + char.class.slice(1)}`)
-      .addFields(
-        { name: '❤️ Health', value: `${char.hp}/${char.maxHp}`, inline: true },
-        { name: '🔮 Mana', value: `${char.mp}/${char.maxMp}`, inline: true },
-        { name: '⚔️ Attack', value: `${char.atk}`, inline: true },
-        { name: '🛡️ Defense', value: `${char.def}`, inline: true },
-        { name: '💨 Speed', value: `${char.spd}`, inline: true },
-        { name: '⭐ Abilities', value: char.abilities.join(', '), inline: false },
-        {
-          name: '📈 Available Stats',
-          value: 'Use `/rpg levelup` to spend skill points on:\n❤️ HP, 🔮 MP, 🛡️ Max HP, 🔮 Max MP, ⚔️ ATK, 🛡️ DEF, 💨 SPD',
-          inline: false,
-        },
-      );
-
-    return interaction.reply({ embeds: [embed] });
-  }
-
-  if (sub === 'inventory') {
-    // Redirect to inventory command for now
-    return interaction.reply({ content: 'Use `/inventory view` to manage your inventory!', flags: MessageFlags.Ephemeral });
-  }
-
-  let char = getCharacter(userId);
-  if (!char) return interaction.reply({ content: 'You have no character. Run /rpg start', flags: MessageFlags.Ephemeral });
-
-  if (sub === 'stats') {
-    const classInfo = getClassInfo(char.class);
-    const embed = new EmbedBuilder()
-      .setTitle(`📊 ${char.name} - Level ${char.lvl} ${char.class.charAt(0).toUpperCase() + char.class.slice(1)}`)
-      .setColor(char.color)
-      .addFields(
-        { name: '❤️ Health', value: `${char.hp}/${char.maxHp}`, inline: true },
-        { name: '🔮 Mana', value: `${char.mp}/${char.maxMp}`, inline: true },
-        { name: '⚔️ Attack', value: `${char.atk}`, inline: true },
-        { name: '🛡️ Defense', value: `${char.def}`, inline: true },
-        { name: '💨 Speed', value: `${char.spd}`, inline: true },
-        { name: '⭐ Experience', value: `${char.xp} XP`, inline: true },
-        { name: '💎 Skill Points', value: `${char.skillPoints || 0}`, inline: true },
-        { name: '🎯 Abilities', value: char.abilities.join(', '), inline: false },
-      );
-
-    // include buttons for quick actions
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`rpg_leaderboard:0:${userId}`).setLabel('Leaderboard').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`rpg_reset_modal:0:${userId}`).setLabel('Reset Character').setStyle(ButtonStyle.Danger),
-    );
-
-    return interaction.reply({ embeds: [embed], components: [row] });
-  }
-
-  if (sub === 'fight') {
-    const monster = encounterMonster(char.lvl);
-    // simple fight: user attacks, monster attacks until one dies (short)
-    let log = [];
-    while (char.hp > 0 && monster.hp > 0 && log.length < 10) {
-      const dmg = fightTurn(char, monster);
-      log.push(`You hit ${monster.name} for ${dmg} dmg (hp ${Math.max(0, monster.hp)})`);
-      if (monster.hp <= 0) break;
-      const mdmg = fightTurn(monster, char);
-      log.push(`${monster.name} hits you for ${mdmg} dmg (hp ${Math.max(0, char.hp)})`);
-    }
-
-    if (char.hp > 0 && monster.hp <= 0) {
-      const res = applyXp(userId, char, monster.lvl * 5);
-      char = res.char;
-      char.hp = Math.min(char.maxHp, char.hp + 2);
-      saveCharacter(userId, char);
-
-      // Track boss defeat achievements
-      if (monster.name.includes('Dragon') || monster.name.includes('Boss')) {
-        updateUserStats(userId, { bosses_defeated: 1 });
-      }
-
-      log.push(`You defeated ${monster.name}! Gained ${monster.lvl * 5} XP.`);
-      if (res.gained > 0) log.push(`Level up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`);
-    } else if (char.hp <= 0) {
-      char.hp = Math.max(1, Math.floor(char.maxHp / 2));
-      saveCharacter(userId, char);
-      log.push('You were defeated and recover to half HP.');
-    }
-
-    return interaction.reply(log.join('\n'));
-  }
-
-  if (sub === 'explore') {
-    // Use new location-based exploration system
-    const result = exploreLocation(userId, 'whispering_woods'); // Default to starting location
-
-    if (!result.success) {
-      return interaction.reply({ content: `❌ ${result.reason}`, flags: MessageFlags.Ephemeral });
-    }
-
-    const { location, encounter, narrative } = result;
-
-    const locationNarrative = await narrate(
-      interaction.guildId,
-      `${location.ai_prompt} An adventurer explores this mystical place.`,
-      `You explore ${location.name}. ${narrative.entry}`,
-    );
-
-    const embed = new EmbedBuilder()
-      .setTitle(`${location.emoji} Exploring ${location.name}`)
-      .setColor(location.color)
-      .setDescription(locationNarrative)
-      .addFields(
-        { name: '🎯 Discovery', value: encounter.type.replace('_', ' ').toUpperCase(), inline: true },
-        { name: '💎 Potential Rewards', value: `${encounter.rewards.xp} XP, ${encounter.rewards.gold} gold`, inline: true },
-      );
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`explore_investigate:${location.id}:${userId}`).setLabel('🔍 Investigate').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`explore_search:${location.id}:${userId}`).setLabel('⚔️ Search for Danger').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId(`explore_rest:${location.id}:${userId}`).setLabel('🛌 Take a Break').setStyle(ButtonStyle.Secondary),
-    );
-
-    return interaction.reply({ embeds: [embed], components: [row] });
-  }
-
-  if (sub === 'boss') {
-    const boss = bossEncounter(Math.max(3, char.lvl + 2));
-    const narr = await narrate(interaction.guildId, `A dire boss ${boss.name} appears. Give a short epic intro.`, 'A fearsome boss appears!');
-    let out = `${narr}`;
-    // exchange
-    const dmg = fightTurn(char, boss);
-    out += `\nYou strike the ${boss.name} for ${dmg} damage.`;
-    if (boss.hp > 0) {
-      const mdmg = fightTurn(boss, char);
-      out += `\n${boss.name} hits you for ${mdmg} damage.`;
-    }
-    if (char.hp <= 0) {
-      char.hp = Math.max(1, Math.floor(char.maxHp / 2));
-      saveCharacter(userId, char);
-      out += '\nYou were defeated but live to fight another day.';
-    } else {
-      const res = applyXp(userId, char, boss.lvl * 20);
-      char = res.char;
-      saveCharacter(userId, char);
-
-      // Track boss defeat
-      updateUserStats(userId, { bosses_defeated: 1 });
-
-      out += `\nYou survived and earned ${boss.lvl * 20} XP!`;
-      if (res.gained > 0) out += `\nLevel up! ${res.oldLvl} → ${res.newLvl}. You gained ${res.gained} skill point(s).`;
-    }
-    return interaction.reply(out);
-  }
-
-  if (sub === 'levelup') {
-    const stat = interaction.options.getString('stat');
-    const amount = interaction.options.getInteger('amount');
-
-    const result = spendSkillPoints(userId, stat, amount);
-    if (!result.success) {
-      return interaction.reply({ content: result.message || 'Failed to spend skill points.', flags: MessageFlags.Ephemeral });
-    }
-
-    return interaction.reply({ content: `Leveled up: +${amount} ${stat}. Remaining points: ${result.char.skillPoints}`, flags: MessageFlags.Ephemeral });
-  }
-
-  if (sub === 'leaderboard') {
-    const limit = 10;
-    const offset = 0;
-    const list = getLeaderboard(limit, offset);
-    const total = getLeaderboardCount();
-    if (list.length === 0) return interaction.reply({ content: 'No players yet.', flags: MessageFlags.Ephemeral });
-    const page = Math.floor(offset / limit) + 1;
-    const totalPages = Math.max(1, Math.ceil(total / limit));
-    const row = new ActionRowBuilder();
-    if (offset > 0)
-      row.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`rpg_leaderboard:${Math.max(0, offset - limit)}:${userId}`)
-          .setLabel('Prev')
-          .setStyle(ButtonStyle.Secondary),
-      );
-    if (offset + limit < total)
-      row.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`rpg_leaderboard:${offset + limit}:${userId}`)
-          .setLabel('Next')
-          .setStyle(ButtonStyle.Primary),
-      );
-    return interaction.reply({
-      content:
-        `Leaderboard — Page ${page}/${totalPages}\n` + list.map((p, i) => `${offset + i + 1}. ${p.name} — Level ${p.lvl} XP ${p.xp} ATK ${p.atk}`).join('\n'),
-      components: row.components.length > 0 ? [row] : [],
-    });
-  }
-
-  if (sub === 'reset') {
-    const newClass = interaction.options.getString('class') || char.class;
-    // show a confirmation modal before resetting
-    const modal = new ModalBuilder().setCustomId(`rpg_reset_confirm:cmd:${userId}:${newClass}`).setTitle('Confirm Reset');
-    const input = new TextInputBuilder()
-      .setCustomId('confirm_text')
-      .setLabel('Type RESET to confirm')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setPlaceholder('RESET');
-    // modal requires ActionRow-like placement via components
-    modal.addComponents({ type: 1, components: [input] });
-    await interaction.showModal(modal);
-    return;
-  }
-
-  if (sub === 'class') {
-    const classes = getCharacterClasses();
-    const embed = new EmbedBuilder()
-      .setTitle('🏛️ Character Classes')
-      .setColor(0x00_99_ff)
-      .setDescription('Choose your class when creating a character with `/rpg start`');
-
-    for (const [key, classInfo] of Object.entries(classes)) {
-      embed.addFields({
-        name: `${classInfo.name}`,
-        value: `**Description:** ${classInfo.description}\n**Base Stats:** ❤️ ${classInfo.baseStats.hp} HP, ⚔️ ${classInfo.baseStats.atk} ATK, 🛡️ ${classInfo.baseStats.def} DEF, 💨 ${classInfo.baseStats.spd} SPD\n**Abilities:** ${classInfo.abilities.join(', ')}`,
-        inline: false,
-      });
-    }
-
-    return interaction.reply({ embeds: [embed] });
-  }
-
-  if (sub === 'quest') {
-    const action = interaction.options.getString('action');
-    if (action === 'create') {
-      const title = interaction.options.getString('title') || 'A simple quest';
-      const desc = interaction.options.getString('desc') || 'Do something heroic.';
-      const q = createQuest(userId, title, desc);
-      return interaction.reply({ content: `Quest created: ${q.title} (id=${q.id})`, flags: MessageFlags.Ephemeral });
-    }
-    if (action === 'list') {
-      const qs = listQuests(userId);
-      if (qs.length === 0) return interaction.reply({ content: 'No quests.', flags: MessageFlags.Ephemeral });
-      return interaction.reply(qs.map((q) => `${q.id} - ${q.title} [${q.status}]`).join('\n'));
-    }
-    if (action === 'complete') {
-      const id = interaction.options.getString('id');
-      const q = completeQuest(userId, id);
-      if (!q) return interaction.reply({ content: 'Quest not found.', flags: MessageFlags.Ephemeral });
-      const rewardText = q.xpReward && q.goldReward ? `\n🎉 **Rewards:** ${q.xpReward} XP, ${q.goldReward} gold!` : '';
-      return interaction.reply({ content: `Quest completed: ${q.title}${rewardText}`, flags: MessageFlags.Ephemeral });
-    }
-    return interaction.reply({ content: 'Unknown quest action. Use create|list|complete', flags: MessageFlags.Ephemeral });
-  }
-
-  if (sub === 'craft') {
-    const itemId = interaction.options.getString('item');
-    const recipes = getCraftingRecipes();
-
-    if (!recipes[itemId]) {
-      return interaction.reply({ content: `❌ "${itemId}" is not a craftable item.`, flags: MessageFlags.Ephemeral });
-    }
-
-    const canCraft = canCraftItem(userId, itemId);
-
-    if (!canCraft.success) {
-      if (canCraft.reason === 'level_too_low') {
-        return interaction.reply({ content: `❌ You need to be level ${canCraft.required} to craft this item.`, flags: MessageFlags.Ephemeral });
-      } else if (canCraft.reason === 'missing_materials') {
-        return interaction.reply({ content: `❌ You're missing materials. You need: ${canCraft.missing}`, flags: MessageFlags.Ephemeral });
-      }
-      return interaction.reply({ content: `❌ Cannot craft this item: ${canCraft.reason}`, flags: MessageFlags.Ephemeral });
-    }
-
-    const result = craftItem(userId, itemId);
-
-    if (result.success) {
-      const recipe = recipes[itemId];
+    if (sub === 'stats' || sub === 'profile') {
       const embed = new EmbedBuilder()
-        .setTitle('🔨 Item Crafted!')
-        .setColor(0x00_ff_00)
-        .setDescription(`Successfully crafted **${result.item.name}**!`)
+        .setTitle(`👤 ${char.name} the ${char.class}`)
+        .setColor(0x5865F2)
+        .setDescription(`Level: ${char.lvl} | XP: ${char.xp}/${char.maxXp}`)
         .addFields(
-          { name: '📦 Item', value: `${result.item.name} (${result.item.rarity})`, inline: true },
-          { name: '⭐ XP Gained', value: `${result.xpGained} XP`, inline: true },
-          { name: '📋 Description', value: result.item.description, inline: false },
+          { name: '❤️ HP', value: `${char.hp}/${char.maxHp}`, inline: true },
+          { name: '⚔️ ATK', value: `${char.atk}`, inline: true },
+          { name: '🛡 DEF', value: `${char.def}`, inline: true },
+          { name: '💨 SPD', value: `${char.spd}`, inline: true },
+          { name: '💎 Gold', value: `${char.gold}`, inline: true },
+          { name: '🏆 Wins', value: `${char.wins || 0}`, inline: true },
         );
-
-      // Track crafting achievement
-      updateUserStats(userId, { items_crafted: 1 });
-
       await interaction.reply({ embeds: [embed] });
-    } else {
-      await interaction.reply({ content: `❌ Failed to craft item: ${result.reason}`, flags: MessageFlags.Ephemeral });
+      return;
     }
+
+    if (sub === 'inventory') {
+      const action = interaction.options.getString('action');
+      const itemParam = interaction.options.getString('item');
+
+      if (!action || action === 'view') {
+        const items = char.inventory || [];
+        const embed = new EmbedBuilder().setTitle('🎒 Inventory').setColor(0x7289da);
+        if (items.length === 0) {
+          embed.setDescription('Your inventory is empty!');
+        } else {
+          embed.setDescription(items.map((i) => `${i.icon || '📦'} ${i.name} x${i.quantity || 1}`).join('\n') || 'Empty inventory');
+        }
+        await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      } else {
+        const result = action === 'use' ? useItem(userId, itemParam) : action === 'equip' ? equipItem(userId, itemParam) : removeItemFromInventory(userId, itemParam);
+        await interaction.reply({
+          content: result.success ? `✅ ${result.message}` : `❌ ${result.reason}`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      return;
+    }
+
+    if (sub === 'explore') {
+      const location = interaction.options.getString('location') || 'random';
+      const result = exploreLocation(userId, location);
+      await interaction.reply({ content: result.message, flags: MessageFlags.Ephemeral });
+      return;
+    }
+
+    if (sub === 'upgrade') {
+      const stat = interaction.options.getString('stat');
+      const result = upgradeStat(userId, stat);
+      await interaction.reply({
+        content: result.success ? `✅ Upgraded ${stat.toUpperCase()}! New value: ${result.newValue}` : `❌ Failed to upgrade: ${result.reason}`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    if (sub === 'battle') {
+      const enemyType = interaction.options.getString('enemy') || 'slime';
+      let result;
+      try {
+        result = await combatRound(userId, enemyType);
+      } catch (e) {
+        console.error(`[RPG] Battle error for ${userId}:`, e);
+        return interaction.reply({ content: '❌ Something went wrong during battle.', flags: MessageFlags.Ephemeral });
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle(result.victory ? '⚔️ Victory!' : '💀 Defeat...')
+        .setColor(result.victory ? 0x2ecc71 : 0xe74c3c)
+        .setDescription(result.message);
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      return;
+    }
+
+    if (sub === 'classes') {
+      const classes = ['warrior', 'mage', 'rogue', 'cleric', 'ranger'];
+      const icons = { warrior: '⚔️', mage: '🧙', rogue: '🗡️', cleric: '⛪', ranger: '🏹' };
+
+      const embed = new EmbedBuilder().setTitle('👥 Character Classes').setColor(0x5865F2);
+      for (const cls of classes) {
+        const classInfo = getCharacterClassInfo(cls);
+        if (!classInfo) continue;
+        embed.addFields({
+          name: `${icons[cls] || ''} ${cls.charAt(0).toUpperCase() + cls.slice(1)}`,
+          value: `**Description:** ${classInfo.description}\n**Base Stats:** ❤️ ${classInfo.baseStats.hp} HP, ⚔️ ${classInfo.baseStats.atk} ATK, 🛡️ ${classInfo.baseStats.def} DEF, 💨 ${classInfo.baseStats.spd} SPD\n**Abilities:** ${classInfo.abilities.join(', ')}`,
+          inline: false,
+        });
+      }
+
+      return interaction.reply({ embeds: [embed] });
+    }
+
+    if (sub === 'quest') {
+      const action = interaction.options.getString('action');
+      if (action === 'create') {
+        const title = interaction.options.getString('title') || 'A simple quest';
+        const desc = interaction.options.getString('desc') || 'Do something heroic.';
+        const q = createQuest(userId, title, desc);
+        return interaction.reply({ content: `Quest created: ${q.title} (id=${q.id})`, flags: MessageFlags.Ephemeral });
+      }
+      if (action === 'list') {
+        const qs = listQuests(userId);
+        if (qs.length === 0) return interaction.reply({ content: 'No quests.', flags: MessageFlags.Ephemeral });
+        return interaction.reply(qs.map((q) => `${q.id} - ${q.title} [${q.status}]`).join('\n'));
+      }
+      if (action === 'complete') {
+        const id = interaction.options.getString('id');
+        const q = completeQuest(userId, id);
+        if (!q) return interaction.reply({ content: 'Quest not found.', flags: MessageFlags.Ephemeral });
+        const rewardText = q.xpReward && q.goldReward ? `\n🎉 **Rewards:** ${q.xpReward} XP, ${q.goldReward} gold!` : '';
+        return interaction.reply({ content: `Quest completed: ${q.title}${rewardText}`, flags: MessageFlags.Ephemeral });
+      }
+      return interaction.reply({ content: 'Unknown quest action. Use create|list|complete', flags: MessageFlags.Ephemeral });
+    }
+
+    if (sub === 'craft') {
+      const itemId = interaction.options.getString('item');
+      const recipes = getCraftingRecipes();
+
+      if (!recipes[itemId]) {
+        return interaction.reply({ content: `❌ "${itemId}" is not a craftable item.`, flags: MessageFlags.Ephemeral });
+      }
+
+      const canCraft = canCraftItem(userId, itemId);
+
+      if (!canCraft.success) {
+        if (canCraft.reason === 'level_too_low') {
+          return interaction.reply({ content: `❌ You need to be level ${canCraft.required} to craft this item.`, flags: MessageFlags.Ephemeral });
+        } else if (canCraft.reason === 'missing_materials') {
+          return interaction.reply({ content: `❌ You're missing materials. You need: ${canCraft.missing}`, flags: MessageFlags.Ephemeral });
+        }
+        return interaction.reply({ content: `❌ Cannot craft this item: ${canCraft.reason}`, flags: MessageFlags.Ephemeral });
+      }
+
+      const result = craftItem(userId, itemId);
+
+      if (result.success) {
+        const recipe = recipes[itemId];
+        const embed = new EmbedBuilder()
+          .setTitle('🔨 Item Crafted!')
+          .setColor(0x00_ff_00)
+          .setDescription(`Successfully crafted **${result.item.name}**!`)
+          .addFields(
+            { name: '📦 Item', value: `${result.item.name} (${result.item.rarity})`, inline: true },
+            { name: '⭐ XP Gained', value: `${result.xpGained} XP`, inline: true },
+            { name: '📋 Description', value: result.item.description, inline: false },
+          );
+
+        // Track crafting achievement
+        updateUserStats(userId, { items_crafted: 1 });
+
+        await interaction.reply({ embeds: [embed] });
+      } else {
+        await interaction.reply({ content: `❌ Failed to craft item: ${result.reason}`, flags: MessageFlags.Ephemeral });
+      }
+      return;
+    }
+
+    // Fallback — unknown subcommand  
+    await interaction.reply({ content: '❌ Unknown RPG command.', flags: MessageFlags.Ephemeral });
+  } catch (error) {
+    console.error('[RPG] Error in /rpg:', error);
+    try {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: '❌ Something went wrong with the RPG command.', flags: MessageFlags.Ephemeral });
+      }
+    } catch (_) { /* reply also failed, ignore */ }
   }
+}
+
+function getCharacterClassInfo(cls) {
+  const classes = {
+    warrior: {
+      description: 'A mighty fighter clad in heavy armor.',
+      baseStats: { hp: 120, atk: 15, def: 12, spd: 8 },
+      abilities: ['Power Strike', 'Defensive Stance'],
+    },
+    mage: {
+      description: 'A master of arcane magic and elemental power.',
+      baseStats: { hp: 80, atk: 20, def: 6, spd: 10 },
+      abilities: ['Fireball', 'Ice Wall', 'Mana Shield'],
+    },
+    rogue: {
+      description: 'A cunning stealth fighter who strikes from shadows.',
+      baseStats: { hp: 90, atk: 14, def: 7, spd: 18 },
+      abilities: ['Backstab', 'Poison Blade'],
+    },
+    cleric: {
+      description: 'A holy warrior who heals allies and smites evil.',
+      baseStats: { hp: 100, atk: 10, def: 10, spd: 9 },
+      abilities: ['Heal', 'Smite Evil'],
+    },
+    ranger: {
+      description: 'An expert archer attuned with nature.',
+      baseStats: { hp: 95, atk: 13, def: 8, spd: 15 },
+      abilities: ['Piercing Shot', 'Nature\'s Blessing'],
+    },
+  };
+  return classes[cls] || null;
 }
