@@ -4,6 +4,7 @@
  */
 
 import { initializeDatabase, getDb, shutdownDatabase } from './database.js';
+import { logger } from './logger.js';
 
 export { initializeDatabase, shutdownDatabase };
 
@@ -21,7 +22,7 @@ export function getGuild(id) {
     const row = db.prepare("SELECT config FROM guilds WHERE id = ?").get(id);
     return row?.config ? JSON.parse(row.config) : null;
   } catch (error) {
-    console.error('Failed to read guild', error);
+    logger.error('Failed to read guild', error instanceof Error ? error : new Error(String(error)));
     return null;
   }
 }
@@ -44,7 +45,7 @@ export function setGuild(id, data) {
     );
     return true;
   } catch (error) {
-    console.error('Failed to set guild', error);
+    logger.error('Failed to set guild', error instanceof Error ? error : new Error(String(error)));
     return false;
   }
 }
