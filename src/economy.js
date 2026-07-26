@@ -450,3 +450,13 @@ export function resetUserEconomyData(userId) {
   }
 }
 
+
+export function getUserEconomyStats(userId) {
+  const db = getDb();
+  try {
+    const rows = db.prepare(`SELECT SUM(CASE WHEN type='income' THEN amount ELSE 0 END) as income,
+                                     SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) as expenses
+                              FROM transactions WHERE user_id=?`).get(userId);
+    return { totalIncome: rows?.income || 0, totalExpenses: rows?.expenses || 0 };
+  } catch (err) { logger.error('getUserEconomyStats error', err); return { totalIncome: 0, totalExpenses: 0 }; }
+}
