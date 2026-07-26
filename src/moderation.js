@@ -118,11 +118,15 @@ export function banUser(guildId, userId, options = {}) {
   try {
     const db = getDb();
     const id = `ban_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    const now = Date.now();
 
-    db.prepare(`INSERT INTO moderation (id, guild_id, user_id, moderator_id, type, reason, duration) VALUES (?, ?, ?, ?, 'ban', ?, ?)`)
-      .run(id, guildId, userId, moderatorId || '', reason || '', duration || null);
+    // Ensure start_time column exists for temp ban expiry tracking
+    try { db.exec(`ALTER TABLE moderation ADD COLUMN start_time INTEGER DEFAULT ${now}`); } catch {}
 
-    return { id, userId, moderatorId, reason, duration, startTime: Date.now(), endTime: duration ? Date.now() + duration : undefined, permanent: !duration, active: true };
+    db.prepare(`INSERT INTO moderation (id, guild_id, user_id, moderator_id, type, reason, duration, start_time) VALUES (?, ?, ?, ?, 'ban', ?, ?, ?)`)
+      .run(id, guildId, userId, moderatorId || '', reason || '', duration || null, now);
+
+    return { id, userId, moderatorId, reason, duration, startTime: now, endTime: duration ? now + duration : undefined, permanent: !duration, active: true };
   } catch (error) {
     logger.error('Failed to ban user', error instanceof Error ? error : new Error(String(error)));
     return null;
@@ -155,18 +159,18 @@ export function isUserBanned(guildId, userId) {
     const db = getDb();
     const now = Date.now();
 
-    // Get the latest non-expired ban for this user in this guild
-    const row = db.prepare(`SELECT duration FROM moderation WHERE guild_id = ? AND user_id = ? AND type = 'ban' ORDER BY created_at DESC LIMIT 1`).get(guildId, userId);
+    // Get the latest non-expired ban for this user in this guild, using start_time column (added by migration below)
+    const row = db.prepare(`SELECT duration, start_time FROM moderation WHERE guild_id = ? AND user_id = ? AND type = 'ban' ORDER BY created_at DESC LIMIT 1`).get(guildId, userId);
 
     if (!row) return false;
 
-    // Check if temporary ban has expired
-    if (row.duration && row.duration > 0) {
-      const endTime = now - row.duration + Date.now(); // Approximate check — buggy, treat as permanent until proper fix
+    // If temporary ban has start_time stored and duration is set, check expiry properly
+    if (row.start_time && row.duration && row.duration > 0) {
+      const expiredAt = row.start_time + row.duration;
+      if (now >= expiredAt) return false; // temp ban expired
     }
 
-    // FIX: previous logic was completely wrong. Store startTime in moderation table for accurate temp-ban expiry.
-    // For now, if latest ban has no corresponding unban after it, user is banned.
+    // If no start_time stored yet or permanent ban, check for subsequent unban
     const latestUnban = db.prepare(`SELECT id FROM moderation WHERE guild_id = ? AND user_id = ? AND type = 'unban' ORDER BY created_at DESC LIMIT 1`).get(guildId, userId);
     if (latestUnban) {
       // Check if unban is after the ban — need to compare timestamps properly
