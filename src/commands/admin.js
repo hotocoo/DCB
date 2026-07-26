@@ -157,7 +157,7 @@ export async function execute(interaction) {
             try {
               await targetUser.send(`⚠️ **Warning from ${interaction.guild.name}:**\n${reason}`);
             } catch (dmError) {
-              console.log('Could not send DM to warned user:', dmError.message);
+              logger.warn('Could not send DM to warned user', { message: dmError.message });
             }
           } catch (warnError) {
             logger.error('Error warning user:', warnError);

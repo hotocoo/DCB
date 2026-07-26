@@ -55,7 +55,7 @@ function writeAll(obj) {
     logger.error('Failed to write RPG data:', error);
     // Attempt to restore from cache if available
     if (cache) {
-      console.log('Restoring from cache after write failure');
+      logger.info('Restoring from cache after write failure');
     } else {
       throw new Error(`Failed to save RPG data: ${error.message}`);
     }

@@ -89,7 +89,8 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction) {
   try {
-    console.log(`[MUSIC] Command executed: ${interaction.options.getSubcommand()} by ${interaction.user.username} in ${interaction.guild?.name || 'DM'}`);
+    [MUSIC]
+    logger.info(`[MUSIC] Command executed: ${interaction.options.getSubcommand()} by ${interaction.user.username} in ${interaction.guild?.name || 'DM'}`);
     const sub = interaction.options.getSubcommand();
 
     // Input validation
@@ -258,7 +259,8 @@ export async function execute(interaction) {
             new ButtonBuilder().setCustomId(`music_queue:${interaction.guild.id}`).setLabel('📋 Queue').setStyle(ButtonStyle.Secondary),
           );
 
-          console.log(`[MUSIC] Editing deferred reply for interaction: ${interaction.id} with success embed`);
+          [MUSIC]
+    logger.info(`[MUSIC] Editing deferred reply for interaction: ${interaction.id} with success embed`);
           logger.info('Music play command successful', {
             guildId: interaction.guild.id,
             userId: interaction.user.id,
