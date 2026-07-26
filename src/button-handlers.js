@@ -1,6 +1,6 @@
-import { EmbedBuilder, MessageFlags } from 'discord.js';
+import { EmbedBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { logCommandExecution, logError, logger } from './logger.js';
-import { CommandError, handleCommandError } from './errorHandler.js';
+import { CommandError, handleCommandError, validateNotEmpty } from './errorHandler.js';
 import { sanitizeInput, validateUserId } from './validation.js';
 import { isOnCooldown, setCooldown, getButtonCooldownType, getFormattedCooldown } from './cooldowns.js';
 import { guessGames, connect4Games, triviaGames, tttGames, pollGames, memoryGames } from './game-states.js';
@@ -12,6 +12,7 @@ import { getBalance } from './economy.js';
 import { getUserGuild } from './guilds.js';
 import { muteUser, unmuteUser, unbanUser } from './moderation.js';
 import { pause, resume, skip, stop, shuffleQueue, clearQueue, getQueue, searchSongs, play, back, getRadioStations } from './music.js';
+import { getMusicStats } from './music.js';
 import { getLocations } from './locations.js';
 import { getActiveAuctions } from './trading.js';
 import { updateProfile } from './profiles.js';
@@ -20,6 +21,52 @@ import { wordleWords } from './wordle-data.js';
 import { safeInteractionReply } from './interaction-router.js';
 
 const PROCESSED_INTERACTION_CLEANUP_TIME = 5 * 60 * 1e3;
+const CIRCUIT_BREAKER_MAX_ATTEMPTS = 3;
+const CIRCUIT_BREAKER_CLEANUP_TIME = 5 * 60 * 1e3;
+
+// Circuit breaker for interaction rate limiting
+const circuitBreakerMap = new Map();
+const processedInteractions = new Map();
+
+function createRateLimiter(points, duration) {
+  const requests = new Map();
+  return {
+    async consume(key) {
+      const now = Date.now();
+      const userRequests = requests.get(key) || [];
+      const validRequests = userRequests.filter((time) => now - time < duration);
+      if (validRequests.length >= points) {
+        const resetTime = validRequests[0] + duration;
+        throw new CommandError('Rate limit exceeded. Please slow down.', 'RATE_LIMITED', { remaining: Math.ceil((resetTime - now) / 1e3) });
+      }
+      validRequests.push(now);
+      requests.set(key, validRequests);
+      return true;
+    },
+  };
+}
+
+const interactionRateLimiter = createRateLimiter(5, 1e4);
+
+function checkCircuitBreaker(interactionId) {
+  const circuitData = circuitBreakerMap.get(interactionId);
+  if (!circuitData) return true;
+  const now = Date.now();
+  if (now - circuitData.lastAttempt > CIRCUIT_BREAKER_CLEANUP_TIME) {
+    circuitBreakerMap.delete(interactionId);
+    return true;
+  }
+  return circuitData.attempts < CIRCUIT_BREAKER_MAX_ATTEMPTS;
+}
+
+function recordErrorAttempt(interactionId) {
+  const now = Date.now();
+  const circuitData = circuitBreakerMap.get(interactionId) || { attempts: 0, lastAttempt: now };
+  circuitData.attempts += 1;
+  circuitData.lastAttempt = now;
+  circuitBreakerMap.set(interactionId, circuitData);
+}
+
 
 async function safeInteractionUpdate(interaction, options) {
   const interactionId = interaction.id;

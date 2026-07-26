@@ -1,8 +1,7 @@
 import { EmbedBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { CommandError, handleCommandError, safeExecuteCommand, validateNotEmpty } from './errorHandler.js';
 import { logError, logger } from './logger.js';
-import { CommandError, handleCommandError, safeExecuteCommand } from './errorHandler.js';
 import { sanitizeInput, validateUserId, inputValidator } from './validation.js';
-import { validateNotEmpty } from './errorHandler.js';
 import { getCharacter, encounterMonster, fightTurn, applyXp, saveCharacter, addItemToInventory, generateRandomItem, getItemInfo, resetCharacter } from './rpg.js';
 import { getBalance } from './economy.js';
 import { getActiveAuctions } from './trading.js';
