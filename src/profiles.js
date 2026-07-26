@@ -37,7 +37,7 @@ function migrateFromJson() {
     }
 
     if (count > 0) {
-      fs.copyFileSync(OLD_PROFILES_DIR + '/.migrated', OLD_PROFILES_DIR + '/.migrated' || null);
+      try { fs.writeFileSync(OLD_PROFILES_DIR + '/.migrated', 'migrated'); } catch {}
       logger.info(`Migrated ${count} profiles to SQLite`);
     }
   } catch (err) { logger.error('Profile JSON migration failed', err); }
