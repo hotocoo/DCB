@@ -146,6 +146,8 @@ try {
 // Initialize scheduler after commands are loaded
 try {
   await schedulerManager.setClient(client);
+  // Start scheduler to load pending reminders and events from DB
+  try { (await import('./scheduler.js')).startScheduler?.(); } catch (_ignore) {}
   logger.success('Scheduler initialized successfully');
 } catch (error) {
   const err = error instanceof Error ? error : new Error(String(error));
