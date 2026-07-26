@@ -58,6 +58,13 @@ async function sendBoard(interaction, gameId) {
     return await interaction.editReply({ content: `${msg}\n\n${formatBoard(g.board)}`, components: [] });
   }
 
+  // Build players object for button-handler compatibility
+  g.players = {
+    red: { id: g.red, name: 'Red', symbol: '🔴' },
+    yellow: { id: g.yellow, name: g.isAI ? 'AI' : 'Yellow', symbol: '🟡' },
+  };
+  g.currentPlayer = g.current;
+
   const turnColor = g.current;
   await interaction.editReply({
     content: `${turnColor === 'red' ? 'Red' : 'Yellow'}'s turn\n\n${formatBoard(g.board)}\nDrop a piece in a column!`,
@@ -68,6 +75,8 @@ async function sendBoard(interaction, gameId) {
     setTimeout(() => aiMove(gameId).then(() => sendBoard(interaction, gameId)), 800);
   }
 }
+
+export { sendBoard as sendConnect4Board };
 
 function formatBoard(board) {
   const sym = { red: '🔴', yellow: '🟡', null: '⬜' };
@@ -158,9 +167,18 @@ function minimax(board, depth, alpha, beta, isMax) {
   }
 }
 
+async function makeMove(gameId, column) {
+  const g = connect4Games.get(gameId);
+  if (!g || g.status !== 'active') return false;
+  for (let r = 5; r >= 0; r--) { if (g.board[r][column] === null) { g.board[r][column] = g.currentPlayer; g.currentPlayer = g.currentPlayer === 'red' ? 'yellow' : 'red'; return true; } }
+  return false;
+}
+
 function dropPiece(board, col) {
   for (let r = 5; r >= 0; r--) { if (board[r][col] === null) { board[r][col] = 'yellow'; return; } }
 }
+
+export { makeMove as makeConnect4Move };
 
 function undoDrop(board, col) {
   for (let r = 0; r < 6; r++) { if (board[r][col] !== null) { board[r][col] = null; return; } }

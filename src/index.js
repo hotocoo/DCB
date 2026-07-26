@@ -20,6 +20,7 @@ import { checkTypingAttempt } from './minigames/typing.js';
 import { isOnCooldown, setCooldown } from './cooldowns.js';
 import { initializeDatabase, shutdownDatabase } from './storage.js';
 import { schedulerManager } from './scheduler.js';
+import { guessGames } from './game-states.js';
 
 /**
  * @typedef {Object} Command
@@ -307,6 +308,17 @@ client.on('messageCreate', async (message) => {
       await message.reply({ content: response });
       return;
     }
+
+    // Handle number guessing game messages
+    try {
+      if (guessGames.has(message.author.id)) {
+        const { handleGuess } = await import('./commands/guess.js');
+        if (handleGuess) {
+          const handled = await handleGuess(message);
+          if (handled !== undefined) return;
+        }
+      }
+    } catch (_ignore) { /* games optional */ }
 
     // Handle general message processing
     const reply = await handleMessage(message);
