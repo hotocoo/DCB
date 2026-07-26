@@ -14,8 +14,8 @@ let started = false;
 
 function migrateFromJson() {
   const db = getDb();
-  // Only run once if tables don't exist or old file still present
-  if (!db.prepare('SELECT name FROM sqlite_master WHERE type="table" AND name="reminders"').get()) return;
+  // Only run once if tables exist AND old file present
+  if (!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='reminders'").get()) return;
   if (!fs.existsSync(OLD_SCHEDULES_FILE)) return;
 
   try {

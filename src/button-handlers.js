@@ -2,7 +2,7 @@ import { EmbedBuilder, MessageFlags } from 'discord.js';
 import { logCommandExecution, logError, logger } from './logger.js';
 import { CommandError, handleCommandError } from './errorHandler.js';
 import { sanitizeInput, validateUserId } from './validation.js';
-import { isOnCooldown, setCooldown, getButtonCooldownType } from './cooldowns.js';
+import { isOnCooldown, setCooldown, getButtonCooldownType, getFormattedCooldown } from './cooldowns.js';
 import { guessGames, connect4Games, triviaGames, tttGames, pollGames, memoryGames } from './game-states.js';
 import { sendMemoryBoard } from './commands/memory.js';
 import { makeConnect4Move, sendConnect4Board } from './commands/connect4.js';
@@ -17,6 +17,7 @@ import { getActiveAuctions } from './trading.js';
 import { updateProfile } from './profiles.js';
 import { updateUserStats } from './achievements.js';
 import { wordleWords } from './wordle-data.js';
+import { safeInteractionReply } from './interaction-router.js';
 
 const PROCESSED_INTERACTION_CLEANUP_TIME = 5 * 60 * 1e3;
 
