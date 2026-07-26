@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { sanitizeInput } from '../validation.js'
 
-import { updateUserStats } from '../achievements.js';
+import { updateStats as updateUserStats } from '../achievements.js';
 import { tttGames } from '../game-states.js';
 
 export const data = new SlashCommandBuilder()

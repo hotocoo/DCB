@@ -11,7 +11,7 @@ import {
 } from 'discord.js';
 
 import { wordleGames } from '../game-states.js';
-import { updateUserStats } from '../achievements.js';
+import { updateStats as updateUserStats } from '../achievements.js';
 import { logError } from '../logger.js';
 
 const WORD_LIST = [

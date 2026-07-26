@@ -2,7 +2,7 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 import { sanitizeInput } from '../validation.js'
 
 import { logger } from '../logger.js';
-import { updateUserStats } from '../achievements.js';
+import { updateStats as updateUserStats } from '../achievements.js';
 import { safeExecuteCommand, CommandError, validateRange } from '../errorHandler.js';
 
 const triviaQuestions = [

@@ -1,5 +1,4 @@
 import {
-import { sanitizeInput } from '../validation.js'
   SlashCommandBuilder,
   ActionRowBuilder,
   ButtonBuilder,
@@ -14,26 +13,25 @@ import { sanitizeInput } from '../validation.js'
 import {
   createCharacter,
   getCharacter,
-  upgradeStat,
-  gainXp,
+  resetCharacter,
+  applyXp,
+  saveCharacter,
   addItemToInventory,
   removeItemFromInventory,
   equipItem,
-  useItem,
-  getItemsByRarity,
-  combatRound,
-  exploreLocation,
-  findQuest,
-  acceptQuest,
-  completeQuest,
-  startQuest,
-  listQuests,
-  createQuest,
-  canCraftItem,
-  craftItem,
+  unequipItem,
   getCraftingRecipes,
+  craftItem,
+  canCraftItem,
+  encounterMonster,
+  fightTurn,
+  generateRandomQuest,
+  createQuest as rpgCreateQuest,
+  completeQuest,
+  randomEventType,
+  bossEncounter,
 } from '../rpg.js';
-import { updateUserStats } from '../achievements.js';
+import { updateStats as updateUserStats } from '../achievements.js';
 
 export const data = new SlashCommandBuilder()
   .setName('rpg')
@@ -178,56 +176,168 @@ export async function execute(interaction) {
       const action = interaction.options.getString('action');
       const itemParam = interaction.options.getString('item');
 
+      // Inventory is stored as an object, not array
+      const items = char.inventory || {};
+      const inventoryList = Object.entries(items);
+
       if (!action || action === 'view') {
-        const items = char.inventory || [];
         const embed = new EmbedBuilder().setTitle('🎒 Inventory').setColor(0x7289da);
-        if (items.length === 0) {
+        if (inventoryList.length === 0) {
           embed.setDescription('Your inventory is empty!');
         } else {
-          embed.setDescription(items.map((i) => `${i.icon || '📦'} ${i.name} x${i.quantity || 1}`).join('\n') || 'Empty inventory');
+          embed.setDescription(inventoryList.map(([id, item]) => `${typeof item === 'object' && item.name ? item.name : id} x${item.quantity || 1}`).join('\n') || 'Empty inventory');
         }
         await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      } else if (action === 'drop' || action === 'remove') {
+        const success = removeItemFromInventory(userId, itemParam, 1);
+        await interaction.reply({ content: success ? `✅ Dropped ${itemParam}` : '❌ Item not found or cannot be removed.', flags: MessageFlags.Ephemeral });
+      } else if (action === 'equip') {
+        const success = equipItem(userId, itemParam);
+        await interaction.reply({ content: success ? `✅ Equipped ${itemParam}` : '❌ Cannot equip this item.', flags: MessageFlags.Ephemeral });
+      } else if (action === 'unequip') {
+        const slot = itemParam || (inventoryList.find(([id]) => id.includes('weapon')) ? 'weapon' : 'armor');
+        const success = unequipItem(userId, slot);
+        await interaction.reply({ content: success ? `✅ Unequipped ${slot}` : '❌ Nothing to unequip.', flags: MessageFlags.Ephemeral });
       } else {
-        const result = action === 'use' ? useItem(userId, itemParam) : action === 'equip' ? equipItem(userId, itemParam) : removeItemFromInventory(userId, itemParam);
-        await interaction.reply({
-          content: result.success ? `✅ ${result.message}` : `❌ ${result.reason}`,
-          flags: MessageFlags.Ephemeral,
-        });
+        await interaction.reply({ content: '❌ Unknown action. Use view/equip/unequip/drop', flags: MessageFlags.Ephemeral });
       }
       return;
     }
 
     if (sub === 'explore') {
-      const location = interaction.options.getString('location') || 'random';
-      const result = exploreLocation(userId, location);
-      await interaction.reply({ content: result.message, flags: MessageFlags.Ephemeral });
+      const charAfter = getCharacter(userId);
+      // Simple exploration logic using available rpg.js functions
+      const eventType = randomEventType();
+      let message, xpGain = 0, goldGain = 0;
+
+      if (eventType === 'combat') {
+        const monster = encounterMonster(char.lvl);
+        const result = fightTurn(char, monster);
+        xpGain += Math.floor(monster.xpReward * 0.5);
+        goldGain += Math.max(0, monster.goldReward - Math.floor(Math.random() * monster.goldReward));
+        message = `🗡️ Found a ${monster.name} (Lv.${Math.round(monster.level)})! You dealt ${result.damage} damage!\n+${xpGain} XP, +${goldGain} gold`;
+      } else if (eventType === 'treasure') {
+        const itemValue = char.lvl * 5;
+        xpGain += Math.floor(itemValue / 2);
+        goldGain += itemValue;
+        message = `💎 Discovered a treasure chest!\n+${xpGain} XP, +${goldGain} gold`;
+      } else if (eventType === 'rest') {
+        char.hp = char.maxHp;
+        char.mp = char.maxMp;
+        xpGain += 2;
+        message = `🏕️ Found a safe resting spot! Fully restored your HP and MP.\n+${xpGain} XP`;
+      } else if (eventType === 'trap') {
+        const dmg = Math.floor(char.hp * 0.15);
+        char.hp = Math.max(1, char.hp - dmg);
+        xpGain += 3;
+        message = `💥 Triggered a trap! Lost ${dmg} HP.\n+${xpGain} XP for surviving.`;
+      } else {
+        xpGain += char.lvl * 2;
+        goldGain += char.lvl;
+        message = `✨ Had an interesting encounter!\n+${xpGain} XP, +${goldGain} gold`;
+      }
+
+      const resultAfterApplyXp = applyXp(userId, charAfter, xpGain);
+      if (goldGain > 0) charAfter.gold = (charAfter.gold || 0) + goldGain;
+      saveCharacter(userId, charAfter);
+
+      let finalMsg = message;
+      if (resultAfterApplyXp.gained > 0) {
+        finalMsg += `\n🎉 **LEVEL UP!** You are now level ${resultAfterApplyXp.newLvl}! (+${resultAfterApplyXp.gained} skill points)`;
+      }
+
+      await interaction.reply({ content: finalMsg, flags: MessageFlags.Ephemeral });
       return;
     }
 
     if (sub === 'upgrade') {
-      const stat = interaction.options.getString('stat');
-      const result = upgradeStat(userId, stat);
-      await interaction.reply({
-        content: result.success ? `✅ Upgraded ${stat.toUpperCase()}! New value: ${result.newValue}` : `❌ Failed to upgrade: ${result.reason}`,
-        flags: MessageFlags.Ephemeral,
-      });
+      const stat = interaction.options.getString('stat').toLowerCase();
+      const validStats = ['hp', 'max_hp', 'atk', 'def', 'spd', 'mp', 'max_mp'];
+      if (!validStats.includes(stat)) {
+        return interaction.reply({ content: `❌ Invalid stat. Choose from: ${validStats.join(', ')}`, flags: MessageFlags.Ephemeral });
+      }
+
+      const cost = char.lvl * 20;
+      if ((char.gold || 0) < cost) {
+        return interaction.reply({ content: `❌ Not enough gold! Need ${cost} gold (you have ${char.gold || 0}).`, flags: MessageFlags.Ephemeral });
+      }
+
+      if ((char.skillPoints || 0) < 1) {
+        return interaction.reply({ content: '❌ No skill points available! Level up to earn more.', flags: MessageFlags.Ephemeral });
+      }
+
+      char.gold -= cost;
+      const oldValue = char[stat] || 0;
+      char[stat] = oldValue + 1;
+      if (stat === 'hp') char.maxHp = char.maxHp + 1;
+      if (stat === 'mp') char.maxMp = char.maxMp + 1;
+
+      saveCharacter(userId, char);
+
+      await interaction.reply({ content: `✅ Upgraded ${stat.toUpperCase()}! ${oldValue} → ${char[stat]} (-${cost} gold, -1 skill point)`, flags: MessageFlags.Ephemeral });
       return;
     }
 
     if (sub === 'battle') {
       const enemyType = interaction.options.getString('enemy') || 'slime';
-      let result;
-      try {
-        result = await combatRound(userId, enemyType);
-      } catch (e) {
-        console.error(`[RPG] Battle error for ${userId}:`, e);
-        return interaction.reply({ content: '❌ Something went wrong during battle.', flags: MessageFlags.Ephemeral });
+      let monster;
+      const charLevel = char.lvl || 1;
+
+      switch (enemyType) {
+        case 'boss':
+          monster = bossEncounter(Math.min(charLevel + 2, 20));
+          break;
+        default:
+          monster = encounterMonster(charLevel);
+          break;
+      }
+
+      // Turn-based combat simulation
+      let rounds = 0;
+      const maxRounds = 30;
+      let battleLog = [`⚔️ **${char.name}** (Lv.${char.lvl}) vs ${monster.name}!`];
+
+      while (char.hp > 0 && monster.hp > 0 && rounds < maxRounds) {
+        rounds++;
+        const playerHit = fightTurn(char, monster);
+        battleLog.push(`Round ${rounds}: You hit for ${playerHit.damage} damage (${monster.hp}/${monster.maxHp} HP left)`);
+
+        if (monster.hp <= 0) break;
+
+        const monsterHit = fightTurn(monster, char);
+        battleLog.push(`${monster.name} hits back for ${monsterHit.damage}! (${char.hp}/${char.maxHp} HP left)`);
+      }
+
+      let xpGain, goldGain, message;
+      if (char.hp <= 0) {
+        message = `💀 **You were defeated!**\n${monster.name} won in ${rounds} rounds.`;
+        xpGain = Math.floor(monster.xpReward * 0.2);
+        goldGain = 0;
+      } else if (monster.hp <= 0) {
+        message = `⚔️ **Victory!** You defeated ${monster.name} in ${rounds} rounds!`;
+        xpGain = monster.xpReward || charLevel * 10;
+        goldGain = monster.goldReward || charLevel * 5;
+      } else {
+        message = '🕐 Battle timed out after max rounds. It\'s a draw.';
+        xpGain = charLevel * 3;
+        goldGain = Math.floor(charLevel * 2);
+      }
+
+      const resultAfterApplyXp = applyXp(userId, char, xpGain);
+      if (goldGain > 0) char.gold = (char.gold || 0) + goldGain;
+      saveCharacter(userId, char);
+
+      message += `\n+${xpGain} XP, +${goldGain} gold`;
+      if (resultAfterApplyXp.gained > 0) {
+        message += `\n🎉 **LEVEL UP!** You are now level ${resultAfterApplyXp.newLvl}! (+${resultAfterApplyXp.gained} skill points)`;
       }
 
       const embed = new EmbedBuilder()
-        .setTitle(result.victory ? '⚔️ Victory!' : '💀 Defeat...')
-        .setColor(result.victory ? 0x2ecc71 : 0xe74c3c)
-        .setDescription(result.message);
+        .setTitle(char.hp > 0 ? '⚔️ Battle Results' : '💀 Defeat')
+        .setColor(char.hp > 0 ? 0x2ecc71 : 0xe74c3c)
+        .setDescription(message)
+        .setFooter({ text: `${battleLog.length} rounds fought` });
+
       await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
       return;
     }
@@ -255,68 +365,50 @@ export async function execute(interaction) {
       if (action === 'create') {
         const title = interaction.options.getString('title') || 'A simple quest';
         const desc = interaction.options.getString('desc') || 'Do something heroic.';
-        const q = createQuest(userId, title, desc);
+        const q = rpgCreateQuest(userId, title, desc);
         return interaction.reply({ content: `Quest created: ${q.title} (id=${q.id})`, flags: MessageFlags.Ephemeral });
       }
       if (action === 'list') {
-        const qs = listQuests(userId);
-        if (qs.length === 0) return interaction.reply({ content: 'No quests.', flags: MessageFlags.Ephemeral });
-        return interaction.reply(qs.map((q) => `${q.id} - ${q.title} [${q.status}]`).join('\n'));
+        return interaction.reply({ content: 'Use `/rpg quest find` to discover a new quest.', flags: MessageFlags.Ephemeral });
+      }
+      if (action === 'find') {
+        const q = generateRandomQuest(userId, char.lvl || 1);
+        return interaction.reply({ content: `New quest available:\n**${q.title}**: ${q.desc}`, flags: MessageFlags.Ephemeral });
       }
       if (action === 'complete') {
-        const id = interaction.options.getString('id');
-        const q = completeQuest(userId, id);
-        if (!q) return interaction.reply({ content: 'Quest not found.', flags: MessageFlags.Ephemeral });
-        const rewardText = q.xpReward && q.goldReward ? `\n🎉 **Rewards:** ${q.xpReward} XP, ${q.goldReward} gold!` : '';
-        return interaction.reply({ content: `Quest completed: ${q.title}${rewardText}`, flags: MessageFlags.Ephemeral });
+        const result = completeQuest(userId, interaction.options.getString('id'));
+        if (!result) return interaction.reply({ content: 'Quest not found or cannot be completed.', flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: `🎉 Quest completed! +20 XP`, flags: MessageFlags.Ephemeral });
       }
-      return interaction.reply({ content: 'Unknown quest action. Use create|list|complete', flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: 'Unknown quest action. Use create/list/find/complete', flags: MessageFlags.Ephemeral });
     }
 
     if (sub === 'craft') {
       const itemId = interaction.options.getString('item');
       const recipes = getCraftingRecipes();
+      const recipe = Array.isArray(recipes) ? recipes.find((r) => r.id === itemId) : recipes[itemId];
 
-      if (!recipes[itemId]) {
+      if (!recipe) {
         return interaction.reply({ content: `❌ "${itemId}" is not a craftable item.`, flags: MessageFlags.Ephemeral });
       }
 
-      const canCraft = canCraftItem(userId, itemId);
+      const canCraftResult = canCraftItem(userId, itemId);
 
-      if (!canCraft.success) {
-        if (canCraft.reason === 'level_too_low') {
-          return interaction.reply({ content: `❌ You need to be level ${canCraft.required} to craft this item.`, flags: MessageFlags.Ephemeral });
-        } else if (canCraft.reason === 'missing_materials') {
-          return interaction.reply({ content: `❌ You're missing materials. You need: ${canCraft.missing}`, flags: MessageFlags.Ephemeral });
-        }
-        return interaction.reply({ content: `❌ Cannot craft this item: ${canCraft.reason}`, flags: MessageFlags.Ephemeral });
+      if (!canCraftResult) {
+        return interaction.reply({ content: `❌ Cannot craft this item (requirements not met).`, flags: MessageFlags.Ephemeral });
       }
 
       const result = craftItem(userId, itemId);
 
-      if (result.success) {
-        const recipe = recipes[itemId];
-        const embed = new EmbedBuilder()
-          .setTitle('🔨 Item Crafted!')
-          .setColor(0x00_ff_00)
-          .setDescription(`Successfully crafted **${result.item.name}**!`)
-          .addFields(
-            { name: '📦 Item', value: `${result.item.name} (${result.item.rarity})`, inline: true },
-            { name: '⭐ XP Gained', value: `${result.xpGained} XP`, inline: true },
-            { name: '📋 Description', value: result.item.description, inline: false },
-          );
-
-        // Track crafting achievement
-        updateUserStats(userId, { items_crafted: 1 });
-
-        await interaction.reply({ embeds: [embed] });
+      if (result) {
+        await interaction.reply({ content: `🔨 Successfully crafted ${itemId}!`, flags: MessageFlags.Ephemeral });
       } else {
-        await interaction.reply({ content: `❌ Failed to craft item: ${result.reason}`, flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: '❌ Failed to craft item.', flags: MessageFlags.Ephemeral });
       }
       return;
     }
 
-    // Fallback — unknown subcommand  
+    // Fallback — unknown subcommand
     await interaction.reply({ content: '❌ Unknown RPG command.', flags: MessageFlags.Ephemeral });
   } catch (error) {
     console.error('[RPG] Error in /rpg:', error);

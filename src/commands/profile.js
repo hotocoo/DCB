@@ -17,8 +17,6 @@ import {
   compareProfiles,
   searchProfiles,
   getLeaderboard,
-  generateProfileInsights,
-  checkMilestones,
 } from '../profiles.js';
 import { safeExecuteCommand, CommandError, validateUser, validateRange, validateNotEmpty } from '../errorHandler.js';
 
@@ -75,7 +73,12 @@ export async function execute(interaction) {
           throw new CommandError('Failed to retrieve profile data.', 'NOT_FOUND');
         }
         const analytics = getProfileAnalytics(viewUserId);
-        const insights = generateProfileInsights(viewUserId);
+
+        // Simple insights based on available data
+        const insights = [];
+        if (analytics.totalPlayTime > 10) insights.push('📚 You\'re a dedicated user!');
+        if (profile.achievements && profile.achievements.length > 3) insights.push('🏆 Achievement hunter detected!');
+        if ((profile.statistics?.activity?.commands_used || 0) > 100) insights.push('⚡ Power user status!');
 
         const embed = new EmbedBuilder()
           .setTitle(`👤 ${profile.displayName}'s Profile`)
@@ -321,30 +324,30 @@ export async function execute(interaction) {
       break;
     }
     case 'insights': {
-      try {
-        const insights = generateProfileInsights(userId);
-        if (!Array.isArray(insights)) {
-          throw new CommandError('Failed to generate profile insights.', 'COMMAND_ERROR');
-        }
+      const profile = getOrCreateProfile(userId, interaction.user.username);
+      const insights = [];
 
-        if (insights.length === 0) {
-          return interaction.reply({ content: '💡 Start using more bot features to get personalized insights!', flags: MessageFlags.Ephemeral });
-        }
+      // Generate insights from available stats
+      if ((profile.statistics?.activity?.commands_used || 0) > 100) insights.push('⚡ You\'ve used over 100 commands — power user!');
+      if ((profile.statistics?.rpg?.bosses_defeated || 0) > 5) insights.push('🐲 You\'re a seasoned adventurer with many boss kills!');
+      if ((profile.statistics?.games?.trivia_correct || 0) > 20) insights.push('🧠 Trivia master in the making!');
+      if (profile.achievements && profile.achievements.length > 3) insights.push('🏆 Achievement collector: ' + profile.achievements.length + ' earned!');
 
-        const embed = new EmbedBuilder().setTitle('💡 Profile Insights').setColor(0x99_32_cc).setDescription('AI-powered analysis of your bot usage patterns:');
-
-        for (const [index, insight] of insights.entries()) {
-          embed.addFields({
-            name: `Insight #${index + 1}`,
-            value: insight,
-            inline: false,
-          });
-        }
-
-        await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-      } catch (error) {
-        throw new CommandError(`Failed to generate insights: ${error.message}`, 'COMMAND_ERROR', { originalError: error.message });
+      if (insights.length === 0) {
+        return interaction.reply({ content: '💡 Start using more bot features to get personalized insights!', flags: MessageFlags.Ephemeral });
       }
+
+      const embed = new EmbedBuilder().setTitle('💡 Profile Insights').setColor(0x99_32_cc).setDescription('Analysis of your bot usage patterns:');
+
+      for (const [index, insight] of insights.entries()) {
+        embed.addFields({
+          name: `Insight #${index + 1}`,
+          value: insight,
+          inline: false,
+        });
+      }
+
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
       break;
     }
