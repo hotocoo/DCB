@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 
-import { getUserAchievements, getAllAchievements, getAchievementLeaderboard, updateUserStats } from '../achievements.js';
+import { getUserAchievements, getAllAchievements, getAchievementLeaderboard, updateStats } from '../achievements.js';
 
 export const data = new SlashCommandBuilder()
   .setName('achievements')
@@ -175,7 +175,7 @@ export async function execute(interaction) {
       }
       case 'stats': {
         try {
-          const userStats = updateUserStats(userId, {}) || { userData: null, newAchievements: [] };
+          const userStats = updateStats(userId, {}) || { userData: null, newAchievements: [] };
 
           const embed = new EmbedBuilder()
             .setTitle(`📊 ${interaction.user.username}'s Statistics`)

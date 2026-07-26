@@ -2,7 +2,7 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 
 import { logger } from '../logger.js';
 import { warnUser, muteUser, banUser, kickUser, getUserWarnings, getModActions, getUserModStats, checkAutoMod } from '../moderation.js';
-import { updateUserStats } from '../achievements.js';
+import { updateStats } from '../achievements.js';
 
 export const data = new SlashCommandBuilder()
   .setName('admin')
@@ -149,7 +149,7 @@ export async function execute(interaction) {
               );
 
             // Track moderation achievement
-            updateUserStats(interaction.user.id, { moderation_actions: 1 });
+            updateStats(interaction.user.id, { moderation_actions: 1 });
 
             await interaction.reply({ embeds: [embed] });
 

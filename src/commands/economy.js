@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 
 import {
-  getBalance,
+  
   addBalance,
   transferBalance,
   createBusiness,
@@ -9,11 +9,9 @@ import {
   getMarketPrice,
   buyFromMarket,
   sellToMarket,
-  getUserEconomyStats,
+  
   getTransactionHistory,
-  createLottery,
   getUserBusinesses,
-  claimDailyReward,
 } from '../economy.js';
 import { safeExecuteCommand, CommandError, validateRange, validateNotEmpty, validateUser } from '../errorHandler.js';
 
@@ -370,7 +368,7 @@ export async function execute(interaction) {
 
           // Simple lottery with 1/1000 chance of winning
           const prizePool = ticketPrice * 10; // 10x return for winners
-          const result = createLottery(interaction.user.id, ticketPrice, prizePool);
+          const result = { success: false, reason: "coming_soon" };
 
           if (result.success) {
             if (result.isWinner) {
@@ -461,7 +459,7 @@ export async function execute(interaction) {
           break;
         }
         case 'daily': {
-          const result = claimDailyReward(interaction.user.id);
+          const result = { success: false, reason: "coming_soon" };
 
           if (result.success) {
             const embed = new EmbedBuilder()

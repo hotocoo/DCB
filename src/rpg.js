@@ -311,7 +311,7 @@ export function getCharacterClasses() { return CHARACTER_CLASSES; }
 
 export function getClassInfo(charClass) { return CHARACTER_CLASSES[charClass] || null; }
 
-function generateRandomItem(level = 1) {
+export function generateRandomItem(level = 1) {
   const rarities = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
   const rarityWeights = [60, 25, 10, 4, 1];
   let rand = Math.random() * 100;
@@ -521,3 +521,4 @@ export function checkSessionXpCap(userId) {
   if ((char.lastSessionReset || 0) < sessionStart) { char.sessionXpGained = 0; char.lastSessionReset = sessionStart; }
   return { available: (char.sessionXpGained || 0) < 500 };
 }
+
