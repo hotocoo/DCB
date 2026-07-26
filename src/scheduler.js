@@ -24,14 +24,14 @@ function migrateFromJson() {
     // Migrate reminders
     for (const [uid, list] of Object.entries(data.reminders || {})) {
       for (const r of Array.isArray(list) ? list : []) {
-        db.prepare('INSERT INTO reminders (id, user_id, reminder_data) VALUES (?, ?, ?)').run(r.id, uid, JSON.stringify(r));
+        db.prepare('INSERT OR REPLACE INTO reminders (id, user_id, reminder_data) VALUES (?, ?, ?)').run(r.id, uid, JSON.stringify(r));
       }
     }
 
     // Migrate events
     for (const [gid, list] of Object.entries(data.events || {})) {
       for (const e of Array.isArray(list) ? list : []) {
-        db.prepare('INSERT INTO events (id, guild_id, event_data) VALUES (?, ?, ?)').run(e.id, gid, JSON.stringify(e));
+        db.prepare('INSERT OR REPLACE INTO events (id, guild_id, event_data) VALUES (?, ?, ?)').run(e.id, gid, JSON.stringify(e));
       }
     }
 
@@ -67,7 +67,7 @@ export function createReminder(userId, reminderData) {
     recurring: reminderData.recurring || null, channelId: reminderData.channelId, guildId: reminderData.guildId, created: Date.now(), active: true, executed: false,
   };
 
-  db.prepare('INSERT INTO reminders (id, user_id, reminder_data) VALUES (?, ?, ?)').run(id, userId, JSON.stringify(reminder));
+  db.prepare('INSERT OR REPLACE INTO reminders (id, user_id, reminder_data) VALUES (?, ?, ?)').run(id, userId, JSON.stringify(reminder));
 
   // Schedule timer if client is ready
   if (started && client) scheduleReminder(reminder);
@@ -161,7 +161,7 @@ export function createEvent(eventData) {
     participants: [], reminders: eventData.reminders || [], created: Date.now(), active: true,
   };
 
-  db.prepare('INSERT INTO events (id, guild_id, event_data) VALUES (?, ?, ?)').run(id, eventData.guildId, JSON.stringify(event));
+  db.prepare('INSERT OR REPLACE INTO events (id, guild_id, event_data) VALUES (?, ?, ?)').run(id, eventData.guildId, JSON.stringify(event));
 
   if (started && client) scheduleEvent(event);
 

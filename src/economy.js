@@ -93,13 +93,33 @@ export function setBalance(userId, amount) {
 }
 
 export function addBalance(userId, amount) {
-  const current = getBalance(userId);
-  return setBalance(userId, current + Number(amount));
+  try {
+    const db = getDb();
+    ensureUser(userId);
+    const amt = Number(amount);
+    // Ensure balance row exists first (same pattern as transferBalance)
+    db.prepare("INSERT OR IGNORE INTO balances (user_id, amount) VALUES (?, 0)").run(userId);
+    db.prepare("UPDATE balances SET amount = COALESCE(amount, 0) + ? WHERE user_id = ?").run(amt, userId);
+    return getBalance(userId);
+  } catch (error) {
+    logger.error('Failed to add balance', error instanceof Error ? error : new Error(String(error)));
+    return getBalance(userId);
+  }
 }
 
 export function subtractBalance(userId, amount) {
-  const current = getBalance(userId);
-  return setBalance(userId, current - Number(amount));
+  try {
+    const db = getDb();
+    ensureUser(userId);
+    const amt = Number(amount);
+    // Ensure balance row exists first
+    db.prepare("INSERT OR IGNORE INTO balances (user_id, amount) VALUES (?, 0)").run(userId);
+    db.prepare("UPDATE balances SET amount = MAX(0, COALESCE(amount, 0) - ?) WHERE user_id = ?").run(amt, userId);
+    return getBalance(userId);
+  } catch (error) {
+    logger.error('Failed to subtract balance', error instanceof Error ? error : new Error(String(error)));
+    return getBalance(userId);
+  }
 }
 
 /**

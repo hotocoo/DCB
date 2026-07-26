@@ -37,7 +37,8 @@ export function setGuild(id, data) {
   if (!data || typeof data !== 'object') return false;
   try {
     const db = getDb();
-    const merged = { ...(typeof db.prepare("SELECT config FROM guilds WHERE id = ?").get(id)?.config === 'string' && JSON.parse(db.prepare("SELECT config FROM guilds WHERE id = ?").get(id).config) || {}), ...data, lastUpdated: new Date().toISOString() };
+    const existing = db.prepare("SELECT config FROM guilds WHERE id = ?").get(id);
+    const merged = { ...(existing?.config ? JSON.parse(existing.config) : {}), ...data, lastUpdated: new Date().toISOString() };
     db.prepare("INSERT OR REPLACE INTO guilds (id, name, config, updated_at) VALUES (?, ?, ?, ?)").run(
       id, merged.name || '', JSON.stringify(merged), new Date().toISOString(),
     );

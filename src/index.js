@@ -18,7 +18,7 @@ import { handleMessage } from './chat.js';
 import { logger, logError } from './logger.js';
 import { checkTypingAttempt } from './minigames/typing.js';
 import { isOnCooldown, setCooldown } from './cooldowns.js';
-import { initializeDatabase } from './storage.js';
+import { initializeDatabase, shutdownDatabase } from './storage.js';
 import { schedulerManager } from './scheduler.js';
 
 /**
@@ -362,6 +362,9 @@ async function gracefulShutdown(client, signal) {
 
     // Flush the logger's file-writer/buffer before tearing down.
     logger.cleanup();
+
+    // Close database connection to ensure writes are flushed
+    try { await shutdownDatabase(); } catch (_ignore) {}
 
     // Destroy the client after a short delay to allow pending operations
     setTimeout(() => {

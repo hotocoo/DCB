@@ -60,6 +60,39 @@ function createTables() {
       updated_at DATETIME DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     )`,
 
+    // Scheduler tables: reminders, events, user_settings
+    `CREATE TABLE IF NOT EXISTS reminders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reminder_data TEXT NOT NULL DEFAULT '{}',
+      created_at DATETIME DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS events (
+      id TEXT PRIMARY KEY,
+      guild_id TEXT NOT NULL,
+      event_data TEXT NOT NULL DEFAULT '{}',
+      created_at DATETIME DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS user_settings (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      settings_data TEXT NOT NULL DEFAULT '{}',
+      updated_at DATETIME DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    )`,
+
+    // Trading table
+    `CREATE TABLE IF NOT EXISTS trades (
+      id TEXT PRIMARY KEY,
+      trade_data TEXT NOT NULL DEFAULT '{}',
+      created_at DATETIME DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    )`,
+
+    // Indexes for scheduler + trading
+    `CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders(user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_events_guild ON events(guild_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_trades_created ON trades(created_at DESC)`,
+
     // RPG character data — one per user
     `CREATE TABLE IF NOT EXISTS characters (
       user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -327,7 +360,7 @@ function migrateEconomy() {
     }
   }
 
-  logger.info(`Migrated economy: ${Object.keys(data.userBalances || {})}} balances, ${(data.transactions || []).length} transactions`);
+  logger.info(`Migrated economy: ${Object.keys(data.userBalances || {}).length} balances, ${(data.transactions || []).length} transactions`);
 }
 
 function migrateModeration() {

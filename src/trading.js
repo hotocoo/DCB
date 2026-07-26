@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { getDb } from './database.js';
-import { getCharacter, addItemToInventory, removeItemFromInventory } from './rpg.js';
+import { getCharacter, addItemToInventory, removeItemFromInventory, saveCharacter } from './rpg.js';
 import { getBalance, subtractBalance, addBalance } from './economy.js';
 import { logger } from './logger.js';
 
@@ -167,7 +167,6 @@ function rollbackAndFail(trade, iGold, tGold, iInv, tInv) {
     db.prepare('INSERT OR REPLACE INTO balances (user_id, amount) VALUES (?, ?)').run(trade.target, Math.max(0, tGold));
 
     // Restore inventories via RPG saveCharacter (uses SQLite now)
-    const { saveCharacter } = require('./rpg.js');
     const iChar = getCharacter(trade.initiator); if (iChar) { iChar.inventory = JSON.parse(JSON.stringify(iInv)); saveCharacter(trade.initiator, iChar); }
     const tChar = getCharacter(trade.target); if (tChar) { tChar.inventory = JSON.parse(JSON.stringify(tInv)); saveCharacter(trade.target, tChar); }
 
@@ -260,6 +259,7 @@ export function getActiveAuctions(limit = 20) {
 // Market price tracking from historical trades
 export function getMarketPrices(itemId, days = 7) {
   migrateFromJson();
+  const db = getDb();
   const cutoff = Date.now() - days * 86_400_000;
   const all = db.prepare('SELECT trade_data FROM trades').all().map((r) => JSON.parse(r.trade_data));
   const relevant = all.filter((t) => {
@@ -290,6 +290,7 @@ export function validateTradeRequest(_userId, _requestedItems, _requestedGold) {
 // Trade analytics per user
 export function getTradeAnalytics(userId) {
   migrateFromJson();
+  const db = getDb();
   const all = db.prepare('SELECT trade_data FROM trades').all().map((r) => JSON.parse(r.trade_data));
   const userTrades = all.filter((t) => t.initiator === userId || t.target === userId);
   const successful = userTrades.filter((t) => t.status === 'completed');

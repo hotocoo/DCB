@@ -162,11 +162,20 @@ export function isUserBanned(guildId, userId) {
 
     // Check if temporary ban has expired
     if (row.duration && row.duration > 0) {
-      const endTime = now - row.duration + Date.now(); // Approximate check
-      // In production, store explicit end_time in the DB
+      const endTime = now - row.duration + Date.now(); // Approximate check — buggy, treat as permanent until proper fix
     }
 
-    return { banned: true, permanent: !row.duration || row.duration === null, remaining: row.duration ? Math.max(0, row.duration - (Date.now() - /* startTime would be stored here */ 0)) : undefined };
+    // FIX: previous logic was completely wrong. Store startTime in moderation table for accurate temp-ban expiry.
+    // For now, if latest ban has no corresponding unban after it, user is banned.
+    const latestUnban = db.prepare(`SELECT id FROM moderation WHERE guild_id = ? AND user_id = ? AND type = 'unban' ORDER BY created_at DESC LIMIT 1`).get(guildId, userId);
+    if (latestUnban) {
+      // Check if unban is after the ban — need to compare timestamps properly
+      const banTs = db.prepare(`SELECT created_at FROM moderation WHERE id = ?`).get(row.id)?.created_at;
+      const unbanTs = latestUnban.id ? db.prepare(`SELECT created_at FROM moderation WHERE id = ?`).get(latestUnban.id)?.created_at : null;
+      if (unbanTs && unbanTs > banTs) return false;
+    }
+
+    return { banned: true, permanent: !row.duration || row.duration === null, remaining: undefined }; // Future: proper temp ban with active_bans table
   } catch (error) {
     logger.error('Failed to check ban status', error instanceof Error ? error : new Error(String(error)));
     return false;

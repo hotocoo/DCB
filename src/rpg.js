@@ -103,14 +103,14 @@ function migrateFromJson() {
   if (count > 0) logger.info(`Migrated ${count} RPG characters to SQLite`);
 }
 
-function upsertChar(db, userId, c) {
-  ensureUser(userId);
-  safeUserId(userId);
+export function upsertChar(db, userId, c) {
+  const uid = safeUserId(userId);
+  ensureUser(uid);
   db.prepare(`INSERT OR REPLACE INTO characters
     (user_id, name, char_class, lvl, xp, skill_points, hp, max_hp, mp, max_mp, atk, def, spd,
      abilities, color, inventory, equipped_weapon, equipped_armor, gold)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    userId, c.name || 'Adventurer', c.class || 'warrior', c.lvl || 1, c.xp || 0,
+    uid, c.name || 'Adventurer', c.class || 'warrior', c.lvl || 1, c.xp || 0,
     c.skillPoints || 0, (c.hp ?? c.maxHp) || 20, c.maxHp || 20, (c.mp ?? c.maxMp) || 10,
     c.maxMp || 10, c.atk || 5, c.def || 2, c.spd || 2, JSON.stringify(c.abilities || []),
     c.color || 16711680, JSON.stringify(c.inventory || {}), c.equipped_weapon || null,
