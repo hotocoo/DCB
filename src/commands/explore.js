@@ -38,7 +38,7 @@ function readAll() {
     cache = raw;
     return raw;
   } catch (error) {
-    console.error('Failed to read rpg storage', error);
+    logger.error('Failed to read rpg storage', error);
     return {};
   }
 }
@@ -52,7 +52,7 @@ function writeAll(obj) {
     fs.renameSync(tmp, FILE);
     cache = obj;
   } catch (error) {
-    console.error('Failed to write RPG data:', error);
+    logger.error('Failed to write RPG data:', error);
     // Attempt to restore from cache if available
     if (cache) {
       console.log('Restoring from cache after write failure');

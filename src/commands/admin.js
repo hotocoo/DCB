@@ -160,7 +160,7 @@ export async function execute(interaction) {
               console.log('Could not send DM to warned user:', dmError.message);
             }
           } catch (warnError) {
-            console.error('Error warning user:', warnError);
+            logger.error('Error warning user:', warnError);
             await interaction.reply({
               content: '❌ Failed to warn user. Please try again.',
               flags: MessageFlags.Ephemeral,
@@ -214,7 +214,7 @@ export async function execute(interaction) {
 
             await interaction.reply({ embeds: [embed] });
           } catch (muteError) {
-            console.error('Error muting user:', muteError);
+            logger.error('Error muting user:', muteError);
             await interaction.reply({
               content: '❌ Failed to mute user. Please try again.',
               flags: MessageFlags.Ephemeral,
@@ -258,7 +258,7 @@ export async function execute(interaction) {
 
             await interaction.reply({ embeds: [embed] });
           } catch (unmuteError) {
-            console.error('Error unmuting user:', unmuteError);
+            logger.error('Error unmuting user:', unmuteError);
             await interaction.reply({
               content: '❌ Failed to unmute user. Please try again.',
               flags: MessageFlags.Ephemeral,
@@ -312,7 +312,7 @@ export async function execute(interaction) {
 
             await interaction.reply({ embeds: [embed] });
           } catch (banError) {
-            console.error('Error banning user:', banError);
+            logger.error('Error banning user:', banError);
             await interaction.reply({
               content: '❌ Failed to ban user. Please try again.',
               flags: MessageFlags.Ephemeral,
@@ -356,7 +356,7 @@ export async function execute(interaction) {
 
             await interaction.reply({ embeds: [embed] });
           } catch (unbanError) {
-            console.error('Error unbanning user:', unbanError);
+            logger.error('Error unbanning user:', unbanError);
             await interaction.reply({
               content: '❌ Failed to unban user. Please try again.',
               flags: MessageFlags.Ephemeral,
@@ -399,7 +399,7 @@ export async function execute(interaction) {
 
             await interaction.reply({ embeds: [embed] });
           } catch (kickError) {
-            console.error('Error kicking user:', kickError);
+            logger.error('Error kicking user:', kickError);
             await interaction.reply({
               content: '❌ Failed to kick user. Please try again.',
               flags: MessageFlags.Ephemeral,
@@ -492,12 +492,12 @@ export async function execute(interaction) {
                 row.addComponents(new ButtonBuilder().setCustomId(`admin_mute:${targetUser.id}:${guildId}`).setLabel('🔇 Mute').setStyle(ButtonStyle.Danger));
               }
             } catch (importError) {
-              console.error('Error importing moderation functions:', importError);
+              logger.error('Error importing moderation functions:', importError);
             }
 
             await interaction.reply({ embeds: [embed], components: row.components.length > 0 ? [row] : [] });
           } catch (checkError) {
-            console.error('Error checking user moderation status:', checkError);
+            logger.error('Error checking user moderation status:', checkError);
             await interaction.reply({
               content: '❌ Failed to check user moderation status. Please try again.',
               flags: MessageFlags.Ephemeral,
@@ -555,7 +555,7 @@ export async function execute(interaction) {
 
             await interaction.reply({ embeds: [embed] });
           } catch (historyError) {
-            console.error('Error fetching moderation history:', historyError);
+            logger.error('Error fetching moderation history:', historyError);
             await interaction.reply({
               content: '❌ Failed to fetch moderation history. Please try again.',
               flags: MessageFlags.Ephemeral,
@@ -621,7 +621,7 @@ export async function execute(interaction) {
 
             await interaction.reply({ embeds: [embed] });
           } catch (statsError) {
-            console.error('Error fetching moderation statistics:', statsError);
+            logger.error('Error fetching moderation statistics:', statsError);
             await interaction.reply({
               content: '❌ Failed to fetch moderation statistics. Please try again.',
               flags: MessageFlags.Ephemeral,
@@ -633,14 +633,14 @@ export async function execute(interaction) {
         // No default
       }
     } catch (subcommandError) {
-      console.error(`Error processing ${sub} subcommand:`, subcommandError);
+      logger.error(`Error processing ${sub} subcommand:`, subcommandError);
       await interaction.reply({
         content: `❌ An error occurred while processing the ${sub} command. Please try again.`,
         flags: MessageFlags.Ephemeral,
       });
     }
   } catch (error) {
-    console.error('Admin command error:', error);
+    logger.error('Admin command error:', error);
     try {
       if (interaction && typeof interaction.reply === 'function') {
         await interaction.reply({
@@ -649,7 +649,7 @@ export async function execute(interaction) {
         });
       }
     } catch (replyError) {
-      console.error('Failed to send error reply:', replyError);
+      logger.error('Failed to send error reply:', replyError);
     }
   }
 }

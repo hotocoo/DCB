@@ -411,7 +411,7 @@ export async function execute(interaction) {
     // Fallback — unknown subcommand
     await interaction.reply({ content: '❌ Unknown RPG command.', flags: MessageFlags.Ephemeral });
   } catch (error) {
-    console.error('[RPG] Error in /rpg:', error);
+    logger.error('[RPG] Error in /rpg:', error);
     try {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: '❌ Something went wrong with the RPG command.', flags: MessageFlags.Ephemeral });

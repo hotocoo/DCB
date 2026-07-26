@@ -39,7 +39,7 @@ export async function execute(interaction) {
     const ans = answers[Math.floor(Math.random() * answers.length)];
     await interaction.reply(`🎱 ${ans}`);
   } catch (error) {
-    console.error('Error in /8ball:', error);
+    logger.error('Error in /8ball:', error);
     try {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: '❌ Something went wrong.', flags: 64 });

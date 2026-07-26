@@ -169,7 +169,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed], components: [row] });
         } catch (error) {
-          console.error('AI chat error:', error);
+          logger.error('AI chat error:', error);
           await interaction.reply({
             content: '❌ Failed to generate AI response. Please try again.',
             flags: MessageFlags.Ephemeral,
@@ -215,7 +215,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          console.error('Sentiment analysis error:', error);
+          logger.error('Sentiment analysis error:', error);
           await interaction.reply({
             content: '❌ Failed to analyze sentiment.',
             flags: MessageFlags.Ephemeral,
@@ -276,7 +276,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          console.error('Summarization error:', error);
+          logger.error('Summarization error:', error);
           await interaction.reply({
             content: '❌ Failed to summarize text.',
             flags: MessageFlags.Ephemeral,
@@ -332,7 +332,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          console.error('Translation error:', error);
+          logger.error('Translation error:', error);
           await interaction.reply({
             content: '❌ Failed to translate text.',
             flags: MessageFlags.Ephemeral,
@@ -382,7 +382,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          console.error('Idea generation error:', error);
+          logger.error('Idea generation error:', error);
           await interaction.reply({
             content: '❌ Failed to generate ideas.',
             flags: MessageFlags.Ephemeral,
@@ -436,7 +436,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          console.error('Code generation error:', error);
+          logger.error('Code generation error:', error);
           await interaction.reply({
             content: '❌ Failed to generate code.',
             flags: MessageFlags.Ephemeral,
@@ -466,7 +466,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          console.error('Error fetching models:', error);
+          logger.error('Error fetching models:', error);
           await interaction.reply({
             content: '❌ Failed to fetch available models.',
             flags: MessageFlags.Ephemeral,
@@ -496,7 +496,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          console.error('Error fetching personalities:', error);
+          logger.error('Error fetching personalities:', error);
           await interaction.reply({
             content: '❌ Failed to fetch available personalities.',
             flags: MessageFlags.Ephemeral,
@@ -521,7 +521,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         } catch (error) {
-          console.error('Recommendation error:', error);
+          logger.error('Recommendation error:', error);
           await interaction.reply({
             content: '❌ Failed to generate recommendations.',
             flags: MessageFlags.Ephemeral,
@@ -538,7 +538,7 @@ export async function execute(interaction) {
             flags: MessageFlags.Ephemeral,
           });
         } catch (error) {
-          console.error('Error clearing history:', error);
+          logger.error('Error clearing history:', error);
           await interaction.reply({
             content: '❌ Failed to clear conversation history.',
             flags: MessageFlags.Ephemeral,
@@ -550,7 +550,7 @@ export async function execute(interaction) {
       // No default
     }
   } catch (error) {
-    console.error('AI command error:', error);
+    logger.error('AI command error:', error);
     try {
       if (interaction && typeof interaction.reply === 'function') {
         await interaction.reply({
@@ -559,7 +559,7 @@ export async function execute(interaction) {
         });
       }
     } catch (replyError) {
-      console.error('Failed to send error reply:', replyError);
+      logger.error('Failed to send error reply:', replyError);
     }
   }
 }

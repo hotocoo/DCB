@@ -169,7 +169,7 @@ export async function execute(interaction) {
       updateUserStats(interaction.user.id, { weather_checks: 1 });
     } catch (error) { /* achievements optional */ }
   } catch (error) {
-    console.error('Weather command error:', error);
+    logger.error('Weather command error:', error);
     if (error.name === 'AbortError') {
       await interaction.reply({ content: '❌ Request timed out. Please try again later.', flags: MessageFlags.Ephemeral });
     } else if (error.message.includes('fetch')) {

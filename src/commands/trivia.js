@@ -232,7 +232,7 @@ async function sendQuestion(interaction, gameState) {
         sendQuestion(interaction, gameState);
       }, 2000);
     } catch (error) {
-      console.error('Error in trivia collector:', error);
+      logger.error('Error in trivia collector:', error);
       await i.reply({ content: 'An error occurred while processing your answer.', flags: MessageFlags.Ephemeral });
     }
   });

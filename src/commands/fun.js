@@ -28,7 +28,7 @@ export async function execute(interaction) {
       case '8ball': return await doEightBall(interaction);
     }
   } catch (err) {
-    console.error('fun error:', err);
+    logger.error('fun error:', err);
     try { await interaction.editReply({ content: "Something went wrong." }); } catch {}
   }
 }

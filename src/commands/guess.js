@@ -24,7 +24,7 @@ export async function execute(interaction) {
       content: `🎯 Guessing game started!\nI'm thinking of a number between ${min} and ${max}.\nSend your guess as a message. Type "quit" to stop.`
     });
   } catch (err) {
-    console.error('guess error:', err);
+    logger.error('guess error:', err);
     try { await interaction.editReply({ content: "Error starting game." }); } catch {}
   }
 }

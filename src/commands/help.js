@@ -19,7 +19,7 @@ async function getAllCommands() {
             commands.push(command.data);
           }
         } catch (error) {
-          console.error(`Failed to load command ${file}:`, error);
+          logger.error(`Failed to load command ${file}:`, error);
         }
       }
     }

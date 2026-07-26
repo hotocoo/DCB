@@ -269,7 +269,7 @@ export async function execute(interaction) {
 
           await interaction.editReply({ embeds: [embed], components: [row] });
         } catch (error) {
-          console.error('Play command error:', error);
+          logger.error('Play command error:', error);
           logger.error('Music play command failed', {
             guildId: interaction.guild.id,
             userId: interaction.user.id,
@@ -350,7 +350,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed], components: rows });
         } catch (error) {
-          console.error('Search command error:', error);
+          logger.error('Search command error:', error);
           await interaction.reply({ content: '❌ Failed to search songs.', flags: MessageFlags.Ephemeral });
         }
 
@@ -383,7 +383,7 @@ export async function execute(interaction) {
             await interaction.reply({ content: '❌ No previous song in history.', flags: MessageFlags.Ephemeral });
           }
         } catch (error) {
-          console.error('Back command error:', error);
+          logger.error('Back command error:', error);
           await interaction.reply({ content: '❌ Failed to go back.', flags: MessageFlags.Ephemeral });
         }
 
@@ -400,7 +400,7 @@ export async function execute(interaction) {
             .setDescription(`Loop mode set to **${mode.charAt(0).toUpperCase() + mode.slice(1)}**`);
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          console.error('Loop command error:', error);
+          logger.error('Loop command error:', error);
           await interaction.reply({ content: '❌ Failed to set loop mode.', flags: MessageFlags.Ephemeral });
         }
 
@@ -432,7 +432,7 @@ export async function execute(interaction) {
             await interaction.reply({ content: '❌ No songs in queue to skip.', flags: MessageFlags.Ephemeral });
           }
         } catch (error) {
-          console.error('Skip command error:', error);
+          logger.error('Skip command error:', error);
           await interaction.reply({ content: '❌ Failed to skip song.', flags: MessageFlags.Ephemeral });
         }
 
@@ -451,7 +451,7 @@ export async function execute(interaction) {
             await interaction.reply({ content: '❌ No music is currently playing.', flags: MessageFlags.Ephemeral });
           }
         } catch (error) {
-          console.error('Pause command error:', error);
+          logger.error('Pause command error:', error);
           await interaction.reply({ content: '❌ Failed to pause music.', flags: MessageFlags.Ephemeral });
         }
 
@@ -467,7 +467,7 @@ export async function execute(interaction) {
             await interaction.reply({ content: '❌ No paused music to resume.', flags: MessageFlags.Ephemeral });
           }
         } catch (error) {
-          console.error('Resume command error:', error);
+          logger.error('Resume command error:', error);
           await interaction.reply({ content: '❌ Failed to resume music.', flags: MessageFlags.Ephemeral });
         }
 
@@ -483,7 +483,7 @@ export async function execute(interaction) {
             await interaction.reply({ content: '❌ No music is currently playing.', flags: MessageFlags.Ephemeral });
           }
         } catch (error) {
-          console.error('Stop command error:', error);
+          logger.error('Stop command error:', error);
           await interaction.reply({ content: '❌ Failed to stop music.', flags: MessageFlags.Ephemeral });
         }
 
@@ -528,7 +528,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed], components: [row] });
         } catch (error) {
-          console.error('Queue command error:', error);
+          logger.error('Queue command error:', error);
           await interaction.reply({ content: '❌ Failed to get queue.', flags: MessageFlags.Ephemeral });
         }
 
@@ -562,7 +562,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed], components: [row] });
         } catch (error) {
-          console.error('Nowplaying command error:', error);
+          logger.error('Nowplaying command error:', error);
           await interaction.reply({ content: '❌ Failed to get now playing info.', flags: MessageFlags.Ephemeral });
         }
 
@@ -578,7 +578,7 @@ export async function execute(interaction) {
             await interaction.reply({ content: '❌ Queue is empty or too small to shuffle.', flags: MessageFlags.Ephemeral });
           }
         } catch (error) {
-          console.error('Shuffle command error:', error);
+          logger.error('Shuffle command error:', error);
           await interaction.reply({ content: '❌ Failed to shuffle queue.', flags: MessageFlags.Ephemeral });
         }
 
@@ -607,7 +607,7 @@ export async function execute(interaction) {
           const embed = new EmbedBuilder().setTitle('🔊 Volume Changed').setColor(0x00_99_ff).setDescription(`Volume set to **${volume}%**`);
           await interaction.reply({ embeds: [embed] });
         } catch (error) {
-          console.error('Volume command error:', error);
+          logger.error('Volume command error:', error);
           await interaction.reply({ content: '❌ Failed to set volume.', flags: MessageFlags.Ephemeral });
         }
 
@@ -634,7 +634,7 @@ export async function execute(interaction) {
             await interaction.reply({ content: '❌ Lyrics not found for that song.', flags: MessageFlags.Ephemeral });
           }
         } catch (error) {
-          console.error('Lyrics command error:', error);
+          logger.error('Lyrics command error:', error);
           await interaction.reply({ content: '❌ Failed to get lyrics.', flags: MessageFlags.Ephemeral });
         }
 
@@ -719,7 +719,7 @@ export async function execute(interaction) {
 
           await interaction.reply({ embeds: [embed], components: [row] });
         } catch (error) {
-          console.error('Radio command error:', error);
+          logger.error('Radio command error:', error);
           await interaction.reply({ content: '❌ Failed to play radio.', flags: MessageFlags.Ephemeral });
         }
 

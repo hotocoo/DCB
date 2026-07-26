@@ -40,7 +40,7 @@ export async function execute(interaction) {
 
     await sendBoard(interaction, gameId);
   } catch (err) {
-    console.error('connect4 error:', err);
+    logger.error('connect4 error:', err);
     try { await interaction.editReply({ content: "Error starting game." }); } catch {}
   }
 }
