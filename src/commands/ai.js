@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
-import { sanitizeInput } from '../validation.js'
 
+import { sanitizeInput } from '../validation.js';
+import { logger } from '../logger.js';
 import {
   generateResponse,
   analyzeSentiment,

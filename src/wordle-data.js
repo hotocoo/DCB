@@ -1,4 +1,4 @@
-export const wordleWords = [[
+export const wordleWords = [
   'HOUSE',
   'PLANE',
   'TIGER',
@@ -604,3 +604,4 @@ export const wordleWords = [[
   'YOURS',
   'YOUTH',
 ]
+

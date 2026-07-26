@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 
+import { logger } from '../logger.js';
 import {
   getNews,
   getRandomJoke,

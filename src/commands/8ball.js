@@ -1,5 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 
+import { logger } from '../logger.js';
+
 const answers = [
   'It is certain.',
   'Without a doubt.',

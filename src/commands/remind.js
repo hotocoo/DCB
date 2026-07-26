@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
-import { sanitizeInput } from '../validation.js'
 
+import { sanitizeInput } from '../validation.js';
 import { createReminder, createEvent, parseTime, getUserReminders, getUserEvents, cancelReminder, cancelEvent, getUpcomingEvents } from '../scheduler.js';
 import { safeExecuteCommand, CommandError, validateGuild, validateRange, validateNotEmpty } from '../errorHandler.js';
 

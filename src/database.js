@@ -183,6 +183,7 @@ function createTables() {
       type TEXT NOT NULL,
       reason TEXT DEFAULT '',
       duration INTEGER,
+      start_time INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     )`,
 
@@ -367,7 +368,7 @@ function migrateModeration() {
   const data = safeJsonRead(path.join(DB_DIR, 'moderation.json'));
   if (!data || typeof data !== 'object') return;
 
-  const insert = db.prepare(`INSERT OR IGNORE INTO moderation (id, guild_id, user_id, moderator_id, type, reason, duration) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  const insert = db.prepare(`INSERT OR IGNORE INTO moderation (id, guild_id, user_id, moderator_id, type, reason, duration, start_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
   let count = 0;
 
   for (const guildId in data.records || {}) {
@@ -375,7 +376,7 @@ function migrateModeration() {
       for (const record of data.records[guildId][userId]) {
         insert.run(
           record.id, guildId, userId, record.moderatorId || '',
-          record.type || 'unknown', record.reason || '', record.duration || null,
+          record.type || 'unknown', record.reason || '', record.duration || null, Date.now(),
         );
         count++;
       }

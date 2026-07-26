@@ -1,13 +1,13 @@
 import fs from 'node:fs';
-import { sanitizeInput } from '../validation.js'
 import path from 'node:path';
 
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 
+import { sanitizeInput } from '../validation.js';
 import { exploreLocation, unlockLocation, enterDungeon, discoverLocation, getLocations } from '../locations.js';
 import { narrate } from '../rpg.js';
 import { safeExecuteCommand, CommandError, validateNotEmpty, validateRange } from '../errorHandler.js';
-
+import { logger } from '../logger.js';
 // RPG data file path
 const FILE = path.join(process.cwd(), 'data', 'rpg.json');
 

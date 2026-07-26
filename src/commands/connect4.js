@@ -1,6 +1,8 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+
 import { connect4Games } from '../game-states.js';
 import { updateStats } from '../achievements.js';
+import { logger } from '../logger.js';
 
 export const data = new SlashCommandBuilder()
   .setName('connect4')
@@ -15,7 +17,7 @@ export async function execute(interaction) {
     await interaction.deferReply();
     const opponent = interaction.options.getUser('opponent');
     const difficulty = interaction.options.getString('difficulty') || 'medium';
-    
+
     if (opponent && opponent.id === interaction.user.id) {
       return await interaction.editReply({ content: "You can't play against yourself!" });
     }
@@ -39,9 +41,9 @@ export async function execute(interaction) {
     });
 
     await sendBoard(interaction, gameId);
-  } catch (err) {
-    logger.error('connect4 error:', err);
-    try { await interaction.editReply({ content: "Error starting game." }); } catch {}
+  } catch (error) {
+    logger.error('connect4 error:', error);
+    try { await interaction.editReply({ content: 'Error starting game.' }); } catch {}
   }
 }
 
@@ -132,7 +134,10 @@ function getAIMove(board, depth) {
     dropPiece(board, c);
     const score = minimax(board, depth, -Infinity, Infinity, false);
     undoDrop(board, c);
-    if (score > best) { best = score; bestCol = c; }
+    if (score > best) {
+      best = score;
+      bestCol = c;
+    }
   }
   return bestCol;
 }
@@ -170,16 +175,32 @@ function minimax(board, depth, alpha, beta, isMax) {
 async function makeMove(gameId, column) {
   const g = connect4Games.get(gameId);
   if (!g || g.status !== 'active') return false;
-  for (let r = 5; r >= 0; r--) { if (g.board[r][column] === null) { g.board[r][column] = g.currentPlayer; g.currentPlayer = g.currentPlayer === 'red' ? 'yellow' : 'red'; return true; } }
+  for (let r = 5; r >= 0; r--) {
+      if (g.board[r][column] === null) {
+        g.board[r][column] = g.currentPlayer;
+        g.currentPlayer = g.currentPlayer === 'red' ? 'yellow' : 'red';
+        return true;
+      }
+    }
   return false;
 }
 
 function dropPiece(board, col) {
-  for (let r = 5; r >= 0; r--) { if (board[r][col] === null) { board[r][col] = 'yellow'; return; } }
+  for (let r = 5; r >= 0; r--) {
+      if (board[r][col] === null) {
+        board[r][col] = 'yellow';
+        return;
+      }
+    }
 }
 
 export { makeMove as makeConnect4Move };
 
 function undoDrop(board, col) {
-  for (let r = 0; r < 6; r++) { if (board[r][col] !== null) { board[r][col] = null; return; } }
+  for (let r = 0; r < 6; r++) {
+    if (board[r][col] !== null) {
+      board[r][col] = null;
+      return;
+    }
+  }
 }

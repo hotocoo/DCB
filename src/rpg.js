@@ -521,4 +521,3 @@ export function checkSessionXpCap(userId) {
   if ((char.lastSessionReset || 0) < sessionStart) { char.sessionXpGained = 0; char.lastSessionReset = sessionStart; }
   return { available: (char.sessionXpGained || 0) < 500 };
 }
-

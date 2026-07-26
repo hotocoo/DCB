@@ -1,8 +1,9 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
-import { sanitizeInput } from '../validation.js'
 
+import { sanitizeInput } from '../validation.js';
 import { updateStats as updateUserStats } from '../achievements.js';
 import { tttGames } from '../game-states.js';
+import { logger } from '../logger.js';
 
 export const data = new SlashCommandBuilder()
   .setName('tictactoe')
@@ -197,9 +198,9 @@ async function sendTicTacToeBoard(interaction, gameState) {
           }
           await sendTicTacToeBoard(interaction, gameState);
         }
-      
-          } catch (err) {
-            logger.error('TicTacToe AI move error:', err);
+
+          } catch (error) {
+            logger.error('TicTacToe AI move error:', error);
           }
         })();
       }, 1000);

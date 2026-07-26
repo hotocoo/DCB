@@ -32,6 +32,7 @@ import {
   bossEncounter,
 } from '../rpg.js';
 import { updateStats as updateUserStats } from '../achievements.js';
+import { logger } from '../logger.js';
 
 export const data = new SlashCommandBuilder()
   .setName('rpg')
@@ -378,7 +379,7 @@ export async function execute(interaction) {
       if (action === 'complete') {
         const result = completeQuest(userId, interaction.options.getString('id'));
         if (!result) return interaction.reply({ content: 'Quest not found or cannot be completed.', flags: MessageFlags.Ephemeral });
-        return interaction.reply({ content: `🎉 Quest completed! +20 XP`, flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: '🎉 Quest completed! +20 XP', flags: MessageFlags.Ephemeral });
       }
       return interaction.reply({ content: 'Unknown quest action. Use create/list/find/complete', flags: MessageFlags.Ephemeral });
     }
@@ -395,7 +396,7 @@ export async function execute(interaction) {
       const canCraftResult = canCraftItem(userId, itemId);
 
       if (!canCraftResult) {
-        return interaction.reply({ content: `❌ Cannot craft this item (requirements not met).`, flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: '❌ Cannot craft this item (requirements not met).', flags: MessageFlags.Ephemeral });
       }
 
       const result = craftItem(userId, itemId);

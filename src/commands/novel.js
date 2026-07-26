@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, MessageFlags, EmbedBuilder } from 'discord.js';
-import { sanitizeInput } from '../validation.js'
 
+import { sanitizeInput } from '../validation.js';
 import { createNovel, listNovels, getNovel, generateChapter } from '../novel.js';
 import { CommandError, handleCommandError } from '../errorHandler.js';
 import { logger } from '../logger.js';

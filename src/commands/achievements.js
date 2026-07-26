@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 
 import { getUserAchievements, getAllAchievements, getAchievementLeaderboard, updateStats } from '../achievements.js';
+import { logger } from '../logger.js';
 
 export const data = new SlashCommandBuilder()
   .setName('achievements')

@@ -4,6 +4,8 @@ import { pathToFileURL } from 'node:url';
 
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 
+import { logger } from '../logger.js';
+
 async function getAllCommands() {
   const commandsPath = path.join(process.cwd(), 'src', 'commands');
   const commands = [];

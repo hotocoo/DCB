@@ -1,12 +1,15 @@
-import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { logError, logger } from './logger.js';
-import { CommandError, safeExecuteCommand } from './errorHandler.js';
-import { sanitizeInput, validateUserId } from './validation.js';
-import { getCharacter, encounterMonster, fightTurn, applyXp, saveCharacter, addItemToInventory, generateRandomItem, getItemInfo } from './rpg.js';
+import { CommandError, handleCommandError, safeExecuteCommand } from './errorHandler.js';
+import { sanitizeInput, validateUserId, inputValidator } from './validation.js';
+import { validateNotEmpty } from './errorHandler.js';
+import { getCharacter, encounterMonster, fightTurn, applyXp, saveCharacter, addItemToInventory, generateRandomItem, getItemInfo, resetCharacter } from './rpg.js';
 import { getBalance } from './economy.js';
 import { getActiveAuctions } from './trading.js';
 import { updateUserStats } from './achievements.js';
 import { wordleWords } from './wordle-data.js';
+import { guessGames } from './game-states.js';
+import { safeInteractionReply } from './interaction-router.js';
 
 async function handleModalSubmit(interaction, client) {
   const custom = interaction.customId || '';
@@ -215,3 +218,5 @@ You have **${attempts - currentAttemptsUsed}** attempts remaining.
     );
   }
 }
+
+export { handleModalSubmit };

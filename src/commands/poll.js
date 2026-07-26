@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } from 'discord.js';
-import { sanitizeInput } from '../validation.js'
 
+import { sanitizeInput } from '../validation.js';
 import { CommandError, handleCommandError } from '../errorHandler.js';
 import { pollGames } from '../game-states.js';
 

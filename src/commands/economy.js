@@ -1,7 +1,9 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 
 import {
-  
+  getBalance,
+  getUserEconomyStats,
+
   addBalance,
   transferBalance,
   createBusiness,
@@ -9,7 +11,7 @@ import {
   getMarketPrice,
   buyFromMarket,
   sellToMarket,
-  
+
   getTransactionHistory,
   getUserBusinesses,
 } from '../economy.js';
@@ -368,7 +370,7 @@ export async function execute(interaction) {
 
           // Simple lottery with 1/1000 chance of winning
           const prizePool = ticketPrice * 10; // 10x return for winners
-          const result = { success: false, reason: "coming_soon" };
+          const result = { success: false, reason: 'coming_soon' };
 
           if (result.success) {
             if (result.isWinner) {
@@ -459,7 +461,7 @@ export async function execute(interaction) {
           break;
         }
         case 'daily': {
-          const result = { success: false, reason: "coming_soon" };
+          const result = { success: false, reason: 'coming_soon' };
 
           if (result.success) {
             const embed = new EmbedBuilder()

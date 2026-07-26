@@ -9,3 +9,4 @@
  */
 
 export { handleInteraction } from './interaction-router.js';
+export { handleButtonInteraction, safeInteractionUpdate } from './button-handlers.js';

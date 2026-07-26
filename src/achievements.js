@@ -115,4 +115,9 @@ export function getAchievementLeaderboard(limit = 10) {
 }
 
 // Backward-compatible singleton API for callers using achievementManager.*
+// Alias for backwards compatibility
+export function updateUserStats(userId, statUpdates) {
+  return updateStats(userId, statUpdates);
+}
+
 export const achievementManager = { updateStats, getUserStats, checkUserAchievements, getAchievementInfo, getAllAchievements, getUserAchievements };
