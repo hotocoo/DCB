@@ -15,7 +15,6 @@ import {
   getTransactionHistory,
   getUserBusinesses,
 } from '../economy.js';
-import { updateStats } from '../achievements.js';
 import { safeExecuteCommand, CommandError, validateRange, validateNotEmpty, validateUser } from '../errorHandler.js';
 
 export const data = new SlashCommandBuilder()

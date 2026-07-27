@@ -69,6 +69,12 @@ export async function claimDaily(userId) {
   data.lastClaim = Date.now();
   db.prepare('INSERT OR REPLACE INTO daily_rewards (user_id, data) VALUES (?, ?)').run(userId, JSON.stringify(data));
 
+  // Track for achievements system
+  try {
+    const { updateUserStats } = await import('./achievements.js');
+    updateUserStats(userId, { daily_claims: nextStreak });
+  } catch (_) { /* ignore */ }
+
   // Apply XP to RPG character if exists
   try {
     const charModule = await import('./rpg.js');
