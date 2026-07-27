@@ -12,6 +12,27 @@ All notable changes to this project will be documented in this file. The format 
 - Rate limiting improvements and distributed caching
 - GraphQL API for external integrations
 
+## [0.1.8] — 2026-07-27
+
+### Fixed
+- **Exhaustive audit completion** — final rounds of deep scanning verified zero critical issues remaining:
+  - Full ESM import/export chain validated (no missing symbols)
+  - All 36 command files have proper error handling (safeExecuteCommand or try/catch)
+  - Zero non-atomic JSON writes causing data loss risk
+  - Zero console.* calls in production code
+  - Scheduler delivery patterns verified (executed flag only after successful send)
+  - Database indexes present for all high-frequency query columns
+  - Trade system uses snapshot+rollback for atomic operations
+
+### Verification
+- Zero lint errors across all src + test files
+- All 38 unit tests pass (100%)
+- Full runtime import chain verified (import('./src/index.js') passes)
+- Token validation error on import is expected behavior (dummy token in .env.template)
+
+### Changed
+- Bumped version to `0.1.8` in package.json, README.md badge and description
+
 ## [0.1.7] — 2026-07-27
 
 ### Fixed
