@@ -51,7 +51,9 @@ class EntertainmentManager {
 
   saveEntertainment() {
     try {
-      fs.writeFileSync(ENTERTAINMENT_FILE, JSON.stringify(this.entertainmentData, null, 2));
+      const tmp = ENTERTAINMENT_FILE + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(this.entertainmentData, null, 2));
+      fs.renameSync(tmp, ENTERTAINMENT_FILE);
     } catch (error) {
       logger.error('Failed to save entertainment data:', error);
     }

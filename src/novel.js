@@ -19,9 +19,12 @@ function readAll() {
     return {};
   }
 }
+// Atomic write: tmp file + rename to prevent data corruption on crash
 function writeAll(obj) {
   ensureDir();
-  fs.writeFileSync(FILE, JSON.stringify(obj, null, 2), 'utf8');
+  const tmp = FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8');
+  fs.renameSync(tmp, FILE);
 }
 
 export function listNovels() {
