@@ -12,6 +12,27 @@ All notable changes to this project will be documented in this file. The format 
 - Rate limiting improvements and distributed caching
 - GraphQL API for external integrations
 
+## [0.1.6] — 2026-07-27
+
+### Fixed
+- **Async error handling gaps** — wrapped async functions without try/catch in proper error handlers:
+  - `src/music.js` setVolume, `src/novel.js` generateChapter now catch and handle errors gracefully
+  - Commands with await but no error boundary: daily.js claimReward/showStatus, guild.js execute, help.js execute, inventory.js updateInventoryEmbed, memory.js execute/sendMemoryBoard/sendBoardEmbed, ping.js execute, roll.js execute, rps.js execute
+  - `src/commands/setmodel.js` wrapped in `safeExecuteCommand` pattern (consistent with all other commands)
+
+- **Data loss on crash — non-atomic JSON writes**:
+  - `src/novel.js` writeAll() now uses tmp file + renameSync for atomic writes
+  - `src/entertainment.js` saveEntertainment() same atomic write fix
+
+### Verification
+- Zero lint errors across all src + test files
+- All 38 unit tests pass (100%)
+- Full runtime import chain verified
+- No remaining console.* calls in production code
+
+### Changed
+- Bumped version to `0.1.6` in package.json, README.md badge and description
+
 ## [0.1.5] — 2026-07-27
 
 ### Fixed
