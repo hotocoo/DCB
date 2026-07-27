@@ -200,10 +200,16 @@ export function buyFromMarket(userId, itemId, quantity = 1) {
 
 /**
  * Sell item to market. Credits balance atomically.
+ * Requires itemId to exist in MARKET_ITEMS configuration.
  */
 export function sellToMarket(userId, itemId, quantity = 1) {
   if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0 || Math.floor(quantity) !== quantity) {
     return { success: false, reason: 'invalid_quantity' };
+  }
+
+  // Only allow selling market-tracked items
+  if (!MARKET_ITEMS[itemId]) {
+    return { success: false, reason: 'item_not_sellable', validItems: Object.keys(MARKET_ITEMS) };
   }
 
   const price = getMarketPrice(itemId);
@@ -211,6 +217,9 @@ export function sellToMarket(userId, itemId, quantity = 1) {
 
   try {
     const db = getDb();
+    ensureUser(userId);
+    // Ensure balance row exists first, then add (same pattern as other mutations)
+    db.prepare("INSERT OR IGNORE INTO balances (user_id, amount) VALUES (?, 0)").run(userId);
     db.prepare("UPDATE balances SET amount = COALESCE(amount, 0) + ? WHERE user_id = ?").run(totalGain, userId);
 
     return {
@@ -337,11 +346,16 @@ export function createInvestment(userId, investmentType, amount) {
   if (!userId || typeof userId !== 'string') return { success: false, reason: 'invalid_user' };
   if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) return { success: false, reason: 'invalid_amount' };
 
-  const types = getInvestmentTypes();
-  const typeKey = Object.keys(types).find((k) => types[k] === investmentType) || investmentType;
-  if (!types[typeKey]) return { success: false, reason: 'invalid_investment_type' };
+  const allTypes = getInvestmentTypes();
+// Accept either the key ('bank') or the name ('Bank Deposit') as input
+let typeKey = investmentType;
+if (!allTypes[typeKey]) {
+  // Try matching against human-readable names
+  typeKey = Object.keys(allTypes).find((k) => allTypes[k].name === investmentType);
+}
+if (!typeKey || !allTypes[typeKey]) return { success: false, reason: 'invalid_investment_type' };
 
-  const typeConfig = types[typeKey];
+const typeConfig = allTypes[typeKey];
   if (amount < typeConfig.minAmount) return { success: false, reason: 'below_minimum_amount', minimum: typeConfig.minAmount };
 
   const currentBalance = getBalance(userId);
@@ -454,9 +468,9 @@ export function resetUserEconomyData(userId) {
 export function getUserEconomyStats(userId) {
   const db = getDb();
   try {
-    const rows = db.prepare(`SELECT SUM(CASE WHEN type='income' THEN amount ELSE 0 END) as income,
-                                     SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) as expenses
-                              FROM transactions WHERE user_id=?`).get(userId);
+    const rows = db.prepare(`SELECT SUM(CASE WHEN type IN ('income','deposit','reward','transfer_in') THEN amount ELSE 0 END) as income,
+                                     SUM(CASE WHEN type IN ('expense','withdrawal','purchase','transfer_out') THEN amount ELSE 0 END) as expenses
+                              FROM economy WHERE user_id=?`).get(userId);
     return { totalIncome: rows?.income || 0, totalExpenses: rows?.expenses || 0 };
-  } catch (err) { logger.error('getUserEconomyStats error', err); return { totalIncome: 0, totalExpenses: 0 }; }
+  } catch (err) { logger.error('getUserEconomyStats error', err instanceof Error ? err : new Error(String(err))); return { totalIncome: 0, totalExpenses: 0 }; }
 }

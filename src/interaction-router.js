@@ -7,6 +7,26 @@ import { wordleWords } from './wordle-data.js';
 import { getCharacter } from './rpg.js';
 import { handleButtonInteraction } from './button-handlers.js';
 import { handleModalSubmit } from './modal-handlers.js';
+import { checkCommandPermission } from './permissions.js';
+
+// Retry wrapper for Discord API calls (handles 5xx + rate-limit backoff)
+async function discordCallWithRetry(fn, maxAttempts = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const status = lastError?.statusCode || 0;
+      const isRetryable = Number.isInteger(status) && status >= 500 && status < 600; // Discord server errors
+      if (!isRetryable && attempt >= maxAttempts) throw lastError;
+      const delay = Math.min(1000 * (2 ** (attempt - 1)) + Math.random() * 500, 8_000);
+      logger.debug(`Discord API retry ${attempt}/${maxAttempts} after ${Math.round(delay)}ms`, { status, attempt });
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastError || new Error('discordCallWithRetry exhausted');
+}
 
 const INTERACTION_RATE_LIMIT = 5;
 const INTERACTION_RATE_WINDOW = 1e4;
@@ -111,7 +131,7 @@ async function safeInteractionReply(interaction, options) {
     }
 
     logger.debug(`Replying to interaction ${interactionId}`, { interactionId });
-    await interaction.reply(options);
+    await discordCallWithRetry(() => interaction.reply(options));
     return true;
   } catch (error) {
     recordErrorAttempt(interactionId);
@@ -136,6 +156,7 @@ async function handleInteraction(interaction, client) {
     validateNotEmpty(interaction.user, 'interaction.user');
     validateUserId(interaction.user.id);
 
+    // Global rate limit check (fails fast before any side effects)
     try {
       await interactionRateLimiter.consume(interaction.user.id);
     } catch (error) {
@@ -159,25 +180,33 @@ async function handleInteraction(interaction, client) {
       });
     }
 
-    setCooldown(interaction.user.id, 'command_global');
+    // Note: global cooldown is set AFTER the command completes (line 211) to avoid blocking slow commands
 
     if (interaction.isModalSubmit()) {
-      await safeExecuteCommand(interaction, () => handleModalSubmit(interaction, client), {
+      await discordCallWithRetry(() => safeExecuteCommand(interaction, () => handleModalSubmit(interaction, client), {
         interactionType: 'modal_submit',
         customId: interaction.customId,
-      });
+      }));
       return;
     }
 
     if (interaction.isButton()) {
-      await safeExecuteCommand(interaction, () => handleButtonInteraction(interaction, client), {
+      await discordCallWithRetry(() => safeExecuteCommand(interaction, () => handleButtonInteraction(interaction, client), {
         interactionType: 'button',
         customId: interaction.customId,
-      });
+      }));
       return;
     }
 
     if (interaction.isChatInputCommand()) {
+      const permCheck = checkCommandPermission(interaction, interaction.commandName);
+      if (!permCheck.allowed) {
+        return await safeInteractionReply(interaction, {
+          content: `🔒 ${permCheck.reason}`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
       const commandCooldown = isOnCooldown(interaction.user.id, interaction.commandName);
       if (commandCooldown.onCooldown) {
         return await safeInteractionReply(interaction, {

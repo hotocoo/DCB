@@ -376,7 +376,7 @@ function migrateModeration() {
       for (const record of data.records[guildId][userId]) {
         insert.run(
           record.id, guildId, userId, record.moderatorId || '',
-          record.type || 'unknown', record.reason || '', record.duration || null, Date.now(),
+          record.type || 'unknown', record.reason || '', record.duration || null, record.startTime || record.created_at || Date.now(),
         );
         count++;
       }
@@ -459,6 +459,7 @@ export function shutdownDatabase() {
 }
 
 // Export convenience wrappers for common operations
+
 export function getBalance(userId) {
   const row = db.prepare("SELECT amount FROM balances WHERE user_id = ?").get(userId);
   return row?.amount || 0;
@@ -469,12 +470,15 @@ export function setBalance(userId, amount) {
   db.prepare("INSERT OR REPLACE INTO balances (user_id, amount) VALUES (?, ?)").run(userId, Math.max(0, Number(amount)));
 }
 
+// Atomic update patterns — avoid TOCTOU by doing arithmetic inside a single SQL statement
 export function addBalance(userId, amount) {
-  const current = getBalance(userId);
-  setBalance(userId, current + Number(amount));
+  ensureUser(userId);
+  db.prepare("INSERT OR IGNORE INTO balances (user_id, amount) VALUES (?, 0)").run(userId);
+  db.prepare("UPDATE balances SET amount = COALESCE(amount, 0) + ? WHERE user_id = ?").run(Number(amount), userId);
 }
 
 export function subtractBalance(userId, amount) {
-  const current = getBalance(userId);
-  setBalance(userId, current - Number(amount));
+  ensureUser(userId);
+  db.prepare("INSERT OR IGNORE INTO balances (user_id, amount) VALUES (?, 0)").run(userId);
+  db.prepare("UPDATE balances SET amount = MAX(0, COALESCE(amount, 0) - ?) WHERE user_id = ?").run(Number(amount), userId);
 }

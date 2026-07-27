@@ -225,15 +225,18 @@ export function getUserModStats(guildId, userId) {
   try {
     const db = getDb();
 
-    const warningsRow = db.prepare(`SELECT COUNT(*) AS c FROM moderation WHERE guild_id = ? AND user_id = ?`).get(guildId, userId);
+    const warningsRow = db.prepare(`SELECT COUNT(*) AS c FROM moderation WHERE guild_id = ? AND user_id = ? AND type IN ('warn','warning')`).get(guildId, userId);
     const kicksRow = db.prepare(`SELECT COUNT(*) AS c FROM moderation WHERE guild_id = ? AND user_id = ? AND type = 'kick'`).get(guildId, userId);
+    const muteRows = db.prepare(`SELECT COUNT(*) AS c FROM moderation WHERE guild_id = ? AND user_id = ? AND type = 'mute'`).get(guildId, userId);
+    const banRows = db.prepare(`SELECT COUNT(*) AS c FROM moderation WHERE guild_id = ? AND user_id = ? AND type = 'ban'`).get(guildId, userId);
+
     const muted = isUserMuted(guildId, userId);
     const banned = isUserBanned(guildId, userId);
 
     const warnings = warningsRow?.c || 0;
     const kicks = kicksRow?.c || 0;
-    const mutes = muted ? 1 : 0;
-    const bans = banned ? 1 : 0;
+    const mutes = muteRows?.c || 0;
+    const bans = banRows?.c || 0;
 
     return {
       warnings,
@@ -241,7 +244,7 @@ export function getUserModStats(guildId, userId) {
       mutes,
       bans,
       total_actions: warnings + kicks + mutes + bans,
-      risk_level: calculateRiskLevel(warnings, kicks, mutes, bans),
+      risk_level: calculateRiskLevel(warnings, kicks, muted ? 1 : 0, banned ? 1 : 0),
     };
   } catch (error) {
     logger.error('Failed to get mod stats', error instanceof Error ? error : new Error(String(error)));
@@ -332,8 +335,8 @@ function cleanup() {
     // Remove expired mutes
     db.prepare(`DELETE FROM active_mutes WHERE expires_at <= ?`).run(now);
 
-    // Trim moderation table to last 1000 records per guild (keep recent history)
-    db.prepare(`DELETE FROM moderation WHERE id NOT IN (SELECT id FROM moderation ORDER BY created_at DESC LIMIT 1000)`).run();
+    // Trim moderation table to last 1000 records PER guild (keep recent history)
+    db.prepare(`DELETE FROM moderation WHERE id NOT IN (SELECT id FROM moderation WHERE guild_id = moderation.guild_id ORDER BY created_at DESC LIMIT 1000)`).run();
 
     // Clean stale cache entries (older than 1 hour)
     for (const [key, messages] of messageCache.entries()) {
