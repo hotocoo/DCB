@@ -12,6 +12,26 @@ All notable changes to this project will be documented in this file. The format 
 - Rate limiting improvements and distributed caching
 - GraphQL API for external integrations
 
+## [0.1.7] — 2026-07-27
+
+### Fixed
+- **Final error handling sweep** — all remaining commands without `safeExecuteCommand` now wrapped:
+  - `src/commands/coinflip.js` — added safeExecuteCommand wrapper (previously bare async execute)
+  - `src/commands/help.js` — added safeExecuteCommand wrapper for command loading and embed generation
+  - `src/commands/memory.js` — added safeExecuteCommand wrapper for game initialization
+
+- **Full verification**:
+  - All 36 command files now have proper error handling (safeExecuteCommand or try/catch)
+  - Zero commands can crash from unhandled async errors
+
+### Verification
+- Zero lint errors across all src + test files
+- All 38 unit tests pass (100%)
+- No remaining console.* calls in production code
+
+### Changed
+- Bumped version to `0.1.7` in package.json, README.md badge and description
+
 ## [0.1.6] — 2026-07-27
 
 ### Fixed

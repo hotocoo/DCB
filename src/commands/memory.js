@@ -1,5 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
+import { safeExecuteCommand } from '../errorHandler.js';
+
 const CARD_EMOJIS = ['🎮', '🎯', '🎲', '🎪', '🎨', '🎭', '🎪', '🎨', '🎭', '🎯', '🎲', '🎮'];
 const DIFFICULTIES = {
   easy: { pairs: 6, timeLimit: 60 },
@@ -19,31 +21,33 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction) {
-  const difficulty = interaction.options.getString('difficulty') || 'easy';
-  // eslint-disable-next-line security/detect-object-injection -- difficulty validated by slash-command choices
-  const config = DIFFICULTIES[difficulty];
+  return safeExecuteCommand(interaction, async () => {
+    const difficulty = interaction.options.getString('difficulty') || 'easy';
+    // eslint-disable-next-line security/detect-object-injection -- difficulty validated by slash-command choices
+    const config = DIFFICULTIES[difficulty];
 
-  // Create shuffled card deck
-  const gameCards = CARD_EMOJIS.slice(0, config.pairs * 2);
-  const shuffledCards = gameCards.sort(() => Math.random() - 0.5);
+    // Create shuffled card deck
+    const gameCards = CARD_EMOJIS.slice(0, config.pairs * 2);
+    const shuffledCards = gameCards.sort(() => Math.random() - 0.5);
 
-  const gameState = {
-    cards: shuffledCards.map((emoji, index) => ({
-      id: index,
-      emoji,
-      isFlipped: false,
-      isMatched: false,
-    })),
-    flippedCards: [],
-    matchedPairs: 0,
-    totalPairs: config.pairs,
-    moves: 0,
-    gameActive: true,
-    difficulty,
-    startTime: Date.now(),
-  };
+    const gameState = {
+      cards: shuffledCards.map((emoji, index) => ({
+        id: index,
+        emoji,
+        isFlipped: false,
+        isMatched: false,
+      })),
+      flippedCards: [],
+      matchedPairs: 0,
+      totalPairs: config.pairs,
+      moves: 0,
+      gameActive: true,
+      difficulty,
+      startTime: Date.now(),
+    };
 
-  await sendMemoryBoard(interaction, gameState);
+    await sendMemoryBoard(interaction, gameState);
+  });
 }
 
 export { sendMemoryBoard, getPerformanceRating };
