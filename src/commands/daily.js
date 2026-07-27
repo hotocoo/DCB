@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+
 import { getDailyState, claimDaily } from '../daily.js';
 
 export const data = new SlashCommandBuilder()
@@ -19,7 +20,7 @@ export async function execute(interaction) {
       case 'status': return await showStatus(interaction, userId);
       case 'leaderboard': return await showLeaderboard(interaction);
     }
-  } catch (err) {
+  } catch (error) {
     try { await interaction.editReply({ content: '❌ Something went wrong.' }); } catch {}
   }
 }
@@ -63,7 +64,7 @@ async function showStatus(i, uid) {
     .setColor(state.claimedToday ? 0x57F287 : 0xFFAA00)
     .setDescription(
       state.claimedToday
-        ? `✅ You've claimed today's reward!`
+        ? '✅ You\'ve claimed today\'s reward!'
         : `⏰ Ready to claim! Your next streak will be **${state.streak + 1}** days.`,
     )
     .addFields(

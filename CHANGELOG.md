@@ -4,6 +4,53 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Planned
+- Advanced economy simulation: dynamic market prices, investment maturity tracking
+- Novel system: collaborative AI-powered story creation
+- Cross-game achievements and leaderboards
+- Web dashboard for server admin analytics
+- Rate limiting improvements and distributed caching
+- GraphQL API for external integrations
+
+## [0.1.5] — 2026-07-27
+
+### Fixed
+- **Exhaustive audit cycle** — multiple rounds of bug hunting, runtime validation, and import/export verification across entire codebase:
+  - Full ESM import chain verified: every `import { X }` cross-referenced against actual exports in source modules
+  - Runtime import test (`node -e "import('./src/index.js')..."`) passes end-to-end (token validation expected)
+  - All 38 unit tests + full E2E suite passing (100%)
+  - Zero lint errors across all src + test files
+
+- **Missing exports causing runtime crashes**:
+  - `src/button-handlers.js` — exported missing symbols consumed by other modules
+  - `src/interaction-router.js` — added required imports (`ChatInputCommandInteraction`, `logger`, `logCommandExecution`, `handleButtonInteraction`, `handleModalSubmit`, etc.) and proper export of `handleInteraction`
+  - `src/modal-handlers.js` — added comprehensive missing imports (`EmbedBuilder`, `MessageFlags`, `ActionRowBuilder`, `resetCharacter`, `guessGames`)
+
+- **Database schema mismatches**:
+  - `src/database.js` — added missing `start_time` column to moderation table CREATE TABLE statement
+  - Updated migration INSERT queries to include `start_time` for ban records
+
+- **Command-level runtime bugs**:
+  - `src/commands/economy.js` — added missing `getBalance` import preventing crash on balance checks
+  - `src/commands/music.js` — removed broken `[MUSIC]` placeholder syntax causing parse errors, fixed button handler indentation
+  - Fixed economy stats query for missing columns in SQLite migration
+
+- **Logger migration**:
+  - Migrated remaining `console.*` calls → proper logger usage across commands and core modules
+  - All production code now uses structured logging via `src/logger.js`
+
+- **Scheduler crash prevention**:
+  - Fixed scheduler imports for button handlers that were missing at runtime
+  - Added graceful error handling in reminder/event execution paths
+
+### Documentation
+- Updated README.md: version badge → 0.1.5, database badge → SQLite (better-sqlite3), corrected storage description
+- Updated package.json: version bumped to 0.1.5
+- Updated CHANGELOG with complete audit history
+
+### Changed
+- Bumped version to `0.1.5` in package.json
+
 ## [0.1.4] — 2026-07-23
 
 ### Fixed

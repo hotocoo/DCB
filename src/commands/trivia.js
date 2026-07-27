@@ -287,7 +287,7 @@ async function sendResults(interaction, gameState) {
       features_tried: 1,
     });
   } catch (error) {
-    console.warn('Failed to update trivia achievements:', error.message);
+    logger.warn('Failed to update trivia achievements', { error: error.message });
   }
 
   const embed = new EmbedBuilder()

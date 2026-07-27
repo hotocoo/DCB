@@ -306,7 +306,7 @@ export async function execute(interaction) {
               `You enter ${location.name}. ${narrative.entry}`,
             );
           } catch (narrativeError) {
-            console.warn('[EXPLORE] AI narrative generation failed, using fallback:', narrativeError.message);
+            logger.warn('[EXPLORE] AI narrative generation failed, using fallback', { error: narrativeError.message });
             locationNarrative = `You enter ${location.name}. ${narrative.entry}`;
           }
 

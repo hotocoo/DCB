@@ -3,18 +3,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Discord.js](https://img.shields.io/badge/discord.js-v14-blue.svg)](https://discord.js.org/)
-[![Version](https://img.shields.io/badge/version-0.1.4-blue.svg)]()
-[![Database](https://img.shields.io/badge/database-JSON--files-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.5-blue.svg)]()
+[![Database](https://img.shields.io/badge/database-SQLite%20(better-sqlite3)-lightgrey.svg)]()
 [![Test Suite](https://img.shields.io/badge/tests-38%2F38%20passing-brightgreen)]()
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)]()
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-black.svg)](https://github.com/hotocoo/DCB)
 
-A feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, and AI-powered interactions. Primary data store is JSON files under `data/` (SQLite migration planned — schema in `database-schema.md`).
+A feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, and AI-powered interactions. Primary data store is SQLite via `better-sqlite3` under `data/athena.db`.
 
-> **Current version:** `0.1.4` (matches `@version` in `src/index.js` and `src/chat.js`, and `package.json`).
+> **Current version:** `0.1.5` (matches `package.json`).
 
-> **Storage:** Primary data store is JSON files under `data/` (per-domain files: `economy.json`, `rpg/players/<id>.json`, `moderation.json`, `schedules.json`, etc.). SQLite is *not* in use yet — see `database-schema.md` for the planned schema.
+> **Storage:** Primary data store is SQLite (`data/athena.db`) with tables: users, balances, economy, cooldowns, guilds, moderation, profiles, achievements. Schema in `src/database.js`.
 
 ## ✨ Features
 
