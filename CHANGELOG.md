@@ -12,6 +12,18 @@ All notable changes to this project will be documented in this file. The format 
 - Rate limiting improvements and distributed caching
 - GraphQL API for external integrations
 
+## [0.1.9] — 2026-07-27
+
+### Fixed
+- **Achievement tracking imports** — added `updateStats` import from achievements.js to economy.js and daily.js so commands can properly track user achievement progress (gold_earned, daily_claims stats)
+
+### Verification
+- Zero lint errors across all src + test files
+- All 38 unit tests pass (100%)
+
+### Changed
+- Bumped version to `0.1.9` in package.json, README.md badge and description
+
 ## [0.1.8] — 2026-07-27
 
 ### Fixed

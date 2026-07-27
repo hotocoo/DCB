@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Discord.js](https://img.shields.io/badge/discord.js-v14-blue.svg)](https://discord.js.org/)
-[![Version](https://img.shields.io/badge/version-0.1.8-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.1.9-blue.svg)]()
 [![Database](https://img.shields.io/badge/database-SQLite%20(better-sqlite3)-lightgrey.svg)]()
 [![Test Suite](https://img.shields.io/badge/tests-38%2F38%20passing-brightgreen)]()
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg)]()
@@ -12,7 +12,7 @@
 
 A feature-rich Discord bot built with Node.js and Discord.js, offering RPG gaming, music playback, economic simulation, moderation tools, and AI-powered interactions. Primary data store is SQLite via `better-sqlite3` under `data/athena.db`.
 
-> **Current version:** `0.1.8` (matches `package.json`).
+> **Current version:** `0.1.9` (matches `package.json`).
 
 > **Storage:** Primary data store is SQLite (`data/athena.db`) with tables: users, balances, economy, cooldowns, guilds, moderation, profiles, achievements. Schema in `src/database.js`.
 

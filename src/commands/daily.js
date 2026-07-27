@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 
 import { getDailyState, claimDaily } from '../daily.js';
+import { updateStats } from '../achievements.js';
 
 export const data = new SlashCommandBuilder()
   .setName('daily')
